@@ -29,13 +29,14 @@ import {
 } from './subsectionHeadings';
 import { buildCampaignRuleBlock } from './campaignRuleText';
 import { buildOperationRuleBlock } from './operationRuleText';
+import { buildPostureRuleBlock } from './postureRuleText';
 
 /**
  * Five-goal list, doctrine, and message guidance for the strategic context block.
  *
  * Purpose: These used to live in the assembler; they are coaching, not computed state.
  * When to use: `buildContextCoaching` in strategic mode.
- * Expected outcome: The goals, the strategy lines, the tools block when a gate holds, the doctrine block, and the message. When `campaignEnabled` is true, the Campaign section follows that block. When `operationsEnabled` is true, the Operations section follows the campaign section, or the context block when the campaign section is absent.
+ * Expected outcome: The goals, the strategy lines, the tools block when a gate holds, the doctrine block, and the message. When `campaignEnabled` is true, the Campaign section follows that block. When `operationsEnabled` is true, the Operations section follows the campaign section, or the context block when the campaign section is absent. When `postureEnabled` is true, the Postures section follows Operations.
  * Exceptions: None.
  */
 export function buildStrategicContextCoaching(gates: CoachingGates): string {
@@ -54,7 +55,8 @@ export function buildStrategicContextCoaching(gates: CoachingGates): string {
 ${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
 ${MESSAGE_BLOCK}`;
   const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock(gates.operationsEnabled === true)}` : message;
-  return gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true)}` : withCampaign;
+  const withOperations = gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true)}` : withCampaign;
+  return gates.postureEnabled === true ? `${withOperations}\n\n${buildPostureRuleBlock()}` : withOperations;
 }
 
 /**

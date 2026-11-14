@@ -3,7 +3,7 @@
  *
  * Purpose: The turn advance and the briefing share one search, including units this tick has already released.
  * When to use: When a slot of either method may still be free, or when the briefing asks for land rows. The caller keeps its own early return when the land mass is missing.
- * Expected outcome: Sea rows first, then air rows, within the menu size. Land rows come first when the caller asked for them. Empty when every open method has no candidate and land was not asked for, the land mass is missing, or the search throws.
+ * Expected outcome: Rows within the menu size, then grouped by the seat's menu order. `overland` with land included is land, sea, air. Empty when every open method has no candidate and land was not asked for, the land mass is missing, or the search throws.
  * Exceptions: A thrown search is logged and returns an empty list.
  */
 
@@ -14,6 +14,8 @@ import { CAMPAIGN_CONTACT_RADIUS } from '../openRouter/campaignRules';
 import { campaignPlanForState, loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import { GAME_SIZE_MULTIPLIER, parseGameSize } from '../../shared/gameSize';
 import type { Operation, OperationCandidate, OperationChoiceMethod, OperationMethod } from '../../shared/operationTypes';
+import type { PostureMenuMethod, PostureSettings } from '../../shared/postureTypes';
+import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import { listAirOperationCandidates } from './airOperationCandidates';
 import { listLandOperationCandidates } from './landOperationCandidates';
 import { buildLiftTerrain } from './liftTerrain';
@@ -31,13 +33,18 @@ import { listSeaOperationCandidates } from './seaOperationCandidates';
  *
  * Purpose: The launch and the menu stop at the same count for that method.
  * When to use: Before searching, and when the stored operations of that method already fill the match.
- * Expected outcome: The method's per-size cap times the match's size multiplier. An unknown size uses the small multiplier.
+ * Expected outcome: The method's per-size cap times the match's size multiplier. Air is also multiplied by `airOperationSlotFactor` when settings are passed. An unknown size uses the small multiplier. Sea is not multiplied.
  * Exceptions: None.
  */
-export function operationSlotsForState(state: GameStateSnapshot, method: OperationMethod): number {
+export function operationSlotsForState(
+  state: GameStateSnapshot,
+  method: OperationMethod,
+  settings?: PostureSettings,
+): number {
   const perSize = method === 'air' ? OPERATION_MAX_AIR_PER_SIZE : OPERATION_MAX_SEA_PER_SIZE;
-  const slots = perSize * GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)];
-  logTrace('operationCandidates operationSlotsForState', { gameSize: state.gameSize ?? null, method, slots });
+  const factor = method === 'air' ? (settings?.airOperationSlotFactor ?? 1) : 1;
+  const slots = perSize * GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)] * factor;
+  logTrace('operationCandidates operationSlotsForState', { gameSize: state.gameSize ?? null, method, slots, factor });
   return slots;
 }
 
@@ -63,16 +70,36 @@ export function operationMenuRows(args: {
 }
 
 /**
+ * Groups menu rows by the posture's method order.
+ *
+ * Purpose: The budget cut stays land, then sea, then air. The seat's posture chooses which group is printed first.
+ * When to use: After `operationMenuRows`, when the caller did not name one objective.
+ * Expected outcome: Rows of the first method, then the next, skipping a method with no row. Order within a method is unchanged.
+ * Exceptions: None.
+ */
+function rowsInMenuOrder(
+  rows: readonly OperationCandidate[],
+  order: readonly PostureMenuMethod[],
+): OperationCandidate[] {
+  return order.flatMap((method) => rows.filter((row) => row.method === method));
+}
+
+/**
  * Whether this method still has a free slot.
  *
  * Purpose: A full sea slot must not skip the air search, and a full air slot must not skip the sea search.
- * When to use: Before each method's search.
+ * When to use: Before each method's search. Pass the seat's posture so an air factor raises the air slot.
  * Expected outcome: True when the stored operations of that method are fewer than its slots.
  * Exceptions: None.
  */
-function methodHasRoom(state: GameStateSnapshot, active: readonly Operation[], method: OperationMethod): boolean {
+function methodHasRoom(
+  state: GameStateSnapshot,
+  active: readonly Operation[],
+  method: OperationMethod,
+  settings: PostureSettings,
+): boolean {
   const running = active.filter((operation) => operation.method === method).length;
-  return running < operationSlotsForState(state, method);
+  return running < operationSlotsForState(state, method, settings);
 }
 
 /**
@@ -99,10 +126,11 @@ export function operationCandidatesForSeat(args: {
     only: args.only?.method ?? null,
   });
   try {
+    const settings = postureSettingsForSeat(args.seatId);
     const onlyLand = args.only?.method === 'land';
     const includeLand = args.includeLand === true && args.only === undefined;
-    const seaOpen = methodHasRoom(args.state, args.active, 'sea');
-    const airOpen = methodHasRoom(args.state, args.active, 'air');
+    const seaOpen = methodHasRoom(args.state, args.active, 'sea', settings);
+    const airOpen = methodHasRoom(args.state, args.active, 'air', settings);
     const searchSea = args.only === undefined ? seaOpen : args.only.method === 'sea' && seaOpen;
     const searchAir = args.only === undefined ? airOpen : args.only.method === 'air' && airOpen;
     if (!searchSea && !searchAir && !includeLand && !onlyLand) {
@@ -152,6 +180,7 @@ export function operationCandidatesForSeat(args: {
           protectedUnitIds,
           hasCampaignPlan: plan !== null,
           onlyObjectiveH3: args.only?.method === 'sea' ? onlyObjectiveH3 : undefined,
+          settings,
         })
       : [];
     const air = searchAir
@@ -166,7 +195,7 @@ export function operationCandidatesForSeat(args: {
         })
       : [];
     if (args.only !== undefined) return args.only.method === 'air' ? air : sea;
-    return operationMenuRows({ land: includeLand ? land : [], sea, air });
+    return rowsInMenuOrder(operationMenuRows({ land: includeLand ? land : [], sea, air }), settings.menuMethodOrder);
   } catch (err) {
     logError('operationCandidates operationCandidatesForSeat failed', { seatId: args.seatId }, err);
     return [];

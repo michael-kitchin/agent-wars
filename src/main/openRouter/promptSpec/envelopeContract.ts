@@ -119,10 +119,19 @@ export interface EnvelopeGates {
    *
    * Contract: Strategic consults with standing orders on. Omitted means false.
    * When to use: Set from the mode and `ordersEnabled`.
-   * Expected outcome: `operations` is last in the field list. A tactical consult never includes it.
+   * Expected outcome: `operations` follows `campaignTarget`. A tactical consult never includes it. `posture` follows it when that gate is on.
    * Exceptions: None.
    */
   readonly includeOperations?: boolean;
+  /**
+   * Whether this consult may declare a posture.
+   *
+   * Contract: The same consults that may launch an operation. Omitted means false.
+   * When to use: Set from the mode and `ordersEnabled`, beside `includeOperations`.
+   * Expected outcome: `posture` is last in the field list. A tactical consult never includes it.
+   * Exceptions: None.
+   */
+  readonly includePosture?: boolean;
 }
 
 /**
@@ -147,6 +156,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'productionOrders',
   'campaignTarget',
   'operations',
+  'posture',
 ] as const;
 
 /**
@@ -220,6 +230,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
     if (field === 'productionOrders') return includeProduction;
     if (field === 'campaignTarget') return gates.coordinateMode !== 'tactical' && gates.includeCampaignTarget === true;
     if (field === 'operations') return gates.coordinateMode !== 'tactical' && gates.includeOperations === true;
+    if (field === 'posture') return gates.coordinateMode !== 'tactical' && gates.includePosture === true;
     return false;
   });
 }

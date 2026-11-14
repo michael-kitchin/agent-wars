@@ -176,6 +176,16 @@ export const SECTION_TITLE_CAMPAIGN_ORDERS = 'Campaign Orders' as const;
 export const SECTION_TITLE_OPERATIONS = 'Active Operations' as const;
 
 /**
+ * Title of the live posture block, without ATX hashes.
+ *
+ * Purpose: The situation message names the seat's posture, when it was set, and what it changes.
+ * When to use: Strategic consults when standing orders are on. It travels in the same string as Active Operations.
+ * Expected outcome: An H1 that the briefing shifts to H2 ahead of Active Operations.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_POSTURE = 'Posture' as const;
+
+/**
  * Title of the landings the commander can choose, without ATX hashes.
  *
  * Purpose: The situation message lists a few achievable operations with their gain, cost, and risk.
@@ -204,6 +214,16 @@ export const SECTION_TITLE_CAMPAIGN = 'Campaign' as const;
  * Exceptions: None.
  */
 export const SECTION_TITLE_OPERATION_RULES = 'Operations' as const;
+
+/**
+ * Title of the posture rules in the system prompt, without ATX hashes.
+ *
+ * Purpose: The cached explanation of the four postures and that the historical names are illustrations.
+ * When to use: Strategic context coaching when standing orders are on and the consult is not a battle.
+ * Expected outcome: An H2 under Strategic Context, after the Operations section.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_POSTURE_RULES = 'Postures' as const;
 
 /**
  * Title of the callback subscription list, without ATX hashes.

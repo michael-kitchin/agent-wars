@@ -463,6 +463,7 @@ const tests = [
   { name: 'parseOrdersResponse explicit_move while embarked auto-debarks', fn: testExplicitMoveWhileEmbarkedAutoDebarks },
   { name: 'parseOrdersResponse campaignTarget keeps a code and drops a non-code', fn: testCampaignTargetCodeOrDropReason },
   { name: 'parseOrdersResponse operations yields commands on strategic and nothing on tactical', fn: testOperationsCommandsOnStrategicOnly },
+  { name: 'parseOrdersResponse posture keeps a known name and drops an unknown one', fn: testPostureNameOrDropReason },
 ];
 
 /**
@@ -501,6 +502,38 @@ function testOperationsCommandsOnStrategicOnly(): void {
   assert.ok(tacticalNamed);
   assert.strictEqual(tacticalNamed!.operationCommands, undefined);
   assert.ok(!(tacticalNamed!.dropReasons ?? []).some((reason) => reason.includes('operations')));
+}
+
+/**
+ * Reads `posture` only when it names one of the four postures.
+ *
+ * Purpose: A mixed-case name is accepted. An unknown name is a drop reason. A tactical reply yields nothing.
+ * When to use: After the envelope parse of `posture`.
+ * Expected outcome: `"Maritime"` is `maritime`. `"rail"` is absent and names the four postures. A tactical reply has no choice and no reason.
+ * Exceptions: None.
+ */
+function testPostureNameOrDropReason(): void {
+  const kept = parseFixture('{"strategy":"hold","orders":[],"posture":"Maritime"}');
+  assert.ok(kept);
+  assert.strictEqual(kept!.postureChoice, 'maritime');
+  const dropped = parseFixture('{"strategy":"hold","orders":[],"posture":"rail"}');
+  assert.ok(dropped);
+  assert.strictEqual(dropped!.postureChoice, undefined);
+  assert.ok(dropped!.dropReasons?.includes('posture dropped: expected one of overland, maritime, strangle, blitz.'));
+  ensureStrategicCoordinateRegistryInitialized();
+  const hexList = minimalState.hexes.map((hex) => hex.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const tactical = parseOrdersResponse(
+    '{"strategy":"hold","orders":[],"posture":"blitz"}',
+    resolveToH3,
+    minimalState,
+    latLngByH3,
+    false,
+    { mode: 'tactical', battleId: 'posture' },
+  );
+  assert.ok(tactical);
+  assert.strictEqual(tactical!.postureChoice, undefined);
+  assert.ok(!(tactical!.dropReasons ?? []).some((reason) => reason.includes('posture')));
 }
 
 function run(): void {

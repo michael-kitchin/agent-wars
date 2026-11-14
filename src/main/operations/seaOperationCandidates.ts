@@ -14,6 +14,7 @@ import { knownCampaignCities } from '../openRouter/campaignTargetSelection';
 import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { getLandStepDistances, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import type { PostureSettings } from '../../shared/postureTypes';
 import { LIFT_OBJECTIVE_CLEAR_RADIUS, liftGroundCap, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
 import type { LiftTerrain } from './liftTerrain';
 import {
@@ -246,6 +247,15 @@ export function listSeaOperationCandidates(args: {
   readonly protectedUnitIds: ReadonlySet<string>;
   readonly hasCampaignPlan: boolean;
   readonly onlyObjectiveH3?: string;
+  /**
+   * The seat's posture settings.
+   *
+   * Contract: Absent leaves the lift cap on the two constants. Present passes `liftGroundShare`.
+   * When to use: `operationCandidatesForSeat` passes the seat's row. Tests omit it.
+   * Expected outcome: A maritime seat may lift half its ground units during a campaign. Other callers are unchanged.
+   * Exceptions: None.
+   */
+  readonly settings?: PostureSettings;
 }): OperationCandidate[] {
   const finish = (candidates: readonly OperationCandidate[]): OperationCandidate[] => {
     logDebug('seaOperationCandidates listSeaOperationCandidates', {
@@ -282,6 +292,7 @@ export function listSeaOperationCandidates(args: {
     groundUnitCount: groundUnits.length,
     committedCount,
     hasCampaignPlan: args.hasCampaignPlan,
+    campaignShare: args.settings?.liftGroundShare,
   });
   if (cap < OPERATION_MIN_GROUND_UNITS) return finish([]);
   const hexSet = new Set(args.state.hexes.map((hex) => hex.h3Index));

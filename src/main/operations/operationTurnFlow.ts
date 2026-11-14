@@ -11,7 +11,8 @@ import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRang
 import type { AiSeatId } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
 import { activeAiSeatIds } from '../../shared/seatRoster';
-import type { Operation } from '../../shared/operationTypes';
+import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import {
   dbGetAll,
@@ -207,9 +208,9 @@ export function buildOperationFacts(args: {
 /**
  * Advances one seat's stored operations and launches into any free slot.
  *
- * Purpose: The seat sees enemy units that fog would hide, so a city is not launched while a defender is standing on it.
+ * Purpose: The seat counts enemy units that fog would hide. It launches only a sea or air row the posture counts as clear, after that row has waited one turn.
  * When to use: Once per active AI seat, after knocked-out seats have been cleared.
- * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until an undefended option has been offered on an earlier turn.
+ * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until a row the posture counts as clear has been offered on an earlier turn. Land rows are not launched.
  * Exceptions: Propagates a database or terrain error. The caller logs it and leaves this seat's previous list in place only when the write has not run.
  */
 export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: KnockoutCoordinates): void {
@@ -258,19 +259,30 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
   }
   let offer = readOperationOffer(configOps, seatId);
   let launchedThisTick = false;
+  const settings = postureSettingsForSeat(seatId);
+  /**
+   * Whether the engine may treat this sea or air row as clear.
+   *
+   * Purpose: The offer clock and the launch share one rule, so a lightly held city can start the clock.
+   * When to use: On the land-free list only. A land row is removed before this runs.
+   * Expected outcome: True when the row is clear, or its defender count is within the posture's maximum. An air row stays true because its clear flag is true.
+   * Exceptions: None.
+   */
+  const engineMayLaunch = (candidate: OperationCandidate): boolean =>
+    candidate.clear || candidate.defenders <= settings.engineLaunchMaxDefenders;
   while (true) {
     const candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds });
     const launchable = candidates.filter((candidate) => candidate.method !== 'land');
     const decision = decideOperationOffer({
       turnNumber: state.turnNumber,
       hasCandidate: launchable.length > 0,
-      hasClear: launchable.some((candidate) => candidate.clear),
+      hasClear: launchable.some(engineMayLaunch),
       offer,
     });
     offer = decision.offer;
     if (decision.consult) seatEvent = true;
     if (!decision.launch || launchedThisTick) break;
-    const candidate = launchable.find((row) => row.clear);
+    const candidate = launchable.find(engineMayLaunch);
     if (candidate === undefined || candidate.method === 'land') break;
     const launched: Operation = {
       id: nextOperationId(seatId, kept, state.turnNumber),

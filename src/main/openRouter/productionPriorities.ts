@@ -9,6 +9,7 @@
 
 import { cellToLatLng } from 'h3-js';
 import { CREDITS_QUEUE_ITEM } from '../../shared/creditsRules';
+import type { PostureSettings } from '../../shared/postureTypes';
 import { buildQueueItemCostFor } from '../../shared/gameRules';
 import { GAME_SIZE_MULTIPLIER, getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { BuildQueueItemType } from '../productionRules';
@@ -80,18 +81,28 @@ function builderFor(
 }
 
 /**
+ * True when this row's queue already holds the item.
+ *
+ * Purpose: A posture that keeps asking for missiles still skips the city that already has one queued.
+ * When to use: The missile loop, and `typeIsQueued`.
+ * Expected outcome: True when any entry's unit type equals `itemType`.
+ * Exceptions: None.
+ */
+function rowQueuesItem(row: ControlledHexQueueSnapshot, itemType: string): boolean {
+  const entries = Array.isArray(row.entries) ? row.entries : [];
+  return entries.some((entry) => String((entry as ProductionQueueEntrySnapshot).unitType ?? '') === itemType);
+}
+
+/**
  * True when any queue entry is that item.
  *
  * Purpose: A type already queued anywhere does not need a priority line.
- * When to use: Missile and naval conditions.
+ * When to use: Missile and naval conditions. The missile condition is skipped when the posture asks for another city.
  * Expected outcome: True when any row's entries include the type.
  * Exceptions: None.
  */
 function typeIsQueued(queues: readonly ControlledHexQueueSnapshot[], itemType: string): boolean {
-  return queues.some((row) => {
-    const entries = Array.isArray(row.entries) ? row.entries : [];
-    return entries.some((entry) => String((entry as ProductionQueueEntrySnapshot).unitType ?? '') === itemType);
-  });
+  return queues.some((row) => rowQueuesItem(row, itemType));
 }
 
 /**
@@ -142,7 +153,7 @@ function ownerName(state: GameStateSnapshot, h3Index: string): string {
  *
  * Purpose: The commander is told which city should build a missile, a ship, or credits, and why.
  * When to use: Once per production briefing, with the same queues the table will show.
- * Expected outcome: Missile, then naval, then credits. Each line is omitted when its condition fails. Labels come from `formatHexLabel`.
+ * Expected outcome: Missile, then naval, then credits. Each line is omitted when its condition fails. Labels come from `formatHexLabel`. Absent `settings` uses the same shares and floors as before.
  * Exceptions: None.
  */
 export function buildProductionPriorityLines(args: {
@@ -151,12 +162,22 @@ export function buildProductionPriorityLines(args: {
   readonly queues: readonly ControlledHexQueueSnapshot[];
   readonly resolveToH3: (lat: number, lng: number) => string | undefined;
   readonly formatHexLabel: (ll: [number, number]) => string;
+  /**
+   * The seat's posture settings.
+   *
+   * Contract: Absent means the naval share, credits floor, and missile gate this function used before postures.
+   * When to use: The production briefing passes the seat's row. Tests omit it.
+   * Expected outcome: Naval share, credits city size, and whether a queued missile still leaves one line.
+   * Exceptions: None.
+   */
+  readonly settings?: PostureSettings;
 }): string[] {
   const counts = getPlayerUnitCountsByType(args.state.units, args.ownSeat);
   const caps = getMaxUnitsPerType(parseGameSize(args.state.gameSize));
   const enemies = enemyInfrastructureHexes(args.state, args.ownSeat);
   const lines: string[] = [];
-  if (counts.missile < caps.missile && !typeIsQueued(args.queues, 'missile')) {
+  const missileEveryCity = args.settings?.missilePriorityEveryCity === true;
+  if (counts.missile < caps.missile && (missileEveryCity || !typeIsQueued(args.queues, 'missile'))) {
     let best: {
       readonly urban: number;
       readonly turns: number;
@@ -167,6 +188,7 @@ export function buildProductionPriorityLines(args: {
       readonly owner: string;
     } | null = null;
     for (const row of args.queues) {
+      if (missileEveryCity && rowQueuesItem(row, 'missile')) continue;
       const builder = builderFor(row, 'missile', args.resolveToH3);
       if (!builder) continue;
       const turns = buildTurns(row, 'missile', builder.urban);
@@ -201,7 +223,8 @@ export function buildProductionPriorityLines(args: {
       lines.push(`- Missile: ${best.builderLabel} can build one in ${turnsWord(best.turns)} and reaches ${best.targetLabel}, a ${best.owner} city with ${best.urban} ${cells}.`);
     }
   }
-  const navalCeiling = Math.ceil(caps.naval * NAVAL_PRIORITY_CAP_SHARE);
+  const navalShare = args.settings?.navalPriorityCapShare ?? NAVAL_PRIORITY_CAP_SHARE;
+  const navalCeiling = Math.ceil(caps.naval * navalShare);
   if (counts.naval < navalCeiling && !typeIsQueued(args.queues, 'naval')) {
     const hexSet = new Set(args.state.hexes.map((hex) => hex.h3Index));
     const terrainByH3 = new Map(args.state.hexes.map((hex) => [hex.h3Index, hex.terrain]));
@@ -228,7 +251,8 @@ export function buildProductionPriorityLines(args: {
     }
   }
   const economy = args.state.mercenaryEconomy;
-  const minUrban = CREDITS_CITY_MIN_URBAN_PER_SIZE * GAME_SIZE_MULTIPLIER[parseGameSize(args.state.gameSize)];
+  const urbanFactor = args.settings?.creditsCityUrbanFactor ?? 1;
+  const minUrban = CREDITS_CITY_MIN_URBAN_PER_SIZE * GAME_SIZE_MULTIPLIER[parseGameSize(args.state.gameSize)] * urbanFactor;
   const creditsNext = args.queues.some((row) => {
     const entries = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
     const next = selectNextQueueEntry(entries);

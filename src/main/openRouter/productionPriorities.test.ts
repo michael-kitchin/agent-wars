@@ -9,7 +9,8 @@ import { cellToLatLng, gridDisk } from 'h3-js';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
-import { buildProductionPriorityLines, NAVAL_PRIORITY_CAP_SHARE } from './productionPriorities';
+import { POSTURE_SETTINGS, type PostureSettings } from '../../shared/postureTypes';
+import { CREDITS_CITY_MIN_URBAN_PER_SIZE, CREDITS_TREASURY_CEILING_TURNS, buildProductionPriorityLines, NAVAL_PRIORITY_CAP_SHARE } from './productionPriorities';
 import type { ControlledHexQueueSnapshot } from './productionQueueSnapshotTypes';
 
 /** Origin reused so `gridDisk` can supply neighbors. */
@@ -132,13 +133,14 @@ function enemies(cities: ReadonlyArray<{ readonly h3: string; readonly urban: nu
  *
  * Purpose: Each case shares the label map and the seat.
  * When to use: The assertions below.
- * Expected outcome: The lines `buildProductionPriorityLines` returns.
+ * Expected outcome: The lines `buildProductionPriorityLines` returns. `settings` is omitted unless the case is checking a posture.
  * Exceptions: None.
  */
 function linesFor(args: {
   readonly state: GameStateSnapshot;
   readonly queues: readonly ControlledHexQueueSnapshot[];
   readonly hexes: readonly string[];
+  readonly settings?: PostureSettings;
 }): string[] {
   const labels = labelsFor(args.hexes);
   return buildProductionPriorityLines({
@@ -147,6 +149,7 @@ function linesFor(args: {
     queues: args.queues,
     resolveToH3: labels.resolveToH3,
     formatHexLabel: labels.formatHexLabel,
+    settings: args.settings,
   });
 }
 
@@ -338,4 +341,121 @@ test('priority lines stay in missile, naval, then credits order', () => {
   assert.match(lines[1]!, /^- Naval: /);
   assert.match(lines[1]!, /1 enemy city is on the coast/);
   assert.match(lines[2]!, /^- Credits: /);
+});
+
+test('maritime still asks for a ship at half the naval cap and stops at the full cap', () => {
+  const ring = neighbors();
+  const builder = ring[0]!;
+  const coastal = ring[1]!;
+  const water = [...gridDisk(coastal, 1)].find((hex) => hex !== coastal && hex !== builder);
+  assert.ok(water);
+  const labels = labelsFor([builder, coastal, water]);
+  const navalCap = getMaxUnitsPerType(parseGameSize('small')).naval;
+  const half = Math.ceil(navalCap * NAVAL_PRIORITY_CAP_SHARE);
+  const navalState = (count: number): GameStateSnapshot => world({
+    ...enemies([{ h3: coastal, urban: 10 }]),
+    hexes: [
+      { h3Index: coastal, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: water, terrain: 'water', terrainKind: 'sea' },
+    ],
+    units: Array.from({ length: count }, (_, index) => ({
+      id: `n${index}`,
+      player: OWN,
+      unitType: 'naval',
+      h3Index: ORIGIN,
+    })),
+  });
+  const queues = [queueRow({ h3: builder, urban: 20, types: ['naval'], center: labels.center })];
+  const atHalf = linesFor({
+    hexes: [builder, coastal, water],
+    queues,
+    state: navalState(half),
+    settings: POSTURE_SETTINGS.maritime,
+  });
+  const atFull = linesFor({
+    hexes: [builder, coastal, water],
+    queues,
+    state: navalState(navalCap),
+    settings: POSTURE_SETTINGS.maritime,
+  });
+  assert.equal(atHalf.some((line) => line.startsWith('- Naval:')), true);
+  assert.equal(atFull.some((line) => line.startsWith('- Naval:')), false);
+});
+
+test('strangle names the next missile city and a larger credits city', () => {
+  const ring = neighbors();
+  const queuedCity = ring[0]!;
+  const openCity = ring[1]!;
+  const target = ring[2]!;
+  const labels = labelsFor([queuedCity, openCity, target]);
+  const economy = { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 };
+  const queues = [
+    queueRow({
+      h3: queuedCity,
+      urban: CREDITS_CITY_MIN_URBAN_PER_SIZE,
+      types: ['missile', 'credits'],
+      center: labels.center,
+      entries: [{ unitType: 'missile', queueIndex: 0 }],
+    }),
+    queueRow({
+      h3: openCity,
+      urban: CREDITS_CITY_MIN_URBAN_PER_SIZE * POSTURE_SETTINGS.strangle.creditsCityUrbanFactor,
+      types: ['missile', 'credits'],
+      center: labels.center,
+    }),
+  ];
+  const base = {
+    hexes: [queuedCity, openCity, target],
+    queues,
+    state: world({
+      ...enemies([{ h3: target, urban: 20 }]),
+      mercenaryEconomy: economy,
+    }),
+  };
+  const leaned = linesFor({ ...base, settings: POSTURE_SETTINGS.strangle });
+  const plain = linesFor(base);
+  const missile = leaned.find((line) => line.startsWith('- Missile:'));
+  assert.ok(missile);
+  assert.match(missile, new RegExp(openCity));
+  assert.doesNotMatch(missile, new RegExp(`Missile: ${queuedCity}`));
+  assert.equal(leaned.filter((line) => line.startsWith('- Missile:')).length, 1);
+  assert.equal(plain.some((line) => line.startsWith('- Missile:')), false);
+  assert.deepEqual(
+    leaned.filter((line) => line.startsWith('- Credits:')),
+    [`- Credits: no city is producing credits. Queue credits in ${openCity}.`],
+  );
+  assert.deepEqual(
+    plain.filter((line) => line.startsWith('- Credits:')),
+    [`- Credits: no city is producing credits. Queue credits in ${queuedCity}.`],
+  );
+  const cap = getMaxUnitsPerType(parseGameSize('small')).missile;
+  const atCap = linesFor({
+    ...base,
+    settings: POSTURE_SETTINGS.strangle,
+    state: world({
+      ...enemies([{ h3: target, urban: 20 }]),
+      mercenaryEconomy: economy,
+      units: Array.from({ length: cap }, (_, index) => ({
+        id: `m${index}`,
+        player: OWN,
+        unitType: 'missile',
+        h3Index: ORIGIN,
+      })),
+    }),
+  });
+  assert.equal(atCap.some((line) => line.startsWith('- Missile:')), false);
+  const defaultCeiling = CREDITS_CITY_MIN_URBAN_PER_SIZE * CREDITS_TREASURY_CEILING_TURNS;
+  const banked = linesFor({
+    hexes: [queuedCity, openCity],
+    queues,
+    settings: POSTURE_SETTINGS.strangle,
+    state: world({ mercenaryEconomy: { ...economy, credits: defaultCeiling } }),
+  });
+  const bankedDefault = linesFor({
+    hexes: [queuedCity, openCity],
+    queues,
+    state: world({ mercenaryEconomy: { ...economy, credits: defaultCeiling } }),
+  });
+  assert.deepEqual(bankedDefault, []);
+  assert.deepEqual(banked, [`- Credits: no city is producing credits. Queue credits in ${openCity}.`]);
 });

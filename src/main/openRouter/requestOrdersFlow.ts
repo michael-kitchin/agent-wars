@@ -432,6 +432,7 @@ export async function requestOrdersFlow(
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
     includeCampaignTarget: !tacticalBattle && flags.ordersEnabled && planState.scenarioId === 'region_vs_region',
     includeOperations: !tacticalBattle && flags.ordersEnabled,
+    includePosture: !tacticalBattle && flags.ordersEnabled,
     includeExitBattle,
   };
   const wallClockStart = Date.now();

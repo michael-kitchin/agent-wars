@@ -8,6 +8,8 @@ import { test } from 'node:test';
 import type { CampaignObjective } from '../../shared/campaignTypes';
 import {
   buildCampaignPlan,
+  CAMPAIGN_ASSAULT_MIN_UNITS,
+  campaignAssaultMinUnitsFor,
   campaignAssaultReady,
   campaignAssaultThreshold,
   campaignOrderFor,
@@ -166,6 +168,9 @@ test('the phase flips at the threshold and falls back below half of it', () => {
   assert.equal(campaignAssaultThreshold(10), 6);
   assert.equal(campaignAssaultThreshold(3), 3);
   assert.equal(campaignAssaultThreshold(0), 1);
+  assert.equal(campaignAssaultThreshold(10, 3), 3);
+  assert.equal(campaignAssaultMinUnitsFor(0.5), 3);
+  assert.equal(campaignAssaultMinUnitsFor(1), CAMPAIGN_ASSAULT_MIN_UNITS);
 });
 
 test('resolve keeps a valid target, retargets a lost one, and keeps a null staging hex', () => {
@@ -400,6 +405,22 @@ test('a home unit left out of the defense still stays in a contact fight', () =>
   assert.deepEqual(plan.defenderUnitIds, ['a1']);
   assert.equal(plan.campaignUnitIds.has('a2'), false);
   assert.equal(plan.campaignUnitIds.has('a3'), true);
+});
+
+test('three massed units are not ready until the threshold is three', () => {
+  const objective: CampaignObjective = {
+    targetH3: '9:0',
+    stagingH3: '5:0',
+    phase: 'assemble',
+    source: 'engine',
+    chosenTurn: 1,
+  };
+  const groundUnitHexes = ['5:0', '4:0', '6:0', '0:20', '1:20', '2:20', '3:20', '4:20'];
+  assert.equal(campaignAssaultReady({ objective, groundUnitHexes, hopDistance: hop }), false);
+  assert.equal(
+    campaignAssaultReady({ objective, groundUnitHexes, hopDistance: hop, assaultMinUnits: 3 }),
+    true,
+  );
 });
 
 test('an assembly is ready once the threshold stands near the staging hex', () => {

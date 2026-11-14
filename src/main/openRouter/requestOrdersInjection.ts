@@ -10,6 +10,7 @@
 
 import { dbGetOne, type GameStateSnapshot } from '../gameDb';
 import { operationNoteTextForTurn, readOperationNote, readOperations } from '../gameDb/operationMemory';
+import { readPosture } from '../gameDb/postureMemory';
 import { logDebug, logTrace } from '../logger';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -19,6 +20,7 @@ import { getInjectionText as getStandingOrderInjectionText } from '../tools/stan
 import { buildProductionBriefing } from './briefingSections';
 import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
+import { buildPostureSection } from './briefingSectionsPosture';
 import { operationCandidatesForSeat } from '../operations/operationCandidates';
 import type { OperationCandidate } from '../../shared/operationTypes';
 import { buildCampaignOrderRows } from '../tools/standingOrdersInjectionText';
@@ -301,7 +303,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
   const operationNote = showOperations
     ? operationNoteTextForTurn(readOperationNote({ getOne: dbGetOne }, seatId), args.state.turnNumber)
     : '';
-  const operationsText = showOperations
+  const operationsBody = showOperations
     ? buildOperationsSection({
         state: args.state,
         operations: activeOperations,
@@ -311,6 +313,17 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         campaignPlan,
       })
     : '';
+  const postureText = showOperations
+    ? buildPostureSection({
+        stored: readPosture({ getOne: dbGetOne }, seatId),
+        turnNumber: args.state.turnNumber,
+      })
+    : '';
+  const operationsText = postureText.length === 0
+    ? operationsBody
+    : operationsBody.length === 0
+      ? postureText
+      : `${postureText}\n\n${operationsBody}`;
   const campaignAttention =
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
       ? formatCampaignAttentionBullet(

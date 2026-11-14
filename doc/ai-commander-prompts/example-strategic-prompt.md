@@ -165,6 +165,17 @@ Units and ships in an operation already have their orders. Leave them alone and 
 
 A unit aboard a ship takes no order. An explicit_move or a disembark unloads it where the ship is.
 
+## Postures
+
+Your posture is what you put your effort into. The engine remembers it and leans production, operations, and the campaign the same way until you change it. Set it with "posture" in your reply. It holds for 6 turns before it can change. If you never set one you are on overland.
+
+- overland: mass your ground units and march. Land options come first. Like the Soviet summer offensive of 1944: mass, then break through.
+- maritime: build ships to your full cap and lift up to half your ground units. Sea and air options come first. Like the Pacific island-hopping campaign: land where the enemy is weak and bypass where it is strong.
+- strangle: keep queuing a missile in a city that reaches an enemy city until you are at the missile cap, bank more credits, and strike city, airport, and seaport cells before units. Like the Combined Bomber Offensive and the Battle of the Atlantic: destroy what builds and moves the enemy's force.
+- blitz: assault with half the usual mass, run twice the air operations, and let the engine launch against a lightly held objective. Like the 1940 campaign in France: strike before the enemy has massed, and accept thin odds for speed.
+
+The historical names are illustrations of an idea. Decide from the map and the tables in front of you, not from how those campaigns went.
+
 # Reading the Briefing
 
 ## Distances and Intel Age
@@ -355,6 +366,8 @@ Legal events and their parameters: turns (n: fires after n turns have passed sin
 Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.
 
 Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To launch against a city that is not listed, add {"action":"launch","objective":"<hex code>","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".
+
+Optional "posture": one of overland, maritime, strangle, blitz. Omit it to keep your posture. A posture holds for 6 turns before it can change; the Posture section of the briefing says when.
 
 Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools). Memory write keys are at most 64 characters and may contain only letters, digits, hyphen, and underscore; content is at most 500 characters.
 
@@ -610,6 +623,11 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 - Target: LP, a South America city with 8 city cells and no known fortifications. The engine chose it on turn 38.
 - Staging hex: G5.
 - Phase: assemble. 0 of 6 ground units are within 2 hexes of G5. The assault starts when 6 are.
+
+## Posture
+
+- Posture: overland, the default. You may set another at any time.
+- Effect: Land options are listed first, and the engine launches only against undefended objectives.
 
 ## Active Operations
 

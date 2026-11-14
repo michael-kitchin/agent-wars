@@ -62,9 +62,11 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `MARCH_CURRENT_HEX_RULE` | both mode files | Legal actions; invalid-output rules; strategic coaching item 5 |
 | `AIR_ORDER_RESTRICTIONS` | both mode files | Air operations status; legal actions |
 | `EMBARK_LEGALITY` | both mode files | Naval transport status |
+| `POSTURE` | [`strategic-prompt.md`](strategic-prompt.md) | Posture |
 | `ACTIVE_OPERATIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Active Operations |
 | `OPERATION_OPTIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Operation Options |
 | `OPERATION_RULES` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic Context, `## Operations` |
+| `POSTURE_RULES` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic Context, `## Postures` |
 | `PRODUCTION_QUEUES` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_RULES_COSTS` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_CAPS` | [`variants.md`](variants.md) | Game size and large rosters |
@@ -128,9 +130,11 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |
 | `## Reminders Triggered This Turn` | Kept — 1.6 |
 | `## Standing Order Status` | Kept — 1.6 |
-| `## Active Operations` | Added. The land campaign is the first bullet when a plan exists, then one bullet per stored operation, sea or air, after Campaign Objective, when standing orders are on and the consult is not a battle. A refusal from the previous turn is `- Last turn:` before the bullets. The heading also stays when a campaign plan exists, or when Operation Options has a row and no operation is stored. Omitted when the seat has neither a campaign plan, an operation, a row, nor a note. |
-| `## Operation Options` | Added. A table of up to five letters, land rows first when the match has a campaign, then sea rows, and air rows in the reserved places, after Active Operations when that section is present, when standing orders are on, the consult is not a battle, and a candidate exists. The engine's list stays sea, then air. A land row does not open the offer. An air row counts as clear. It still prints when no operation is stored. A full sea slot does not omit an air row. |
+| `## Posture` | Added. Prepended to the Active Operations string when standing orders are on and the consult is not a battle. A missing row says the seat is on `overland`. Omitted when orders are off or the consult is a battle. |
+| `## Active Operations` | Added. The land campaign is the first bullet when a plan exists, then one bullet per stored operation, sea or air, after Posture when that section is present, when standing orders are on and the consult is not a battle. A refusal from the previous turn is `- Last turn:` before the bullets. The heading also stays when a campaign plan exists, or when Operation Options has a row and no operation is stored. Omitted when the seat has neither a campaign plan, an operation, a row, nor a note. |
+| `## Operation Options` | Added. A table of up to five letters. The budget cut is land rows first when the match has a campaign, then sea rows, and air rows in the reserved places. The printed order follows the posture. On `overland` that is land, sea, air. The engine's list omits land and keeps that order, so `overland` is sea, then air, and `blitz` is air, then sea. A land row does not open the offer. An air row counts as clear. It still prints when no operation is stored. A full sea slot does not omit an air row. |
 | `## Operations` | Added under `# Strategic Context`, after `## Campaign` when that block is present, when standing orders are on and the consult is not a battle. The command paragraph names the letter launch, the named city and method, the cancel, and the engine's one-turn window. |
+| `## Postures` | Added under `# Strategic Context`, after `## Operations`, on the same gate. It names the four postures, the six-turn hold, and that the historical names are illustrations. |
 | `## Units Without Standing Orders` | Kept — 1.6 |
 | `## Active Callbacks` | Kept, with a detail-cell contract — 1.6 |
 | `# Scenario Objective (Required)` | Kept — 1.7 |

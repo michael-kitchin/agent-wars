@@ -25,6 +25,7 @@ import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from '.
 import { findIdleProductionHexes, selectNextQueueEntry, type IdleProductionHex } from './productionAttention';
 import { findPausedProductionHexes, formatPausedQueuesSection, type PausedProductionHex } from './pausedProductionAttention';
 import { buildProductionPriorityLines } from './productionPriorities';
+import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
@@ -338,6 +339,7 @@ export function buildProductionBriefing(args: {
     queues: queues as ControlledHexQueueSnapshot[],
     resolveToH3: args.resolveToH3,
     formatHexLabel: args.formatHexLabel,
+    settings: postureSettingsForSeat(ownSeat),
   });
   if (priorityLines.length > 0) {
     lines.push('');

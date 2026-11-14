@@ -1,4 +1,5 @@
 import { logDebug } from '../logger';
+import { POSTURE_MIN_HOLD_TURNS, POSTURES } from '../../shared/postureTypes';
 import {
   EXAMPLE_CALLBACKS,
   EXAMPLE_MEMORY_UPDATES,
@@ -136,6 +137,15 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   includeOperations?: boolean;
+  /**
+   * When true, the contract names optional `posture` after `operations`.
+   *
+   * Contract: Omitted means false. True on the same consults that include operations.
+   * When to use: Pass from `buildConsultPromptParts` beside `includeOperations`.
+   * Expected outcome: The header and one paragraph name the field. The example omits it.
+   * Exceptions: None.
+   */
+  includePosture?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -168,6 +178,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeExitBattle = false,
     includeCampaignTarget = false,
     includeOperations = false,
+    includePosture = false,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -184,6 +195,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeExitBattle,
     includeCampaignTarget,
     includeOperations,
+    includePosture,
     coordinateMode,
     structuredOutputs,
   });
@@ -198,6 +210,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeNavalActions,
     includeCampaignTarget: coordinateMode !== 'tactical' && includeCampaignTarget,
     includeOperations: coordinateMode !== 'tactical' && includeOperations,
+    includePosture: coordinateMode !== 'tactical' && includePosture,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
@@ -214,6 +227,7 @@ export function buildFinalJsonContractInstruction(args: {
     productionOrders: '"productionOrders": [...]',
     campaignTarget: '"campaignTarget": "<optional hex code>"',
     operations: '"operations": [...]',
+    posture: '"posture": "<optional posture>"',
   };
   const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
     .map((field) => headerSlots[field])
@@ -257,6 +271,10 @@ export function buildFinalJsonContractInstruction(args: {
     gates.includeOperations === true
       ? 'Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To launch against a city that is not listed, add {"action":"launch","objective":"<hex code>","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".'
       : '';
+  const postureParagraph =
+    gates.includePosture === true
+      ? `Optional "posture": one of ${POSTURES.join(', ')}. Omit it to keep your posture. A posture holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change; the Posture section of the briefing says when.`
+      : '';
   const paragraphs = [
     ...(structuredOutputs ? [] : [submitHeader]),
     ...(structuredOutputs ? strictSchemaParagraphs.slice(1) : strictSchemaParagraphs),
@@ -268,6 +286,7 @@ export function buildFinalJsonContractInstruction(args: {
     ...callbacksClause.split('\n\n'),
     campaignParagraph,
     operationsParagraph,
+    postureParagraph,
     memoryParagraph,
     ...productionClause.split('\n\n'),
   ].map((part) => part.trim()).filter((part) => part.length > 0);

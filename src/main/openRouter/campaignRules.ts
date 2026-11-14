@@ -222,13 +222,27 @@ function anyWithinHops(fromH3: string, targets: readonly string[], radius: numbe
  *
  * Purpose: The threshold is the smaller of the constant and the force, and at least one.
  * When to use: The phase flip and the ready check.
- * Expected outcome: `min(CAMPAIGN_ASSAULT_MIN_UNITS, groundUnitCount)`, or 1 when the force is empty.
+ * Expected outcome: `min(minUnits, groundUnitCount)`, or 1 when the force is empty. Absent `minUnits` uses `CAMPAIGN_ASSAULT_MIN_UNITS`.
  * Exceptions: None.
  */
-export function campaignAssaultThreshold(groundUnitCount: number): number {
-  const threshold = Math.max(1, Math.min(CAMPAIGN_ASSAULT_MIN_UNITS, groundUnitCount));
-  logTrace('campaignRules campaignAssaultThreshold', { groundUnitCount, threshold });
+export function campaignAssaultThreshold(groundUnitCount: number, minUnits: number = CAMPAIGN_ASSAULT_MIN_UNITS): number {
+  const threshold = Math.max(1, Math.min(minUnits, groundUnitCount));
+  logTrace('campaignRules campaignAssaultThreshold', { groundUnitCount, minUnits, threshold });
   return threshold;
+}
+
+/**
+ * How many units a posture requires before the assault.
+ *
+ * Purpose: The campaign keeps one threshold function. A posture supplies the factor.
+ * When to use: Pass `campaignAssaultFactor` from the seat's settings. Callers that pass nothing to `campaignAssaultThreshold` do not call this.
+ * Expected outcome: At least 1. A factor of 1 is `CAMPAIGN_ASSAULT_MIN_UNITS`. A factor of 0.5 is 3.
+ * Exceptions: None.
+ */
+export function campaignAssaultMinUnitsFor(factor: number): number {
+  const minUnits = Math.max(1, Math.ceil(CAMPAIGN_ASSAULT_MIN_UNITS * factor));
+  logTrace('campaignRules campaignAssaultMinUnitsFor', { factor, minUnits });
+  return minUnits;
 }
 
 /**
@@ -386,6 +400,7 @@ export function resolveCampaignObjective(args: {
   readonly landStepsFromTarget: (targetH3: string) => ReadonlyMap<string, number>;
   readonly groundUnitHexes: readonly string[];
   readonly hopDistance: HopDistance;
+  readonly assaultMinUnits?: number;
 }): CampaignObjective | null {
   if (args.groundUnitHexes.length === 0) {
     logDebug('campaignRules resolveCampaignObjective', { storedTarget: args.stored?.targetH3 ?? null, target: null, steps: null, phase: null });
@@ -433,7 +448,7 @@ export function resolveCampaignObjective(args: {
       phase: stored.phase,
       stagingH3,
       massedCount: countMassedUnits(args.groundUnitHexes, campaignMassCenters(withStaging), args.hopDistance),
-      threshold: campaignAssaultThreshold(args.groundUnitHexes.length),
+      threshold: campaignAssaultThreshold(args.groundUnitHexes.length, args.assaultMinUnits),
     });
     objective = { ...withStaging, phase };
   }
@@ -458,6 +473,7 @@ export function campaignAssaultReady(args: {
   readonly objective: CampaignObjective;
   readonly groundUnitHexes: readonly string[];
   readonly hopDistance: HopDistance;
+  readonly assaultMinUnits?: number;
 }): boolean {
   const { objective } = args;
   if (objective.phase !== 'assemble' || objective.stagingH3 === null || args.groundUnitHexes.length === 0) {
@@ -465,7 +481,7 @@ export function campaignAssaultReady(args: {
     return false;
   }
   const massed = countMassedUnits(args.groundUnitHexes, [objective.stagingH3], args.hopDistance);
-  const ready = massed >= campaignAssaultThreshold(args.groundUnitHexes.length);
+  const ready = massed >= campaignAssaultThreshold(args.groundUnitHexes.length, args.assaultMinUnits);
   logTrace('campaignRules campaignAssaultReady', { ready, massed, phase: objective.phase });
   return ready;
 }
@@ -486,6 +502,7 @@ export function buildCampaignPlan(args: {
   readonly enemyGroundUnitHexes: readonly string[];
   readonly landStepsFromWaypoint: ReadonlyMap<string, number>;
   readonly hopDistance: HopDistance;
+  readonly assaultMinUnits?: number;
 }): CampaignPlan {
   const waypointH3 = campaignWaypoint(args.objective);
   const assembling = args.objective.phase === 'assemble' && args.objective.stagingH3 !== null;
@@ -517,7 +534,7 @@ export function buildCampaignPlan(args: {
     homeThreatCount: homeDefense.threatCount,
     homeDefenseCapped: homeDefense.homeDefenseCapped,
     massedCount: countMassedUnits(unitHexes, campaignMassCenters(args.objective), args.hopDistance),
-    threshold: campaignAssaultThreshold(unitHexes.length),
+    threshold: campaignAssaultThreshold(unitHexes.length, args.assaultMinUnits),
   };
   logTrace('campaignRules buildCampaignPlan', {
     waypointH3,

@@ -182,6 +182,15 @@ export interface CoachingGates {
    */
   readonly operationsEnabled?: boolean;
   /**
+   * Whether this consult teaches postures.
+   *
+   * Contract: The same consults that teach operations. Omitted means false.
+   * When to use: Set beside `operationsEnabled`.
+   * Expected outcome: True appends the Postures section after the Operations section.
+   * Exceptions: None.
+   */
+  readonly postureEnabled?: boolean;
+  /**
    * Whether the consulted seat owns a missile outside battle.
    *
    * Contract: Omitted means false. Tactical consultations leave it false.

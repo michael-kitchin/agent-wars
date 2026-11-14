@@ -10,6 +10,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
+import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import { operationUnitIdsForSeat } from '../gameDb/operationMemory';
 import { briefingOwnSeatId, ownHomeHexes } from '../briefing/briefingPerspective';
 import { getLandStepDistances, landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalStrategic';
@@ -21,6 +22,7 @@ import { logDebug, logError, logTrace } from '../logger';
 import {
   CAMPAIGN_REACH_LIMIT_STEPS,
   buildCampaignPlan,
+  campaignAssaultMinUnitsFor,
   campaignWaypoint,
   resolveCampaignObjective,
   type CampaignPlan,
@@ -232,6 +234,7 @@ export function resolveCampaignObjectiveForSeat(state: GameStateSnapshot): Campa
     return null;
   }
   const seatId = briefingOwnSeatId(state);
+  const assaultMinUnits = campaignAssaultMinUnitsFor(postureSettingsForSeat(seatId).campaignAssaultFactor);
   const landMass = loadCampaignLandMass(seatId);
   if (landMass === null) return null;
   const inputs = campaignInputsFromState(state, landMass);
@@ -247,6 +250,7 @@ export function resolveCampaignObjectiveForSeat(state: GameStateSnapshot): Campa
     landStepsFromTarget: (targetH3) => campaignLandSteps(inputs, landMass, [targetH3]),
     groundUnitHexes,
     hopDistance: computeGridDistanceWithPathFallbackPure,
+    assaultMinUnits,
   });
   writeCampaignObjectiveForSeat(ops, seatId, next);
   logDebug('campaignObjectiveFlow resolveCampaignObjectiveForSeat', {
@@ -278,6 +282,7 @@ export function campaignPlanForState(state: GameStateSnapshot): CampaignPlan | n
     return null;
   }
   const seatId = briefingOwnSeatId(state);
+  const assaultMinUnits = campaignAssaultMinUnitsFor(postureSettingsForSeat(seatId).campaignAssaultFactor);
   const objective = readCampaignObjectives({ getOne: dbGetOne }).get(seatId) ?? null;
   if (objective === null) return null;
   const landMass = loadCampaignLandMass(seatId);
@@ -292,6 +297,7 @@ export function campaignPlanForState(state: GameStateSnapshot): CampaignPlan | n
     enemyGroundUnitHexes: inputs.enemyGroundUnitHexes,
     landStepsFromWaypoint: campaignLandSteps(inputs, landMass, [campaignWaypoint(objective)]),
     hopDistance: computeGridDistanceWithPathFallbackPure,
+    assaultMinUnits,
   });
   logDebug('campaignObjectiveFlow campaignPlanForState', {
     seatId,

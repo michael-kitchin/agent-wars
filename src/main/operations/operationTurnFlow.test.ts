@@ -15,6 +15,7 @@ import { canLandUnitTraverseEdge, getLandStepDistances, STRATEGIC_LAND_MAX_WATER
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot } from '../gameDb';
 import { readOperationEventTurn, readOperationNote, readOperationOffer, readOperations, writeOperationEventTurn, writeOperationNote, writeOperationOffer } from '../gameDb/operationMemory';
+import { writePosture } from '../gameDb/postureMemory';
 import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import type { LatLng } from '../tools/h3LatLng';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -216,5 +217,24 @@ test('a defender hidden by fog still blocks the launch', () => {
     setTurn(8);
     advanceOperationsForSeat(SEAT, coordinates());
     assert.equal((readOperations({ getOne: dbGetOne }).get(SEAT) ?? []).length, 1);
+  });
+});
+
+test('blitz records one defender and launches that sea city on the next turn', () => {
+  withTempGameDb('aw-operation-turn-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass, true);
+    writePosture({ getOne: dbGetOne, run: dbRun }, SEAT, { posture: 'blitz', sinceTurn: 1 });
+    setTurn(5);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+    assert.equal(readOperationOffer({ getOne: dbGetOne }, SEAT).clearOfferTurn, 5);
+    setTurn(6);
+    advanceOperationsForSeat(SEAT, coordinates());
+    const launched = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(launched.length, 1);
+    assert.equal(launched[0]?.method, 'sea');
+    assert.equal(launched[0]?.objectiveH3, city);
   });
 });

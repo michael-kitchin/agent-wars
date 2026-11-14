@@ -35,6 +35,8 @@ test('liftGroundCap follows the campaign share and never goes negative', () => {
   assert.equal(liftGroundCap({ groundUnitCount: 8, committedCount: 0, hasCampaignPlan: false }), 4);
   assert.equal(liftGroundCap({ groundUnitCount: 3, committedCount: 0, hasCampaignPlan: true }), 0);
   assert.equal(liftGroundCap({ groundUnitCount: 4, committedCount: 10, hasCampaignPlan: false }), 0);
+  assert.equal(liftGroundCap({ groundUnitCount: 8, committedCount: 0, hasCampaignPlan: true, campaignShare: 0.5 }), 4);
+  assert.equal(liftGroundCap({ groundUnitCount: 8, committedCount: 0, hasCampaignPlan: false, campaignShare: 0.25 }), 4);
 });
 
 test('rankLiftCities orders by size then hex id and does not change the input', () => {

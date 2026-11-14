@@ -16,6 +16,7 @@ import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
 import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
 import { normalizeOperationCommands, type OperationCommand } from './operationCommandParsing';
+import { POSTURES, isPosture, type Posture } from '../../shared/postureTypes';
 import { normalizeAirDropOrders } from './airDropOrderRows';
 import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
 /**
@@ -576,6 +577,15 @@ export function parseOrdersResponse(
    * Exceptions: None.
    */
   operationCommands?: readonly OperationCommand[];
+  /**
+   * Posture the commander declared.
+   *
+   * Contract: A member of `POSTURES`. Absent for a tactical reply, an omitted field, and a name that is not a posture.
+   * When to use: `applyPostureChoice` after operation commands.
+   * Expected outcome: The lowercased name. A present bad name adds a drop reason and leaves this absent.
+   * Exceptions: None.
+   */
+  postureChoice?: Posture;
   productionAppliedCount?: number;
   /**
    * Units whose standing order this response assigned or cancelled.
@@ -722,6 +732,14 @@ export function parseOrdersResponse(
         if (rawCampaignTarget !== undefined && campaignTargetCode === undefined) {
           dropReasons.push('campaignTarget dropped: expected one two-character hex code.');
         }
+        const rawPosture = obj.posture;
+        const postureChoice =
+          context.mode !== 'tactical' && typeof rawPosture === 'string' && isPosture(rawPosture.trim().toLowerCase())
+            ? (rawPosture.trim().toLowerCase() as Posture)
+            : undefined;
+        if (context.mode !== 'tactical' && rawPosture !== undefined && postureChoice === undefined) {
+          dropReasons.push(`posture dropped: expected one of ${POSTURES.join(', ')}.`);
+        }
         return {
           movementOrders,
           rangedAttacks,
@@ -737,6 +755,7 @@ export function parseOrdersResponse(
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           campaignTargetCode,
           operationCommands: operationCommands.commands.length > 0 ? operationCommands.commands : undefined,
+          postureChoice,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
           standingOrderUnitIds: standingOrderUnitIds.length > 0 ? standingOrderUnitIds : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

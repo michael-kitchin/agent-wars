@@ -20,6 +20,7 @@ import type { AiSeatId } from '../../shared/seatIds';
 import type { OperationCandidate } from '../../shared/operationTypes';
 import { writeOperationRefusal } from '../gameDb/operationMemory';
 import { applyOperationCommands } from '../operations/operationCommands';
+import { applyPostureChoice } from '../operations/postureChoice';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
 import { applyCampaignTargetOverride } from './campaignTargetOverride';
@@ -294,6 +295,14 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   if (!tacticalBattle && ordersEnabled && parsed.operationCommands) {
     const operationResult = applyOperationCommands({ state: planState, seatId, commands: parsed.operationCommands, coordinates: { latLngByH3, resolveToH3 }, candidates: offeredCandidates });
     dropReasons.push(...operationResult.dropReasons);
+  }
+  if (!tacticalBattle && ordersEnabled && parsed.postureChoice) {
+    const postureResult = applyPostureChoice({
+      seatId,
+      posture: parsed.postureChoice,
+      turnNumber: planState.turnNumber,
+    });
+    dropReasons.push(...postureResult.dropReasons);
   }
   if (!tacticalBattle && ordersEnabled) {
     writeOperationRefusal({ getOne: dbGetOne, run: dbRun }, seatId, planState.turnNumber, dropReasons);

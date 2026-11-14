@@ -666,6 +666,10 @@ const tests = [
     name: 'operations paragraph appears only when the operations gate is on',
     fn: testOperationsParagraphFollowsTheGate,
   },
+  {
+    name: 'posture paragraph appears only when the posture gate is on',
+    fn: testPostureParagraphFollowsTheGate,
+  },
 ];
 
 /**
@@ -734,6 +738,32 @@ function testOperationsParagraphFollowsTheGate(): void {
   assert.ok(!disabled.includes('Optional "operations"'));
   const tactical = buildFinalJsonContractInstruction({ ...shared, includeOperations: true, coordinateMode: 'tactical' });
   assert.ok(!tactical.includes('Optional "operations"'));
+}
+
+/**
+ * The posture paragraph is taught only when that gate is on.
+ *
+ * Purpose: A battle prompt and an orders-off prompt must not teach a posture.
+ * When to use: After edits to `buildFinalJsonContractInstruction`.
+ * Expected outcome: The paragraph and the header slot appear together, and neither appears when the gate is off or the mode is tactical.
+ * Exceptions: None.
+ */
+function testPostureParagraphFollowsTheGate(): void {
+  const shared = {
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: 'Move.',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  };
+  const enabled = buildFinalJsonContractInstruction({ ...shared, includePosture: true });
+  assert.ok(enabled.includes('Optional "posture": one of overland, maritime, strangle, blitz.'));
+  assert.ok(enabled.includes('A posture holds for 6 turns'));
+  assert.ok(enabled.includes('"posture": "<optional posture>"'));
+  const disabled = buildFinalJsonContractInstruction(shared);
+  assert.ok(!disabled.includes('Optional "posture"'));
+  const tactical = buildFinalJsonContractInstruction({ ...shared, includePosture: true, coordinateMode: 'tactical' });
+  assert.ok(!tactical.includes('Optional "posture"'));
 }
 
 function run(): void {

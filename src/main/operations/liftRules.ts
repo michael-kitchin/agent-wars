@@ -105,15 +105,26 @@ function compareIds(left: string, right: string): number {
  *
  * Purpose: The share is of the whole ground force. Units already committed are subtracted by the caller.
  * When to use: Pass every infantry and armor unit of the seat, aboard or not, as `groundUnitCount`.
- * Expected outcome: `floor(groundUnitCount * share) - committedCount`, and never below zero. `committedCount` is a count of distinct units the caller already committed. This function does not merge those sets.
+ * Expected outcome: `floor(groundUnitCount * share) - committedCount`, and never below zero. `committedCount` is a count of distinct units the caller already committed. This function does not merge those sets. Absent `campaignShare` keeps the two constants.
  * Exceptions: None.
  */
 export function liftGroundCap(args: {
   readonly groundUnitCount: number;
   readonly committedCount: number;
   readonly hasCampaignPlan: boolean;
+  /**
+   * Share to use while a campaign plan exists.
+   *
+   * Contract: Absent means `LIFT_MAX_GROUND_SHARE`. Without a campaign, the share is at least `LIFT_MAX_GROUND_SHARE_NO_CAMPAIGN`.
+   * When to use: A posture passes `liftGroundShare`. Other callers omit it.
+   * Expected outcome: A campaign uses this share. A match with no campaign stays on the no-campaign cap unless this share is larger.
+   * Exceptions: None.
+   */
+  readonly campaignShare?: number;
 }): number {
-  const share = args.hasCampaignPlan ? LIFT_MAX_GROUND_SHARE : LIFT_MAX_GROUND_SHARE_NO_CAMPAIGN;
+  const withCampaign = args.campaignShare ?? LIFT_MAX_GROUND_SHARE;
+  const withoutCampaign = Math.max(LIFT_MAX_GROUND_SHARE_NO_CAMPAIGN, args.campaignShare ?? LIFT_MAX_GROUND_SHARE_NO_CAMPAIGN);
+  const share = args.hasCampaignPlan ? withCampaign : withoutCampaign;
   const remaining = Math.max(0, Math.floor(args.groundUnitCount * share) - args.committedCount);
   logTrace('liftRules liftGroundCap', {
     groundUnitCount: args.groundUnitCount,

@@ -24,6 +24,7 @@ import { applyCampaignTargetH3 } from '../openRouter/campaignTargetOverride';
 import type { OperationCommand } from '../openRouter/operationCommandParsing';
 import { CAMPAIGN_OPERATION_ID, type Operation, type OperationCandidate, type OperationChoiceMethod } from '../../shared/operationTypes';
 import { applyOperationActions } from './operationActions';
+import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import { operationCandidatesForSeat, operationSlotsForState } from './operationCandidates';
 import { OPERATION_OPTION_LETTERS } from './operationRules';
 import { listKnownEnemyCities } from './seaOperationCandidates';
@@ -316,7 +317,7 @@ function resolveNamedLaunch(args: {
     return { operation: null, dropReasons: [`operations launch dropped: ${args.objective} is not a known enemy city.`] };
   }
   const running = args.operations.filter((operation) => operation.method === args.method).length;
-  if (running >= operationSlotsForState(args.state, args.method)) {
+  if (running >= operationSlotsForState(args.state, args.method, postureSettingsForSeat(args.seatId))) {
     return { operation: null, dropReasons: [`operations launch dropped: you already have as many ${args.method} operations as you can run.`] };
   }
   if (args.method === 'air' && airObjectiveBlocked(args.state, args.seatId, objectiveH3, city.knownFortifiedCount)) {

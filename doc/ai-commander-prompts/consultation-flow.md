@@ -14,7 +14,7 @@ Roles in order for a normal consultation:
 4. Zero or more rounds of: `assistant` carrying tool calls, then one `tool` message per call, section 3.
 5. `assistant` — the response envelope as text. One captured strategic reply is in [`example-strategic-response.md`](example-strategic-response.md).
 
-An event-driven policy also starts this conversation when `operationUpdateOverride` appends `operation_update`. That fires when standing orders are on and the stored operation event turn equals the planning turn. The turn is stored when an operation changes phase or ends, when a sea or air menu is first offered, when an undefended sea or air row is first offered, when the engine launches one, or when a sea or air launch or cancel was applied. A land row does not store it. The same menu on a later turn does not start another consult by itself.
+An event-driven policy also starts this conversation when `operationUpdateOverride` appends `operation_update`. That fires when standing orders are on and the stored operation event turn equals the planning turn. The turn is stored when an operation changes phase or ends, when a sea or air menu is first offered, when a sea or air row the posture counts as clear is first offered, when the engine launches one, or when a sea or air launch or cancel was applied. On `overland` that row is an undefended sea city or any air row. Under `blitz` a sea city with one defender counts too. A land row does not store it. The same menu on a later turn does not start another consult by itself.
 
 Invariants:
 

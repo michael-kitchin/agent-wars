@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildCoachingBullets, buildContextCoaching, type CoachingGates } from './coachingText';
 import { buildOperationRuleBlock } from './operationRuleText';
+import { POSTURE_SETTINGS } from '../../../shared/postureTypes';
+import { buildPostureRuleBlock } from './postureRuleText';
 
 /**
  * Fully enabled strategic gates used as the baseline for presence assertions.
@@ -370,4 +372,24 @@ test('operation rules follow the campaign rules only when the gate is on', () =>
   const tactical = buildContextCoaching(tacticalGates({ operationsEnabled: true, campaignEnabled: true }));
   assert.equal(tactical.includes('Your land campaign is listed there too'), false);
   assert.equal(tactical.includes('You may instead launch a land row of Operation Options'), false);
+});
+
+test('posture rules follow the operation rules only when the gate is on', () => {
+  const withPosture = buildContextCoaching(strategicGates({ operationsEnabled: true, postureEnabled: true }));
+  const operationsAt = withPosture.indexOf('## Operations');
+  const postureAt = withPosture.indexOf('## Postures');
+  assert.ok(operationsAt >= 0);
+  assert.ok(postureAt > operationsAt);
+  assert.ok(withPosture.includes('The historical names are illustrations of an idea.'));
+  assert.equal(buildContextCoaching(strategicGates({ operationsEnabled: true })).includes('## Postures'), false);
+  assert.equal(buildContextCoaching(tacticalGates({ postureEnabled: true })).includes('## Postures'), false);
+  assert.equal(POSTURE_SETTINGS.maritime.navalPriorityCapShare, 1);
+  assert.equal(POSTURE_SETTINGS.maritime.liftGroundShare, 0.5);
+  assert.equal(POSTURE_SETTINGS.blitz.airOperationSlotFactor, 2);
+  assert.equal(POSTURE_SETTINGS.blitz.campaignAssaultFactor, 0.5);
+  assert.equal(POSTURE_SETTINGS.blitz.engineLaunchMaxDefenders, 1);
+  assert.ok(buildPostureRuleBlock().includes('full cap'));
+  assert.ok(buildPostureRuleBlock().includes('half your ground units'));
+  assert.ok(buildPostureRuleBlock().includes('twice the air operations'));
+  assert.ok(buildPostureRuleBlock().includes('half the usual mass'));
 });

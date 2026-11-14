@@ -31,7 +31,8 @@ import {
 } from '../callbackEvaluation';
 import { readCampaignObjectives } from '../gameDb/campaignObjectiveMemory';
 import { operationUnitIdsForSeat, readOperationEventTurn } from '../gameDb/operationMemory';
-import { campaignAssaultReady } from './campaignRules';
+import { postureSettingsForSeat } from '../gameDb/postureMemory';
+import { campaignAssaultMinUnitsFor, campaignAssaultReady } from './campaignRules';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getToolFlags } from './openRouterToolGroups';
 import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
@@ -226,6 +227,7 @@ export function campaignReadyOverride(
     objective: campaign,
     groundUnitHexes,
     hopDistance: computeGridDistanceWithPathFallbackPure,
+    assaultMinUnits: campaignAssaultMinUnitsFor(postureSettingsForSeat(seatId).campaignAssaultFactor),
   });
   logDebug('afterResolution campaignReadyOverride', { seatId, ready, phase: campaign.phase });
   return ready ? { type: 'campaign_ready' } : null;

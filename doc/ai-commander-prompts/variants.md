@@ -62,7 +62,7 @@ Gate: the enabled tool-name set, reduced to flags by `getToolFlags`. Each group 
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the standing-order status section, the orderless table, Active Operations, Operation Options, and `## Operations` under Strategic Context. |
+| system | Omit the standing-order status section, the orderless table, Posture, Active Operations, Operation Options, and `## Operations` and `## Postures` under Strategic Context. |
 | user | Do not name standing-order actions among the legal ones. |
 | tools | The order-query tool is absent. |
 | envelope | Omit the standing-order assignment and cancellation actions from the legal-action list, the example, and the repair schema. Omit `operations`. |
@@ -190,7 +190,7 @@ Adding a scenario is a change to this file and to the goal statement. Silently l
 
 ### 4.3 Tactical mode
 
-Scenario surfaces are omitted in battle regardless of the scenario id, per [`tactical-prompt.md`](tactical-prompt.md). Active Operations, Operation Options, and `## Operations` are omitted in battle too, even when standing orders are on. A battle reply does not include `operations`.
+Scenario surfaces are omitted in battle regardless of the scenario id, per [`tactical-prompt.md`](tactical-prompt.md). Posture, Active Operations, Operation Options, `## Operations`, and `## Postures` are omitted in battle too, even when standing orders are on. A battle reply does not include `operations` or `posture`.
 
 ## 5. Game size and large rosters
 
