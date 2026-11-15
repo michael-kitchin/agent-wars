@@ -347,7 +347,6 @@ export async function handleNotifyResolutionPlaybackComplete(
     const push: PostResolutionConsultationPushPayload = {
       planningTurnNumber: pending.planningTurnNumber,
       ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
-      ...(postConsult.aiMessage ? { aiMessage: postConsult.aiMessage } : {}),
       ...(postConsult.toolInvocationCounts ? { toolInvocationCounts: postConsult.toolInvocationCounts } : {}),
       ...(typeof postConsult.cost === 'number' && Number.isFinite(postConsult.cost) ? { cost: postConsult.cost } : {}),
     };

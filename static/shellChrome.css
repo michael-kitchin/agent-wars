@@ -277,8 +277,7 @@ body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
 body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Leaflet's bottom-right corner keeps the map's 12px inset. The zoom buttons are the rightmost item, and the scale
-   sits to their left. */
+/* Leaflet's bottom-right corner keeps the map's 12px inset. The scale is the only control there. */
 #main-map .leaflet-bottom.leaflet-right {
   bottom: 12px;
   right: 12px;
@@ -291,32 +290,6 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   margin: 0;
   float: none;
   clear: none;
-}
-/* The main map's + and − buttons use the expand control's dark slate, not the Ready teal. A button at the zoom limit is dimmed. */
-#main-map .leaflet-control-zoom {
-  border: 1px solid var(--chrome-border);
-  border-radius: 2px;
-  box-shadow: none;
-}
-#main-map .leaflet-control-zoom a {
-  width: 30px;
-  height: 30px;
-  line-height: 30px;
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  border-bottom-color: var(--chrome-border);
-}
-#main-map .leaflet-control-zoom a:hover,
-#main-map .leaflet-control-zoom a:focus {
-  background: var(--chrome-bg-raised);
-  color: var(--chrome-text);
-}
-#main-map .leaflet-control-zoom a.leaflet-disabled,
-#main-map .leaflet-control-zoom a.leaflet-disabled:hover,
-#main-map .leaflet-control-zoom a.leaflet-disabled:focus {
-  background: var(--chrome-bg-deep);
-  color: var(--chrome-disabled);
-  cursor: default;
 }
 #terrain-legend select {
   display: block;

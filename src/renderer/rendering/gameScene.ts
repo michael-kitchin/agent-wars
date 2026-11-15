@@ -25,6 +25,7 @@ import {
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
 import { invalidateLeafletMapSizes } from '../map/worldLeafletMap';
 import { flushResolutionPlaybackCompleteNotifyCallbacks } from '../openRouter/resolutionPlaybackDeferral';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { updateReadyButtonState } from '../openRouter/openRouterUiHelpers';
 import { tacticalUpdateExitButtonVisibility } from '../tactical/tacticalUiOrchestration';
 import {
@@ -809,6 +810,7 @@ function tickResolutionMoveAnimation(): void {
   } else {
     S.resolutionMoveAnimation = null;
     S.resolutionMoveAnimationFrameId = null;
+    syncChatPanelVisibility();
     updateGameStateSidebar(S.gameState);
     flushResolutionPlaybackCompleteNotifyCallbacks();
     // Re-enable committed path rendering at the end of resolution playback.

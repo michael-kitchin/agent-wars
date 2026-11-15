@@ -742,15 +742,6 @@ controlLossLightningHexes?: string[];
    */
 aiStrategy?: string;
     /**
-   * The message this commander sent to the human player in this wave, when there is one.
-
-   * Contract: Optional; omit when empty after trim.
-   * When to use: Renderer upper-right toast Message section after Ready.
-   * Expected outcome: Independent of `aiStrategy` so message-only consults still display.
-   * Exceptions: None.
-   */
-aiMessage?: string;
-    /**
    * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
 
    * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.

@@ -149,15 +149,6 @@ consulted: boolean;
    * Exceptions: None.
    */
 strategy?: string;
-    /**
-   * The message this commander sent to the human player in this wave, when there is one.
-   *
-   * Contract: Optional. The orders reply does not set it.
-   * When to use: Map onto Ready IPC `aiMessage` after post-resolution consultation.
-   * Expected outcome: The text, or absent.
-   * Exceptions: None.
-   */
-message?: string;
   /**
    * How many times each tool group ran during the consult.
    *
@@ -380,13 +371,11 @@ export async function afterResolution(
           turnNumber: state.turnNumber,
           movementCount: result.orders.length,
           hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
-          hasMessage: Boolean(result.message?.trim()),
           cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
         });
         return {
           consulted: true,
           strategy: result.strategy,
-          message: result.message,
           toolInvocationCounts: result.toolInvocationCounts,
           ...(typeof result.cost === 'number' && Number.isFinite(result.cost) ? { cost: result.cost } : {}),
         };
@@ -528,15 +517,6 @@ export interface AfterTacticalBeatResolutionResult {
    * Exceptions: None.
    */
   strategy?: string;
-  /**
-   * The message this commander sent to the human player in this wave, when there is one.
-   *
-   * Contract: Optional. The orders reply does not set it.
-   * When to use: Map onto tactical IPC `aiMessage` after post-beat consultation.
-   * Expected outcome: The text, or absent.
-   * Exceptions: None.
-   */
-  message?: string;
   /**
    * Tool invocation counts for the tactical consultation pass, when collected.
    *
@@ -733,14 +713,12 @@ export async function afterTacticalBeatResolution(
         movementCount: tacticalOpponentPlan.movementOrders.length,
         rangedCount: tacticalOpponentPlan.rangedAttacks.length,
         hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
-        hasMessage: Boolean(result.message?.trim()),
         cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
       });
       return {
         consulted: true,
         tacticalOpponentPlan,
         strategy: result.strategy,
-        message: result.message,
         toolInvocationCounts: result.toolInvocationCounts,
         attachTacticalOpponentPlanToIpc: true,
         ...(typeof result.cost === 'number' && Number.isFinite(result.cost) ? { cost: result.cost } : {}),

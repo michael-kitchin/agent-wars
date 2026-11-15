@@ -65,6 +65,13 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
 - Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
 - Settings, Help, How to play, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Chat panel expand, while the history is hidden: Show the messages sent and received this match.
+- Chat panel expand, while the history is showing: Hide the message history.
+- Chat panel recipient: Choose the side this message goes to.
+- Chat panel text field: Write to that side's commander. Press Enter to stage the message. It is sent when you press Ready.
+- Chat panel send: Stage this message. It is sent when you press Ready.
+- Chat panel edit: Put this message back in the text field to change it.
+- Chat panel cancel: Discard this message. It has not been sent.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
@@ -199,7 +206,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 
 ## Source Anchors
 
-- `static/index.html` (`#control-tooltip`)
+- `static/index.html` (`#control-tooltip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`, `#chat-panel-staged-edit`, `#chat-panel-staged-cancel`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
 - `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`, `aiOnlyTimedResultOkTooltipText`, `mapThemeTooltipText`)

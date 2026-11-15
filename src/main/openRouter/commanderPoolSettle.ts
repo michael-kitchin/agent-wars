@@ -7,11 +7,14 @@
  * Exceptions: A database error is logged by the write queue. A stale launch is ignored.
  */
 
-import type { CommanderDispatch } from '../../shared/commanderStatus';
+import type { CommanderDispatch, CommanderDispatchMessage } from '../../shared/commanderStatus';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
+import { activeHumanSeatId } from '../../shared/observeModeControls';
+import { sideMessageVisibleTo } from '../../shared/sideMessages';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
-import { clearAiPendingOrders, setAiPendingOrders } from '../gameDb';
+import { clearAiPendingOrders, getSeatRoster, setAiPendingOrders } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
+import { isFogOfWarEnabled } from '../gameDb/fogState';
 import { recordSeatConsultation, recordSeatThinkTime } from '../gameDb/seatRosterStore';
 import { logDebug, logError, logInfo } from '../logger';
 import { recordCommanderToolCounts } from './commanderToolCounts';
@@ -126,6 +129,31 @@ export function expireConsult(
 }
 
 /**
+ * The messages from this consult that the current viewer may see.
+ *
+ * Purpose: The dialog and Reports keep a snapshot. A later fog change does not rewrite it.
+ * When to use: Both places that push a dispatch. Not the timeout path.
+ * Expected outcome: Messages this seat stored, filtered for the active human seat, or every message when no human seat is playing.
+ * Exceptions: None.
+ */
+function visibleDispatchMessages(
+  seatId: string,
+  sent: readonly CommanderDispatchMessage[] | undefined
+): CommanderDispatchMessage[] {
+  const humanSeatId = activeHumanSeatId(getSeatRoster());
+  const viewer = humanSeatId === null
+    ? { kind: 'observer' as const }
+    : { kind: 'player' as const, seatId: humanSeatId };
+  const fogOfWarEnabled = isFogOfWarEnabled(gameDbOps);
+  return (sent ?? []).filter((row) => sideMessageVisibleTo({
+    viewer,
+    fogOfWarEnabled,
+    fromSeatId: seatId,
+    toSeatId: row.toSeatId,
+  }));
+}
+
+/**
  * Stores a finished consult, or records a failure, when the seat is still waiting.
  *
  * Purpose: A timeout or a cancel that already settled the seat must win over a late reply.
@@ -162,13 +190,13 @@ export function applyConsultOutcome(
     if (!outcome.finished) {
       if (outcome.errorMessage) logError('commanderPool consult failed', new Error(outcome.errorMessage));
       if (outcome.costUsd > 0) recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
-      const message = outcome.message?.trim() ? outcome.message.trim() : null;
       const strategy = outcome.strategy?.trim() ? outcome.strategy.trim() : null;
-      if (message || strategy) {
+      const messages = visibleDispatchMessages(seatId, outcome.sentMessages);
+      if (strategy || messages.length > 0) {
         context.dispatches.push({
           seatId,
-          message,
           strategy,
+          messages,
           modelLabel: modelLabel(outcome.modelId),
           turnNumber: entry.turnNumber,
         });
@@ -200,8 +228,8 @@ export function applyConsultOutcome(
     recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
     context.dispatches.push({
       seatId,
-      message: outcome.message,
       strategy: outcome.strategy,
+      messages: visibleDispatchMessages(seatId, outcome.sentMessages),
       modelLabel: modelLabel(outcome.modelId),
       turnNumber: entry.turnNumber,
     });

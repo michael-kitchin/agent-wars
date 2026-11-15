@@ -116,7 +116,13 @@ Tell the user about these in your final message.
 - **"During a turn update" means:** from the moment resolution playback starts until the map toast is hidden. The panel is also hidden whenever the map toast is showing for any other reason, because both sit at the bottom-right, and during the New game and Game over overlays.
 - **The map scale stays** in the bottom-right corner. The panel sits directly above it.
 - **An observer's panel has no entry line.** Its bar shows the title and the expand control only.
-- **A side that leaves the match** drops out of the drop-down. A staged message to it is discarded the next time the player commits (the talk stage plan's `sendStagedHumanSideMessages` does this).
+- **A side that leaves the match** drops out of the drop-down. A staged message to it is discarded the next time the player commits (`sendStagedHumanSideMessages` does this).
+- **You has no flag.** In the dialog and in the history, a party labelled You is the name alone.
+- **Sending again to the same side replaces that staged draft.** The text field clears only after the replacement succeeds.
+- **The dialog and Reports are a snapshot.** They keep the messages that were visible when the consult was stored. Turning fog of war on or off later changes the chat history on its next read. It does not rewrite a dialog tab or a Reports entry.
+- **A timed-out orders consult does not open the dialog,** even when that commander stored messages. The chat history shows those messages. Do not add a dispatch on the timeout path in `applyConsultOutcome`.
+- **A staging failure uses `showMapToast(sentence)` with no options,** so it is an error toast and is not filed. The panel hides while that toast is up. The typed text stays in the field.
+- **Reports shows one line per visible message** under the sender's name, `To {label}: {text}`, not one quoted string.
 
 ---
 
@@ -232,7 +238,8 @@ export function dispatchMessagesInSideOrder<T extends { readonly toSeatId: strin
   messages: readonly T[],
   seatOrderOf: (seatId: string) => number,
 ): T[]
-// Sorted by the recipient's side order, 1 to 4. Stable.
+// Stable sort by seatOrderOf(toSeatId) ascending. That callback reads `seat.seatOrder`.
+// A recipient missing from the roster sorts after every known seat. Do not invent a 1-to-4 index.
 
 export const SIDE_MESSAGES_TITLE = 'Messages';
 export const SIDE_MESSAGE_BULLET_PREFIX = 'To';
@@ -246,7 +253,7 @@ Also move the `SideMessageView` and `SideMessageThreadSnapshot` types from the D
 
 - Grouping: messages from turns 3, 3, 5 give two groups with headings `Turn 3` and `Turn 5`, in that order, and an empty list gives no groups.
 - Party label: `You` for the viewer's seat, the name otherwise, and never `You` for an observer.
-- Side order: messages to sides 3, 1, 2 come back as 1, 2, 3.
+- Side order: `seatOrderOf` returns 3, 1, and 2 for three recipients, and the result is that order 1, 2, 3. A recipient whose callback returns a higher number than the others sorts last.
 
 ### Verification
 
@@ -267,13 +274,15 @@ The renderer can ask for the thread and stage or cancel a message. No screen use
 2. `preload.ts`: add the three channel strings to the preload's own channel list (it keeps a copy: find `readCommanderPool: 'game:readCommanderPool'`), and three methods on the exposed game API, following `readCommanderPool`.
 3. `gameApiTypes.ts`: add the three method types.
 4. `sideMessageIpcHandler.ts`:
-   - `export function buildSideMessageThreadSnapshot(): SideMessageThreadSnapshot`. The viewer is `activeHumanSeatId(getSeatRoster())`. Fog comes from `isFogOfWarEnabled`. `messages` is `listSentSideMessages` mapped to views and filtered with `sideMessageVisibleTo`. `staged` is `listStagedSideMessages` for the viewer, or empty for an observer. `recipientSeatIds` is the AI seats with `outTurn == null`, in side order. `canSend` is true when there is a viewer and at least one recipient. When the database is not ready, return an empty snapshot with `viewerSeatId: null` and `canSend: false`.
-   - `export function registerSideMessageIpcHandler(ipcMain: IpcMain): void` registers the three channels. `stageSideMessage` validates that the payload is an object with string `toSeatId` and string `text`, and otherwise returns `{ success: false, reason: 'Invalid message.' }`. Then it calls `stageHumanSideMessage`. `cancelStagedSideMessage` validates `toSeatId` and calls `cancelStagedHumanSideMessage`.
+   - `export function buildSideMessageThreadSnapshot(): SideMessageThreadSnapshot`. When `hasDbHandle()` is false, return `{ viewerSeatId: null, canSend: false, recipientSeatIds: [], messages: [], staged: [] }` and do not touch the store. Otherwise the viewer is `activeHumanSeatId(getSeatRoster())`. Fog comes from `isFogOfWarEnabled` (a missing `fog_of_war_enabled` row means on; `'0'` or `'false'` means off). Pass `{ kind: 'observer' }` when the viewer is null, and `{ kind: 'player', seatId: viewer }` otherwise. Never pass a player with a null seat.
+   - `messages` is `listSentSideMessages(gameDbOps)` filtered with `sideMessageVisibleTo`, mapped to views, oldest first. A row's text is `body`. Its `scope`, `turnNumber`, and `beatNumber` come from `row.step`, not from columns of those names. `staged` is `listStagedSideMessages(gameDbOps, viewer)` mapped the same way, or empty when the viewer is null. `recipientSeatIds` is `activeAiSeatIds(getSeatRoster())`, which is already in `seatOrder`. `canSend` is true when the viewer is non-null and that list is not empty.
+   - Log `logTrace` with the viewer kind and the two counts. Do not log text.
+   - `export function registerSideMessageIpcHandler(ipcMain: IpcMain): void` registers the three channels with `ipcMain.handle` and logs `logDebug`. The preload methods use `ipcRenderer.invoke`, the same pair `readCommanderPool` uses. `stageSideMessage` returns `{ success: false, reason: 'Invalid message.' }` unless the payload is an object with string `toSeatId` and string `text`. Then it returns whatever `stageHumanSideMessage` returns. A thrown error is `logError` and `{ success: false, reason: 'Invalid message.' }`. `cancelStagedSideMessage` does nothing unless `toSeatId` is a string, then calls `cancelStagedHumanSideMessage`. A thrown error is `logError` and a resolved `void`. Neither handler logs message text. Staging the same recipient again replaces that draft; do not reject a second stage.
 5. `main.ts`: call `registerSideMessageIpcHandler(ipcMain)` next to `registerEndMatchIpcHandler` (search for it). One line and one import.
 
 ### Tests
 
-- `sideMessageIpcHandler.test.ts`, on a seated temp match, calling `buildSideMessageThreadSnapshot` directly:
+- `sideMessageIpcHandler.test.ts`, using `withSeatedTempGameDb` from `src/main/testSupport/withSeatedTempGameDb.ts` and inserting rows with `insertSentSideMessage` and `replaceStagedSideMessage` (do not call `requestTalk`), calling `buildSideMessageThreadSnapshot` directly:
   - A human seat with fog on, with one message to the human, one from the human, and one between two AI sides: the snapshot has the first two only.
   - The same match with fog off (write `fog_of_war_enabled` as `'0'`): all three.
   - A match with no human seat: all three, `viewerSeatId` null, `canSend` false, `staged` empty.
@@ -292,29 +301,29 @@ Run the Verification Bar.
 The dialog shows each commander's messages as bullets.
 
 **Add:** nothing.
-**Edit:** `src/shared/commanderStatus.ts`, `src/main/openRouter/commanderPool.ts`, `src/main/openRouter/commanderPoolSupport.ts`, `src/main/openRouter/commanderPoolSettle.ts`, `src/shared/commanderMessageTabs.ts`, `src/shared/commanderMessageTabs.test.ts`, `src/shared/aiStrategyToastContent.ts`, `src/renderer/openRouter/commanderMessageTabsUi.ts`, `src/renderer/openRouter/commanderPoolClient.ts`, `src/renderer/openRouter/openRouterControls.ts`, `src/main/openRouter/commanderPool.test.ts`, `doc/ux/notifications-and-feedback.md`, `doc/ux/reports-tab.md`
+**Edit:** `src/shared/commanderStatus.ts`, `src/main/openRouter/commanderPool.ts`, `src/main/openRouter/commanderPoolSupport.ts`, `src/main/openRouter/commanderPoolSettle.ts`, `src/shared/commanderMessageTabs.ts`, `src/shared/commanderMessageTabs.test.ts`, `src/shared/aiStrategyToastContent.ts`, `src/renderer/openRouter/commanderMessageTabsUi.ts`, `src/renderer/openRouter/commanderPoolClient.ts`, `src/renderer/openRouter/openRouterControls.ts`, `src/renderer/chrome/consoleReports.ts`, `src/main/openRouter/commanderPool.test.ts`, `doc/ux/notifications-and-feedback.md`, `doc/ux/reports-tab.md`
 
 ### Steps
 
 1. `commanderStatus.ts`: add `CommanderDispatchMessage` and `readonly messages: readonly CommanderDispatchMessage[];` to `CommanderDispatch`. Keep `message` for now.
 2. Main process:
    - `commanderPoolSupport.ts`: add `readonly sentMessages?: readonly CommanderDispatchMessage[];` to `CommanderConsultOutcome`.
-   - `commanderPool.ts`, in `launch`, where the outcome is adjusted before `applyConsultOutcome`: set `sentMessages` from `talkRound?.sentBy(seatId) ?? []`, mapped to `{ toSeatId, text }`.
-   - `commanderPoolSettle.ts`: both places that push a dispatch add `messages`. Filter `outcome.sentMessages ?? []` with `sideMessageVisibleTo`, using `activeHumanSeatId(getSeatRoster())` as the viewer, `isFogOfWarEnabled`, and the dispatch's seat as `fromSeatId`. In the failed-consult branch, the condition `if (message || strategy)` becomes `if (message || strategy || messages.length > 0)`.
-3. `commanderMessageTabs.ts`: a tab holds `messages` beside `message` and `strategy`. `applyCommanderMessage` takes and stores them. `commanderDispatchHasProse` gains a third parameter, the message count, and returns true when it is above zero. Update its callers.
+   - `commanderPool.ts`: inside `withTalkCost`, which already runs after the consult returns and after `speakAndAwaitTalkRound` has waited for `whenClosed`. Set `sentMessages` from `talkRound?.sentBy(seatId) ?? []`, mapped to `{ toSeatId, text }`. `sentBy` is empty until the round closes, and empty when persistence stored nothing. Do not read it earlier in `launch`.
+   - `commanderPoolSettle.ts`: both places that push a dispatch add `messages`. Each stored row is from the consulting seat, so `fromSeatId` is that seat and `toSeatId` is the row's. The viewer is `{ kind: 'observer' }` when `activeHumanSeatId(getSeatRoster())` is null, otherwise `{ kind: 'player', seatId }` with that id. Fog is `isFogOfWarEnabled()`. Keep the timeout branch as it is: it returns without a dispatch. In the failed-consult branch, `if (message || strategy)` becomes `if (message || strategy || messages.length > 0)`.
+3. `commanderMessageTabs.ts`: a tab holds `messages` beside `message` and `strategy`, including the tabs `initialCommanderMessageTabs` builds (`messages: []`). `applyCommanderMessage` takes and stores them. Its early return `if (!message && !strategy) return state` must also continue when `messages` has an entry, or a consult that sent only messages never enables the tab. Change `commanderDispatchHasProse` to one object argument, `{ message?, strategy?, messages? }`, true when the strategy is non-empty or any message text is non-empty. Update every caller. Phase 9 deletes the `message` field from that object; do not add a positional third parameter.
 4. `aiStrategyToastContent.ts`:
    - `AI_STRATEGY_TOAST_MESSAGE_TITLE` becomes `SIDE_MESSAGES_TITLE` (`'Messages'`). Import it from `sideMessageView.ts`, or re-export it, so the word exists once.
    - `AiStrategyToastFields` gains `messages?: readonly CommanderDispatchMessage[]`, and `AiStrategyToastSection` gains `bullets?: readonly CommanderDispatchMessage[]`.
    - `buildAiStrategyToastSections` returns a Messages section with `bullets` (and an empty `body`) when `messages` is not empty. It no longer builds a section from the single `message` field.
-5. `commanderMessageTabsUi.ts`, `renderCommanderMessageTabs`: for a section with `bullets`, after the header, append a `<ul>` with one `<li>` per bullet in the order `dispatchMessagesInSideOrder` gives (side order from `S.gameState?.seats`). Each `<li>` holds the text `To `, the recipient's flag from `createSideNumberFlag`, the recipient's `sideDisplayName` (or `You` when the recipient is the viewer, via `sideMessagePartyLabel`), `: `, and the message, set with `textContent`. Never use `innerHTML` with message text. Use the bullet indent the map toast uses (`MAP_TOAST_SECTION_BULLET_INDENT` in `mapToastBody.ts`).
-6. `commanderPoolClient.ts` and `openRouterControls.ts`: pass `dispatch.messages` wherever `dispatch.message` is passed today (`messageLines`, `showCommanderMessageTabs`, `fileCommanderMessage`). For the Reports entry, `messageText` becomes the bullets as lines, `To {name}: {text}`, joined with `\n`.
-7. Docs: in `doc/ux/notifications-and-feedback.md`, the AI strategy toast row and bullet now say the selected tab shows **Messages**, one bullet per message that commander sent in that consult that the viewer may see, in side order, then Strategy. State the fog-of-war rule in one sentence. In `doc/ux/reports-tab.md`, update what a Message entry holds.
+5. `commanderMessageTabsUi.ts`, `renderCommanderMessageTabs`: for a section with `bullets`, after the header, append a `<ul>` with one `<li>` per bullet in the order `dispatchMessagesInSideOrder` gives. `seatOrderOf` reads `seatOrder` from `S.gameState?.seats`. Each `<li>` holds the text `To `, then the recipient's flag from `createSideNumberFlag` (`src/renderer/chrome/toastInlineMarks.ts`) unless `sideMessagePartyLabel` is `You`, then the label, `: `, and the message. Set the words with `textContent`. Never use `innerHTML` with message text. Use the bullet indent the map toast uses (`MAP_TOAST_SECTION_BULLET_INDENT` in `mapToastBody.ts`).
+6. `commanderPoolClient.ts` and `openRouterControls.ts`: pass `dispatch.messages` into the dialog. Keep filing one Reports entry per dispatch, but stop putting `dispatch.message` into it. `consoleReports.ts` `messageReportBody` draws the sender's flag and name, then one line per visible message, `To {label}: {text}`, each with `textContent`. You has no flag. Do not wrap the lines in one pair of quotes. A dispatch with messages and no strategy still files. Update the "sender line" sentence in `doc/ux/reports-tab.md` to this shape, and state that the lines are the ones visible when the consult was stored.
+7. Docs: in `doc/ux/notifications-and-feedback.md`, the AI strategy toast row and bullet now say the selected tab shows **Messages**, one bullet per message that commander sent in that consult that the viewer could see when the consult was stored, in `seatOrder`, then Strategy. You has no flag. State that a later fog change does not rewrite that tab. In `doc/ux/reports-tab.md`, a Message entry is the sender plus one `To {label}: {text}` line per message that was visible then.
 
 ### Tests
 
-- `commanderMessageTabs.test.ts`: a dispatch with two messages and no strategy enables the tab; `commanderDispatchHasProse(null, null, 0)` is false and `(null, null, 1)` is true.
+- `commanderMessageTabs.test.ts`: a dispatch with two messages and no strategy enables the tab. `commanderDispatchHasProse({ strategy: null, messages: [] })` is false, and the same call with one message is true.
 - Extend `src/shared/aiStrategyToastContent.test.ts`: messages and a strategy give two sections, Messages first with two bullets; no messages gives the Strategy section alone; the legacy `message` field alone gives no Messages section.
-- `commanderPool.test.ts`: with a human seat and fog on, a wave whose talk runner sent one message to the human and one to another AI produces a dispatch with one entry in `messages`. With fog off, two. With no human seat, two.
+- Extend the test `a message to the human seat is the dispatch message, and a message to another AI is not` in `commanderPool.test.ts`. It already installs a talk runner, waits with `waitForSeatsSettled` and `flushWrites`, and uses `withMatch(..., true)` for a human seat. One reply that contains both a message to the human and a message to another AI yields one `messages` entry while fog is on (a missing fog row is on). Write `fog_of_war_enabled` as `'0'` through `upsertGameConfigValue` and the same reply yields two. A `withMatch` that has no human seat yields two. Leave the existing `message` assertions in place until Phase 9.
 - A source contract in a new `src/main/rendererMessageDialogContracts.test.ts`: `commanderMessageTabsUi.ts` calls `dispatchMessagesInSideOrder` and `createSideNumberFlag`, and does not contain `innerHTML`.
 
 ### Verification
@@ -328,7 +337,7 @@ Run the Verification Bar. Then, if you can run the app with a key: start a match
 The + and − buttons are gone. A collapsed panel sits in their place and expands and collapses. It has no content yet beyond a title.
 
 **Add:** `static/chatChrome.css`, `src/renderer/chat/chatPanel.ts`, `src/main/rendererChatPanelContracts.test.ts`, `doc/ux/chat-panel.md`
-**Edit:** `static/index.html`, `static/shellChrome.css`, `src/renderer/map/worldLeafletMap.ts`, `src/renderer/map/mapChromeLayout.ts`, `src/renderer/gameplay/selectionPanel.ts`, `src/shared/mapChromePlacement.ts`, `src/shared/mapChromePlacement.test.ts`, `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`, `doc/ux/map-surface.md`, `doc/ux/selection-panel.md`, `doc/ux/notifications-and-feedback.md`, `doc/ux-specification.md`, `doc/ui-style-guide.md`
+**Edit:** `static/index.html`, `static/shellChrome.css`, `static/feedbackChrome.css`, `src/renderer/map/worldLeafletMap.ts`, `src/renderer/map/mapChromeLayout.ts`, `src/renderer/gameplay/selectionPanel.ts`, `src/shared/mapChromePlacement.ts`, `src/shared/mapChromePlacement.test.ts`, `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`, `doc/ux/map-surface.md`, `doc/ux/selection-panel.md`, `doc/ux/notifications-and-feedback.md`, `doc/ux/new-game-dialog.md`, `doc/ux-specification.md`, `doc/ui-style-guide.md`
 
 Read first: `static/selectionChrome.css`, `src/renderer/gameplay/selectionPanelExpand.ts`, `src/renderer/chrome/panelSlideHelpers.ts`, and the `#selection-panel` markup in `static/index.html`. The chat panel copies their structure and look.
 
@@ -336,8 +345,9 @@ Read first: `static/selectionChrome.css`, `src/renderer/gameplay/selectionPanelE
 
 1. **Remove the zoom buttons.**
    - `worldLeafletMap.ts`: delete the line `leafletRef.control.zoom({ position: 'bottomright' }).addTo(mainMap);`. Both maps already pass `zoomControl: false`.
-   - `shellChrome.css`: delete the four `#main-map .leaflet-control-zoom…` rules and their comment. In the comment above `#main-map .leaflet-bottom.leaflet-right`, drop the sentence about the zoom buttons.
-   - `ui-smoke-map-chrome-checks.cjs`: remove the `zoom-buttons-bottom-right` check and the `LEAFLET.zoom` entry. Rewrite the scale check so it expects the scale's right edge 12 px in from the map's right edge. Leave `minimapHasZoom` in `ui-smoke-checks.cjs` alone. It asserts the minimap has none.
+   - `shellChrome.css`: delete every `#main-map .leaflet-control-zoom` rule and the comment above them. In the comment above `#main-map .leaflet-bottom.leaflet-right`, drop the sentence that the zoom buttons are the rightmost item and the scale sits to their left.
+   - `feedbackChrome.css`: the comments that say the map toast covers the + and − buttons, and that 62 px covers two buttons, now say the toast sits at that corner and the chat panel hides while the toast is showing. Leave the toast's `min-height` and `z-index` as they are.
+   - `ui-smoke-map-chrome-checks.cjs`: remove the `zoom-buttons-bottom-right` check and the `LEAFLET.zoom` entry. Rewrite `scale-and-attribution-bottom-right` so it no longer needs the zoom control: the scale's bottom edge and its right edge are each 12 px in from the map. Leave `minimapHasZoom` in `ui-smoke-checks.cjs` alone. It asserts the minimap has none.
 2. **Markup.** In `static/index.html`, add a stylesheet link for `chatChrome.css` after `selectionChrome.css`, and this section directly after the `#selection-panel` section closes:
 
    ```html
@@ -358,9 +368,9 @@ Read first: `static/selectionChrome.css`, `src/renderer/gameplay/selectionPanelE
    </section>
    ```
 
-   Give the expand, edit, and send buttons inline SVG icons in the style of the selection panel's (`class="chrome-icon"`): a chevron, a pencil, and a right-facing arrow.
+   Give the expand, edit, and send buttons inline SVG icons in the style of the selection panel's (`class="chrome-icon"`): a chevron, a pencil, and a right-facing arrow. The section stays inside `#canvas-container`, a sibling of `#main-map`, in the same place as `#selection-panel`. Do not put it inside `#main-map`. The input's `maxlength` is the digits of `SIDE_MESSAGE_MAX_CHARS` (280).
 
-3. **Styles.** `chatChrome.css`: the panel is `position: absolute`, anchored to the map container's bottom-right. Its face, border, radius, bar height (50 px), and control sizes (32 px wide, full bar height) match `.selection-panel`. `data-state="compact"` hides `.chat-panel-history`. `data-state="expanded"` shows it with `overflow-y: auto`. The history's maximum height is set from script. The staged row is one line with the text ending in an ellipsis and the two buttons keeping their size. `.chat-panel-title` shows only when the entry controls are hidden (`#chat-panel[data-can-send="false"]`), and the select, input, and send button hide in that state. Where the panel and the selection panel overlap, the selection panel is on top: give the chat panel the lower `z-index`.
+3. **Styles.** `chatChrome.css`: the panel is `position: absolute`, anchored to the map container's bottom-right. Its face, border, radius, bar height (50 px), and control sizes (32 px wide, full bar height) match `.selection-panel`. `data-state="compact"` hides `.chat-panel-history`. `data-state="expanded"` shows it with `overflow-y: auto`. The history's maximum height is set from script. The staged row is one line with the text ending in an ellipsis and the two buttons keeping their size. `.chat-panel-title` shows only when the entry controls are hidden (`#chat-panel[data-can-send="false"]`), and the select, input, send button, and staged row hide in that state. The panel's `z-index` is below `.selection-panel` (6200). The map toast is 7000 and is not covered by this panel, because the panel hides while that toast shows.
 
 4. **Width and place.** `mapChromePlacement.ts`: add
 
@@ -379,12 +389,12 @@ Read first: `static/selectionChrome.css`, `src/renderer/gameplay/selectionPanelE
 
 5. **Behavior.** `chatPanel.ts`: `export function wireChatPanel(): void` binds the expand button. A click toggles `data-state` between `compact` and `expanded`, sets `aria-expanded`, swaps the button's `aria-label` between `Show the message history` and `Hide the message history`, slides the height with `startPanelHeightSlide` the way `toggleSelectionPanel` does (and not at all when `reducedMotionRequested()`), and calls `layoutMapChrome()`. The state starts compact and lasts until the app closes. It is not saved. Call `wireChatPanel()` directly after the `wireSelectionPanelExpand();` call in `src/renderer/gameplay/selectionPanel.ts`. In this phase, also remove the `hidden` attribute there so the shell can be seen: Phase 7 replaces that line with the real rule.
 
-6. **Docs.** Write `doc/ux/chat-panel.md` with the fixed heading set (see Conventions), covering what exists after this phase. Later phases extend it. Give it a row in the routing table of `doc/ux-specification.md`, with the cross-cutting documents to read with it (`modes-and-transitions.md`, `notifications-and-feedback.md`, `input-map.md`), and an entry in that file's list of element documents. In `doc/ui-style-guide.md`, update the implementation-status note and the map-view section so they no longer describe + and − buttons and do mention the chat panel. Update `doc/ux/map-surface.md` (the + and − bullet is replaced by one sentence that the wheel and the documented keys zoom, and that the chat panel sits at the bottom-right), `doc/ux/selection-panel.md` and `doc/ux/notifications-and-feedback.md` (every mention of the zoom buttons or the + and − buttons becomes the chat panel), and the index and "where to look" table in `doc/ux-specification.md`. Search `doc/` for `zoom button`, `+ and −`, and `leaflet-control-zoom` and fix every hit.
+6. **Docs.** Write `doc/ux/chat-panel.md` with the fixed heading set (see Conventions), covering what exists after this phase. Later phases extend it. Give it a row in the routing table of `doc/ux-specification.md`, with the cross-cutting documents to read with it (`modes-and-transitions.md`, `notifications-and-feedback.md`, `input-map.md`), and an entry in that file's list of element documents. In `doc/ui-style-guide.md`, update the implementation-status note, the button-face row that excepts the + and − buttons, the map-view section, and the checklist line so they no longer describe those buttons and do mention the chat panel. Update `doc/ux/map-surface.md` (the + and − bullet is replaced by one sentence that the wheel and the documented keys zoom, and that the chat panel sits at the bottom-right), `doc/ux/selection-panel.md`, `doc/ux/notifications-and-feedback.md`, and `doc/ux/new-game-dialog.md` (the preview loses the buttons too). Search `doc/` for `zoom button`, `+ and −`, and `leaflet-control-zoom`. Update living UX docs and the style guide. Do not edit `doc/release-notes/`, `doc/devleopment-plan-v3.4.md`, `doc/poc-analysis.md`, or `doc/market-research.md`. Leave `doc/how-to-play.md` for Phase 10.
 
 ### Tests
 
 - `mapChromePlacement.test.ts`: `chatPanelPlacement` returns the band width; `bottom` is 12 with no scale and `12 + scaleHeight + 8` with one; `maxHistoryHeight` is half the map height.
-- `rendererChatPanelContracts.test.ts`: `static/index.html` contains each id above exactly once and links `chatChrome.css`; `worldLeafletMap.ts` does not contain `control.zoom(`; `shellChrome.css` does not contain `leaflet-control-zoom`; `chatPanel.ts` calls `startPanelHeightSlide` and `layoutMapChrome`. Read static files with `fs` from the repo root the way the existing contract tests locate renderer source.
+- `rendererChatPanelContracts.test.ts`: `static/index.html` contains each id above exactly once and links `chatChrome.css`; the chat section is inside `#canvas-container` and not inside `#main-map`; the input `maxlength` equals `String(SIDE_MESSAGE_MAX_CHARS)`; `worldLeafletMap.ts` does not contain `control.zoom(`; `shellChrome.css` does not contain `leaflet-control-zoom`; `chatPanel.ts` calls `startPanelHeightSlide` and `layoutMapChrome`. Read static files with `fs` from the repo root the way the existing contract tests locate renderer source.
 
 ### Verification
 
@@ -429,8 +439,8 @@ The player picks a side, types, and stages a message. The staged message shows a
    - **Staged row:** shown when `stagedMessageFor(snapshot.staged, recipient)` is not null, with that text in `#chat-panel-staged-text` (`textContent`) and the full text as the element's `title`. Hidden otherwise.
    - **Edit:** puts the staged text into the text field, awaits `cancelStagedChatMessage()`, and focuses the field with the caret at the end.
    - **Cancel (×):** awaits `cancelStagedChatMessage()`.
-   - **`data-can-send`** on `#chat-panel` is `"true"` or `"false"` from `snapshot.canSend`. The send button is disabled while the field has no stageable text.
-   - **Keys must not reach the map.** `shouldIgnoreGlobalKeydown` and `isEditableKeyboardTarget` in `src/renderer/map/mapHelpers.ts` already return true for `input`, `textarea`, and `select`. Confirm that the map's key handlers call one of them, so typing W, A, S, D, or T in the field does not pan the map or toggle a map mode. If a handler does not, add the check there and record it. Do not add `stopPropagation` to the field.
+   - **`data-can-send`** on `#chat-panel` is `"true"` or `"false"` from `snapshot.canSend`. The send button is disabled while the field has no stageable text. `renderChatPanel` never writes `#chat-panel-input` except the Edit button. A refresh must not clear text the player is still typing.
+   - **Keys must not reach the map.** The window `keydown` listener in `src/renderer/map/initCore.ts` already returns when `shouldIgnoreGlobalKeydown` is true, and that is true for `input`, `textarea`, and `select`. Confirm no other listener pans the map without that check. Do not add `stopPropagation` to the field.
 4. Call `refreshChatThread()` when a match is shown. There are two places:
    - At the end of `wireChatPanel()`. The window loads once at start and reloads after a save is loaded, so this covers both.
    - In `src/renderer/gameplay/newGame.ts`, directly after the line `S.gameState = state;` in the new-match path.
@@ -462,12 +472,12 @@ Expanded, the panel shows every visible message by turn, and it stays current.
    - With no messages, the history holds one line: `No messages yet.`
    - **Scrolling:** before rebuilding, note whether the history was scrolled to within 8 px of its bottom. After rebuilding, scroll to the bottom when it was, or when the panel has just been expanded. Otherwise keep the scroll position, so reading older messages is not interrupted.
    - Rebuild only when the list of message ids changed.
-2. **Keep it current.** Call `refreshChatThread()`:
-   - In `commanderPoolClient.ts`, `readCommanderPoolAndApply`: inside the existing `if (drain && (next.dispatches.length > 0 || consultFinished))` block. This is when commanders have just spoken.
-   - In `readyHandler.ts`, after a Ready result is applied successfully. This is when the player's staged messages have been sent.
-   - In `readyTacticalCommit.ts`, after a successful beat commit, for the same reason.
+2. **Keep it current.** The history is the snapshot from `readSideMessages`, not the dispatches. Call `refreshChatThread()`:
+   - In `commanderPoolClient.ts`, `readCommanderPoolAndApply`: inside the existing `if (drain && (next.dispatches.length > 0 || consultFinished))` block, after `poolReplyIsCurrent` has passed. The pool already polls once a second. This is that poll, not a new one. A commander's message shows up because of it.
+   - In `readyHandler.ts`, immediately after `readyResult.success` is known and before the `awaitingMeleeDecision` branch. `callReadyWithTimeout` is the call that already sent the staged messages, including when the result is waiting on a melee decision.
+   - In `readyTacticalCommit.ts`, immediately after `commitResult.success`. The main process sends staged messages only when that result also has `tacticalResolutionPlayback`. A success without playback leaves the draft staged, and the refresh shows it still staged.
 
-   Each is one line. Do not add a timer or a poll.
+   Each is one line. Do not add a timer or a poll. `chatPanelClient.ts` must not import `commanderPoolClient.ts`.
 3. `chatChrome.css`: history rows wrap, the group heading uses the muted text color the selection panel's caption uses, and a message row from the viewer is visually distinct by weight or alignment only, not by a new color.
 4. Docs: extend `doc/ux/chat-panel.md` with the history, the grouping, the scroll rule, the fog-of-war rule, and when it refreshes.
 
@@ -486,7 +496,7 @@ Run the Verification Bar and `npm run ui:smoke`. Then run the app with a key, fo
 The panel hides during a turn update and the overlays, and an observer gets a read-only panel.
 
 **Add:** `src/renderer/chat/chatPanelVisibility.ts`
-**Edit:** `src/shared/chatPanelState.ts`, `src/shared/chatPanelState.test.ts`, `src/renderer/chat/chatPanel.ts`, `src/renderer/gameplay/selectionPanel.ts`, `src/renderer/openRouter/openRouterUiHelpers.ts`, the renderer files that assign `S.resolutionMoveAnimation`, `static/chatChrome.css`, `src/main/rendererChatPanelContracts.test.ts`, `doc/ux/chat-panel.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/resolution-playback.md`
+**Edit:** `src/shared/chatPanelState.ts`, `src/shared/chatPanelState.test.ts`, `src/renderer/chat/chatPanel.ts`, `src/renderer/gameplay/selectionPanel.ts`, `src/renderer/openRouter/openRouterUiHelpers.ts`, `src/renderer/gameplay/readyHandler.ts`, `src/renderer/gameplay/readyTacticalCommit.ts`, `src/renderer/rendering/gameScene.ts`, `src/renderer/tactical/tacticalUiOrchestration.ts`, `src/renderer/tactical/tacticalIpcHandlers.ts`, `static/chatChrome.css`, `src/main/rendererChatPanelContracts.test.ts`, `doc/ux/chat-panel.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/resolution-playback.md`
 
 ### Steps
 
@@ -510,12 +520,12 @@ The panel hides during a turn update and the overlays, and an observer gets a re
    - When the panel becomes hidden while the text field has focus, blur the field. Text in the field and the staged message are kept.
    - After changing `hidden`, call `layoutMapChrome()`.
 3. Call `syncChatPanelVisibility()`:
-   - In `openRouterUiHelpers.ts`: at the end of `showMapToast` and at the end of `hideMapToast`. This covers "until the update dialog either times out or is closed", because both paths end in `hideMapToast`.
-   - Where `S.resolutionMoveAnimation` is assigned (search `src/renderer` for `resolutionMoveAnimation = `; there were five sites when this plan was written): after each assignment. Record the sites in the Completion Log.
+   - In `openRouterUiHelpers.ts`: at the end of `showMapToast` and at the end of `hideMapToast`. `#map-toast` uses the class `hidden`, not the `hidden` attribute. `hideMapToast` adds that class. This covers the update toast and an error toast, including a staging failure. Both the timer and a close end in `hideMapToast`.
+   - After each of these five assignments, and no others: `readyHandler.ts` and `readyTacticalCommit.ts` set the animation object; `gameScene.ts`, `tacticalUiOrchestration.ts`, and `tacticalIpcHandlers.ts` set it to null. Setting it to null at tactical entry shows the panel again when no toast is up, which is right: a battle's planning turn has the panel.
    - At the end of `renderChatPanel()`.
    - Replace the temporary line from Phase 4 that removed `hidden`.
 
-   If any of these files would import `chatPanelVisibility.ts` in a way that `check:circular` reports, register the function as a callback instead, the way `setAiStrategyToastHiddenListener` works.
+   `chatPanelVisibility.ts` imports neither `chatPanel.ts` nor `openRouterUiHelpers.ts`. It sets `hidden` on `#chat-panel` and calls `layoutMapChrome`. If a file cannot import it without a new cycle, register the function as a callback the way `setAiStrategyToastHiddenListener` works. Do not import it from both ends.
 4. **Observer.** `data-can-send="false"` already hides the entry controls and shows the title (Phase 4 CSS). Confirm that in that state the staged row is never shown, and that the bar still has the expand control.
 5. Docs: finish `doc/ux/chat-panel.md` (Availability and States). Add the panel to the tables in `doc/ux/modes-and-transitions.md` and to `doc/ux/resolution-playback.md` (hidden while playback runs and while the turn-update toast shows).
 
@@ -536,15 +546,15 @@ Run the Verification Bar and `npm run ui:smoke`. Then run the app: press Ready, 
 One pass over the things that are easy to get slightly wrong.
 
 **Add:** nothing.
-**Edit:** `static/chatChrome.css`, `src/renderer/chat/chatPanel.ts`, `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`, `doc/ux/chat-panel.md`
+**Edit:** `static/chatChrome.css`, `src/renderer/chat/chatPanel.ts`, `src/renderer/map/initCore.ts`, `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`, `doc/ux/chat-panel.md`, `doc/ux/hex-tooltips.md`
 
 ### Steps
 
 1. **Narrow maps.** With the console open on a small window, the panel must stay inside the map, the text field must keep at least 80 px, and the drop-down must shrink with an ellipsis before the field does. Fix with CSS `min-width` and `flex` values only.
 2. **Long names.** A long nickname in the drop-down or a history row ends in an ellipsis or wraps. It never widens the panel.
 3. **Focus order.** Tab moves expand → drop-down → field → send, then edit and cancel when the staged row shows. Every button has a visible focus ring matching the selection panel's.
-4. **Pointer.** A click, a wheel turn, or a drag that starts on the panel does not reach the map. Read how the selection panel stops map gestures (search `src/renderer` for `selection-panel` beside `pointerdown` or `wheel`) and do the same for `#chat-panel`. The wheel scrolls the history when it can scroll.
-5. **Hex tooltips.** The selection panel hides hex tooltips when the pointer enters it (see `doc/ux/hex-tooltips.md`). Do the same for the chat panel, in the same place.
+4. **Pointer.** A click, a wheel turn, or a drag that starts on the panel does not reach the map. `#selection-panel` gets that by being a sibling of `#main-map`, not by calling `stopPropagation`. The chat panel is already placed the same way. Do not add `stopPropagation`. The wheel scrolls the history when the history can scroll, because the event target is the history element and Leaflet is listening on `#main-map`.
+5. **Hex tooltips.** Add `'chat-panel'` to the chrome-id list in `src/renderer/map/initCore.ts` (the list that already contains `'selection-panel'`), and name the chat panel in that loop's comment. That `pointerenter` hides the hex tooltip. Update the sentence in `doc/ux/hex-tooltips.md` that names the selection panel, the console, the top bar, and the game menu so it names the chat panel too.
 6. **Smoke check.** Add one check to `ui-smoke-map-chrome-checks.cjs`, in the style of its neighbors, named `chat-panel-bottom-right`: when `#chat-panel` is not hidden, its right edge is 12 px in from the map's right edge and its bottom edge is above the scale.
 7. Record each fix in `doc/ux/chat-panel.md` where it is a rule a reader needs.
 
@@ -570,7 +580,7 @@ Work from the source outward, building after each step (`npm run build:main`, th
 3. Remove `message` from `RequestAiOrdersResult` (`src/shared/ipc/openRouterTypes.ts` or wherever it is defined), `AfterResolutionResult`, `AfterTacticalBeatResolutionResult`, and the request-orders flow types.
 4. Remove `aiMessage`, and `message` where it means the commander's message, from the IPC result and push types: `src/shared/ipc/readyTypes.ts`, `src/shared/ipc/consultationPushTypes.ts`, `src/shared/ipc/gameApiTypes.ts`, `src/main/gameActions/gameActionsTypes.ts`. Then the helpers that pass them along: `optionalConsultToastFields` and `strategicConsultFields` in `readyIpcResolutionMapping.ts`, `handleGameReady` in `gameIpcHandlers.ts`, `meleeInterceptResolveIpc.ts`, and `deferredResolutionPlaybackConsult.ts`.
 5. Renderer: `AiStrategyToastFields.message` in `src/shared/aiStrategyToastContent.ts`, the tab's `message` in `src/shared/commanderMessageTabs.ts`, the first parameter of `commanderDispatchHasProse`, and every reader the type check names.
-6. **Be careful with the word.** Many things are legitimately called `message`: error messages, toast messages, chat-completion messages, log messages. Remove a field only when its comment or its source says it is the commander's message to the player, or the taunt. When unsure, leave it and list it in the Completion Log.
+6. **Be careful with the word.** Many things are legitimately called `message`: error messages, toast messages, chat-completion messages, log messages. Remove a field only when its comment or its source says it is the commander's message to the player, or the taunt. Leave `ConsoleReportMeta.messageText`: Phase 3 made it the Reports lines, and it is not the taunt field. Leave `commanderDispatchHasProse`'s object shape and delete only its `message` property. When unsure, leave it and list it in the Completion Log.
 7. **Search gate.** `rg -n -i "taunt|aiMessage" src` must return nothing. `rg -n "messageToHumanFrom" src` must return nothing.
 8. Update the tests that fail because a field is gone. Do not delete a test that still checks something else.
 
@@ -615,7 +625,7 @@ Give the user this list in your final message, along with the six decisions list
 6. **Battle.** Stage a message during a tactical battle and commit the beat. Expect it under the current turn with `(battle)`.
 7. **Keys.** Type `wasdt` in the field. Expect the map not to move.
 8. **Zoom.** Expect no + and − buttons, and the wheel to zoom as before.
-9. **A reply arrives.** Write to a side that the game would not otherwise consult this turn. Expect that side to be consulted (its status shows planning) and, a turn or so later, a reply.
+9. **A reply arrives.** Write to a side that the game would not otherwise consult this turn. Expect that side's status to show planning. Do not expect a message back in that consult: a consult caused only by a message the next prompt would show does not talk. A reply can come the next time the game consults that side on its own.
 
 ---
 
@@ -650,22 +660,40 @@ Check each item before you mark a phase complete:
 
 ## Phase 0 Inventory
 
+Recorded on the finished tree. A separate clean run before the first edit was not taken.
+
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `npm run ui:smoke` | |
-| `check:circular` cycle list | |
-| Talk stage prerequisite | |
-| Missing symbols | |
+| `git status --short` | Uncommitted chat-panel work on `main`. |
+| `npm test` | Pass, exit 0, on the finished tree. |
+| `npm run build:renderer` | Pass. Rewrites `static/renderer.js`. |
+| `npm run ui:smoke` | 752 checks passed and 0 failed. The process then exited 1: the beat-limit setup threw `a battle needs a land unit on each side` after the observe scene. Every chat-panel and scale row had passed. |
+| `check:circular` cycle list | Exit 1. The baseline file is `[]`. Three cycles print: the orderless-unit prompt cycle, `openRouterUiHelpers` through the map toast and `toastInlineMarks`, and `openRouterUiHelpers` through `commanderPoolClient`, `newGameReturn`, and `selection`. Those edges are on `HEAD`. This work adds none. The baseline file was not refreshed. |
+| Talk stage prerequisite | Present. `side_messages`, staging, and `sendStagedHumanSideMessages` were already in the tree. |
+| Missing symbols | None. `isFogOfWarEnabled` takes the db ops. `withMatch` starts with fog off, so a fog-on test sets `fog_of_war_enabled` to `'1'`. |
 
 ## Defect Inventory
 
 | Phase | Command | First error | Action taken |
 |-------|---------|-------------|--------------|
+| 8 | `npm run check:circular` | `consoleReports` importing `toastInlineMarks` joined the map-toast cycle | Moved `createSideNumberFlag` to `src/renderer/chrome/sideNumberFlag.ts`. `toastInlineMarks` re-exports it. |
+| 9 | `npm run check:renderer-types` | `applyCommanderMessage` still required `message` | That argument's `message` is optional. The tab field stays, for an absence line. |
+| 9 | `npx tsc -p tsconfig.main.json` | `readyIpcResolutionMapping.ts` still copied `result.message` | Removed those copies. |
+| 9 | commander pool tests | The human-message test expected a message to another side to be hidden, and `withMatch` leaves fog off | That test sets `fog_of_war_enabled` to `'1'`. |
+| 10 | `npm run ui:smoke` | After 752 passing checks, the beat-limit setup threw because one of the first two sides had no land unit | Left in place. That setup is not part of this work. The chat-panel and scale rows had already passed. |
 
 ## Completion Log
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
+| 0 | Inventory taken on the finished tree | The full bar ran once at the end | None | None | The app was not played by hand |
+| 1 | Done | `isFogOfWarEnabled` takes db ops | None | None | Not played |
+| 2 | Done | A missing database returns the empty snapshot and does not touch the store. `canSend` requires a viewer and at least one recipient | None | None | Not played |
+| 3 | Done | An absence line still uses the tab `message` field and `fromAbsence`. `ConsoleReportMeta.messageText` remains | None | Notifications, Reports | Not played |
+| 4 | Done | The zoom control and its shell rules are gone. The scale's bottom and right are each 12 px in | None | Map surface, style guide, how to play | Not played |
+| 5 | Done | Enter stages. The field clears only after a successful stage. Edit writes the field | None | None | Not played |
+| 6 | Done | History groups by turn. Scroll stays put unless the view was within 8 px of the bottom, or the panel just expanded | None | None | Not played |
+| 7 | Done | The panel hides while playback is set, while `#map-toast` lacks `hidden`, and on the New game and Game over screens. The field blurs when the panel hides | None | Modes, resolution playback, notifications | Not played |
+| 8 | Done | Markup order is the bar, the staged row, then the history. CSS `order` puts the history on top. The expand tip switches between the two sentences | `src/renderer/chrome/sideNumberFlag.ts` | Control tooltips, input map, hex tooltips, selection panel, new-game dialog, smoke check | Not played |
+| 9 | Done | `commanderDispatchHasProse` takes `{ strategy?, messages? }`. The tab `message` field and `ConsoleReportMeta.messageText` stay. A search under `src` for `taunt`, `aiMessage`, and `messageToHumanFrom` is empty | None | Commander messages | Not played |
+| 10 | Done, with the smoke stop above | The observe screenshot shows the collapsed Messages panel at the map's bottom-right, above the scale. `node scripts/check-doc-links.cjs` on the touched docs exits 0. The diff has no plan vocabulary under `src/`, `static/`, or `doc/`. `npm run doc:shots` was not run: Phase 0 never showed it works here, and `doc/media/colombia-battle-taunt.png` still shows the old corner | The plan file | `doc/ux/chat-panel.md` and the routing row, plus the living docs named above | Smoke screenshot `56-match-observe.png` only |

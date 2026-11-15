@@ -2,7 +2,7 @@
 
 *Version 3.1 — August 2026 (intent plus live 2.5.0 implementation)*
 
-This is the product intent document. **Where a roster, fog radius, cost, cap, or phase claim disagrees with the engine, the engine and [combat-rules-v3.md](combat-rules-v3.md) win.** Commanders send short messages and keep private stances ([commander-messages.md](commander-messages.md)). Alliances, shared visibility, a chat panel, async multiplayer, and Steam/Discord shipping remain intent. Save and load are shipped.
+This is the product intent document. **Where a roster, fog radius, cost, cap, or phase claim disagrees with the engine, the engine and [combat-rules-v3.md](combat-rules-v3.md) win.** Commanders send short messages and keep private stances ([commander-messages.md](commander-messages.md)). The player reads and writes them in the chat panel ([ux/chat-panel.md](ux/chat-panel.md)). Alliances, shared visibility, async multiplayer, and Steam/Discord shipping remain intent. Save and load are shipped.
 
 **Implementation status (2.5.0):** The global strategic game, hybrid OpenRouter AI, fog of war, production, air, sealift, and optional tactical battles are playable on the global map (res1 strategic, res4 battles) and on regional maps (res2 or res3 strategic, res5 or res6 battles; milestone 2.5). Save and load are shipped. Tactical battles are not deferred.
 

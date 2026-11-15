@@ -33,6 +33,7 @@ import {
   forgetDismissArmedExcept,
   selectionRowDismissShown,
 } from './selectionPanelDismiss';
+import { wireChatPanel } from '../chat/chatPanel';
 import { settleSelectionPanelSlide, wireSelectionPanelExpand } from './selectionPanelExpand';
 import { wireSelectionPanelResize } from './selectionPanelResize';
 
@@ -401,5 +402,6 @@ export function wireSelectionPanel(deps: SelectionPanelDeps): void {
   selectionPanelDeps = deps;
   onQueuedOrdersChanged(() => renderSelectionPanel());
   wireSelectionPanelExpand();
+  wireChatPanel();
   wireSelectionPanelResize();
 }

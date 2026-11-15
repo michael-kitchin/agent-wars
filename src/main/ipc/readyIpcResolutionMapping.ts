@@ -25,19 +25,17 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { TacticalPostBeatConsultFields, TacticalPostBeatConsultMergeSource } from '../../shared/ipc/consultationPushTypes';
 
 /**
- * Spreads optional `aiMessage` / `aiStrategy` IPC fields when the trimmed text is non-empty.
+ * Spreads an optional `aiStrategy` IPC field when the trimmed text is non-empty.
  *
  * Purpose: One omit-empty rule so Ready, melee-resolve, and tactical post-beat payloads cannot drift.
- * When to use: Mapping consultation `message`/`strategy` onto renderer-facing IPC.
+ * When to use: Mapping consultation strategy onto renderer-facing IPC.
  * Expected outcome: Empty or whitespace values are omitted entirely.
  * Exceptions: None.
  */
-function optionalConsultToastFields(message?: string, strategy?: string): { aiMessage?: string; aiStrategy?: string } {
-  const msg = message?.trim() ?? '';
+function optionalConsultToastFields(strategy?: string): { aiStrategy?: string } {
   const strat = strategy?.trim() ?? '';
   return {
     ...(strat ? { aiStrategy: strat } : {}),
-    ...(msg ? { aiMessage: msg } : {}),
   };
 }
 
@@ -208,9 +206,9 @@ export interface TacticalBeatConsultArgs extends PostResolutionConsultArgs {
 /**
  * Maps runner merge source plus `battleId` into the renderer-facing tactical post-beat consultation IPC fields.
  *
- * Purpose: Single attach/`tacticalOpponentPlan`/`aiStrategy`/`aiMessage`/`toolInvocationCounts` wiring for `commitHumanTacticalDraftOrders` so `main.ts` and `runEventDrivenAfterTacticalBeatConsultation` cannot drift.
+ * Purpose: Single attach/`tacticalOpponentPlan`/`aiStrategy`/`toolInvocationCounts` wiring for `commitHumanTacticalDraftOrders` so `main.ts` and `runEventDrivenAfterTacticalBeatConsultation` cannot drift.
  * When to use: After `runEventDrivenAfterTacticalBeatConsultation` resolves, or whenever converting an `afterTacticalBeatResolution`-shaped merge source into `TacticalPostBeatConsultFields`.
- * Expected outcome: `kind` and `battleId` always set; strategy/message from the merge source are exposed as `aiStrategy`/`aiMessage` when present.
+ * Expected outcome: `kind` and `battleId` always set; strategy from the merge source is exposed as `aiStrategy` when present.
  * Exceptions: None; pure data transform.
  */
 export function toTacticalPostBeatConsultFields(
@@ -219,12 +217,10 @@ export function toTacticalPostBeatConsultFields(
 ): TacticalPostBeatConsultFields {
   const attach = post.attachTacticalOpponentPlanToIpc === true;
   const strategyText = post.aiStrategy ?? post.strategy;
-  const shownMessage = post.message ?? post.aiMessage;
   logDebug('ipc toTacticalPostBeatConsultFields', {
     battleId,
     attachTacticalOpponentPlanToIpc: attach,
     hasStrategy: Boolean(strategyText?.trim()),
-    hasMessage: Boolean(shownMessage?.trim()),
     hasToolInvocationCounts: Boolean(post.toolInvocationCounts),
     cost: typeof post.cost === 'number' && Number.isFinite(post.cost) ? post.cost : undefined,
   });
@@ -233,7 +229,7 @@ export function toTacticalPostBeatConsultFields(
     battleId,
     attachTacticalOpponentPlanToIpc: attach,
     ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
-    ...optionalConsultToastFields(shownMessage, strategyText),
+    ...optionalConsultToastFields(strategyText),
     ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
   };
@@ -422,7 +418,7 @@ export function buildDistinctAiMovesFromPlanningOrders(
  */
 export async function runEventDrivenAfterResolutionConsultation(
   args: StrategicConsultArgs
-): Promise<{ aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number>; cost?: number }> {
+): Promise<{ aiStrategy?: string; toolInvocationCounts?: Record<string, number>; cost?: number }> {
   if (!args.useEventDrivenConsultation || !args.resolutionSuccess || !args.aiPlanningRunEnabled) {
     return {};
   }
@@ -451,7 +447,6 @@ export async function runEventDrivenAfterResolutionConsultation(
       results.set(request.seatId, result);
       return emptyConsultOutcome({
         costUsd: finiteCost(result.cost),
-        message: result.message ?? null,
         strategy: result.strategy ?? null,
         modelId,
         absenceReason: result.consulted ? null : (result.absenceReason ?? null),
@@ -529,7 +524,6 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
         return emptyConsultOutcome({
           costUsd: finiteCost(result.cost),
           modelId,
-          message: result.message ?? null,
           strategy: result.strategy ?? null,
           absenceReason: result.consulted ? null : (result.absenceReason ?? null),
           ...toolCounts,
@@ -540,7 +534,6 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
         tacticalPlan: result.tacticalOpponentPlan,
         costUsd: finiteCost(result.cost),
         modelId,
-        message: result.message ?? null,
         strategy: result.strategy ?? null,
         absenceReason: null,
         ...toolCounts,
@@ -555,7 +548,6 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
     attachTacticalOpponentPlanToIpc: post.attachTacticalOpponentPlanToIpc,
     tacticalOpponentPlan: post.tacticalOpponentPlan,
     strategy: post.strategy,
-    message: post.message,
     toolInvocationCounts: post.toolInvocationCounts,
     ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
   };
@@ -635,14 +627,14 @@ async function consultSeatsThroughPool(
 /**
  * Toast fields from the first seat that consulted, plus the sum of reported costs.
  *
- * Purpose: The Ready result still carries the first seat's message for callers that read the IPC payload. The message dialog reads the pool, not this field.
+ * Purpose: The Ready result still carries the first seat's strategy for callers that read the IPC payload. The message dialog reads the pool.
  * When to use: After every post-resolution runner has stored its result.
  * Expected outcome: Omitted prose stays omitted. Cost is present only when at least one consult reported a finite cost.
  * Exceptions: None.
  */
 function strategicConsultFields(
   results: ReadonlyMap<AiSeatId, AfterResolutionResult>
-): { aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number>; cost?: number } {
+): { aiStrategy?: string; toolInvocationCounts?: Record<string, number>; cost?: number } {
   let first: AfterResolutionResult | undefined;
   let cost = 0;
   let sawCost = false;
@@ -658,7 +650,7 @@ function strategicConsultFields(
   logTrace('readyIpcResolutionMapping strategicConsultFields', { consulted: Boolean(first), sawCost });
   if (!first) return sawCost ? { cost } : {};
   return {
-    ...optionalConsultToastFields(first.message, first.strategy),
+    ...optionalConsultToastFields(first.strategy),
     ...(first.toolInvocationCounts ? { toolInvocationCounts: first.toolInvocationCounts } : {}),
     ...(sawCost ? { cost } : {}),
   };

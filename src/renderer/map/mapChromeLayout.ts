@@ -9,7 +9,7 @@
  *   message toast's tab row is wider than the gap.
  * Exceptions: None; missing elements are skipped.
  */
-import { legendPopoverPosition, messageToastBandWidth, toastBandSpan } from '../../shared/mapChromePlacement';
+import { chatPanelPlacement, legendPopoverPosition, messageToastBandWidth, toastBandSpan } from '../../shared/mapChromePlacement';
 
 /**
  * Moves the open legend beside or under the minimap panel, then fits the toast band between the chrome on the left
@@ -70,6 +70,33 @@ export function layoutMapChrome(): void {
     width = messageToastBandWidth({ mapWidth: mapBox.width, available, tabRowOuterWidth });
     band.style.width = `${width}px`;
   }
+  placeChatPanel(mapBox, width);
+}
+
+/**
+ * Sets the chat panel's box from the band width and the scale.
+ *
+ * Purpose: The panel matches the message dialog's width and sits above the scale.
+ * When to use: At the end of `layoutMapChrome`, after the band width is final.
+ * Expected outcome: `#chat-panel` gets `width`, `right`, and `bottom`. `#chat-panel-history` gets `max-height`. A missing scale counts as height 0.
+ * Exceptions: None. A missing panel is skipped.
+ */
+function placeChatPanel(mapBox: DOMRect, bandWidth: number): void {
+  const panel = document.getElementById('chat-panel');
+  if (!(panel instanceof HTMLElement)) return;
+  const scale = document.querySelector('#main-map .leaflet-control-scale');
+  const scaleHeight = scale instanceof HTMLElement ? scale.getBoundingClientRect().height : 0;
+  const place = chatPanelPlacement({
+    mapWidth: mapBox.width,
+    mapHeight: mapBox.height,
+    bandWidth,
+    scaleHeight,
+  });
+  panel.style.width = `${place.width}px`;
+  panel.style.right = `${place.right}px`;
+  panel.style.bottom = `${place.bottom}px`;
+  const history = document.getElementById('chat-panel-history');
+  if (history instanceof HTMLElement) history.style.maxHeight = `${place.maxHistoryHeight}px`;
 }
 
 /**

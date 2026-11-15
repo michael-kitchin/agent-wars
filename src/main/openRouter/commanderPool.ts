@@ -10,7 +10,6 @@
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS, AI_CONSULTATION_WALL_CLOCK_MS, AI_TALK_ROUND_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
 import type { CommanderAbsenceReason, CommanderDispatch, CommanderPoolSnapshot, CommanderStatus } from '../../shared/commanderStatus';
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
-import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { AI_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { tacticalDraftAlreadyDecided } from '../../shared/ipc/tacticalOpponentPlanMerge';
@@ -620,21 +619,6 @@ export function openCommanderTalkRound(
 }
 
 /**
- * The message this seat sent to the human player in this wave.
- *
- * Purpose: The existing message dialog shows that text.
- * When to use: When a consult outcome is stored. The round has closed by then when this seat spoke.
- * Expected outcome: The stored text, or null when this seat sent nothing to the active human seat.
- * Exceptions: None.
- */
-function messageToHumanFrom(talkRound: TalkRound | null, seatId: AiSeatId): string | null {
-  const humanSeatId = activeHumanSeatId(getSeatRoster());
-  if (!talkRound || !humanSeatId) return null;
-  const text = talkRound.sentBy(seatId).find((row) => row.toSeatId === humanSeatId)?.text.trim() ?? '';
-  return text.length > 0 ? text : null;
-}
-
-/**
  * Starts one consult and returns without waiting for it.
  *
  * Purpose: The caller loops every eligible seat before any of them resolves.
@@ -716,7 +700,7 @@ function launch(
     return {
       ...outcome,
       costUsd: outcome.costUsd + (talkRound?.costFor(seatId) ?? 0),
-      message: messageToHumanFrom(talkRound, seatId) ?? outcome.message,
+      sentMessages: (talkRound?.sentBy(seatId) ?? []).map((row) => ({ toSeatId: row.toSeatId, text: row.text })),
     };
   };
   void pending.then(

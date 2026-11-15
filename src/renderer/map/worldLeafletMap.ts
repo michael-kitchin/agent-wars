@@ -250,8 +250,6 @@ export function initWorldLeafletMaps(
   } catch {
     /* scale control not available in some Leaflet builds */
   }
-  /* Leaflet inserts a bottom control at the front of the corner, so adding zoom after the scale puts it on the right. */
-  leafletRef.control.zoom({ position: 'bottomright' }).addTo(mainMap);
 
   miniMap = leafletRef.map(miniEl, {
     minZoom: 0,

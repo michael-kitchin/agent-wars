@@ -8,7 +8,7 @@ Collect the settings for a match, and later show how the match finished.
 
 ## Availability
 
-Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. At startup and at game over it cannot be dismissed without starting a match. While a match is waiting under the screen, the header bar's right edge holds a close control (`#new-game-dialog-close`) that hides the screen and returns to that match. The console and the selection panel are not on screen while it is open, including while the choices are hidden. The top bar is the new-game bar ([top-bar.md](top-bar.md)). The setup panel floats over the map, 12 px in from the map's top-left corner, and the map fills the window under the top bar. Drag and the wheel pan and zoom the preview, and the + and − buttons zoom it, with the choices showing or hidden.
+Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. At startup and at game over it cannot be dismissed without starting a match. While a match is waiting under the screen, the header bar's right edge holds a close control (`#new-game-dialog-close`) that hides the screen and returns to that match. The console and the selection panel are not on screen while it is open, including while the choices are hidden. The top bar is the new-game bar ([top-bar.md](top-bar.md)). The setup panel floats over the map, 12 px in from the map's top-left corner, and the map fills the window under the top bar. Drag and the wheel pan and zoom the preview, with the choices showing or hidden. The chat panel is hidden with the selection panel.
 
 ## Information Displayed
 
@@ -34,7 +34,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 ### Mouse
 
-- When the player drags or turns the wheel over the map outside the panel, the preview pans and zooms, inside the extent already applied. The + and − buttons zoom the preview. A click, double-click, or right-click on the map itself does not select, order, or change the selection. Hover does not open a hex tooltip or an order preview, and the pointer does not show a unit cursor.
+- When the player drags or turns the wheel over the map outside the panel, the preview pans and zooms, inside the extent already applied. A click, double-click, or right-click on the map itself does not select, order, or change the selection. Hover does not open a hex tooltip or an order preview, and the pointer does not show a unit cursor.
 - When the player clicks the expand control while the choices are showing, the panel slides down to the header bar and the chevron points down. The settled bar shows Start game, or New game, in place of the message. The map keeps its centre and zoom. Clicking it again puts that button back in the footer as the panel grows, slides the choices open, and the chevron points up. A panel dragged low moves up if the expanded height would leave the map.
 - When the player drags the grip, the panel follows the pointer and stays inside the map, 12 px in from each edge. Every open puts it back at the corner.
 - When the player clicks the close control, the screen hides and the match that was waiting returns, including its camera, its hillshade, its orders, and its selection. The control is absent at startup and at game over.

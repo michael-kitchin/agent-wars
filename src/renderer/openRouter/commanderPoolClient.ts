@@ -7,6 +7,7 @@
  * Exceptions: A failed IPC call is logged and leaves the last snapshot in place.
  */
 
+import { refreshChatThread } from '../chat/chatPanelClient';
 import { commanderDispatchHasProse } from '../../shared/commanderMessageTabs';
 import type { CommanderDispatch, CommanderPlanningMode, CommanderPoolSnapshot, CommanderStatusRow } from '../../shared/commanderStatus';
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
@@ -234,7 +235,7 @@ export async function stopCommanderPlanningFromScreen(reason: ModelCallCancelRea
 function messageLines(dispatches: readonly CommanderDispatch[]): CommanderDispatch[] {
   const kept: CommanderDispatch[] = [];
   for (const dispatch of dispatches) {
-    if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
+    if (!commanderDispatchHasProse(dispatch)) continue;
     fileMessage?.(dispatch);
     kept.push(dispatch);
   }
@@ -260,6 +261,7 @@ export async function readCommanderPoolAndApply(drain: boolean, showMessages = t
     applyCommanderToolCountSum(next.toolInvocationCounts);
     const consultFinished = wasPlanning && !anyCommanderIsPlanning();
     if (drain && (next.dispatches.length > 0 || consultFinished)) {
+      void refreshChatThread();
       messageLines(next.dispatches);
       if (showMessages) showToast?.(next.dispatches, next.statuses);
       await refreshSeatCosts();

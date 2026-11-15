@@ -113,7 +113,6 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
       airDropOrders: value.airDropOrders ?? [],
       embarkOrders: value.embarkOrders ?? [],
       missileLaunchOrders: value.missileLaunches ?? [],
-      message: prose(value.message),
       strategy: prose(value.strategy),
       costUsd: typeof value.cost === 'number' && Number.isFinite(value.cost) ? value.cost : 0,
       modelId: usedModelId,

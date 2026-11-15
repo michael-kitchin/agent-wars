@@ -56,7 +56,7 @@ Release **2.20.0** removes a vertical line of city cells that a new game drew do
 
 Release **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, groups idle build hexes by what they can still queue, turns a move past this turn's budget into a march when standing orders are on, and holds a unit ordered onto its own cell. A battle that crosses the 180° meridian draws as one area. Starting the game again brings the open window to the front, and preparing a commander's briefing freezes the window less.
 
-A finished match keeps a history file ([match-recording.md](match-recording.md)). Playing that history back is not built. Commanders send messages and keep private stances ([commander-messages.md](commander-messages.md)). A chat panel, alliances, and async multiplayer remain unbuilt.
+A finished match keeps a history file ([match-recording.md](match-recording.md)). Playing that history back is not built. Commanders send messages and keep private stances ([commander-messages.md](commander-messages.md)). The player reads and writes them in the chat panel ([ux/chat-panel.md](ux/chat-panel.md)). Alliances and async multiplayer remain unbuilt.
 
 ## How to read `doc/`
 
@@ -65,7 +65,7 @@ A finished match keeps a history file ([match-recording.md](match-recording.md))
 | [how-to-play.md](how-to-play.md) | Player guide, in this order: winning and losing, setup on global and regional maps, saving and loading, controls, turn order, a units table, building, credits and hiring, fortifications, targeting, air power, ballistic missiles, sealift, battles with roads and rail, unit bonuses, common surprises, and messages | **Current UI.** Downloads and the OpenRouter key are under Play it in the root [README.md](../README.md). Per-surface detail is in [ux/](ux/). |
 | [save-files.md](save-files.md) | How a match is written to an `.agentwars` file and opened again, including what the file omits, the version rule, and the exclusive lock on the open match file | **Current.** Matches `EXPECTED_USER_VERSION`, `MACHINE_LOCAL_CONFIG_KEYS`, and `applyGameDbPragmas`. |
 | [match-recording.md](match-recording.md) | The history of one match: frames, events, and the recording file written when the match ends | **Current.** Matches `MATCH_TABLE_RECORDING_POLICY`, `MATCH_EVENT_TYPES`, and `RECORDING_FILE_FORMAT_VERSION`. |
-| [commander-messages.md](commander-messages.md) | Messages between sides, private stances, and the talk call that runs before orders | **Current.** Matches `sideMessageVisibleTo`, `SIDE_MESSAGE_MAX_CHARS`, `AI_TALK_ROUND_TIMEOUT_MS`, and `isTalkStageEnabled`. |
+| [commander-messages.md](commander-messages.md) | Messages between sides, the chat panel, private stances, and the talk call that runs before orders | **Current.** Matches `sideMessageVisibleTo`, `SIDE_MESSAGE_MAX_CHARS`, `AI_TALK_ROUND_TIMEOUT_MS`, and `isTalkStageEnabled`. |
 | [combat-rules-v3.md](combat-rules-v3.md) | Combat, movement, production, fog, sealift, and tactical battles | **Current mechanics.** Numbers are taken from engine constants. |
 | [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
 | [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `decideEndOfTurnOutcome`. |

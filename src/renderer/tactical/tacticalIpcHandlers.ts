@@ -6,6 +6,7 @@ import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../..
 import { reconcileSelectionToCurrentState } from '../core/selection';
 import { updateGameStateSidebar } from '../core/uiState';
 import { rendererSharedState as S } from '../core/state';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { flushResolutionPlaybackCompleteNotifyCallbacks } from '../openRouter/resolutionPlaybackDeferral';
 import { stashStrategicOrderDraftsForTacticalSession } from './tacticalStrategicOrderUiStash';
 
@@ -28,6 +29,7 @@ function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned(): void {
   }
   S.resolutionMoveAnimationFrameId = null;
   S.resolutionMoveAnimation = null;
+  syncChatPanelVisibility();
   if (interruptedStrategicPlayback) {
     flushResolutionPlaybackCompleteNotifyCallbacks();
   }

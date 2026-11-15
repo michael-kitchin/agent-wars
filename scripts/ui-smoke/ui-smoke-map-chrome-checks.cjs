@@ -45,16 +45,15 @@ const PANEL = Object.freeze({
 const MODE_TABS = Object.freeze(['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production', '#map-legend-toggle']);
 
 /**
- * Leaflet's scale and zoom control on the main map.
+ * Leaflet's scale on the main map.
  *
- * Purpose: One place for the selectors the position checks read.
+ * Purpose: One place for the selector the position check reads.
  * When to use: The scale check.
- * Expected outcome: Leaflet's own class names inside `#main-map`.
+ * Expected outcome: Leaflet's own class name inside `#main-map`.
  * Exceptions: None.
  */
 const LEAFLET = Object.freeze({
   scale: '#main-map .leaflet-control-scale',
-  zoom: '#main-map .leaflet-control-zoom',
 });
 
 /**
@@ -235,36 +234,39 @@ const MAP_CHROME_CHECKS = Object.freeze([
   {
     name: 'scale-and-attribution-bottom-right',
     scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', LEAFLET.scale, LEAFLET.zoom],
+    needs: ['#canvas-container', LEAFLET.scale],
     run: (p, el) => {
       const c = el('#canvas-container');
       const scale = el(LEAFLET.scale);
-      const zoom = el(LEAFLET.zoom);
       if (!scale.shown) return 'the scale is not shown';
+      const right = c.x + c.w - PANEL.inset;
       const bottom = c.y + c.h - PANEL.inset;
       if (!near(scale.y + scale.h, bottom)) {
         return `the scale is at ${fmt(scale)}, expected its bottom ${PANEL.inset} px in from the map ${fmt(c)}`;
       }
-      if (!near(scale.x + scale.w, zoom.x - 6)) {
-        return `the scale is at ${fmt(scale)}, expected 6 px left of the zoom buttons ${fmt(zoom)}`;
+      if (!near(scale.x + scale.w, right)) {
+        return `the scale is at ${fmt(scale)}, expected its right ${PANEL.inset} px in from the map ${fmt(c)}`;
       }
       return null;
     },
   },
   {
-    name: 'zoom-buttons-bottom-right',
-    scenes: [...PLACEMENT_SCENES, ...NEW_GAME_SCENES],
-    needs: ['#canvas-container', LEAFLET.zoom],
+    name: 'chat-panel-bottom-right',
+    scenes: PLACEMENT_SCENES,
+    needs: ['#canvas-container', '#chat-panel', LEAFLET.scale],
     run: (p, el) => {
-      if (p.minimapHasZoom) return 'the minimap has zoom buttons';
+      const panel = el('#chat-panel');
+      if (!panel.shown) return null;
       const c = el('#canvas-container');
-      const zoom = el(LEAFLET.zoom);
-      if (!zoom.shown) return 'the zoom buttons are not shown';
+      const scale = el(LEAFLET.scale);
       const right = c.x + c.w - PANEL.inset;
-      const bottom = c.y + c.h - PANEL.inset;
-      return near(zoom.x + zoom.w, right) && near(zoom.y + zoom.h, bottom)
-        ? null
-        : `the zoom buttons are at ${fmt(zoom)}, expected ${PANEL.inset} px in from the map's bottom-right ${fmt(c)}`;
+      if (!near(panel.x + panel.w, right)) {
+        return `the chat panel is at ${fmt(panel)}, expected its right ${PANEL.inset} px in from the map ${fmt(c)}`;
+      }
+      if (scale.shown && panel.y + panel.h > scale.y + 1) {
+        return `the chat panel is at ${fmt(panel)}, expected above the scale ${fmt(scale)}`;
+      }
+      return null;
     },
   },
   {

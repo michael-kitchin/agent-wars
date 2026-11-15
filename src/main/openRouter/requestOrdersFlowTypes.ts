@@ -113,15 +113,6 @@ export interface RequestOrdersResult {
    */
   strategy?: string;
   /**
-   * The message this commander sent to the human player in this wave, when there is one.
-   *
-   * Contract: Optional. The orders reply does not set it.
-   * When to use: The commander pool, from the talk round.
-   * Expected outcome: The text, or omitted.
-   * Exceptions: None.
-   */
-  message?: string;
-  /**
    * Why this success stored no plan and called no model.
    *
    * Contract: Set only for a tactical consult whose own roster is empty. A strategic consult with no units omits this and continues.

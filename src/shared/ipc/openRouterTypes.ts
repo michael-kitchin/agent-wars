@@ -251,15 +251,6 @@ embarkOrders?: EmbarkOrder[];
        */
 strategy?: string;
             /**
-       * The message this commander sent to the human player in this wave, when there is one.
-
-       * Contract: Opaque prose for the player-facing toast and later prompts; not parsed for mechanics.
-       * When to use: Surface beside `strategy` after a successful consultation.
-       * Expected outcome: Trimmed string or omitted when the model did not emit a message.
-       * Exceptions: None.
-       */
-message?: string;
-            /**
        * Why this success stored no plan and called no model.
 
        * Contract: Set only for a tactical consult whose own roster is empty. Omitted when the model was called.

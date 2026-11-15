@@ -12,8 +12,10 @@ import {
   type ConsoleReportKind,
 } from '../../shared/consoleReportLog';
 import { paletteForOwner } from '../../shared/seatPalette';
+import { activeHumanSeatId } from '../../shared/observeModeControls';
+import { dispatchMessagesInSideOrder, sideMessagePartyLabel } from '../../shared/sideMessageView';
 import { sideDisplayName } from '../../shared/sideNicknames';
-import { createSideNumberFlag } from './toastInlineMarks';
+import { createSideNumberFlag } from './sideNumberFlag';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
 
@@ -53,6 +55,15 @@ export interface ConsoleReportMeta {
    * Exceptions: None.
    */
   readonly messageText?: string;
+  /**
+   * The messages visible when the consult was stored.
+   *
+   * Contract: One line per entry. A later fog change does not rewrite a filed entry.
+   * When to use: A commander dispatch.
+   * Expected outcome: `To {label}: {text}` under the sender's name.
+   * Exceptions: None.
+   */
+  readonly messages?: readonly { readonly toSeatId: string; readonly text: string }[];
   /**
    * Strategy prose.
    *
@@ -107,9 +118,9 @@ const listeners: Array<() => void> = [];
 /**
  * The sender line for a message entry.
  *
- * Purpose: The row names the side and quotes the message. Strategy follows when the consult sent it.
- * When to use: `recordConsoleReport` when `messageText` is set.
- * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name, the message in quotes when it is non-empty, and a strategy line when strategy is non-empty.
+ * Purpose: The row names the side, then one line per message that was visible when the consult was stored.
+ * When to use: `recordConsoleReport` when `messageText` or `messages` is set.
+ * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name. Each message is `To {label}: {text}`, and You has no flag. A `messageText` with no message lines is still quoted. A strategy line follows when strategy is non-empty.
  * Exceptions: None.
  */
 function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
@@ -125,11 +136,37 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
     mark.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? '#9D174D';
   }
   const name = document.createElement('span');
-  const message = meta.messageText?.trim() ?? '';
   const home = seat ? sideDisplayName(seat) : 'Commander';
-  name.textContent = message.length > 0 ? `${home} "${message}"` : home;
+  name.textContent = home;
   line.append(mark, name);
   wrap.append(line);
+  const viewerSeatId = activeHumanSeatId(seats);
+  const lines = dispatchMessagesInSideOrder(meta.messages ?? [], (seatId) => seats.find((row) => row.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER);
+  for (const row of lines) {
+    const text = row.text.trim();
+    if (text.length === 0) continue;
+    const item = document.createElement('p');
+    item.className = 'console-report-message';
+    const label = sideMessagePartyLabel(row.toSeatId, viewerSeatId, (seatId) => {
+      const named = seats.find((candidate) => candidate.seatId === seatId);
+      return named ? sideDisplayName(named) : seatId;
+    });
+    if (label !== 'You') {
+      const recipientFlag = createSideNumberFlag(row.toSeatId, seats);
+      if (recipientFlag) item.appendChild(recipientFlag);
+    }
+    const words = document.createElement('span');
+    words.textContent = `To ${label}: ${text}`;
+    item.appendChild(words);
+    wrap.append(item);
+  }
+  const quoted = lines.length === 0 ? (meta.messageText?.trim() ?? '') : '';
+  if (quoted.length > 0) {
+    const legacy = document.createElement('p');
+    legacy.className = 'console-report-message';
+    legacy.textContent = `"${quoted}"`;
+    wrap.append(legacy);
+  }
   const strategyText = meta.strategyText?.trim() ?? '';
   if (strategyText.length > 0) {
     const strategy = document.createElement('p');
@@ -260,8 +297,8 @@ export function currentConsoleReportTag(): string {
  * Purpose: Keeps what a toast showed after the toast hides.
  * When to use: Right after a map toast or the AI strategy toast is filled. `body` is the toast's text element;
  *   it is copied, not moved.
- * Expected outcome: A new first entry with the tag and the kind. Without `messageText`, the body is a copy of the toast.
- *   With `messageText`, the body is the sender's name and the quoted message when that message is non-empty, plus a strategy line when the consult sent one.
+ * Expected outcome: A new first entry with the tag and the kind. Without `messageText` and without `messages`, the body is a copy of the toast.
+ *   With either of those, the body is the sender's name and one line per stored message, plus a strategy line when the consult sent one.
  *   A message can show a model label. A turn report also gets a disabled Replay placeholder. The entry is marked new
  *   until the player next leaves the Reports tab, and counts as unread unless the tab is on screen. Past
  *   `MAX_CONSOLE_REPORTS` the oldest entry is dropped. A sender filter hides a new message from another seat.
@@ -296,7 +333,7 @@ export function recordConsoleReport(kind: ConsoleReportKind, tag: string, body: 
   if (kind === 'turn') head.append(createReplayPlaceholder());
   const content = document.createElement('div');
   content.className = 'console-report-body';
-  if (meta?.messageText !== undefined) content.append(messageReportBody(meta));
+  if (meta?.messageText !== undefined || meta?.messages !== undefined) content.append(messageReportBody(meta));
   else content.append(...Array.from(body.cloneNode(true).childNodes));
   entry.append(head, content);
   entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);

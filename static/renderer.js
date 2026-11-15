@@ -16403,6 +16403,22 @@
     return palette ?? null;
   }
 
+  // src/renderer/chrome/sideNumberFlag.ts
+  function createSideNumberFlag(seatId, seats) {
+    const index = aiIndexForSeatId(seatId);
+    const palette = paletteForOwner(seatId, seats);
+    if (index == null || palette == null) return null;
+    const flag = document.createElement("span");
+    flag.className = "side-number-flag";
+    flag.style.background = palette.map;
+    flag.setAttribute("aria-hidden", "true");
+    const digit = document.createElement("span");
+    digit.textContent = String(index);
+    digit.style.color = "#ffffff";
+    flag.appendChild(digit);
+    return flag;
+  }
+
   // src/shared/observeModeControls.ts
   function activeHumanSeatId(seats) {
     return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
@@ -17763,7 +17779,6 @@
       }).addTo(mainMap4);
     } catch {
     }
-    leafletRef2.control.zoom({ position: "bottomright" }).addTo(mainMap4);
     miniMap2 = leafletRef2.map(miniEl, {
       minZoom: 0,
       maxZoom: 2,
@@ -18568,20 +18583,6 @@
     if (colors != null && ownerId !== HUMAN_SEAT_ID) image.style.transform = "scaleX(-1)";
     token.appendChild(image);
     return token;
-  }
-  function createSideNumberFlag(seatId, seats) {
-    const index = aiIndexForSeatId(seatId);
-    const palette = paletteForOwner(seatId, seats);
-    if (index == null || palette == null) return null;
-    const flag = document.createElement("span");
-    flag.className = "side-number-flag";
-    flag.style.background = palette.map;
-    flag.setAttribute("aria-hidden", "true");
-    const digit = document.createElement("span");
-    digit.textContent = String(index);
-    digit.style.color = "#ffffff";
-    flag.appendChild(digit);
-    return flag;
   }
 
   // src/shared/htmlTextFormatting.ts
@@ -21971,6 +21972,102 @@ ${bonuses}`;
     }
   }
 
+  // src/shared/chatPanelState.ts
+  function stagedMessageFor(staged, recipientSeatId2) {
+    if (recipientSeatId2 == null) return null;
+    return staged.find((row) => row.toSeatId === recipientSeatId2) ?? null;
+  }
+  function nextRecipientSeatId(current, recipientSeatIds) {
+    if (current != null && recipientSeatIds.includes(current)) return current;
+    return recipientSeatIds[0] ?? null;
+  }
+  function canStageText(text) {
+    return text.trim().length > 0;
+  }
+  function chatPanelShouldShow(input) {
+    return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing;
+  }
+
+  // src/renderer/core/matchEpoch.ts
+  var rendererMatchEpoch = 0;
+  function advanceRendererMatchEpoch() {
+    rendererMatchEpoch += 1;
+    return rendererMatchEpoch;
+  }
+  function currentRendererMatchEpoch() {
+    return rendererMatchEpoch;
+  }
+  function rendererMatchEpochCurrent(captured) {
+    return captured === rendererMatchEpoch;
+  }
+
+  // src/renderer/chat/chatPanelClient.ts
+  var EMPTY_THREAD = {
+    viewerSeatId: null,
+    canSend: false,
+    recipientSeatIds: [],
+    messages: [],
+    staged: []
+  };
+  var snapshot = EMPTY_THREAD;
+  var recipientSeatId = null;
+  var listeners = [];
+  function chatSnapshot() {
+    return snapshot;
+  }
+  function chatRecipientSeatId() {
+    return recipientSeatId;
+  }
+  function setChatRecipient(seatId) {
+    recipientSeatId = seatId;
+  }
+  function subscribeChatThread(listener) {
+    listeners.push(listener);
+    return () => {
+      const index = listeners.indexOf(listener);
+      if (index >= 0) listeners.splice(index, 1);
+    };
+  }
+  function notifyChatThread() {
+    for (const listener of listeners) listener();
+  }
+  async function refreshChatThread() {
+    const read = window.gameApi?.readSideMessages;
+    if (!read) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    try {
+      const next = await read();
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      snapshot = next;
+      recipientSeatId = nextRecipientSeatId(recipientSeatId, next.recipientSeatIds);
+      notifyChatThread();
+    } catch (err) {
+      console.error("readSideMessages failed", err);
+    }
+  }
+  async function stageChatMessage(text) {
+    const stage = window.gameApi?.stageSideMessage;
+    if (!stage || recipientSeatId == null) return "Invalid message.";
+    try {
+      const result = await stage({ toSeatId: recipientSeatId, text });
+      await refreshChatThread();
+      return result.success ? null : result.reason;
+    } catch (err) {
+      console.error("stageSideMessage failed", err);
+      return "Invalid message.";
+    }
+  }
+  async function cancelStagedChatMessage() {
+    const cancel = window.gameApi?.cancelStagedSideMessage;
+    if (!cancel || recipientSeatId == null) return;
+    try {
+      await cancel({ toSeatId: recipientSeatId });
+      await refreshChatThread();
+    } catch (err) {
+      console.error("cancelStagedSideMessage failed", err);
+    }
+  }
+
   // src/shared/commanderMessageTabs.ts
   function compareCommanderMessageTabs(left, right) {
     const leftIndex = aiIndexForSeatId(left.seatId) ?? Number.MAX_SAFE_INTEGER;
@@ -21983,6 +22080,7 @@ ${bonuses}`;
       label: seat.label,
       enabled: false,
       message: null,
+      messages: [],
       strategy: null,
       consultedWithoutProse: false,
       fromAbsence: false
@@ -21990,18 +22088,23 @@ ${bonuses}`;
     return { tabs, selectedSeatId: null };
   }
   function applyCommanderMessage(state, arrival) {
-    const message = proseOrNull(arrival.message);
+    const message = proseOrNull(arrival.message ?? null);
     const strategy = proseOrNull(arrival.strategy);
-    if (!message && !strategy) return state;
+    const messages = (arrival.messages ?? []).flatMap((row) => {
+      const text = proseOrNull(row.text);
+      return text ? [{ toSeatId: row.toSeatId, text }] : [];
+    });
+    if (!message && !strategy && messages.length === 0) return state;
     const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
     if (index < 0) return state;
     const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy, consultedWithoutProse: false, fromAbsence: false } : tab
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, messages, strategy, consultedWithoutProse: false, fromAbsence: false } : tab
     );
     return { tabs, selectedSeatId: arrival.seatId };
   }
-  function commanderDispatchHasProse(message, strategy) {
-    return proseOrNull(message ?? null) !== null || proseOrNull(strategy ?? null) !== null;
+  function commanderDispatchHasProse(input) {
+    if (proseOrNull(input.strategy ?? null) !== null) return true;
+    return (input.messages ?? []).some((row) => proseOrNull(row.text) !== null);
   }
   function proseOrNull(value) {
     const trimmed = value?.trim() ?? "";
@@ -22051,6 +22154,7 @@ ${bonuses}`;
         consultedWithoutProse: true,
         enabled: false,
         message: current.fromAbsence ? null : tab.message,
+        messages: current.fromAbsence ? [] : tab.messages,
         strategy: null,
         fromAbsence: false
       } : tab
@@ -22066,7 +22170,7 @@ ${bonuses}`;
     const current = state.tabs[index];
     if (!current || current.enabled && !current.fromAbsence) return state;
     const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message: line, strategy: null, fromAbsence: true, consultedWithoutProse: false } : tab
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message: line, messages: [], strategy: null, fromAbsence: true, consultedWithoutProse: false } : tab
     );
     return { tabs, selectedSeatId: state.selectedSeatId };
   }
@@ -22076,19 +22180,6 @@ ${bonuses}`;
       tabs: state.tabs.map((tab) => tab.consultedWithoutProse ? { ...tab, consultedWithoutProse: false } : tab),
       selectedSeatId: state.selectedSeatId
     };
-  }
-
-  // src/renderer/core/matchEpoch.ts
-  var rendererMatchEpoch = 0;
-  function advanceRendererMatchEpoch() {
-    rendererMatchEpoch += 1;
-    return rendererMatchEpoch;
-  }
-  function currentRendererMatchEpoch() {
-    return rendererMatchEpoch;
-  }
-  function rendererMatchEpochCurrent(captured) {
-    return captured === rendererMatchEpoch;
   }
 
   // src/renderer/core/matchSnapshotClient.ts
@@ -22636,6 +22727,15 @@ ${bonuses}`;
     const row = Number.isFinite(input.tabRowOuterWidth) ? Math.max(0, input.tabRowOuterWidth) : 0;
     return Math.min(cap, Math.max(fitted, row));
   }
+  function chatPanelPlacement(input) {
+    const scaleHeight = input.scaleHeight > 0 ? input.scaleHeight : 0;
+    return {
+      width: input.bandWidth,
+      right: MAP_CHROME_INSET,
+      bottom: MAP_CHROME_INSET + scaleHeight + (scaleHeight > 0 ? MAP_CHROME_GAP : 0),
+      maxHistoryHeight: Math.floor(input.mapHeight / 2)
+    };
+  }
   function floatingPanelOffset(input) {
     const maxLeft = Math.max(MAP_CHROME_INSET, input.mapWidth - input.panelWidth - MAP_CHROME_INSET);
     const maxTop = Math.max(MAP_CHROME_INSET, input.mapHeight - input.panelHeight - MAP_CHROME_INSET);
@@ -22689,6 +22789,24 @@ ${bonuses}`;
       width = messageToastBandWidth({ mapWidth: mapBox.width, available, tabRowOuterWidth });
       band.style.width = `${width}px`;
     }
+    placeChatPanel(mapBox, width);
+  }
+  function placeChatPanel(mapBox, bandWidth) {
+    const panel = document.getElementById("chat-panel");
+    if (!(panel instanceof HTMLElement)) return;
+    const scale = document.querySelector("#main-map .leaflet-control-scale");
+    const scaleHeight = scale instanceof HTMLElement ? scale.getBoundingClientRect().height : 0;
+    const place = chatPanelPlacement({
+      mapWidth: mapBox.width,
+      mapHeight: mapBox.height,
+      bandWidth,
+      scaleHeight
+    });
+    panel.style.width = `${place.width}px`;
+    panel.style.right = `${place.right}px`;
+    panel.style.bottom = `${place.bottom}px`;
+    const history = document.getElementById("chat-panel-history");
+    if (history instanceof HTMLElement) history.style.maxHeight = `${place.maxHistoryHeight}px`;
   }
   function messageTabRowOuterWidth() {
     const toast = document.getElementById("ai-strategy-toast");
@@ -23739,7 +23857,7 @@ ${bonuses}`;
 
   // src/renderer/openRouter/commanderPoolClient.ts
   var POLL_MS = 1e3;
-  var snapshot = { statuses: [], dispatches: [], toolInvocationCounts: {} };
+  var snapshot2 = { statuses: [], dispatches: [], toolInvocationCounts: {} };
   var pollTimer = null;
   var showToast = null;
   var fileMessage = null;
@@ -23755,7 +23873,7 @@ ${bonuses}`;
     onPoolChanged = deps.updateReadyButtonState;
   }
   function anyCommanderIsPlanning() {
-    return snapshot.statuses.some((row) => row.status === "planning");
+    return snapshot2.statuses.some((row) => row.status === "planning");
   }
   var commanderStartDepth = 0;
   function commanderStartIsSettling() {
@@ -23763,7 +23881,7 @@ ${bonuses}`;
   }
   function longestPlanningElapsedMs() {
     let longest = 0;
-    for (const row of snapshot.statuses) {
+    for (const row of snapshot2.statuses) {
       if (row.status !== "planning" || row.planningElapsedMs == null) continue;
       if (row.planningElapsedMs > longest) longest = row.planningElapsedMs;
     }
@@ -23789,7 +23907,7 @@ ${bonuses}`;
       try {
         const next = await window.gameApi.startCommanderPlanning({ mode });
         if (!poolReplyIsCurrent(matchEpoch)) return;
-        snapshot = next;
+        snapshot2 = next;
         applyCommanderToolCountSum(next.toolInvocationCounts);
       } catch (err) {
         console.error("startCommanderPlanning failed", err);
@@ -23813,7 +23931,7 @@ ${bonuses}`;
   function messageLines(dispatches) {
     const kept = [];
     for (const dispatch of dispatches) {
-      if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
+      if (!commanderDispatchHasProse(dispatch)) continue;
       fileMessage?.(dispatch);
       kept.push(dispatch);
     }
@@ -23826,10 +23944,11 @@ ${bonuses}`;
     try {
       const next = await window.gameApi.readCommanderPool(drain);
       if (!poolReplyIsCurrent(matchEpoch)) return;
-      snapshot = next;
+      snapshot2 = next;
       applyCommanderToolCountSum(next.toolInvocationCounts);
       const consultFinished = wasPlanning && !anyCommanderIsPlanning();
       if (drain && (next.dispatches.length > 0 || consultFinished)) {
+        void refreshChatThread();
         messageLines(next.dispatches);
         if (showMessages) showToast?.(next.dispatches, next.statuses);
         await refreshSeatCosts();
@@ -23842,7 +23961,7 @@ ${bonuses}`;
     syncCommanderPoolPolling();
   }
   function commanderPoolStatuses() {
-    return snapshot.statuses;
+    return snapshot2.statuses;
   }
   function subscribeCommanderPool(listener) {
     poolListeners.add(listener);
@@ -24229,6 +24348,30 @@ ${bonuses}`;
     return senderSeatId === filterSeatId;
   }
 
+  // src/shared/sideMessageView.ts
+  var SIDE_MESSAGES_TITLE = "Messages";
+  var SIDE_MESSAGE_BULLET_PREFIX = "To";
+  function groupSideMessagesByTurn(messages) {
+    const byTurn = /* @__PURE__ */ new Map();
+    for (const message of messages) {
+      const existing = byTurn.get(message.turnNumber);
+      if (existing) existing.push(message);
+      else byTurn.set(message.turnNumber, [message]);
+    }
+    return [...byTurn.entries()].sort((left, right) => left[0] - right[0]).map(([turnNumber, group]) => ({
+      turnNumber,
+      heading: `Turn ${turnNumber}`,
+      messages: group
+    }));
+  }
+  function sideMessagePartyLabel(seatId, viewerSeatId2, nameOf) {
+    if (viewerSeatId2 !== null && seatId === viewerSeatId2) return "You";
+    return nameOf(seatId);
+  }
+  function dispatchMessagesInSideOrder(messages, seatOrderOf) {
+    return [...messages].sort((left, right) => seatOrderOf(left.toSeatId) - seatOrderOf(right.toSeatId));
+  }
+
   // src/renderer/chrome/frameTooltipText.ts
   var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
   var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
@@ -24253,7 +24396,7 @@ ${bonuses}`;
   var reportSenderFilter = "";
   var unreadCount = 0;
   var reportsVisible = false;
-  var listeners = [];
+  var listeners2 = [];
   function messageReportBody(meta) {
     const wrap = document.createElement("div");
     const line = document.createElement("div");
@@ -24267,11 +24410,37 @@ ${bonuses}`;
       mark.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
     }
     const name = document.createElement("span");
-    const message = meta.messageText?.trim() ?? "";
     const home = seat ? sideDisplayName(seat) : "Commander";
-    name.textContent = message.length > 0 ? `${home} "${message}"` : home;
+    name.textContent = home;
     line.append(mark, name);
     wrap.append(line);
+    const viewerSeatId2 = activeHumanSeatId(seats);
+    const lines = dispatchMessagesInSideOrder(meta.messages ?? [], (seatId) => seats.find((row) => row.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER);
+    for (const row of lines) {
+      const text = row.text.trim();
+      if (text.length === 0) continue;
+      const item = document.createElement("p");
+      item.className = "console-report-message";
+      const label = sideMessagePartyLabel(row.toSeatId, viewerSeatId2, (seatId) => {
+        const named = seats.find((candidate) => candidate.seatId === seatId);
+        return named ? sideDisplayName(named) : seatId;
+      });
+      if (label !== "You") {
+        const recipientFlag = createSideNumberFlag(row.toSeatId, seats);
+        if (recipientFlag) item.appendChild(recipientFlag);
+      }
+      const words = document.createElement("span");
+      words.textContent = `To ${label}: ${text}`;
+      item.appendChild(words);
+      wrap.append(item);
+    }
+    const quoted = lines.length === 0 ? meta.messageText?.trim() ?? "" : "";
+    if (quoted.length > 0) {
+      const legacy = document.createElement("p");
+      legacy.className = "console-report-message";
+      legacy.textContent = `"${quoted}"`;
+      wrap.append(legacy);
+    }
     const strategyText = meta.strategyText?.trim() ?? "";
     if (strategyText.length > 0) {
       const strategy = document.createElement("p");
@@ -24310,7 +24479,7 @@ ${bonuses}`;
     if (list) syncReportsEmptyState(list);
   }
   function notifyReportsChanged() {
-    for (const listener of listeners) listener();
+    for (const listener of listeners2) listener();
   }
   function syncReportsEmptyState(list) {
     const anyVisible = [...list.querySelectorAll(".console-report")].some((entry) => entry instanceof HTMLElement && !entry.hidden);
@@ -24361,7 +24530,7 @@ ${bonuses}`;
     if (kind === "turn") head2.append(createReplayPlaceholder());
     const content = document.createElement("div");
     content.className = "console-report-body";
-    if (meta?.messageText !== void 0) content.append(messageReportBody(meta));
+    if (meta?.messageText !== void 0 || meta?.messages !== void 0) content.append(messageReportBody(meta));
     else content.append(...Array.from(body.cloneNode(true).childNodes));
     entry.append(head2, content);
     entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
@@ -24389,7 +24558,24 @@ ${bonuses}`;
     notifyReportsChanged();
   }
   function onConsoleReportsChanged(listener) {
-    listeners.push(listener);
+    listeners2.push(listener);
+  }
+
+  // src/renderer/chat/chatPanelVisibility.ts
+  function syncChatPanelVisibility() {
+    const panel = document.getElementById("chat-panel");
+    if (!(panel instanceof HTMLElement)) return;
+    const toast = document.getElementById("map-toast");
+    const show = chatPanelShouldShow({
+      matchLoaded: (rendererSharedState.gameState?.seats?.length ?? 0) > 0,
+      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
+      mapToastShowing: toast != null && !toast.classList.contains("hidden")
+    });
+    const field = document.getElementById("chat-panel-input");
+    if (!show && field instanceof HTMLElement && document.activeElement === field) field.blur();
+    if (show) panel.removeAttribute("hidden");
+    else panel.setAttribute("hidden", "");
+    layoutMapChrome();
   }
 
   // src/renderer/openRouter/openRouterUiHelpers.ts
@@ -24522,6 +24708,7 @@ ${bonuses}`;
       rendererSharedState.toastHideTimer = null;
       hideMapToast();
     }, TOAST_DURATION_MS);
+    syncChatPanelVisibility();
   }
   function hideMapToast() {
     if (rendererSharedState.toastHideTimer !== null) {
@@ -24530,6 +24717,7 @@ ${bonuses}`;
     }
     const el = document.getElementById("map-toast");
     if (el) el.classList.add("hidden");
+    syncChatPanelVisibility();
   }
   function showFilledAiStrategyToast(build, fileReport) {
     if (rendererSharedState.aiStrategyToastHideTimer !== null) {
@@ -31991,10 +32179,10 @@ ${bonuses}`;
 
   // src/renderer/gameplay/queuedOrderRows.ts
   var ordersByGroup = /* @__PURE__ */ new Map();
-  var listeners2 = [];
+  var listeners3 = [];
   function publishQueuedOrders(group, orders) {
     ordersByGroup.set(group, orders);
-    for (const listener of listeners2) listener();
+    for (const listener of listeners3) listener();
   }
   function queuedOrderCount() {
     let count = 0;
@@ -32009,7 +32197,7 @@ ${bonuses}`;
     return null;
   }
   function onQueuedOrdersChanged(listener) {
-    listeners2.push(listener);
+    listeners3.push(listener);
   }
 
   // src/renderer/chrome/consoleFrame.ts
@@ -32420,6 +32608,232 @@ ${bonuses}`;
     return slot;
   }
 
+  // src/renderer/chat/chatPanel.ts
+  var HISTORY_BOTTOM_SLACK_PX = 8;
+  var expanded2 = false;
+  var slide2 = null;
+  var historyKey = "";
+  var recipientKey = "";
+  var scrollHistoryToEnd = false;
+  function rosterSeats() {
+    return rendererSharedState.gameState?.seats ?? [];
+  }
+  function seatName(seatId) {
+    const seat = rosterSeats().find((row) => row.seatId === seatId);
+    return seat ? sideDisplayName(seat) : seatId;
+  }
+  function syncExpandControl(button) {
+    button.setAttribute("aria-expanded", String(expanded2));
+    button.setAttribute("aria-label", expanded2 ? "Hide the message history" : "Show the message history");
+    button.setAttribute(
+      "data-control-tooltip",
+      expanded2 ? "Hide the message history." : "Show the messages sent and received this match."
+    );
+  }
+  function settleChat(panel) {
+    slide2?.cancel();
+    slide2 = null;
+    panel.dataset.state = expanded2 ? "expanded" : "compact";
+    panel.style.height = "";
+  }
+  function slideChat(panel, from, to) {
+    slide2 = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide2 === finished) settleChat(panel);
+    });
+    if (!slide2) settleChat(panel);
+  }
+  function toggleChatPanel(panel, bar, button) {
+    const from = panel.getBoundingClientRect().height;
+    slide2?.cancel();
+    slide2 = null;
+    expanded2 = !expanded2;
+    syncExpandControl(button);
+    if (expanded2) {
+      scrollHistoryToEnd = true;
+      panel.dataset.state = "expanding";
+      renderChatPanel();
+      slideChat(panel, from, panel.getBoundingClientRect().height);
+      return;
+    }
+    panel.dataset.state = "collapsing";
+    panel.style.height = "";
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slideChat(panel, from, bar.offsetHeight + borders);
+  }
+  function syncSendEnabled() {
+    const input = document.getElementById("chat-panel-input");
+    const send = document.getElementById("chat-panel-send");
+    if (!(input instanceof HTMLInputElement) || !(send instanceof HTMLButtonElement)) return;
+    send.disabled = !canStageText(input.value);
+  }
+  async function stageFromInput() {
+    const input = document.getElementById("chat-panel-input");
+    if (!(input instanceof HTMLInputElement) || !canStageText(input.value)) return;
+    const text = input.value;
+    const failure = await stageChatMessage(text);
+    if (failure) {
+      showMapToast(failure);
+      return;
+    }
+    if (input.value === text) {
+      input.value = "";
+      syncSendEnabled();
+    }
+    input.focus();
+  }
+  async function editStaged() {
+    const staged = stagedMessageFor(chatSnapshot().staged, chatRecipientSeatId());
+    const input = document.getElementById("chat-panel-input");
+    if (!staged || !(input instanceof HTMLInputElement)) return;
+    input.value = staged.text;
+    syncSendEnabled();
+    await cancelStagedChatMessage();
+    input.focus();
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+  }
+  function appendParty(parent, seatId, viewerSeatId2) {
+    const label = sideMessagePartyLabel(seatId, viewerSeatId2, seatName);
+    if (label !== "You") {
+      const flag = createSideNumberFlag(seatId, rosterSeats());
+      if (flag) parent.append(flag);
+    }
+    const name = document.createElement("span");
+    name.textContent = label;
+    parent.append(name);
+  }
+  function appendHistoryRow(parent, row, viewerSeatId2) {
+    const line = document.createElement("p");
+    line.className = "chat-panel-row";
+    if (viewerSeatId2 != null && row.fromSeatId === viewerSeatId2) line.dataset.own = "true";
+    appendParty(line, row.fromSeatId, viewerSeatId2);
+    const arrow = document.createElement("span");
+    arrow.textContent = " \u2192 ";
+    line.append(arrow);
+    appendParty(line, row.toSeatId, viewerSeatId2);
+    if (row.scope === "tactical") {
+      const battle = document.createElement("span");
+      battle.textContent = " (battle)";
+      line.append(battle);
+    }
+    const words = document.createElement("span");
+    words.textContent = `: ${row.text}`;
+    line.append(words);
+    parent.append(line);
+  }
+  function renderHistory() {
+    const history = document.getElementById("chat-panel-history");
+    if (!(history instanceof HTMLElement)) return;
+    const snapshot3 = chatSnapshot();
+    const key = `${snapshot3.viewerSeatId ?? ""}|${snapshot3.messages.map((row) => row.messageId).join(",")}`;
+    const followLatest = scrollHistoryToEnd;
+    scrollHistoryToEnd = false;
+    const nearBottom = history.scrollHeight - history.scrollTop - history.clientHeight <= HISTORY_BOTTOM_SLACK_PX;
+    if (key === historyKey && history.childElementCount > 0) {
+      if (followLatest) history.scrollTop = history.scrollHeight;
+      return;
+    }
+    historyKey = key;
+    history.textContent = "";
+    if (snapshot3.messages.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "chat-panel-empty";
+      empty.textContent = "No messages yet.";
+      history.append(empty);
+    } else {
+      for (const group of groupSideMessagesByTurn(snapshot3.messages)) {
+        const heading = document.createElement("p");
+        heading.className = "chat-panel-turn";
+        heading.textContent = group.heading;
+        history.append(heading);
+        for (const row of group.messages) appendHistoryRow(history, row, snapshot3.viewerSeatId);
+      }
+    }
+    if (nearBottom || followLatest) history.scrollTop = history.scrollHeight;
+  }
+  function renderRecipient() {
+    const select = document.getElementById("chat-panel-recipient");
+    if (!(select instanceof HTMLSelectElement)) return;
+    const ids = chatSnapshot().recipientSeatIds;
+    const key = ids.join("\n");
+    if (key !== recipientKey) {
+      recipientKey = key;
+      select.textContent = "";
+      for (const seatId of ids) {
+        const option2 = document.createElement("option");
+        option2.value = seatId;
+        option2.textContent = seatName(seatId);
+        select.append(option2);
+      }
+    }
+    const picked = chatRecipientSeatId();
+    if (picked && select.value !== picked) select.value = picked;
+  }
+  function renderStaged() {
+    const row = document.getElementById("chat-panel-staged");
+    const text = document.getElementById("chat-panel-staged-text");
+    if (!(row instanceof HTMLElement) || !(text instanceof HTMLElement)) return;
+    const snapshot3 = chatSnapshot();
+    const staged = snapshot3.canSend ? stagedMessageFor(snapshot3.staged, chatRecipientSeatId()) : null;
+    if (!staged) {
+      row.hidden = true;
+      text.textContent = "";
+      text.removeAttribute("title");
+      return;
+    }
+    row.hidden = false;
+    text.textContent = staged.text;
+    text.title = staged.text;
+  }
+  function renderChatPanel() {
+    const panel = document.getElementById("chat-panel");
+    if (!(panel instanceof HTMLElement)) return;
+    panel.dataset.canSend = chatSnapshot().canSend ? "true" : "false";
+    renderRecipient();
+    renderStaged();
+    renderHistory();
+    syncSendEnabled();
+    syncChatPanelVisibility();
+  }
+  function wireChatPanel() {
+    const panel = document.getElementById("chat-panel");
+    const button = document.getElementById("chat-panel-expand");
+    const bar = document.getElementById("chat-panel-bar");
+    if (panel instanceof HTMLElement && button instanceof HTMLElement && bar instanceof HTMLElement) {
+      syncExpandControl(button);
+      button.addEventListener("click", () => toggleChatPanel(panel, bar, button));
+    }
+    const input = document.getElementById("chat-panel-input");
+    if (input instanceof HTMLInputElement) {
+      input.addEventListener("input", () => syncSendEnabled());
+      input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+        event.preventDefault();
+        void stageFromInput();
+      });
+    }
+    document.getElementById("chat-panel-send")?.addEventListener("click", () => {
+      void stageFromInput();
+    });
+    const select = document.getElementById("chat-panel-recipient");
+    if (select instanceof HTMLSelectElement) {
+      select.addEventListener("change", () => {
+        setChatRecipient(select.value);
+        renderChatPanel();
+      });
+    }
+    document.getElementById("chat-panel-staged-edit")?.addEventListener("click", () => {
+      void editStaged();
+    });
+    document.getElementById("chat-panel-staged-cancel")?.addEventListener("click", () => {
+      void cancelStagedChatMessage();
+    });
+    subscribeChatThread(() => renderChatPanel());
+    void refreshChatThread();
+    syncChatPanelVisibility();
+    layoutMapChrome();
+  }
+
   // src/shared/selectionPanelSize.ts
   var SELECTION_PANEL_MIN_WIDTH = 400;
   var SELECTION_PANEL_MAX_WIDTH = 640;
@@ -32503,33 +32917,33 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/selectionPanelExpand.ts
-  var expanded2 = false;
-  var slide2 = null;
-  function syncExpandControl(button) {
-    button.setAttribute("aria-expanded", String(expanded2));
-    button.setAttribute("aria-label", expanded2 ? "Hide selection details" : "Show selection details");
-    const tip = expanded2 ? selectionPanelCollapseTooltipText : selectionPanelExpandTooltipText;
+  var expanded3 = false;
+  var slide3 = null;
+  function syncExpandControl2(button) {
+    button.setAttribute("aria-expanded", String(expanded3));
+    button.setAttribute("aria-label", expanded3 ? "Hide selection details" : "Show selection details");
+    const tip = expanded3 ? selectionPanelCollapseTooltipText : selectionPanelExpandTooltipText;
     button.setAttribute("data-control-tooltip", tip);
   }
   function settle2(panel) {
-    slide2?.cancel();
-    slide2 = null;
-    panel.dataset.state = expanded2 ? "expanded" : "compact";
-    if (!expanded2) clearPanelHeight(panel);
+    slide3?.cancel();
+    slide3 = null;
+    panel.dataset.state = expanded3 ? "expanded" : "compact";
+    if (!expanded3) clearPanelHeight(panel);
   }
   function slidePanel(panel, from, to) {
-    slide2 = startPanelHeightSlide(panel, from, to, (finished) => {
-      if (slide2 === finished) settle2(panel);
+    slide3 = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide3 === finished) settle2(panel);
     });
-    if (!slide2) settle2(panel);
+    if (!slide3) settle2(panel);
   }
   function toggleSelectionPanel(panel, bar, button) {
     const from = panel.getBoundingClientRect().height;
-    slide2?.cancel();
-    slide2 = null;
-    expanded2 = !expanded2;
-    syncExpandControl(button);
-    if (expanded2) {
+    slide3?.cancel();
+    slide3 = null;
+    expanded3 = !expanded3;
+    syncExpandControl2(button);
+    if (expanded3) {
       panel.dataset.state = "expanding";
       applyDraggedPanelHeight(panel);
       slidePanel(panel, from, panel.getBoundingClientRect().height);
@@ -32542,7 +32956,7 @@ ${bonuses}`;
   }
   function settleSelectionPanelSlide() {
     const panel = document.getElementById("selection-panel");
-    if (panel && slide2) settle2(panel);
+    if (panel && slide3) settle2(panel);
   }
   function wireSelectionPanelExpand() {
     const panel = document.getElementById("selection-panel");
@@ -32550,7 +32964,7 @@ ${bonuses}`;
     const button = document.getElementById("selection-panel-expand");
     if (!panel || !bar || !button) return;
     settle2(panel);
-    syncExpandControl(button);
+    syncExpandControl2(button);
     button.addEventListener("click", () => toggleSelectionPanel(panel, bar, button));
   }
 
@@ -32734,6 +33148,7 @@ ${bonuses}`;
     selectionPanelDeps = deps;
     onQueuedOrdersChanged(() => renderSelectionPanel());
     wireSelectionPanelExpand();
+    wireChatPanel();
     wireSelectionPanelResize();
   }
 
@@ -36204,6 +36619,7 @@ ${bonuses}`;
     }
     rendererSharedState.resolutionMoveAnimationFrameId = null;
     rendererSharedState.resolutionMoveAnimation = null;
+    syncChatPanelVisibility();
     dropQueuedResolutionPlaybackCompleteNotifies();
     abandonResolutionPlaybackWaits();
   }
@@ -37866,6 +38282,7 @@ ${bonuses}`;
     } else {
       rendererSharedState.resolutionMoveAnimation = null;
       rendererSharedState.resolutionMoveAnimationFrameId = null;
+      syncChatPanelVisibility();
       updateGameStateSidebar(rendererSharedState.gameState);
       flushResolutionPlaybackCompleteNotifyCallbacks();
       rendererSharedState.hideCommittedOrderLinesAfterReady = false;
@@ -38104,6 +38521,7 @@ ${bonuses}`;
         installRendererGameMap(state);
         await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
         rendererSharedState.gameState = state;
+        void refreshChatThread();
         rendererSharedState.strategicScenarioInitialLeafletView = null;
         tacticalReleaseRendererSessionForNewStrategicMatch(state);
         clearObserveAfterKnockout();
@@ -39092,6 +39510,7 @@ ${bonuses}`;
     }
     rendererSharedState.resolutionMoveAnimationFrameId = null;
     rendererSharedState.resolutionMoveAnimation = null;
+    syncChatPanelVisibility();
     if (interruptedStrategicPlayback) {
       flushResolutionPlaybackCompleteNotifyCallbacks();
     }
@@ -39292,15 +39711,15 @@ ${bonuses}`;
     if (labels.length === 2) return `${labels[0]} and ${labels[1]}${suffix}`;
     return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}${suffix}`;
   }
-  function buildQueueTemplateFromSnapshot(snapshot2) {
-    return snapshot2.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
+  function buildQueueTemplateFromSnapshot(snapshot3) {
+    return snapshot3.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
   }
   function unionAvailableBuildUnitTypes(snapshots) {
-    const available = new Set(snapshots.flatMap((snapshot2) => snapshot2.availableUnitTypes));
+    const available = new Set(snapshots.flatMap((snapshot3) => snapshot3.availableUnitTypes));
     return ALL_BUILD_QUEUE_ITEM_TYPES.filter((unitType) => available.has(unitType));
   }
   function countEligibleBuildHexes(snapshots, unitType) {
-    return snapshots.filter((snapshot2) => snapshot2.availableUnitTypes.includes(unitType)).length;
+    return snapshots.filter((snapshot3) => snapshot3.availableUnitTypes.includes(unitType)).length;
   }
   function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
     const typeLabel = formatBuildQueueItemLabel(unitType);
@@ -39310,8 +39729,8 @@ ${bonuses}`;
     if (eligibleCount === 1) return `${typeLabel} (1 hex)`;
     return `${typeLabel} (${Math.max(0, eligibleCount)} hexes)`;
   }
-  function filterTemplateForBuildHex(template, snapshot2) {
-    const available = new Set(snapshot2.availableUnitTypes);
+  function filterTemplateForBuildHex(template, snapshot3) {
+    const available = new Set(snapshot3.availableUnitTypes);
     return template.filter((entry) => available.has(entry.unitType));
   }
   function templateEntriesForTurnEstimate(template) {
@@ -39324,14 +39743,14 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/buildQueueKeepBuilding.ts
-  function canArmKeepBuilding(snapshot2) {
-    return snapshot2.entries.length > 0 || snapshot2.keepBuilding && snapshot2.keepBuildingUnitType !== null;
+  function canArmKeepBuilding(snapshot3) {
+    return snapshot3.entries.length > 0 || snapshot3.keepBuilding && snapshot3.keepBuildingUnitType !== null;
   }
   function areAllKeepBuildingArmed(snapshots) {
-    return snapshots.length > 0 && snapshots.every((snapshot2) => snapshot2.keepBuilding);
+    return snapshots.length > 0 && snapshots.every((snapshot3) => snapshot3.keepBuilding);
   }
   function canArmKeepBuildingForAll(snapshots) {
-    return snapshots.length > 0 && snapshots.every((snapshot2) => canArmKeepBuilding(snapshot2));
+    return snapshots.length > 0 && snapshots.every((snapshot3) => canArmKeepBuilding(snapshot3));
   }
   function appendKeepBuildingCheckbox(args) {
     const row = document.createElement("div");
@@ -39388,7 +39807,7 @@ ${bonuses}`;
         }
       })
     );
-    return snapshots.filter((snapshot2) => snapshot2 !== null);
+    return snapshots.filter((snapshot3) => snapshot3 !== null);
   }
   function copyBuildQueueTemplate(template) {
     return template.map((row) => ({ ...row }));
@@ -39403,8 +39822,8 @@ ${bonuses}`;
     const seedHex = rendererSharedState.selectedBuildHexH3s[0];
     const snapshots = seedHex ? await loadSelectedBuildSnapshots([seedHex]) : [];
     if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
-    const snapshot2 = snapshots[0];
-    rendererSharedState.buildQueueTemplate = snapshot2 ? buildQueueTemplateFromSnapshot(snapshot2) : previousTemplate;
+    const snapshot3 = snapshots[0];
+    rendererSharedState.buildQueueTemplate = snapshot3 ? buildQueueTemplateFromSnapshot(snapshot3) : previousTemplate;
     return true;
   }
   async function commitEditedTemplate(deps, nextTemplate) {
@@ -39423,10 +39842,10 @@ ${bonuses}`;
     if (rendererSharedState.buildQueueTemplate.length === 0) return "<strong>Queue:</strong> (none)";
     const queueTotalCost = sumQueuedProductionCost(rendererSharedState.buildQueueTemplate);
     const turns = snapshots.map(
-      (snapshot2) => estimateTurnsToCompleteQueuedProduction(
-        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot2)),
-        snapshot2.storedPoints,
-        snapshot2.urbanHexCount
+      (snapshot3) => estimateTurnsToCompleteQueuedProduction(
+        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot3)),
+        snapshot3.storedPoints,
+        snapshot3.urbanHexCount
       )
     );
     const numericTurns = turns.filter((turn) => turn !== null);
@@ -39486,7 +39905,7 @@ ${bonuses}`;
       techSpacer.style.height = "0.5em";
       section.appendChild(techSpacer);
     }
-    const totalProduction = snapshots.reduce((sum, snapshot2) => sum + snapshot2.urbanHexCount, 0);
+    const totalProduction = snapshots.reduce((sum, snapshot3) => sum + snapshot3.urbanHexCount, 0);
     const pointsLine = document.createElement("div");
     pointsLine.innerHTML = `<strong>Production:</strong> ${formatProductionCapacityAmount(totalProduction.toLocaleString())} / turn`;
     section.appendChild(pointsLine);
@@ -40037,17 +40456,17 @@ ${bonuses}`;
       }
       if (!window.gameApi?.getHexBuildQueue) return;
       const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
-      let snapshot2 = null;
+      let snapshot3 = null;
       let namingCaption = null;
       try {
-        snapshot2 = await window.gameApi.getHexBuildQueue({ h3Index });
+        snapshot3 = await window.gameApi.getHexBuildQueue({ h3Index });
         if (window.gameApi.getHexNamingTooltipLine) {
           namingCaption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
         }
       } catch (err) {
         console.error("getHexBuildQueue failed:", err);
       }
-      if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot2 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
+      if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot3 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
       mount.innerHTML = "";
       mount.appendChild(createBuildPopupCloseRow(hideBuildPopup3));
       const section = document.createElement("div");
@@ -40082,7 +40501,7 @@ ${bonuses}`;
         section.appendChild(techSpacer);
       }
       const pointsLine = document.createElement("div");
-      const productionCapacity = snapshot2.urbanHexCount;
+      const productionCapacity = snapshot3.urbanHexCount;
       const productionDetail = productionCapacity > 0 ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn` : "(none)";
       pointsLine.innerHTML = `<strong>Production (Build):</strong> ${productionDetail}`;
       section.appendChild(pointsLine);
@@ -40090,13 +40509,13 @@ ${bonuses}`;
       productionQueueSpacer.style.height = "0.5em";
       section.appendChild(productionQueueSpacer);
       const queueSummaryLine = document.createElement("div");
-      const queueTotalCost = sumQueuedProductionCost(snapshot2.entries);
-      if (snapshot2.entries.length === 0) {
+      const queueTotalCost = sumQueuedProductionCost(snapshot3.entries);
+      if (snapshot3.entries.length === 0) {
         queueSummaryLine.innerHTML = `<strong>Queue:</strong> (none)`;
       } else {
         const queueTurns = estimateTurnsToCompleteQueuedProduction(
-          snapshot2.entries,
-          snapshot2.storedPoints,
+          snapshot3.entries,
+          snapshot3.storedPoints,
           productionCapacity
         );
         const queueTurnsDisplay = queueTurns === null ? "?" : queueTurns.toLocaleString();
@@ -40107,17 +40526,17 @@ ${bonuses}`;
       const productionSpacer = document.createElement("div");
       productionSpacer.style.height = "0.5em";
       section.appendChild(productionSpacer);
-      const pausedNote = snapshot2.controlledByRequester ? formatQueuePausedNote(snapshot2.pausedReasons ?? []) : null;
+      const pausedNote = snapshot3.controlledByRequester ? formatQueuePausedNote(snapshot3.pausedReasons ?? []) : null;
       if (pausedNote) section.appendChild(createQueuePausedNote(pausedNote));
-      if (!snapshot2.controlledByRequester) {
+      if (!snapshot3.controlledByRequester) {
         mount.appendChild(section);
         placeOpenBuildPopup();
         return;
       }
-      if (!snapshot2.buildSectionVisible) {
+      if (!snapshot3.buildSectionVisible) {
         const noUrban = document.createElement("div");
         noUrban.className = "build-no-urban";
-        noUrban.textContent = snapshot2.noBuildReason ?? "This hex cannot build units.";
+        noUrban.textContent = snapshot3.noBuildReason ?? "This hex cannot build units.";
         section.appendChild(noUrban);
         mount.appendChild(section);
         placeOpenBuildPopup();
@@ -40148,8 +40567,8 @@ ${bonuses}`;
       section.appendChild(head2);
       const list = document.createElement("div");
       list.className = "build-queue-list";
-      const options = snapshot2.availableUnitTypes;
-      for (const entry of snapshot2.entries) {
+      const options = snapshot3.availableUnitTypes;
+      for (const entry of snapshot3.entries) {
         const row = document.createElement("div");
         row.className = "build-queue-row";
         const typeSelect = document.createElement("select");
@@ -40222,8 +40641,8 @@ ${bonuses}`;
       section.appendChild(list);
       appendKeepBuildingCheckbox({
         section,
-        checked: snapshot2.keepBuilding,
-        disabled: !canArmKeepBuilding(snapshot2),
+        checked: snapshot3.keepBuilding,
+        disabled: !canArmKeepBuilding(snapshot3),
         tooltipText: keepBuildingTooltipText,
         onChange: async (keepBuilding) => {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
@@ -40763,6 +41182,7 @@ ${bonuses}`;
       deps.updateReadyButtonState();
       return true;
     }
+    void refreshChatThread();
     const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
     const playback = commitResult.tacticalResolutionPlayback;
     const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
@@ -40808,6 +41228,7 @@ ${bonuses}`;
         meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
         ...pickPlaybackDiceRolls(playback)
       };
+      syncChatPanelVisibility();
     }
     if (commitResult.tacticalBattle) {
       rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
@@ -41138,6 +41559,7 @@ ${bonuses}`;
         deps.updateReadyButtonState();
         return;
       }
+      void refreshChatThread();
       if (readyResult.awaitingMeleeDecision) {
         if (!window.gameApi.resolveMeleeIntercept) {
           deps.showSidebarError("Melee intercept resolve is not available in this build.");
@@ -41325,6 +41747,7 @@ ${bonuses}`;
             unknownHexes: /* @__PURE__ */ new Set([...unknownCombatHexes, ...unknownCasualtyHexes])
           })
         };
+        syncChatPanelVisibility();
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
         if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
@@ -42011,7 +42434,6 @@ ${bonuses}`;
   }
 
   // src/shared/aiStrategyToastContent.ts
-  var AI_STRATEGY_TOAST_MESSAGE_TITLE = "Message";
   var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
   function trimToastField(raw) {
     const trimmed = raw?.trim() ?? "";
@@ -42019,9 +42441,9 @@ ${bonuses}`;
   }
   function buildAiStrategyToastSections(fields) {
     const sections = [];
-    const message = trimToastField(fields.message);
+    const bullets = (fields.messages ?? []).filter((row) => row.text.trim().length > 0);
     const strategy = trimToastField(fields.strategy);
-    if (message) sections.push({ title: AI_STRATEGY_TOAST_MESSAGE_TITLE, body: message });
+    if (bullets.length > 0) sections.push({ title: SIDE_MESSAGES_TITLE, body: "", bullets });
     if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
     return sections;
   }
@@ -42035,7 +42457,7 @@ ${bonuses}`;
   }
   function showCommanderMessageTabs(dispatches, statuses = []) {
     const opening = strategyToastHidden() || tabState === null;
-    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch.message, dispatch.strategy))) return;
+    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
     if (opening) {
       const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
       tabState = initialCommanderMessageTabs(seats);
@@ -42044,10 +42466,10 @@ ${bonuses}`;
     }
     if (!tabState) return;
     for (const dispatch of dispatches) {
-      tabState = commanderDispatchHasProse(dispatch.message, dispatch.strategy) ? applyCommanderMessage(tabState, {
+      tabState = commanderDispatchHasProse(dispatch) ? applyCommanderMessage(tabState, {
         seatId: dispatch.seatId,
-        message: dispatch.message,
-        strategy: dispatch.strategy
+        strategy: dispatch.strategy,
+        messages: dispatch.messages
       }) : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
     }
     tabState = applyOpenTabAbsences(tabState, statuses);
@@ -42106,19 +42528,54 @@ ${bonuses}`;
     host.append(list);
     const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
     if (!selected?.enabled) return;
-    const sections = buildAiStrategyToastSections({ message: selected.message, strategy: selected.strategy });
-    if (sections.length === 0) return;
+    const sections = buildAiStrategyToastSections({ messages: selected.messages, strategy: selected.strategy });
+    const absence = selected.fromAbsence ? selected.message : null;
+    if (sections.length === 0 && !absence) return;
     const panel = document.createElement("div");
     panel.setAttribute("role", "tabpanel");
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const viewerSeatId2 = activeHumanSeatId(seats);
     sections.forEach((section, index) => {
       if (index > 0) panel.appendChild(document.createElement("br"));
       appendMapToastSectionHeader(panel, section.title);
+      if (section.bullets && section.bullets.length > 0) {
+        const list2 = document.createElement("ul");
+        for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
+          const item = document.createElement("li");
+          item.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
+          const label = sideMessagePartyLabel(bullet.toSeatId, viewerSeatId2, (seatId) => seatName2(seats, seatId));
+          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_BULLET_PREFIX} `));
+          if (label !== "You") {
+            const flag = createSideNumberFlag(bullet.toSeatId, seats);
+            if (flag) item.appendChild(flag);
+          }
+          const words = document.createElement("span");
+          words.textContent = `${label}: ${bullet.text}`;
+          item.appendChild(words);
+          list2.appendChild(item);
+        }
+        panel.appendChild(list2);
+      } else {
+        const span = document.createElement("span");
+        span.style.display = "block";
+        span.textContent = section.body;
+        panel.append(span);
+      }
+    });
+    if (absence) {
       const span = document.createElement("span");
       span.style.display = "block";
-      span.textContent = section.body;
+      span.textContent = absence;
       panel.append(span);
-    });
+    }
     host.append(panel);
+  }
+  function seatOrder(seats, seatId) {
+    return seats.find((seat) => seat.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
+  }
+  function seatName2(seats, seatId) {
+    const seat = seats.find((row) => row.seatId === seatId);
+    return seat ? sideDisplayName(seat) : seatId;
   }
   function strategyToastHidden() {
     const toast = document.getElementById("ai-strategy-toast");
@@ -42354,7 +42811,7 @@ ${bonuses}`;
         recordConsoleReport("message", currentConsoleReportTag(), body, {
           senderSeatId: dispatch.seatId,
           modelLabel: dispatch.modelLabel,
-          messageText: dispatch.message ?? "",
+          messages: dispatch.messages,
           strategyText: dispatch.strategy ?? void 0
         });
       },
@@ -44786,7 +45243,7 @@ ${bonuses}`;
       rendererSharedState.tacticalEntryButtonPointerInside = false;
     });
     const canvasContainer = document.getElementById("canvas-container");
-    for (const chromeId of ["sidebar", "app-topbar", "game-menu", "selection-panel"]) {
+    for (const chromeId of ["sidebar", "app-topbar", "game-menu", "selection-panel", "chat-panel"]) {
       document.getElementById(chromeId)?.addEventListener("pointerenter", () => {
         dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
       });

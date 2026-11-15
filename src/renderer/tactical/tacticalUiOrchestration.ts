@@ -17,6 +17,7 @@ import {
 } from '../openRouter/openRouterRuntime';
 import { clearPendingTacticalOrders } from '../gameplay/tacticalOrders';
 import { dropHeldBattleTurnUpdate } from '../gameplay/heldBattleTurnUpdate';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { abandonResolutionPlaybackWaits, dropQueuedResolutionPlaybackCompleteNotifies } from '../openRouter/resolutionPlaybackDeferral';
 
 /**
@@ -35,6 +36,7 @@ export function clearResolutionPlaybackAnimationState(): void {
   }
   S.resolutionMoveAnimationFrameId = null;
   S.resolutionMoveAnimation = null;
+  syncChatPanelVisibility();
   dropQueuedResolutionPlaybackCompleteNotifies();
   abandonResolutionPlaybackWaits();
 }

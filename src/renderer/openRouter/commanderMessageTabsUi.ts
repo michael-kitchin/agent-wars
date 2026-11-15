@@ -3,11 +3,14 @@
  *
  * Purpose: Later opponents update their own tab instead of replacing the dialog.
  * When to use: A draining pool read that has kept dispatches.
- * Expected outcome: Tabs start disabled. A dispatch enables and selects its tab. The panel shows Message, then Strategy, when that consult sent them.
+ * Expected outcome: Tabs start disabled. A dispatch enables and selects its tab. The panel shows Messages, one bullet per message the viewer could see when the consult was stored, then Strategy.
  * Exceptions: None. A missing toast is skipped.
  */
 
 import { buildAiStrategyToastSections } from '../../shared/aiStrategyToastContent';
+import { activeHumanSeatId } from '../../shared/observeModeControls';
+import { dispatchMessagesInSideOrder, SIDE_MESSAGE_BULLET_PREFIX, sideMessagePartyLabel } from '../../shared/sideMessageView';
+import { sideDisplayName, type SideDisplaySeat } from '../../shared/sideNicknames';
 import {
   applyCommanderAbsence,
   applyCommanderMessage,
@@ -22,10 +25,9 @@ import {
 } from '../../shared/commanderMessageTabs';
 import type { CommanderDispatch, CommanderStatusRow } from '../../shared/commanderStatus';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
-import { sideDisplayName } from '../../shared/sideNicknames';
 import { rendererSharedState as S } from '../core/state';
 import { createSideNumberFlag } from '../chrome/toastInlineMarks';
-import { appendMapToastSectionHeader, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
+import { appendMapToastSectionHeader, MAP_TOAST_SECTION_BULLET_INDENT, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
 
 /**
  * Tabs for the dialog that is open, or null after it hides.
@@ -64,7 +66,7 @@ export function showCommanderMessageTabs(
   statuses: readonly CommanderStatusRow[] = []
 ): void {
   const opening = strategyToastHidden() || tabState === null;
-  if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch.message, dispatch.strategy))) return;
+  if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
   if (opening) {
     const seats = (S.gameState?.seats ?? [])
       .filter((seat) => seat.kind === AI_SEAT_KIND)
@@ -75,11 +77,11 @@ export function showCommanderMessageTabs(
   }
   if (!tabState) return;
   for (const dispatch of dispatches) {
-    tabState = commanderDispatchHasProse(dispatch.message, dispatch.strategy)
+    tabState = commanderDispatchHasProse(dispatch)
       ? applyCommanderMessage(tabState, {
           seatId: dispatch.seatId,
-          message: dispatch.message,
           strategy: dispatch.strategy,
+          messages: dispatch.messages,
         })
       : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
   }
@@ -170,19 +172,72 @@ export function renderCommanderMessageTabs(target?: HTMLElement): void {
   host.append(list);
   const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
   if (!selected?.enabled) return;
-  const sections = buildAiStrategyToastSections({ message: selected.message, strategy: selected.strategy });
-  if (sections.length === 0) return;
+  const sections = buildAiStrategyToastSections({ messages: selected.messages, strategy: selected.strategy });
+  const absence = selected.fromAbsence ? selected.message : null;
+  if (sections.length === 0 && !absence) return;
   const panel = document.createElement('div');
   panel.setAttribute('role', 'tabpanel');
+  const seats = S.gameState?.seats ?? [];
+  const viewerSeatId = activeHumanSeatId(seats);
   sections.forEach((section, index) => {
     if (index > 0) panel.appendChild(document.createElement('br'));
     appendMapToastSectionHeader(panel, section.title);
+    if (section.bullets && section.bullets.length > 0) {
+      const list = document.createElement('ul');
+      for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
+        const item = document.createElement('li');
+        item.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
+        const label = sideMessagePartyLabel(bullet.toSeatId, viewerSeatId, (seatId) => seatName(seats, seatId));
+        item.appendChild(document.createTextNode(`${SIDE_MESSAGE_BULLET_PREFIX} `));
+        if (label !== 'You') {
+          const flag = createSideNumberFlag(bullet.toSeatId, seats);
+          if (flag) item.appendChild(flag);
+        }
+        const words = document.createElement('span');
+        words.textContent = `${label}: ${bullet.text}`;
+        item.appendChild(words);
+        list.appendChild(item);
+      }
+      panel.appendChild(list);
+    } else {
+      const span = document.createElement('span');
+      span.style.display = 'block';
+      span.textContent = section.body;
+      panel.append(span);
+    }
+  });
+  if (absence) {
     const span = document.createElement('span');
     span.style.display = 'block';
-    span.textContent = section.body;
+    span.textContent = absence;
     panel.append(span);
-  });
+  }
   host.append(panel);
+}
+
+/**
+ * The roster order of one recipient.
+ *
+ * Purpose: Dialog bullets follow `seatOrder`.
+ * When to use: `dispatchMessagesInSideOrder`.
+ * Expected outcome: That seat's `seatOrder`. A missing seat sorts after every known seat.
+ * Exceptions: None.
+ */
+function seatOrder(seats: readonly { readonly seatId: string; readonly seatOrder?: number }[], seatId: string): number {
+  return seats.find((seat) => seat.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * The name shown for one seat.
+ *
+ * Purpose: A bullet names the recipient the way the rest of the match does.
+ * When to use: `sideMessagePartyLabel`.
+ * Expected outcome: `sideDisplayName` for a roster seat, or the seat id when the seat is missing.
+ * Exceptions: None.
+ */
+function seatName(seats: readonly (SideDisplaySeat & { readonly seatId: string })[], seatId: string): string {
+  const seat = seats.find((row) => row.seatId === seatId);
+  return seat ? sideDisplayName(seat) : seatId;
 }
 
 /**

@@ -16,6 +16,7 @@ import { commanderSeatCostUsd, commanderPoolStatuses, longestPlanningElapsedMs }
 import { markCommanderLogLine, renderCommanderCards } from './commanderCardsUi';
 import { setReadyButtonLabelAiWait, setReadyButtonLabelReady } from './readyButtonLabel';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { layoutMapChrome } from '../map/mapChromeLayout';
 import { isObservingRoster } from '../../shared/observeModeControls';
 import { activeAiSeats } from '../../shared/seatRoster';
@@ -317,6 +318,7 @@ export function showMapToast(message: string, options?: MapToastOptions): void {
     S.toastHideTimer = null;
     hideMapToast();
   }, TOAST_DURATION_MS);
+  syncChatPanelVisibility();
 }
 
 /**
@@ -334,6 +336,7 @@ export function hideMapToast(): void {
   }
   const el = document.getElementById('map-toast');
   if (el) el.classList.add('hidden');
+  syncChatPanelVisibility();
 }
 
 /**

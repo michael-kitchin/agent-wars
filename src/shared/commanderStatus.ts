@@ -143,6 +143,35 @@ export type CommanderStatusRow = {
  * Expected outcome: One dispatch per finished consult, including a consult that sent no prose, and one per unfinished consult that sent prose. A draining read takes them. An absence line is not a dispatch.
  * Exceptions: None.
  */
+/**
+ * One message a commander stored in a consult, for the dialog.
+ *
+ * Purpose: The dialog lists each recipient separately.
+ * When to use: `CommanderDispatch.messages`.
+ * Expected outcome: The recipient and the stored text. The sender is the dispatch's seat.
+ * Exceptions: None.
+ */
+export type CommanderDispatchMessage = {
+  /**
+   * The seat the message is addressed to.
+   *
+   * Contract: A seat id.
+   * When to use: The bullet's flag and name.
+   * Expected outcome: The stored recipient.
+   * Exceptions: None.
+   */
+  readonly toSeatId: string;
+  /**
+   * The stored message text.
+   *
+   * Contract: The cleaned body. Do not log it.
+   * When to use: The bullet's text.
+   * Expected outcome: The text that was inserted.
+   * Exceptions: None.
+   */
+  readonly text: string;
+};
+
 export type CommanderDispatch = {
   /**
    * The AI seat that produced the prose.
@@ -154,14 +183,14 @@ export type CommanderDispatch = {
    */
   readonly seatId: AiSeatId;
   /**
-   * The model's one-line message, when it sent one.
+   * The messages this commander stored in this wave that the viewer may see.
    *
-   * Contract: Trimmed text, or null when the model sent none.
-   * When to use: The toast message.
-   * Expected outcome: The message, or null.
+   * Contract: Filtered when the consult is stored. A later fog change does not rewrite this list.
+   * When to use: The Messages section of the dialog, in seat order at render time.
+   * Expected outcome: One entry per visible message. Empty when this consult stored none the viewer could see.
    * Exceptions: None.
    */
-  readonly message: string | null;
+  readonly messages: readonly CommanderDispatchMessage[];
   /**
    * The model's strategy prose, when it sent one.
    *

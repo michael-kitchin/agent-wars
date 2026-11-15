@@ -7,7 +7,10 @@
  * Exceptions: None.
  */
 
-import { HUMAN_SEAT_ID, aiIndexForSeatId } from '../../shared/seatIds';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { createSideNumberFlag } from './sideNumberFlag';
+
+export { createSideNumberFlag };
 import { miniTokenColors, paletteForOwner } from '../../shared/seatPalette';
 import { unitIconPathForUnitType } from '../rendering/unitDrawing';
 
@@ -46,27 +49,4 @@ export function createLossTypeToken(unitType: string, ownerId: string, seats: re
   if (colors != null && ownerId !== HUMAN_SEAT_ID) image.style.transform = 'scaleX(-1)';
   token.appendChild(image);
   return token;
-}
-
-/**
- * The opponent index on that side's map color.
- *
- * Purpose: Tabs, loss headers, hex sentences, and Reports message rows name an opponent the same way.
- * When to use: When a line or a tab shows an AI seat's name.
- * Expected outcome: A `side-number-flag` with a white digit from `aiIndexForSeatId` and a background of `palette.map`.
- * Exceptions: Returns null when the seat is not an AI seat or has no palette. The caller then paints no flag.
- */
-export function createSideNumberFlag(seatId: string, seats: readonly MarkSeat[]): HTMLSpanElement | null {
-  const index = aiIndexForSeatId(seatId);
-  const palette = paletteForOwner(seatId, seats);
-  if (index == null || palette == null) return null;
-  const flag = document.createElement('span');
-  flag.className = 'side-number-flag';
-  flag.style.background = palette.map;
-  flag.setAttribute('aria-hidden', 'true');
-  const digit = document.createElement('span');
-  digit.textContent = String(index);
-  digit.style.color = '#ffffff';
-  flag.appendChild(digit);
-  return flag;
 }

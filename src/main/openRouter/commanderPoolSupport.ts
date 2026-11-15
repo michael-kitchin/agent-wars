@@ -181,14 +181,14 @@ export type CommanderConsultOutcome = {
    */
   readonly missileLaunchOrders: readonly MissileLaunchOrder[];
   /**
-   * The message this commander sent to the human player in this wave, when there is one.
+   * The messages this seat stored when the talk round closed.
    *
-   * Contract: The text, or null.
-   * When to use: The dispatch only.
-   * Expected outcome: Not written into the pending-order table.
+   * Contract: Empty until the round closes, and empty when persistence stored nothing. The pool filters these for the viewer.
+   * When to use: The dispatch's Messages section.
+   * Expected outcome: Recipient and text for each stored message.
    * Exceptions: None.
    */
-  readonly message: string | null;
+  readonly sentMessages?: readonly { readonly toSeatId: string; readonly text: string }[];
   /**
    * Player-facing strategy prose.
    *
@@ -275,7 +275,6 @@ export function emptyConsultOutcome(
     airDropOrders: [],
     embarkOrders: [],
     missileLaunchOrders: [],
-    message: null,
     strategy: null,
     costUsd: 0,
     modelId: null,

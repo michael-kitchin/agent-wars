@@ -18,6 +18,8 @@ import { rendererSharedState as S } from '../core/state';
 import { getExploredHexSet, reconcileSelectionToCurrentState } from '../core/selection';
 import { rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
+import { refreshChatThread } from '../chat/chatPanelClient';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import {
   applyTacticalPostBeatConsultSideEffects,
@@ -109,6 +111,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     deps.updateReadyButtonState();
     return true;
   }
+  void refreshChatThread();
   const tacticalSubUnitsBeforeCommit = S.tacticalBattleSnapshot?.subUnits;
   const playback = commitResult.tacticalResolutionPlayback;
   const hasMoves =
@@ -184,6 +187,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
       meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
       ...pickPlaybackDiceRolls(playback),
     };
+    syncChatPanelVisibility();
   }
   if (commitResult.tacticalBattle) {
     S.tacticalBattleSnapshot = commitResult.tacticalBattle;

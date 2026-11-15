@@ -50,15 +50,6 @@ export type TacticalPostBeatConsultFields = {
   attachTacticalOpponentPlanToIpc: boolean;
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   aiStrategy?: string;
-  /**
-   * The message this commander sent to the human player in this wave, when there is one.
-   *
-   * Contract: Optional; omit when empty after trim.
-   * When to use: Renderer strategy toast Message section after a tactical beat consult.
-   * Expected outcome: Independent of `aiStrategy` so message-only consults still display.
-   * Exceptions: None.
-   */
-  aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
   /**
    * Dollar cost of this tactical post-beat consultation.
@@ -93,16 +84,6 @@ export type TacticalPostBeatConsultMergeSource = {
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   strategy?: string;
   aiStrategy?: string;
-  /**
-   * The message this commander sent to the human player in this wave, when there is one. Taken from `message` or `aiMessage`.
-   *
-   * Contract: Optional; mapper prefers `message` then `aiMessage`.
-   * When to use: `toTacticalPostBeatConsultFields`.
-   * Expected outcome: Exposed as `aiMessage` on the IPC fields when non-empty.
-   * Exceptions: None.
-   */
-  message?: string;
-  aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
   /**
    * Dollar cost from the tactical post-beat consult, before IPC mapping.
@@ -139,15 +120,6 @@ export type NotifyResolutionPlaybackCompletePayload =
 export type PostResolutionConsultationPushPayload = {
   planningTurnNumber: number;
   aiStrategy?: string;
-  /**
-   * The message this commander sent to the human player in this wave, when there is one.
-   *
-   * Contract: Optional; omit when empty after trim.
-   * When to use: Renderer post-resolution consultation listener.
-   * Expected outcome: Shown in the Message toast section independently of `aiStrategy`.
-   * Exceptions: None.
-   */
-  aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
   /**
    * Dollar cost of the deferred strategic or melee post-resolution consultation.

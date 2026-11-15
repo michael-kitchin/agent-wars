@@ -8,6 +8,8 @@ import { rendererSharedState as S } from '../core/state';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { sightCueBeamsForViewer } from '../../shared/sightCueDrawModel';
 import { deferTacticalEntryUntilStrategicPlayback, observeModeControls } from '../../shared/observeModeControls';
+import { refreshChatThread } from '../chat/chatPanelClient';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import {
   isDeferredResolutionPlaybackConsultPending,
@@ -171,6 +173,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.updateReadyButtonState();
       return;
     }
+    void refreshChatThread();
 
     if (readyResult.awaitingMeleeDecision) {
       if (!window.gameApi.resolveMeleeIntercept) {
@@ -388,6 +391,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           unknownHexes: new Set([...unknownCombatHexes, ...unknownCasualtyHexes]),
         }),
       };
+      syncChatPanelVisibility();
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
       if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);

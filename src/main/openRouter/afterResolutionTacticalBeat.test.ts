@@ -386,7 +386,6 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
         success: true,
         orders: [{ unitId: 'opp-sub-1', toH3Index: tacticalIndex }],
         strategy: 'push armor',
-        message: 'This close, hesitation is already a casualty.',
         toolInvocationCounts: { planning: 7, assessment: 0 },
       }),
     }, AI_SEAT_IDS[0]);
@@ -395,7 +394,6 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
     assert.equal(res.tacticalOpponentPlan?.movementOrders.length, 1);
     assert.equal(res.tacticalOpponentPlan?.movementOrders[0]?.unitId, 'opp-sub-1');
     assert.equal(res.strategy, 'push armor');
-    assert.equal(res.message, 'This close, hesitation is already a casualty.');
     assert.deepEqual(res.toolInvocationCounts, { planning: 7, assessment: 0 });
   });
 });
@@ -447,14 +445,12 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
         success: true,
         orders: [],
         strategy: 'push armor',
-        message: 'This close, hesitation is already a casualty.',
       }),
       timeoutMs: 5000,
       errorLogMessage: 'test: afterTacticalBeatResolution failed',
     });
     const fields = toTacticalPostBeatConsultFields(tacticalBattle.battleId, merge);
     assert.equal(fields.aiStrategy, 'push armor');
-    assert.equal(fields.aiMessage, 'This close, hesitation is already a casualty.');
     resetCommanderPool([]);
   });
 });

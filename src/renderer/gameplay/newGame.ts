@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { clearRememberedUnitOrigins } from '../core/unitOriginFlags';
 import { clearOpenRouterLog, hideAiStrategyToast } from '../openRouter/openRouterUiHelpers';
+import { refreshChatThread } from '../chat/chatPanelClient';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import { clearConsoleReports } from '../chrome/consoleReports';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
@@ -348,6 +349,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       installRendererGameMap(state);
       await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;
+      void refreshChatThread();
       S.strategicScenarioInitialLeafletView = null;
       tacticalReleaseRendererSessionForNewStrategicMatch(state);
       clearObserveAfterKnockout();

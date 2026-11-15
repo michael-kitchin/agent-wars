@@ -1,5 +1,5 @@
 /* Toasts, and the dialog that reports a battle's result. */
-/* The message toast sits in one band at the top of the map. mapChromeLayout.ts sets its pixel width and right edge. The width is the gap beside the left chrome, and no wider than one third of the map, unless the opponent tab row needs more. It stays inside the map insets. The map toast is a sibling at the lower right, on the same corner as the + and − buttons, and it covers them. */
+/* The message toast sits in one band at the top of the map. mapChromeLayout.ts sets its pixel width and right edge. The width is the gap beside the left chrome, and no wider than one third of the map, unless the opponent tab row needs more. It stays inside the map insets. The map toast sits at the lower right. The chat panel hides while that toast is showing. */
 .map-toast-band {
   position: absolute;
   top: 12px;
@@ -13,7 +13,7 @@
   gap: 8px;
   pointer-events: none;
 }
-/* 12px matches the zoom control's corner. 62px is two 30px buttons plus the control's 1px top and bottom borders, so a short toast still covers both. */
+/* 12px matches the map's corner inset. The chat panel hides while this toast is showing, so the toast is not covered by raising the panel. */
 #map-toast {
   position: absolute;
   right: 12px;

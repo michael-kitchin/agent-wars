@@ -236,7 +236,6 @@ export async function handleGameReady(
   const turnOutputTokens = undefined;
   const aiSkipReason = undefined;
   let aiStrategy: string | undefined;
-  let aiMessage: string | undefined;
   const aiConsulted = useEventDrivenConsultation ? consultedSeatIds.length > 0 : undefined;
   logDebug('handleGameReady consultation source', {
     useEventDrivenConsultation,
@@ -277,7 +276,6 @@ export async function handleGameReady(
       aiMoves: aiMovesAwait.length > 0 ? aiMovesAwait : undefined,
       aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
       aiStrategy,
-      aiMessage,
       toolInvocationCounts,
       cost: turnCost,
       wallClockMs: turnWallClockMs,
@@ -315,9 +313,6 @@ export async function handleGameReady(
     if (postConsult.aiStrategy) {
       aiStrategy = postConsult.aiStrategy;
     }
-    if (postConsult.aiMessage) {
-      aiMessage = postConsult.aiMessage;
-    }
     if (postConsult.toolInvocationCounts) {
       toolInvocationCounts = postConsult.toolInvocationCounts;
     }
@@ -343,7 +338,6 @@ export async function handleGameReady(
     aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
     ...pickReadyResolutionIpcMirrorFields(readyResult),
     aiStrategy,
-    aiMessage,
     toolInvocationCounts,
     cost: turnCost,
     wallClockMs: turnWallClockMs,

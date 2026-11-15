@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { floatingPanelOffset, legendPopoverPosition, messageToastBandWidth, toastBandSpan } from './mapChromePlacement';
+import { chatPanelPlacement, floatingPanelOffset, legendPopoverPosition, messageToastBandWidth, toastBandSpan } from './mapChromePlacement';
 
 test('legendPopoverPosition puts the legend right of the panel when it fits', () => {
   assert.deepEqual(legendPopoverPosition({ mapWidth: 904, panelRight: 310, panelBottom: 214, legendWidth: 110 }), {
@@ -40,6 +40,17 @@ test('messageToastBandWidth keeps the one-third cap when the tab row fits or is 
   assert.equal(messageToastBandWidth({ mapWidth: 900, available: 200, tabRowOuterWidth: 0 }), 200);
   assert.equal(messageToastBandWidth({ mapWidth: 900, available: 800, tabRowOuterWidth: Number.NaN }), 300);
   assert.equal(messageToastBandWidth({ mapWidth: 900, available: 800, tabRowOuterWidth: -10 }), 300);
+});
+
+test('chatPanelPlacement uses the band width and sits above the scale', () => {
+  const bare = chatPanelPlacement({ mapWidth: 900, mapHeight: 500, bandWidth: 300, scaleHeight: 0 });
+  assert.equal(bare.width, 300);
+  assert.equal(bare.right, 12);
+  assert.equal(bare.bottom, 12);
+  assert.equal(bare.maxHistoryHeight, 250);
+  const above = chatPanelPlacement({ mapWidth: 900, mapHeight: 501, bandWidth: 280, scaleHeight: 20 });
+  assert.equal(above.bottom, 12 + 20 + 8);
+  assert.equal(above.maxHistoryHeight, 250);
 });
 
 test('messageToastBandWidth grows to the tab row and stops at the map insets', () => {

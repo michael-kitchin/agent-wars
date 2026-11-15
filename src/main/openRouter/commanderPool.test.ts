@@ -27,6 +27,8 @@ import {
   openGameDatabaseAtPathForTests,
   resetGameForNewMatch,
 } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { upsertGameConfigValue } from '../gameDb/gameConfigRows';
 import type { ResetGameForNewMatchOptions } from '../gameDb/resetGame';
 import { listGameMaps } from '../gameMap/listGameMaps';
 import { clearLoadedGameMapForTests } from '../gameMap/loadGameMap';
@@ -97,7 +99,6 @@ function finishedConsult(seatId: AiSeatId): CommanderConsultOutcome {
     ...emptyConsultOutcome(),
     finished: true,
     movementOrders: [{ unitId: `move-${seatId}`, toH3Index: '8129fffffffffff' }],
-    message: 'You cannot hide.',
     strategy: STRATEGY,
     costUsd: 1.25,
     modelId: 'model-a',
@@ -254,7 +255,6 @@ describe('commander pool', { concurrency: 1 }, () => {
       setCommanderConsultRunnerForTests(async () =>
         emptyConsultOutcome({
           finished: false,
-          message: 'You cannot hide.',
           strategy: 'Hold the coast.',
           costUsd: 0,
           modelId: 'model-a',
@@ -264,7 +264,6 @@ describe('commander pool', { concurrency: 1 }, () => {
       await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
       const drained = readCommanderPoolSnapshot(true);
       assert.equal(drained.dispatches.length, 2);
-      assert.equal(drained.dispatches[0]?.message, 'You cannot hide.');
       assert.equal(drained.dispatches[0]?.strategy, 'Hold the coast.');
     });
     await withMatch(['model-a', 'model-a'], async () => {
@@ -275,7 +274,7 @@ describe('commander pool', { concurrency: 1 }, () => {
     });
     await withMatch(['model-a', 'model-a'], async () => {
       setCommanderConsultRunnerForTests(async () =>
-        emptyConsultOutcome({ finished: false, message: '   ', strategy: null })
+        emptyConsultOutcome({ finished: false, strategy: null })
       );
       startStrategicPlanning();
       await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
@@ -530,13 +529,14 @@ describe('commander pool', { concurrency: 1 }, () => {
     });
   });
 
-  test('a message to the human seat is the dispatch message, and a message to another AI is not', async (t) => {
+  test('fog on keeps a message to the human and hides a message to another side', async (t) => {
     if (!regionalMap()) {
       t.skip('no regional map with three side groups is extracted');
       return;
     }
     delete process.env.AGENT_WARS_DISABLE_TALK;
     await withMatch([null, 'model-a', null], async () => {
+      upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '1');
       setCommanderPoolTimingForTests({
         nowMs: () => 1_000,
         wallClockMs: 60_000,
@@ -544,7 +544,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         talkRoundTimeoutMs: 75_000,
         schedule: () => ({ cancel: () => undefined }),
       });
-      const quiet = { ...finishedConsult(AI_SEAT_IDS[0]), message: null };
+      const quiet = finishedConsult(AI_SEAT_IDS[0]);
       setCommanderConsultRunnerForTests(async (request) => {
         await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
         return quiet;
@@ -559,7 +559,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
         await flushWrites();
         const toHuman = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
-        assert.equal(toHuman?.message, 'hello human');
+        assert.deepEqual(toHuman?.messages.map((row) => row.text), ['hello human']);
         resetCommanderPool(getSeatRoster());
         setCommanderTalkRunnerForTests(async () => ({
           kind: 'spoke',
@@ -570,13 +570,104 @@ describe('commander pool', { concurrency: 1 }, () => {
         await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
         await flushWrites();
         const toOther = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
-        assert.equal(toOther?.message, null);
+        assert.deepEqual(toOther?.messages, []);
       } finally {
         setCommanderTalkRunnerForTests(null);
         setCommanderConsultRunnerForTests(null);
         setCommanderPoolTimingForTests(null);
       }
     }, true);
+  });
+
+  test('a wave keeps the messages the viewer may see', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    const both = {
+      kind: 'spoke' as const,
+      reply: {
+        messages: [
+          { toSeatId: HUMAN_SEAT_ID, text: 'hello human' },
+          { toSeatId: AI_SEAT_IDS[1], text: 'hello other' },
+        ],
+        stances: [],
+        droppedCount: 0,
+      },
+      costUsd: 0,
+    };
+    await withMatch([null, 'model-a', null], async () => {
+      setCommanderPoolTimingForTests({
+        nowMs: () => 1_000,
+        wallClockMs: 60_000,
+        waitTimeoutMs: 120_000,
+        talkRoundTimeoutMs: 75_000,
+        schedule: () => ({ cancel: () => undefined }),
+      });
+      const quiet = finishedConsult(AI_SEAT_IDS[0]);
+      setCommanderConsultRunnerForTests(async (request) => {
+        await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
+        return quiet;
+      });
+      setCommanderTalkRunnerForTests(async () => both);
+      try {
+        upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '1');
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        await flushWrites();
+        const fogOn = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
+        assert.deepEqual(fogOn?.messages.map((row) => row.toSeatId), [HUMAN_SEAT_ID]);
+        resetCommanderPool(getSeatRoster());
+        upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '0');
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        await flushWrites();
+        const fogOff = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
+        assert.deepEqual(fogOff?.messages.map((row) => row.text), ['hello human', 'hello other']);
+      } finally {
+        setCommanderTalkRunnerForTests(null);
+        setCommanderConsultRunnerForTests(null);
+        setCommanderPoolTimingForTests(null);
+      }
+    }, true);
+    await withMatch(['model-a', null, null], async () => {
+      setCommanderPoolTimingForTests({
+        nowMs: () => 1_000,
+        wallClockMs: 60_000,
+        waitTimeoutMs: 120_000,
+        talkRoundTimeoutMs: 75_000,
+        schedule: () => ({ cancel: () => undefined }),
+      });
+      setCommanderConsultRunnerForTests(async (request) => {
+        await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
+        return finishedConsult(request.seatId);
+      });
+      setCommanderTalkRunnerForTests(async () => ({
+        kind: 'spoke',
+        reply: {
+          messages: [
+            { toSeatId: AI_SEAT_IDS[1], text: 'one' },
+            { toSeatId: AI_SEAT_IDS[2], text: 'two' },
+          ],
+          stances: [],
+          droppedCount: 0,
+        },
+        costUsd: 0,
+      }));
+      try {
+        upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '1');
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        await flushWrites();
+        const observed = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
+        assert.deepEqual(observed?.messages.map((row) => row.text), ['one', 'two']);
+      } finally {
+        setCommanderTalkRunnerForTests(null);
+        setCommanderConsultRunnerForTests(null);
+        setCommanderPoolTimingForTests(null);
+      }
+    });
   });
 
   test('a consult that never talks still closes the round, and the switch leaves the round null', async (t) => {

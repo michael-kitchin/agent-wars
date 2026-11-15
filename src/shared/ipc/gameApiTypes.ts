@@ -20,6 +20,7 @@ import type { BasemapVectorName } from '../vectorPackTypes';
 import type { DismissMercenaryResult } from '../mercenaryDismiss';
 import type { HexHireView, HireMutationResult, HireOrderRequest } from './mercenaryTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
+import type { SideMessageThreadSnapshot } from '../sideMessageView';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
 import type { AiSeatId } from '../seatIds';
@@ -74,15 +75,6 @@ export type CommitHumanTacticalDraftOrdersIpcResult = {
   committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
   toolInvocationCounts?: Record<string, number>;
   aiStrategy?: string;
-  /**
-   * The message this commander sent to the human player in this wave, when there is one. From the post-beat consult (IPC merge only).
-   *
-   * Contract: Same source as `aiStrategy`; omit when empty.
-   * When to use: Renderer Message toast section after tactical Ready.
-   * Expected outcome: Independent of `aiStrategy`.
-   * Exceptions: None.
-   */
-  aiMessage?: string;
   /**
    * True when main deferred `runEventDrivenAfterTacticalBeatConsultation` until resolution playback notify + push.
    *
@@ -397,6 +389,33 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    * Exceptions: Rejects when the IPC channel fails.
    */
   readCommanderPool: (drain: boolean) => Promise<CommanderPoolSnapshot>;
+  /**
+   * Reads the messages the current viewer may see.
+   *
+   * Contract: The main process has already applied the visibility rule.
+   * When to use: When the chat panel needs a fresh thread.
+   * Expected outcome: Sent messages the viewer may see, the viewer's drafts, and the AI sides still in the match.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readSideMessages: () => Promise<SideMessageThreadSnapshot>;
+  /**
+   * Stores one draft from the player to one side.
+   *
+   * Contract: Success replaces any draft to that recipient. `reason` is a sentence the player can read.
+   * When to use: Enter or the send button.
+   * Expected outcome: The draft is stored, or the sentence that explains the refusal.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  stageSideMessage: (request: { toSeatId: string; text: string }) => Promise<{ success: true } | { success: false; reason: string }>;
+  /**
+   * Drops the player's draft to one side.
+   *
+   * Contract: A missing draft is unchanged.
+   * When to use: Cancel, and Edit before the text is staged again.
+   * Expected outcome: No staged row from the player to that side.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  cancelStagedSideMessage: (request: { toSeatId: string }) => Promise<void>;
     /**
    * Specifies the contract for the `submitOrders` member (submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;).
 

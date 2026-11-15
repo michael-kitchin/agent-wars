@@ -5,6 +5,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
+import type { SideMessageThreadSnapshot } from '../shared/sideMessageView';
 import type { BasemapVectorName } from '../shared/vectorPackTypes';
 import type { DismissMercenaryResult } from '../shared/mercenaryDismiss';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
@@ -93,6 +94,9 @@ const IPC_GAME = {
   startCommanderPlanning: 'game:startCommanderPlanning',
   stopCommanderPlanning: 'game:stopCommanderPlanning',
   readCommanderPool: 'game:readCommanderPool',
+  readSideMessages: 'game:readSideMessages',
+  stageSideMessage: 'game:stageSideMessage',
+  cancelStagedSideMessage: 'game:cancelStagedSideMessage',
   submitOrders: 'game:submitOrders',
   listHumanStandingOrders: 'game:listHumanStandingOrders',
   previewHumanMarchOrder: 'game:previewHumanMarchOrder',
@@ -442,6 +446,36 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    */
   readCommanderPool: (drain: boolean): Promise<CommanderPoolSnapshot> =>
     ipcRenderer.invoke(IPC_GAME.readCommanderPool, { drain }),
+  /**
+   * Reads the messages the current viewer may see.
+   *
+   * Purpose: The chat panel never receives a message the viewer may not see.
+   * When to use: When the panel opens, after a commit, and after commanders speak.
+   * Expected outcome: The snapshot. An observer can read and cannot send.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readSideMessages: (): Promise<SideMessageThreadSnapshot> =>
+    ipcRenderer.invoke(IPC_GAME.readSideMessages),
+  /**
+   * Stores one draft from the player to one side.
+   *
+   * Purpose: The message is not sent until the player commits.
+   * When to use: Enter or the send button.
+   * Expected outcome: Success replaces any draft to that side. A refusal carries the sentence to show.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  stageSideMessage: (request: { toSeatId: string; text: string }): Promise<{ success: true } | { success: false; reason: string }> =>
+    ipcRenderer.invoke(IPC_GAME.stageSideMessage, request),
+  /**
+   * Drops the player's draft to one side.
+   *
+   * Purpose: The player changed their mind before the commit.
+   * When to use: The staged row's cancel, and Edit before the text is staged again.
+   * Expected outcome: That draft is gone. A missing draft is unchanged.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  cancelStagedSideMessage: (request: { toSeatId: string }): Promise<void> =>
+    ipcRenderer.invoke(IPC_GAME.cancelStagedSideMessage, request),
     /**
    * Documents the object literal property `submitOrders` (submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:submitOrders', payload)).
 

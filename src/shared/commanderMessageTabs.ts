@@ -7,7 +7,7 @@
  * Exceptions: None. This module does not import the logger.
  */
 
-import type { CommanderAbsenceReason, CommanderConsultTheater, CommanderStatus } from './commanderStatus';
+import type { CommanderAbsenceReason, CommanderConsultTheater, CommanderDispatchMessage, CommanderStatus } from './commanderStatus';
 import { aiIndexForSeatId } from './seatIds';
 
 /**
@@ -55,6 +55,15 @@ export interface CommanderMessageTab {
    * Exceptions: None.
    */
   readonly message: string | null;
+  /**
+   * The messages this consult stored that the viewer could see.
+   *
+   * Contract: The snapshot from the dispatch. Empty when that consult sent none.
+   * When to use: The Messages section. A later fog change does not rewrite this list.
+   * Expected outcome: Recipient and text for each visible message.
+   * Exceptions: None.
+   */
+  readonly messages: readonly CommanderDispatchMessage[];
   /**
    * The seat's latest strategy.
    *
@@ -147,6 +156,7 @@ export function initialCommanderMessageTabs(
       label: seat.label,
       enabled: false,
       message: null,
+      messages: [],
       strategy: null,
       consultedWithoutProse: false,
       fromAbsence: false,
@@ -167,18 +177,23 @@ export function applyCommanderMessage(
   state: CommanderMessageTabState,
   arrival: {
     readonly seatId: string;
-    readonly message: string | null;
+    readonly message?: string | null;
     readonly strategy: string | null;
+    readonly messages?: readonly CommanderDispatchMessage[];
   }
 ): CommanderMessageTabState {
-  const message = proseOrNull(arrival.message);
+  const message = proseOrNull(arrival.message ?? null);
   const strategy = proseOrNull(arrival.strategy);
-  if (!message && !strategy) return state;
+  const messages = (arrival.messages ?? []).flatMap((row) => {
+    const text = proseOrNull(row.text);
+    return text ? [{ toSeatId: row.toSeatId, text }] : [];
+  });
+  if (!message && !strategy && messages.length === 0) return state;
   const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
   if (index < 0) return state;
   const tabs = state.tabs.map((tab, tabIndex) =>
     tabIndex === index
-      ? { ...tab, enabled: true, message, strategy, consultedWithoutProse: false, fromAbsence: false }
+      ? { ...tab, enabled: true, message, messages, strategy, consultedWithoutProse: false, fromAbsence: false }
       : tab
   );
   return { tabs, selectedSeatId: arrival.seatId };
@@ -189,14 +204,15 @@ export function applyCommanderMessage(
  *
  * Purpose: The message popup and Reports keep a consult that sent a message, a strategy, or both.
  * When to use: Before enabling a tab or filing a Reports entry. This function does not read observe mode.
- * Expected outcome: True when either trimmed value is non-empty.
+ * Expected outcome: True when the strategy is non-empty or any message text is non-empty.
  * Exceptions: None.
  */
-export function commanderDispatchHasProse(
-  message: string | null | undefined,
-  strategy: string | null | undefined
-): boolean {
-  return proseOrNull(message ?? null) !== null || proseOrNull(strategy ?? null) !== null;
+export function commanderDispatchHasProse(input: {
+  readonly strategy?: string | null;
+  readonly messages?: readonly { readonly text: string }[];
+}): boolean {
+  if (proseOrNull(input.strategy ?? null) !== null) return true;
+  return (input.messages ?? []).some((row) => proseOrNull(row.text) !== null);
 }
 
 /**
@@ -357,6 +373,7 @@ export function noteCommanderConsultWithoutProse(
           consultedWithoutProse: true,
           enabled: false,
           message: current.fromAbsence ? null : tab.message,
+          messages: current.fromAbsence ? [] : tab.messages,
           strategy: null,
           fromAbsence: false,
         }
@@ -387,7 +404,7 @@ export function applyCommanderAbsence(
   if (!current || (current.enabled && !current.fromAbsence)) return state;
   const tabs = state.tabs.map((tab, tabIndex) =>
     tabIndex === index
-      ? { ...tab, enabled: true, message: line, strategy: null, fromAbsence: true, consultedWithoutProse: false }
+      ? { ...tab, enabled: true, message: line, messages: [], strategy: null, fromAbsence: true, consultedWithoutProse: false }
       : tab
   );
   return { tabs, selectedSeatId: state.selectedSeatId };

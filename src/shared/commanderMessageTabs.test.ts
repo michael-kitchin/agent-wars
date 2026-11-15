@@ -77,12 +77,30 @@ test('a nickname is stored character for character', () => {
 });
 
 test('commanderDispatchHasProse keeps a message, a strategy, or both', () => {
-  assert.equal(commanderDispatchHasProse('Hold the coast.', null), true);
-  assert.equal(commanderDispatchHasProse(null, 'Watch the strait.'), true);
-  assert.equal(commanderDispatchHasProse(null, null), false);
-  assert.equal(commanderDispatchHasProse('   ', '\n'), false);
-  assert.equal(commanderDispatchHasProse(undefined, undefined), false);
-  assert.equal(commanderDispatchHasProse(undefined, 'Watch the strait.'), true);
+  assert.equal(commanderDispatchHasProse({ strategy: null, messages: [{ text: 'Hold the coast.' }] }), true);
+  assert.equal(commanderDispatchHasProse({ strategy: 'Watch the strait.' }), true);
+  assert.equal(commanderDispatchHasProse({ strategy: null }), false);
+  assert.equal(commanderDispatchHasProse({ strategy: '\n', messages: [{ text: '   ' }] }), false);
+  assert.equal(commanderDispatchHasProse({}), false);
+  assert.equal(commanderDispatchHasProse({ strategy: null, messages: [] }), false);
+  assert.equal(commanderDispatchHasProse({ strategy: null, messages: [{ text: 'Hello' }] }), true);
+});
+
+test('two messages and no strategy enable the tab', () => {
+  const initial = initialCommanderMessageTabs(seats);
+  const next = applyCommanderMessage(initial, {
+    seatId: 'opponent',
+    message: null,
+    strategy: null,
+    messages: [
+      { toSeatId: 'human', text: 'Hello' },
+      { toSeatId: 'opponent2', text: 'Watch' },
+    ],
+  });
+  const tab = next.tabs.find((row) => row.seatId === 'opponent');
+  assert.equal(tab?.enabled, true);
+  assert.equal(tab?.messages.length, 2);
+  assert.equal(next.selectedSeatId, 'opponent');
 });
 
 test('whitespace and an unknown seat do not enable or add a tab', () => {

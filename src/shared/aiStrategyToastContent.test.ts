@@ -4,8 +4,8 @@
  */
 
 import assert from 'node:assert/strict';
+import { SIDE_MESSAGES_TITLE } from './sideMessageView';
 import {
-  AI_STRATEGY_TOAST_MESSAGE_TITLE,
   AI_STRATEGY_TOAST_STRATEGY_TITLE,
   buildAiStrategyToastSections,
   hasAiStrategyToastContent,
@@ -16,19 +16,23 @@ import {
  *
  * Purpose: Locks display order for the two-section toast.
  * When to use: After changing `buildAiStrategyToastSections`.
- * Expected outcome: Two sections with titles Message then Strategy.
+ * Expected outcome: Two sections, Messages with two bullets, then Strategy.
  * Exceptions: None.
  */
 function testBothFieldsMessageThenStrategy(): void {
   const sections = buildAiStrategyToastSections({
-    message: 'You will not find safety in delay.',
+    messages: [
+      { toSeatId: 'human', text: 'Hello' },
+      { toSeatId: 'opponent2', text: 'Watch' },
+    ],
     strategy: 'Close with observed enemies.',
   });
-  assert.deepEqual(sections, [
-    { title: AI_STRATEGY_TOAST_MESSAGE_TITLE, body: 'You will not find safety in delay.' },
-    { title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: 'Close with observed enemies.' },
-  ]);
-  assert.equal(hasAiStrategyToastContent({ message: 'a', strategy: 'b' }), true);
+  assert.equal(sections.length, 2);
+  assert.equal(sections[0]?.title, SIDE_MESSAGES_TITLE);
+  assert.equal(sections[0]?.body, '');
+  assert.equal(sections[0]?.bullets?.length, 2);
+  assert.equal(sections[1]?.title, AI_STRATEGY_TOAST_STRATEGY_TITLE);
+  assert.equal(hasAiStrategyToastContent({ messages: [{ toSeatId: 'human', text: 'a' }], strategy: 'b' }), true);
 }
 
 /**
@@ -40,14 +44,12 @@ function testBothFieldsMessageThenStrategy(): void {
  * Exceptions: None.
  */
 function testOmitsEmptyAndWhitespaceSections(): void {
-  assert.deepEqual(buildAiStrategyToastSections({ message: 'Taunt only.', strategy: '' }), [
-    { title: AI_STRATEGY_TOAST_MESSAGE_TITLE, body: 'Taunt only.' },
-  ]);
-  assert.deepEqual(buildAiStrategyToastSections({ message: null, strategy: 'Hold.' }), [
+  assert.deepEqual(buildAiStrategyToastSections({ strategy: '' }), []);
+  assert.deepEqual(buildAiStrategyToastSections({ messages: [], strategy: 'Hold.' }), [
     { title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: 'Hold.' },
   ]);
-  assert.deepEqual(buildAiStrategyToastSections({ message: '  ', strategy: '\n' }), []);
-  assert.equal(hasAiStrategyToastContent({ message: '  ', strategy: undefined }), false);
+  assert.deepEqual(buildAiStrategyToastSections({ strategy: '\n' }), []);
+  assert.equal(hasAiStrategyToastContent({ strategy: undefined }), false);
 }
 
 /**
@@ -60,11 +62,11 @@ function testOmitsEmptyAndWhitespaceSections(): void {
  */
 function testBothEmptyHidesToast(): void {
   assert.deepEqual(buildAiStrategyToastSections({}), []);
-  assert.equal(hasAiStrategyToastContent({ message: null, strategy: null }), false);
+  assert.equal(hasAiStrategyToastContent({ strategy: null }), false);
 }
 
 const tests = [
-  { name: 'buildAiStrategyToastSections both fields Message then Strategy', fn: testBothFieldsMessageThenStrategy },
+  { name: 'buildAiStrategyToastSections lists Messages before Strategy', fn: testBothFieldsMessageThenStrategy },
   { name: 'buildAiStrategyToastSections omits empty and whitespace sections', fn: testOmitsEmptyAndWhitespaceSections },
   { name: 'hasAiStrategyToastContent false when both empty', fn: testBothEmptyHidesToast },
 ];

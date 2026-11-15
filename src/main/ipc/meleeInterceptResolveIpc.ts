@@ -80,7 +80,6 @@ export async function handleResolveMeleeIntercept(
   const aiPlanningRunEnabled = payload?.aiPlanningRunEnabled === true;
 
   let aiStrategy: string | undefined;
-  let aiMessage: string | undefined;
   let toolInvocationCounts: Record<string, number> | undefined;
   let turnCost: number | undefined;
   let turnWallClockMs: number | undefined;
@@ -126,9 +125,6 @@ export async function handleResolveMeleeIntercept(
     if (resolvePostConsult.aiStrategy) {
       aiStrategy = resolvePostConsult.aiStrategy;
     }
-    if (resolvePostConsult.aiMessage) {
-      aiMessage = resolvePostConsult.aiMessage;
-    }
     if (resolvePostConsult.toolInvocationCounts) {
       toolInvocationCounts = resolvePostConsult.toolInvocationCounts;
     }
@@ -146,7 +142,6 @@ export async function handleResolveMeleeIntercept(
     removedUnitIdsBySeat: resolveResult.removedUnitIdsBySeat,
     tacticalAutoStartH3Index: resolveResult.tacticalAutoStartH3Index,
     aiStrategy,
-    aiMessage,
     toolInvocationCounts,
     cost: turnCost,
     wallClockMs: turnWallClockMs,

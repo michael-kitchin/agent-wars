@@ -65,6 +65,7 @@ import { registerBuildQueueSealiftIpcHandler } from './ipc/buildQueueSealiftIpcH
 import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
 import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
+import { registerSideMessageIpcHandler } from './ipc/sideMessageIpcHandler';
 import { registerHumanNicknameIpcHandler } from './ipc/humanNicknameIpcHandler';
 import { registerSeatCommanderIpcHandler } from './ipc/seatCommanderIpcHandler';
 import { registerMissileLaunchIpcHandler } from './ipc/missileLaunchIpcHandler';
@@ -607,6 +608,7 @@ function registerIpcHandlers(): void {
   registerOpenRouterIpcHandler(ipcMain);
   registerCommanderPoolIpcHandler(ipcMain);
   registerEndMatchIpcHandler(ipcMain);
+  registerSideMessageIpcHandler(ipcMain);
   registerHumanNicknameIpcHandler(ipcMain);
   registerSeatCommanderIpcHandler(ipcMain);
   registerMissileLaunchIpcHandler(ipcMain);

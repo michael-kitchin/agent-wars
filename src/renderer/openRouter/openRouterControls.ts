@@ -268,7 +268,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       recordConsoleReport('message', currentConsoleReportTag(), body, {
         senderSeatId: dispatch.seatId,
         modelLabel: dispatch.modelLabel,
-        messageText: dispatch.message ?? '',
+        messages: dispatch.messages,
         strategyText: dispatch.strategy ?? undefined,
       });
     },
