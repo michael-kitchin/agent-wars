@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **2.25.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **2.26.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **2.26.0** lets a commander launch or cancel a listed sea or air operation, or name a city for one, and turns a land choice into a new target for the campaign. On the turn after a clear sea or air row was offered, the engine launches the first one and never launches a land row on its own. A commander can set a posture, overland, maritime, strangle, or blitz, and it holds for 6 turns. An order on a unit aboard a ship or an air unit is refused, and a standing order does not move a unit that is aboard.
 
 Release **2.25.0** tells a commander to keep one city queued on credits, and names a city for a missile, a ship, or credits when one is worth building. A commander that can build a ship or a missile reads those rules before it owns one. Balanced and cautious commanders are told to strike enemy production their ground units cannot reach. Raise Options shows distance, nearby enemies, and chokepoints, and attention names one affordable raise and a missile that can launch.
 
