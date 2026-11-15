@@ -14,7 +14,11 @@ import {
   setAiLastConsultationTurn,
   upsertTurnStrategyNote,
 } from '../gameDb';
-import { logDebug } from '../logger';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { readMatchId } from '../gameDb/gameConfigKv';
+import { logDebug, logTrace } from '../logger';
+import { getMatchGeneration } from '../matchGeneration';
+import { recordCommanderStrategy, stepForConsult } from '../recorder/matchRecordingEvents';
 import type { ConsultTelemetry, ConsultTelemetryOutcome } from './consultTelemetry';
 import type { RequestOrdersError } from './requestOrdersFlowTypes';
 
@@ -43,11 +47,27 @@ export function settleConsultFailure(
 }
 
 /**
+ * Reports whether a consult still belongs to the open match.
+ *
+ * Purpose: New and Load replace the database while a model call can still finish. Stopping the model does not.
+ * When to use: Before writing a consultation or strategy row at the end of a model call.
+ * Expected outcome: True when the generation is unchanged and the match id is unchanged. Also true when this match had no id yet and the generation is unchanged, so creating the id does not drop the consult. False after New or Load moves the generation, including when the loaded file still has this match's id.
+ * Exceptions: None.
+ */
+export function consultStillOnOpenMatch(matchIdAtStart: string | null, generationAtStart: number): boolean {
+  const sameId = readMatchId(gameDbOps) === matchIdAtStart;
+  const sameGeneration = getMatchGeneration() === generationAtStart;
+  const stillOpen = sameGeneration && (sameId || matchIdAtStart === null);
+  logTrace('requestOrdersConsultationMarks consultStillOnOpenMatch', { sameId, sameGeneration, stillOpen });
+  return stillOpen;
+}
+
+/**
  * Marks one consultation complete for this seat.
  *
  * Purpose: Event-driven consultation and the strategy note need the same turn stamp.
  * When to use: After a parsed envelope, and when the tool budget ends the consult.
- * Expected outcome: Strategic notes use an empty battle id. Tactical notes use the battle's turn.
+ * Expected outcome: Strategic notes use an empty battle id. Tactical notes use the battle's turn. The strategy event is skipped when New or Load has replaced this consult's match.
  * Exceptions: Propagates database errors.
  */
 export function markSuccessfulConsultation(args: {
@@ -56,6 +76,24 @@ export function markSuccessfulConsultation(args: {
   readonly tacticalBattle: TacticalBattleSnapshot | undefined;
   readonly strategyText?: string | null;
   readonly messageText?: string | null;
+  /**
+   * The match id at the start of the consult.
+   *
+   * Contract: Omit it when the caller has no match id to compare.
+   * When to use: The orders flow, which reads the id before the model call.
+   * Expected outcome: The strategy is not recorded when a new match has replaced this one.
+   * Exceptions: None.
+   */
+  readonly matchIdAtStart?: string | null;
+  /**
+   * The match generation at the start of the consult.
+   *
+   * Contract: Omit it when the caller is not comparing matches.
+   * When to use: With `matchIdAtStart`. New and Load move the generation. Stopping the model does not.
+   * Expected outcome: The strategy event is skipped only when this consult's match was replaced.
+   * Exceptions: None.
+   */
+  readonly generationAtStart?: number;
 }): void {
   logDebug('requestOrdersConsultationMarks markSuccessfulConsultation', {
     seatId: args.seatId,
@@ -69,10 +107,19 @@ export function markSuccessfulConsultation(args: {
       strategyText: args.strategyText,
       messageText: args.messageText,
     });
-    return;
+  } else {
+    upsertTurnStrategyNote(args.seatId, 'strategic', '', args.turnNumber, {
+      strategyText: args.strategyText,
+      messageText: args.messageText,
+    });
   }
-  upsertTurnStrategyNote(args.seatId, 'strategic', '', args.turnNumber, {
-    strategyText: args.strategyText,
-    messageText: args.messageText,
-  });
+  const recordStrategy = args.generationAtStart === undefined
+    || consultStillOnOpenMatch(args.matchIdAtStart ?? null, args.generationAtStart);
+  if (recordStrategy) {
+    recordCommanderStrategy({
+      step: stepForConsult(args.turnNumber, args.tacticalBattle),
+      seatId: args.seatId,
+      strategy: args.strategyText ?? '',
+    });
+  }
 }

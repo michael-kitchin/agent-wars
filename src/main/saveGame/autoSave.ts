@@ -16,6 +16,7 @@ import { getActiveTacticalBattleSnapshot } from '../tacticalBattle/tacticalBattl
 import { isSaveOrLoadInProgress } from './saveLoadGate';
 import { autosaveDirectory, saveStagingPath } from './saveGamePaths';
 import { AUTOSAVE_FILE_PREFIX, AUTOSAVE_KEEP_COUNT, SAVE_FILE_EXTENSION } from './saveFileFormat';
+import { stepKeyText, strategicStep, tacticalStep } from '../../shared/matchRecording';
 import { matchSaveBlocker, writeSaveFileFromOpenDatabase } from './saveFileWrite';
 
 /**
@@ -72,8 +73,8 @@ export function turnStartKey(
   battleId: string | null,
   tacticalTurnNumber: number | null,
 ): string {
-  if (battleId === null || tacticalTurnNumber === null) return `s${turnNumber}`;
-  return `s${turnNumber}-b${battleId}-t${tacticalTurnNumber}`;
+  if (battleId === null || tacticalTurnNumber === null) return stepKeyText(strategicStep(turnNumber));
+  return stepKeyText(tacticalStep(turnNumber, battleId, tacticalTurnNumber));
 }
 
 /**

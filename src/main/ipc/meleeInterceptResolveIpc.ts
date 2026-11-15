@@ -13,6 +13,10 @@ import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/
 import type { ReadyDeps, ReadyResultMinimal } from '../gameIpcHandlers';
 import { logHybridPipelineBoundary } from '../hybridTurnPipeline';
 import { buildReadyPlaybackMoves } from './readyPlaybackMoves';
+import { recordStepBoundary } from '../recorder/matchRecorder';
+import { recordStrategicResolution } from '../recorder/matchRecordingEvents';
+import { currentStepKey } from '../recorder/recorderStepKey';
+import { strategicStep } from '../../shared/matchRecording';
 import { logDebug } from '../logger';
 import {
   hasDeferredPlaybackConsultPending,
@@ -87,10 +91,18 @@ export async function handleResolveMeleeIntercept(
     return { success: false, reason: 'Invalid melee intercept payload.' };
   }
 
+  const resolvedStep = strategicStep(state.turnNumber);
   const resolveResult = deps.resolveMeleeIntercept(payload);
   if (!resolveResult.success) {
     return { success: false, reason: resolveResult.reason };
   }
+  const playbackMoves = buildReadyPlaybackMoves(resolveResult);
+  recordStrategicResolution(resolvedStep, {
+    ...pickReadyResolutionIpcMirrorFields(resolveResult),
+    humanMoves: playbackMoves.humanMoves,
+    aiMoves: playbackMoves.aiMoves,
+  });
+  recordStepBoundary(currentStepKey(), deps.appVersion);
 
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
@@ -125,7 +137,6 @@ export async function handleResolveMeleeIntercept(
     }
   }
 
-  const playbackMoves = buildReadyPlaybackMoves(resolveResult);
   return {
     success: true,
     ...pickReadyResolutionIpcMirrorFields(resolveResult),

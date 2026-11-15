@@ -14,6 +14,10 @@ import { logDebug, logError } from '../logger';
 import { stopModelWork } from './modelWorkCancellation';
 import { isReadyInFlight } from './readyInFlight';
 import { maybeWriteTurnStartAutoSave } from '../saveGame/autoSave';
+import { hasDeferredPlaybackConsultPending } from './deferredResolutionPlaybackConsult';
+import { exportFinishedMatchRecordingIfNeeded } from '../recorder/matchRecordingExport';
+import { recordStepBoundary } from '../recorder/matchRecorder';
+import { currentStepKey } from '../recorder/recorderStepKey';
 import { runLoadGame, runSaveGame, SAVE_FAILED_MESSAGE, LOAD_FAILED_MESSAGE, type SaveLoadDeps } from '../saveGame/saveLoadPipeline';
 import { SAVE_FILE_EXTENSION, SAVE_FILE_FILTER_NAME } from '../saveGame/saveFileFormat';
 
@@ -23,17 +27,25 @@ export { runWithReadyInFlight } from './readyInFlight';
 /**
  * Runs `work`, then writes an automatic save when the open turn has not been saved.
  *
- * Purpose: Turn-start handlers share one place that saves after their own work has finished.
+ * Purpose: Turn-start handlers share one place that records the step, saves, and exports a finished match.
  * When to use: After Ready, melee resolution, a tactical commit, a battle start, a battle end, or a new match. Never inside a database transaction or inside resolution code.
- * Expected outcome: `work`'s result. An automatic save is attempted only when `work` returns. A throw from `work` is rethrown with no save.
- * Exceptions: Propagates whatever `work` throws.
+ * Expected outcome: The step is recorded before `work` and again after it. An automatic save is attempted only when `work` returns. A finished match is exported when no deferred consult is pending. A throw from `work` is rethrown with no save.
+ * Exceptions: Propagates whatever `work` throws. Recording and export do not throw.
  */
 export async function withAutoSaveAfter<T>(work: () => T | Promise<T>): Promise<T> {
+  const appVersion = app.getVersion();
+  recordStepBoundary(currentStepKey(), appVersion);
   const result = await work();
-  maybeWriteTurnStartAutoSave({
+  recordStepBoundary(currentStepKey(), appVersion);
+  const exportDeps = {
     userDataDir: app.getPath('userData'),
-    appVersion: app.getVersion(),
+    appVersion,
     now: () => new Date(),
+  };
+  maybeWriteTurnStartAutoSave(exportDeps);
+  exportFinishedMatchRecordingIfNeeded({
+    ...exportDeps,
+    deferredConsultPending: hasDeferredPlaybackConsultPending(),
   });
   return result;
 }

@@ -38,6 +38,7 @@
     "check:renderer-types": "node scripts/check-renderer-typecheck.cjs",
     "dump:renderer-types-baseline": "node scripts/dump-renderer-typecheck-baseline.cjs scripts/renderer-typecheck-baseline.json",
     "lint": "eslint src",
+    "recording:summary": "node dist/main/recorder/recordingSummaryCli.js",
     "terrain:validate": "python -m scripts.terrain_pipeline.cli validate --verbose",
     "terrain:generate:metadata": "python -m scripts.terrain_pipeline.metadata_cli run --verbose",
     "terrain:generate:landmass": "python -m scripts.terrain_pipeline.landmass_cli run --verbose",

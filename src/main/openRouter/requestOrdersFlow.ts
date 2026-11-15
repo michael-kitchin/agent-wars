@@ -7,7 +7,11 @@ import { readSeatApiKey } from './commanderKeyMemory';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
 import { createConsultTelemetry, logConsultTelemetrySummary } from './consultTelemetry';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { readMatchId } from '../gameDb/gameConfigKv';
+import { recordConsultation, stepForConsult } from '../recorder/matchRecordingEvents';
 import {
+  consultStillOnOpenMatch,
   markSuccessfulConsultation as recordSuccessfulConsultation,
   settleConsultFailure,
 } from './requestOrdersConsultationMarks';
@@ -24,6 +28,7 @@ import { formatTacticalBriefing } from './formatTacticalBriefing';
 import { resetHexControllerParityCheckDedupForTurn } from '../snapshotDbParity';
 import { buildPossibleActionsIndexedState } from './possibleUnitActions';
 import { getSubscriptions } from '../callbackSubscriptions';
+import { getMatchGeneration } from '../matchGeneration';
 import { setAiToolLimitExceededLastTurn } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
@@ -453,8 +458,18 @@ export async function requestOrdersFlow(
     responseFormat: requestProfile.structuredOutputs ? buildOrdersEnvelopeResponseFormat(envelopeGates) : null,
     telemetry,
   };
+  const matchIdAtStart = readMatchId(gameDbOps);
+  const generationAtStart = getMatchGeneration();
   const markSuccessfulConsultation = (strategyText?: string | null, messageText?: string | null): void =>
-    recordSuccessfulConsultation({ seatId, turnNumber: state.turnNumber, tacticalBattle, strategyText, messageText });
+    recordSuccessfulConsultation({
+      seatId,
+      turnNumber: state.turnNumber,
+      tacticalBattle,
+      strategyText,
+      messageText,
+      matchIdAtStart,
+      generationAtStart,
+    });
   const failSettled = (error: string): RequestOrdersError =>
     settleConsultFailure(telemetry, error, REQUEST_ORDERS_WALL_CLOCK_ERROR, (failure) => failRequest(failure, toolInvocationCounts));
   try {
@@ -607,7 +622,11 @@ export async function requestOrdersFlow(
     if (onLog) onLog(String(err), true);
     return failSettled(String(err));
   } finally {
-    logConsultTelemetrySummary(telemetry.summary());
+    const summary = telemetry.summary();
+    logConsultTelemetrySummary(summary);
+    if (consultStillOnOpenMatch(matchIdAtStart, generationAtStart)) {
+      recordConsultation({ step: stepForConsult(state.turnNumber, tacticalBattle), stage: 'orders', summary });
+    }
     finalizeRequestOrdersPathfindingMetrics({
       turnNumber: state.turnNumber,
       modelId,

@@ -48,6 +48,9 @@ import {
 } from './tacticalBattle/tacticalBattleSession';
 import { restorePersistedTacticalBattleSession } from './tacticalBattle/tacticalBattleSession';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
+import { exportFinishedMatchRecordingIfNeeded } from './recorder/matchRecordingExport';
+import { recordTacticalBeat } from './recorder/matchRecordingEvents';
+import { currentStepKey } from './recorder/recorderStepKey';
 import {
   parseGroupedTargetPayload,
   parseGroupedStrikePayload,
@@ -265,6 +268,7 @@ function buildSharedHumanReadyConsultationDeps(
     getToolNamesForEnabledGroups,
     defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
     requestOrders: requestOrdersFn,
+    appVersion: app.getVersion(),
   };
 }
 
@@ -344,6 +348,14 @@ function registerIpcHandlers(): void {
       : normalizeSideNickname(payload.humanNickname) || HUMAN_NICKNAME_DEFAULT;
     if (payload?.humanNickname !== undefined) setHumanNickname(humanNickname);
     const aiOnlyBeatLimit = aiOnlyBeatLimitForRequest(payload?.aiOnlyBeatLimit);
+    if (getGameState().gameOver === true) {
+      exportFinishedMatchRecordingIfNeeded({
+        userDataDir: app.getPath('userData'),
+        appVersion: app.getVersion(),
+        now: () => new Date(),
+        deferredConsultPending: false,
+      });
+    }
     logDebug('main game:newGame', {
       fogOfWarEnabled,
       gameSize,
@@ -447,6 +459,7 @@ function registerIpcHandlers(): void {
     const parsed = parseHumanTacticalCommitPayload(payload);
     if (!parsed.ok) return { success: false, reason: parsed.reason };
     const v = parsed.value;
+    const beatStep = currentStepKey();
     const result = commitHumanTacticalDraftOrders({
       movementOrders: v.movementOrders,
       rangedAttacks: v.rangedAttacks,
@@ -456,6 +469,21 @@ function registerIpcHandlers(): void {
       embarkOrders: v.embarkOrders,
       opponentTacticalDraft: v.opponentTacticalDraft,
     });
+    if (result.success && beatStep && result.tacticalResolutionPlayback) {
+      recordTacticalBeat({
+        step: beatStep,
+        orders: {
+          movementOrders: v.movementOrders,
+          rangedAttacks: v.rangedAttacks,
+          airStrikes: v.airStrikes,
+          airDropOrders: v.airDropOrders,
+          ferryOrders: v.ferryOrders,
+          embarkOrders: v.embarkOrders,
+          opponentTacticalDraft: v.opponentTacticalDraft,
+        },
+        playback: result.tacticalResolutionPlayback,
+      });
+    }
     if (
       !result.success ||
       !result.tacticalBattle ||

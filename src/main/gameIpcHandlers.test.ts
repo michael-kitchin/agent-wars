@@ -100,6 +100,7 @@ async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => {
       requestOrdersCalled = true;
       throw new Error('requestOrders should not be called when no consult is running');
@@ -145,6 +146,7 @@ async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<vo
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => {
       requestOrdersCalled = true;
       return { success: false, error: 'should not be called' };
@@ -193,6 +195,7 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => {
       requestOrdersCalled = true;
       return { success: false, error: 'should not be called' };
@@ -250,6 +253,7 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({
       success: false,
       error: 'should not be called',
@@ -288,6 +292,7 @@ async function testGameReadyAwaitingMeleeDecisionSurfacesFields(): Promise<void>
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     ready: (): ReadyResultMinimal & { success: boolean } => ({
       success: true,
@@ -321,6 +326,7 @@ async function testHandleResolveMeleeInterceptRejectsInvalidPayload(): Promise<v
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     resolveMeleeIntercept: (): ReadyResultMinimal & { success: boolean } => ({
       success: false,
@@ -356,6 +362,7 @@ async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight()
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     resolveMeleeIntercept: (): ReadyResult => ({
       ...minimalResolvedReady,
@@ -407,6 +414,7 @@ async function testHandleGameReadyFailsWhileDeferredPlaybackConsultPending(): Pr
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: true, orders: [] }),
     ready: (): ReadyResultMinimal & { success: boolean } => {
       readyCalled = true;
@@ -445,6 +453,7 @@ async function testHandleResolveMeleeInterceptForwardsPlaybackMoves(): Promise<v
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     resolveMeleeIntercept: (): ReadyResult => ({
       ...minimalResolvedReady,
@@ -505,6 +514,7 @@ async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): 
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     resolveMeleeIntercept: (): ReadyResult => ({ ...minimalResolvedReady }),
   };
@@ -550,6 +560,7 @@ async function testGameReadyNewGameDuringConsultDoesNotResolve(): Promise<void> 
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
+    appVersion: 'test',
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     ready: (): ReadyResultMinimal & { success: boolean } => {
       readyCalled = true;

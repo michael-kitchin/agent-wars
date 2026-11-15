@@ -114,6 +114,7 @@ Save game… and Load game… are in the game menu, under the button at the top 
 
 - **When Save is off:** Save is disabled when there's no match, the match is over, the new-game screen is open over a live match, or a turn or beat is still resolving. It works while you are giving orders, including during a battle.
 - **Automatic saves:** The last five turn starts sit in an `autosaves` folder. Open one with Load game….
+- **When the match is over:** Save stays off. The match's history is written as a file in a `recordings` folder next to that `autosaves` folder.
 - **What the file leaves out:** This computer's API keys aren't in the file, and neither is the Nickname in Game Options. The names the sides are using in that match are in the file. A file written by another version of Agent Wars can't be opened.
 - **New game:** Opening New game from the menu leaves that match running. Close the screen to come back, or start a match to replace it.
 

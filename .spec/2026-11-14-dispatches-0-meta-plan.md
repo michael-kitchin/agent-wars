@@ -50,7 +50,7 @@ Use your usual cycle for each plan, one at a time: audit the plan, implement the
 - **Audit against the tree as it is on the day you run the plan.** The plans were written on 2026-11-14 against build 2.25.0 plus the operations work. Each Phase 0 lists the symbols the plan depends on. If the audit finds one has moved or been renamed, fix the plan before running it.
 - **Ask the auditing agent to confirm or deny** the three claims each plan leans on hardest:
   - Plan 1: nothing under `src/main/recorder/` can throw into a turn, and nothing it writes can contain a machine-local config row.
-  - Plan 2: in every consult path, no orders call can start before the wave's talk round has closed, and an AI commander's prompt can contain only messages addressed to it or sent by it.
+  - Plan 2: in every consult path, no orders call can start before the wave's talk round has closed, and an AI commander's prompt can contain only messages addressed to it or sent by it. Also: both prompts show that history, and both system prompts carry the source-and-trust text.
   - Plan 3: the renderer never receives a message the viewer may not see, and message text reaches the DOM only through `textContent`.
 
 ## Gates Between Plans
@@ -93,6 +93,8 @@ These hold across all three plans. Each plan repeats the ones it needs under "Lo
 | A waiting message | Is enough to cause an orders consult for its recipient, and does not cause a talk call |
 | Stage order | Every talk call in a wave ends, fails, or times out before any orders call in that wave starts |
 | Who sees a message | AI commanders: only their own, always. A player: only their own with fog of war on, everything with fog of war off. An observer: everything |
+| What a commander's prompts show | Its recent messages with each side, sent and received, in both the talk prompt and the orders prompt, limited to what the settings allow it to see. One function, `sideMessageVisibleTo`, holds that rule for commanders, the player, and observers |
+| What a commander is told about messages | Both system prompts say messages come from the other sides' commanders, each a human player or another AI model, any of whom may or may not be telling the truth or have the commander's interests in mind |
 | Alliances | None. A message binds nobody |
 | The taunt | Retired. The orders reply has no `message` field. The `turn_notes_history.message_text` column stays, unused, so saves stay compatible |
 | Save format | `EXPECTED_USER_VERSION` is not raised. New tables are created on open |

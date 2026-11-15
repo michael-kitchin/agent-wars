@@ -14,6 +14,7 @@ import {
   type GameEndReason,
   type VictorySettings,
 } from '../../shared/victoryRules';
+import { randomUUID } from 'node:crypto';
 import { logDebug, logError, logTrace } from '../logger';
 import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 
@@ -262,4 +263,53 @@ export function readGameEndReason(ops: GameConfigKvDbOps): GameEndReason | undef
   const reason = GAME_END_REASONS.find((item) => item === raw);
   if (raw && !reason) logError('readGameEndReason found an unknown reason', { raw });
   return reason;
+}
+
+/**
+ * `game_config` key for the id of the open match.
+ *
+ * Purpose: A recording file is named from this id, and a new match must not reuse the previous one.
+ * When to use: Reading or writing the match id.
+ * Expected outcome: The string `match_id`.
+ * Exceptions: None.
+ */
+export const MATCH_ID_CONFIG_KEY = 'match_id';
+
+/**
+ * Reads the open match's id.
+ *
+ * Purpose: The export names the recording from the stored id.
+ * When to use: When the caller only needs the id and must not create one.
+ * Expected outcome: The stored id, or null when the row is missing or empty. The id itself is not logged.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function readMatchId(ops: GameConfigKvDbOps): string | null {
+  if (ops.hasDb && !ops.hasDb()) {
+    logTrace('gameConfigKv readMatchId', { found: false });
+    return null;
+  }
+  const value = selectGameConfigValue(ops, MATCH_ID_CONFIG_KEY);
+  const found = value !== undefined && value.length > 0;
+  logTrace('gameConfigKv readMatchId', { found });
+  return found ? value : null;
+}
+
+/**
+ * Returns the open match's id, creating one when the row is missing.
+ *
+ * Purpose: A match that began in an earlier build gets an id the first time it is recorded.
+ * When to use: `match_started`, and any caller that must have an id.
+ * Expected outcome: The stored id, or a new UUID written with `upsertGameConfigValue`. The log says whether one was created, not the id.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function ensureMatchId(ops: GameConfigKvDbOps): string {
+  const existing = readMatchId(ops);
+  if (existing) {
+    logDebug('gameConfigKv ensureMatchId', { created: false });
+    return existing;
+  }
+  const created = randomUUID();
+  upsertGameConfigValue(ops, MATCH_ID_CONFIG_KEY, created);
+  logDebug('gameConfigKv ensureMatchId', { created: true });
+  return created;
 }

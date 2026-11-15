@@ -1,3 +1,5 @@
+import { MATCH_RECORDS_TABLE_DDL } from './matchRecordsTable';
+
 /**
  * Defines the `getFullDdl` function shape (export function getFullDdl(): string).
 
@@ -256,5 +258,7 @@ export function getFullDdl(): string {
       enemy_loss_json TEXT,
       PRIMARY KEY (seat_id, scope, battle_id, turn_number)
     );
+
+    ${MATCH_RECORDS_TABLE_DDL};
   `;
 }

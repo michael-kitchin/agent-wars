@@ -39,6 +39,7 @@ import {
   SAVE_LOAD_IN_PROGRESS_MESSAGE,
 } from './saveFileFormat';
 import { matchSaveBlocker, writeSaveFileFromOpenDatabase } from './saveFileWrite';
+import { exportFinishedMatchRecordingIfNeeded } from '../recorder/matchRecordingExport';
 import { endSaveLoadOperation, tryBeginSaveLoadOperation } from './saveLoadGate';
 
 export {
@@ -220,7 +221,7 @@ async function saveBody(deps: SaveLoadDeps): Promise<SaveGameResult> {
  *
  * Purpose: The dialog is the only await. The swap, the memory reset, and the remembered automatic-save key stay synchronous.
  * When to use: `runLoadGame` only.
- * Expected outcome: The same result `runLoadGame` returns.
+ * Expected outcome: A finished match is exported before its database is replaced. The result is the same result `runLoadGame` returns.
  * Exceptions: None.
  */
 async function loadBody(deps: SaveLoadDeps, stagingPath: string): Promise<LoadGameResult> {
@@ -234,6 +235,12 @@ async function loadBody(deps: SaveLoadDeps, stagingPath: string): Promise<LoadGa
   if (!staged.ok) return failedLoad(staged.message);
   // No await from here through the remembered automatic-save key. See `runLoadGame`.
   deps.stopModelWorkForLoad();
+  exportFinishedMatchRecordingIfNeeded({
+    userDataDir: deps.userDataDir,
+    appVersion: deps.appVersion,
+    now: () => new Date(),
+    deferredConsultPending: false,
+  });
   try {
     const replaced = replaceGameDatabaseWithStagedFile(deps.canonicalDbPath, stagingPath);
     if (!replaced.ok) return failedLoad(replaced.mapLoadError ?? LOAD_FAILED_MESSAGE);

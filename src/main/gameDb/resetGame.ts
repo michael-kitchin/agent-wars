@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { clearAttackMixOnNewGame } from '../attackMixReset';
 import { logDebug, logError } from '../logger';
 import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { deleteGameConfigRow, upsertGameConfigValue } from './gameConfigRows';
+import { MATCH_ID_CONFIG_KEY } from './gameConfigKv';
 import { persistGameSize } from './gameSizeConfig';
 import { persistOriginBonusSettings } from './originBonusConfig';
 import { parseBonusLevel, type BonusLevel } from '../../shared/bonusLevel';
@@ -512,6 +514,8 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM pending_missile_launches');
   run('DELETE FROM pending_ferry_orders');
   run('DELETE FROM pending_air_drop_orders');
+  run('DELETE FROM match_records');
+  upsertGameConfigValue({ run }, MATCH_ID_CONFIG_KEY, randomUUID());
   run('DELETE FROM unit_transport_assignments');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
   deps.clearGameOver();

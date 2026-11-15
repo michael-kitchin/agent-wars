@@ -7,9 +7,12 @@
  * Exceptions: Propagates a database error after logging it.
  */
 
-import type { IpcMain } from 'electron';
+import { app, type IpcMain } from 'electron';
 import { endMatchByHuman } from '../gameActions/endOfTurnOutcome';
 import { getGameState } from '../gameDb';
+import { exportFinishedMatchRecordingIfNeeded } from '../recorder/matchRecordingExport';
+import { recordStepBoundary } from '../recorder/matchRecorder';
+import { currentStepKey } from '../recorder/recorderStepKey';
 import { readMatchSnapshot } from './matchViewSnapshot';
 import { IPC_GAME } from '../../shared/ipc/channels';
 import { logDebug, logError } from '../logger';
@@ -37,6 +40,14 @@ export function registerEndMatchIpcHandler(ipcMain: IpcMain): void {
       throw err;
     }
     logDebug('endMatchIpcHandler ended the match', { turnNumber: state.turnNumber });
+    const appVersion = app.getVersion();
+    recordStepBoundary(currentStepKey(), appVersion);
+    exportFinishedMatchRecordingIfNeeded({
+      userDataDir: app.getPath('userData'),
+      appVersion,
+      now: () => new Date(),
+      deferredConsultPending: false,
+    });
     return readMatchSnapshot(undefined);
   });
 }

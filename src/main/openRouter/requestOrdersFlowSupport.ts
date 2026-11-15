@@ -12,6 +12,9 @@ import * as path from 'path';
 import type { CoordinateContextMode } from '../briefing/map/coordinateContext';
 import { AI_CONSULTATION_WALL_CLOCK_MS } from '../../shared/aiConsultationLimits';
 import { logDebug, logError, logTrace } from '../logger';
+import { isEnvFlagEnabled } from '../envFlag';
+
+export { isEnvFlagEnabled };
 
 /**
  * Documents the module-scope binding `FULL_PROMPT_LOG_PREVIEW_CHARS` (FULL_PROMPT_LOG_PREVIEW_CHARS).
@@ -232,27 +235,6 @@ export function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPath
  */
 export function isAgentWarsFullPromptLoggingEnabled(): boolean {
   return isEnvFlagEnabled(FULL_PROMPT_LOG_ENV_FLAG);
-}
-
-/**
- * Interprets common truthy string values of a developer environment flag.
- *
- * Purpose: Shared parsing for `AGENT_WARS_*` on/off flags, tolerating quotes that some shells keep.
- * When to use: Whenever main-process code reads an on/off developer flag; the value is read on every call.
- * Expected outcome: True for 1/true/yes/on (case-insensitive) after trim and optional quote strip; false when unset.
- * Exceptions: None.
- */
-export function isEnvFlagEnabled(flagName: string): boolean {
-  let value = process.env[flagName]?.trim();
-  const quoted =
-    value !== undefined &&
-    value.length > 1 &&
-    ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")));
-  if (quoted && value !== undefined) value = value.slice(1, -1).trim();
-  const normalized = value?.toLowerCase();
-  const enabled = normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-  logTrace('requestOrdersFlowSupport isEnvFlagEnabled', { flagName, enabled });
-  return enabled;
 }
 
 /**

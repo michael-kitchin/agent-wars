@@ -180,7 +180,7 @@ collapsed, player:                         expanded, player:
 
 | File | Holds |
 | --- | --- |
-| `src/shared/sideMessageView.ts` | View types, the visibility rule, grouping, labels. Pure, tested |
+| `src/shared/sideMessageView.ts` | View types, grouping, labels. Pure, tested. The visibility rule is `sideMessageVisibleTo` in `src/shared/sideMessages.ts` |
 | `src/shared/chatPanelState.ts` | The panel's visibility rule and staged-row lookup. Pure, tested |
 | `src/main/ipc/sideMessageIpcHandler.ts` | The three channels |
 | `src/renderer/chat/chatPanelClient.ts` | Calls the three channels and keeps the last snapshot |
@@ -196,16 +196,16 @@ collapsed, player:                         expanded, player:
 
 1. Run `git status --short` and record the output in the Phase 0 Inventory.
 2. Run the Verification Bar and `npm run ui:smoke`. Record pass or fail for each, and the exact cycle list `check:circular` prints.
-3. **Prerequisite.** Confirm the talk stage exists: `src/main/gameDb/sideMessageStore.ts` exports `listSentSideMessages` and `listStagedSideMessages`; `src/main/sideMessages/humanSideMessages.ts` exports `stageHumanSideMessage` and `cancelStagedHumanSideMessage`; `src/main/openRouter/talk/talkRound.ts` exports `TalkRound` with `sentBy`; `src/main/openRouter/commanderPool.ts` contains `messageToHumanFrom`. **If any is missing, stop.** Tell the user the talk stage plan has to be finished first.
+3. **Prerequisite.** Confirm the talk stage exists: `src/main/gameDb/sideMessageStore.ts` exports `listSentSideMessages` and `listStagedSideMessages`; `src/shared/sideMessages.ts` exports `sideMessageVisibleTo`; `src/main/sideMessages/humanSideMessages.ts` exports `stageHumanSideMessage` and `cancelStagedHumanSideMessage`; `src/main/openRouter/talk/talkRound.ts` exports `TalkRound` with `sentBy`; `src/main/openRouter/commanderPool.ts` contains `messageToHumanFrom`. **If any is missing, stop.** Tell the user the talk stage plan has to be finished first.
 4. Confirm these exist, and record any that do not: `src/shared/commanderStatus.ts` (`CommanderDispatch`), `src/shared/commanderMessageTabs.ts` (`applyCommanderMessage`, `commanderDispatchHasProse`), `src/shared/aiStrategyToastContent.ts` (`buildAiStrategyToastSections`), `src/renderer/openRouter/commanderMessageTabsUi.ts` (`renderCommanderMessageTabs`), `src/renderer/openRouter/openRouterUiHelpers.ts` (`showMapToast`, `hideMapToast`), `src/renderer/map/worldLeafletMap.ts` (the text `leafletRef.control.zoom({ position: 'bottomright' }).addTo(mainMap);`), `src/renderer/map/mapChromeLayout.ts` (`layoutMapChrome`), `src/shared/mapChromePlacement.ts` (`toastBandSpan`, `messageToastBandWidth`), `src/renderer/gameplay/selectionPanelExpand.ts` (`wireSelectionPanelExpand`), `src/shared/observeModeControls.ts` (`activeHumanSeatId`), `src/main/gameDb/fogState.ts` (`isFogOfWarEnabled`), `src/shared/ipc/channels.ts` (`IPC_GAME`), `src/main/preload.ts`, `src/shared/ipc/gameApiTypes.ts`.
 
 **Stop if** the bar fails before any edit.
 
 ---
 
-## Phase 1 — The Visibility Rule and View Helpers
+## Phase 1 — View Helpers
 
-Pure functions decide who sees a message and how the history is grouped.
+Pure functions decide how the history is grouped and labelled.
 
 **Add:** `src/shared/sideMessageView.ts`, `src/shared/sideMessageView.test.ts`
 **Edit:** nothing.
@@ -214,15 +214,9 @@ Pure functions decide who sees a message and how the history is grouped.
 
 `sideMessageView.ts` (no logging, no DOM):
 
-```ts
-export function sideMessageVisibleToViewer(input: {
-  readonly viewerSeatId: string | null;     // null: an observer
-  readonly fogOfWarEnabled: boolean;
-  readonly fromSeatId: string;
-  readonly toSeatId: string;
-}): boolean
-// Observer: true. Fog of war off: true. Otherwise true only when the viewer sent it or it was sent to the viewer.
+The visibility rule already exists: `sideMessageVisibleTo` in `src/shared/sideMessages.ts`, added by the talk stage plan, with `player` and `observer` viewers. **Do not write a second rule.** Everything in this plan that says "visible to the viewer" calls that function, with `{ kind: 'player', seatId }` for an active human seat and `{ kind: 'observer' }` when there is none.
 
+```ts
 export interface SideMessageTurnGroup {
   readonly turnNumber: number;
   readonly heading: string;                  // 'Turn 12'
@@ -250,7 +244,6 @@ Also move the `SideMessageView` and `SideMessageThreadSnapshot` types from the D
 
 `sideMessageView.test.ts`:
 
-- Visibility, as a table of eight rows: observer sees an AI-to-AI message with fog on; a player with fog on sees a message to them, a message from them, and not a message between two others; a player with fog off sees a message between two others.
 - Grouping: messages from turns 3, 3, 5 give two groups with headings `Turn 3` and `Turn 5`, in that order, and an empty list gives no groups.
 - Party label: `You` for the viewer's seat, the name otherwise, and never `You` for an observer.
 - Side order: messages to sides 3, 1, 2 come back as 1, 2, 3.
@@ -274,7 +267,7 @@ The renderer can ask for the thread and stage or cancel a message. No screen use
 2. `preload.ts`: add the three channel strings to the preload's own channel list (it keeps a copy: find `readCommanderPool: 'game:readCommanderPool'`), and three methods on the exposed game API, following `readCommanderPool`.
 3. `gameApiTypes.ts`: add the three method types.
 4. `sideMessageIpcHandler.ts`:
-   - `export function buildSideMessageThreadSnapshot(): SideMessageThreadSnapshot`. The viewer is `activeHumanSeatId(getSeatRoster())`. Fog comes from `isFogOfWarEnabled`. `messages` is `listSentSideMessages` mapped to views and filtered with `sideMessageVisibleToViewer`. `staged` is `listStagedSideMessages` for the viewer, or empty for an observer. `recipientSeatIds` is the AI seats with `outTurn == null`, in side order. `canSend` is true when there is a viewer and at least one recipient. When the database is not ready, return an empty snapshot with `viewerSeatId: null` and `canSend: false`.
+   - `export function buildSideMessageThreadSnapshot(): SideMessageThreadSnapshot`. The viewer is `activeHumanSeatId(getSeatRoster())`. Fog comes from `isFogOfWarEnabled`. `messages` is `listSentSideMessages` mapped to views and filtered with `sideMessageVisibleTo`. `staged` is `listStagedSideMessages` for the viewer, or empty for an observer. `recipientSeatIds` is the AI seats with `outTurn == null`, in side order. `canSend` is true when there is a viewer and at least one recipient. When the database is not ready, return an empty snapshot with `viewerSeatId: null` and `canSend: false`.
    - `export function registerSideMessageIpcHandler(ipcMain: IpcMain): void` registers the three channels. `stageSideMessage` validates that the payload is an object with string `toSeatId` and string `text`, and otherwise returns `{ success: false, reason: 'Invalid message.' }`. Then it calls `stageHumanSideMessage`. `cancelStagedSideMessage` validates `toSeatId` and calls `cancelStagedHumanSideMessage`.
 5. `main.ts`: call `registerSideMessageIpcHandler(ipcMain)` next to `registerEndMatchIpcHandler` (search for it). One line and one import.
 
@@ -307,7 +300,7 @@ The dialog shows each commander's messages as bullets.
 2. Main process:
    - `commanderPoolSupport.ts`: add `readonly sentMessages?: readonly CommanderDispatchMessage[];` to `CommanderConsultOutcome`.
    - `commanderPool.ts`, in `launch`, where the outcome is adjusted before `applyConsultOutcome`: set `sentMessages` from `talkRound?.sentBy(seatId) ?? []`, mapped to `{ toSeatId, text }`.
-   - `commanderPoolSettle.ts`: both places that push a dispatch add `messages`. Filter `outcome.sentMessages ?? []` with `sideMessageVisibleToViewer`, using `activeHumanSeatId(getSeatRoster())` as the viewer, `isFogOfWarEnabled`, and the dispatch's seat as `fromSeatId`. In the failed-consult branch, the condition `if (message || strategy)` becomes `if (message || strategy || messages.length > 0)`.
+   - `commanderPoolSettle.ts`: both places that push a dispatch add `messages`. Filter `outcome.sentMessages ?? []` with `sideMessageVisibleTo`, using `activeHumanSeatId(getSeatRoster())` as the viewer, `isFogOfWarEnabled`, and the dispatch's seat as `fromSeatId`. In the failed-consult branch, the condition `if (message || strategy)` becomes `if (message || strategy || messages.length > 0)`.
 3. `commanderMessageTabs.ts`: a tab holds `messages` beside `message` and `strategy`. `applyCommanderMessage` takes and stores them. `commanderDispatchHasProse` gains a third parameter, the message count, and returns true when it is above zero. Update its callers.
 4. `aiStrategyToastContent.ts`:
    - `AI_STRATEGY_TOAST_MESSAGE_TITLE` becomes `SIDE_MESSAGES_TITLE` (`'Messages'`). Import it from `sideMessageView.ts`, or re-export it, so the word exists once.

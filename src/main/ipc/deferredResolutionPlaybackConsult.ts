@@ -24,6 +24,7 @@ import type {
   TacticalPostBeatConsultMergeSource,
 } from '../../shared/ipc/consultationPushTypes';
 import { getMatchGeneration } from '../matchGeneration';
+import { exportFinishedMatchRecordingIfNeeded } from '../recorder/matchRecordingExport';
 import { getModelCallCancelEpoch, hasModelCallCancelSince } from '../openRouter/modelCallControl';
 import {
   runEventDrivenAfterResolutionConsultation,
@@ -241,6 +242,7 @@ function abandonDeferredPlaybackConsult(
     ...detail,
   });
   pendingPlaybackConsult = null;
+  exportFinishedRecordingAfterConsult();
   sender.send(IPC_OPENROUTER.log, {
     line: DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG,
     isError: true,
@@ -273,6 +275,7 @@ function abandonDeferredPlaybackConsult(
 function skipDeferredConsultBecausePlayerStopped(sender: WebContents, pending: PendingPlaybackConsult): boolean {
   if (!hasModelCallCancelSince(pending.cancelEpoch, AI_SEAT_IDS[0])) return false;
   pendingPlaybackConsult = null;
+  exportFinishedRecordingAfterConsult();
   logDebug('handleNotifyResolutionPlaybackComplete: skipped because planning was stopped', { tag: pending.tag });
   if (pending.tag === 'tactical-beat') {
     sender.send(IPC_GAME.postTacticalBeatConsultation, toTacticalPostBeatConsultFields(pending.battleId, {}));
@@ -339,6 +342,7 @@ export async function handleNotifyResolutionPlaybackComplete(
     const generationAtStart = pending.generationAtStart;
     const postConsult = await runEventDrivenAfterResolutionConsultation(pending.consultArgs);
     const finished = finishDeferredConsult(pending, generationAtStart);
+    exportFinishedRecordingAfterConsult();
     if (finished !== 'push') return finished;
     const push: PostResolutionConsultationPushPayload = {
       planningTurnNumber: pending.planningTurnNumber,
@@ -358,6 +362,7 @@ export async function handleNotifyResolutionPlaybackComplete(
       pending.consultArgs
     );
     const finished = finishDeferredConsult(pending, generationAtStart);
+    exportFinishedRecordingAfterConsult();
     if (finished !== 'push') return finished;
     const fields = toTacticalPostBeatConsultFields(pending.battleId, mergeSource);
     sender.send(IPC_GAME.postTacticalBeatConsultation, fields);
@@ -366,4 +371,33 @@ export async function handleNotifyResolutionPlaybackComplete(
 
   abandonDeferredPlaybackConsult(sender, pending, { reason: 'metadata mismatch', payload });
   return { ok: false, reason: 'Deferred consultation metadata mismatch.' };
+}
+
+/**
+ * Exports a finished match after a deferred consult has released its slot.
+ *
+ * Purpose: The consult can finish after the ending turn already returned, and the recording has to include it.
+ * When to use: After `finishDeferredConsult`. The slot is already clear, so the export does not wait.
+ * Expected outcome: A finished match's file is written or rewritten. A match that is still running is unchanged.
+ * Exceptions: None. A missing Electron app, which unit tests hit, is logged and ignored.
+ */
+function exportFinishedRecordingAfterConsult(): void {
+  try {
+    // A top-level import would load Electron in the unit tests that load this module.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const electron = require('electron') as {
+      app?: { getVersion?: () => string; getPath?: (name: string) => string };
+    };
+    const appVersion = electron.app?.getVersion?.();
+    const userDataDir = electron.app?.getPath?.('userData');
+    if (!appVersion || !userDataDir) return;
+    exportFinishedMatchRecordingIfNeeded({
+      userDataDir,
+      appVersion,
+      now: () => new Date(),
+      deferredConsultPending: false,
+    });
+  } catch (err) {
+    logError('deferredResolutionPlaybackConsult could not export the recording', { err });
+  }
 }

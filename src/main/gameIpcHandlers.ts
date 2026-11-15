@@ -21,6 +21,12 @@ import {
   type StrategicConsultArgs,
 } from './ipc/readyIpcResolutionMapping';
 import { buildReadyPlaybackMoves } from './ipc/readyPlaybackMoves';
+import { gameDbOps } from './gameDb/dbConnection';
+import { readHumanOrderTables } from './recorder/matchFrameCapture';
+import { recordStepBoundary } from './recorder/matchRecorder';
+import { currentStepKey } from './recorder/recorderStepKey';
+import { recordStrategicOrders, recordStrategicResolution } from './recorder/matchRecordingEvents';
+import { strategicStep } from '../shared/matchRecording';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
 import { getMatchGeneration } from './matchGeneration';
@@ -153,6 +159,15 @@ requestOrders: (
     options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
     /**
+   * The app version stored on `match_started`.
+   *
+   * Contract: `app.getVersion()` in the process, or a test string.
+   * When to use: The step boundary inside this handler. This module does not import Electron.
+   * Expected outcome: The version string written on the match-start event.
+   * Exceptions: None.
+   */
+appVersion: string;
+    /**
    * Resolves the turn from the orders gathered for every owner.
    *
    * Contract: Does not consult. Consultation happens after this returns success.
@@ -232,10 +247,13 @@ export async function handleGameReady(
     logDebug('handleGameReady: match generation changed before resolution', { generationAtStart });
     return { success: false, reason: 'A new game started before this turn finished.' };
   }
+  const resolvedStep = strategicStep(state.turnNumber);
+  const humanOrderTables = readHumanOrderTables(gameDbOps);
   const readyResult = deps.ready(ordersByOwner);
   if (!readyResult.success) {
     return { success: false, reason: readyResult.reason };
   }
+  recordStrategicOrders({ step: resolvedStep, humanOrderTables, ordersByOwner });
   if (readyResult.awaitingMeleeDecision) {
     const aiRangedByTypeAwait = computeAiRangedByTypeCounts(state, aiRangedOrders);
     const aiMovesAwait = buildDistinctAiMovesFromPlanningOrders(state, aiOrders);
@@ -266,6 +284,12 @@ export async function handleGameReady(
     };
   }
   const playbackMoves = buildReadyPlaybackMoves(readyResult);
+  recordStrategicResolution(resolvedStep, {
+    ...pickReadyResolutionIpcMirrorFields(readyResult),
+    aiMoves: playbackMoves.aiMoves,
+    humanMoves: playbackMoves.humanMoves,
+  });
+  recordStepBoundary(currentStepKey(), deps.appVersion);
 
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;

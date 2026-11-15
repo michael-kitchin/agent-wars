@@ -114,7 +114,9 @@ The user asked for each record to be written in the same transaction as the stat
 
 - **The recorder never opens a transaction.** Each record is exactly one `INSERT`. When the caller is inside a transaction, the record joins it. When it is not, the insert is atomic on its own.
 - **A record is written in the same synchronous call sequence as its state change,** with no `await` between them. The database driver is synchronous and the app has one connection, so nothing else can run in between.
-- **Frames heal themselves.** A frame is a snapshot of whatever the state is. `recordStepBoundary` writes one whenever the current step differs from the last recorded frame's step, so a boundary that was missed for any reason is caught at the next call.
+- **Frames heal themselves.** A frame is a snapshot of whatever the state is. `recordStepBoundary` writes one whenever the current step differs from the last recorded frame's step. `withAutoSaveAfter` calls it before `work` as well as after, so a loaded or resumed match is snapshotted before the next mutation. Launching the app writes no rows by itself.
+- **A normal frame stays the boundary snapshot.** It is taken when the step key changes, before the post-resolution consult. Consult events are written after that frame. Later same-step table writes show up in the next frame. A save made after the consult holds that older frame and the newer tables.
+- **The ended match is the exception.** There is no next frame, and a finished match cannot be saved. Before the recording file is written, the latest frame's payload is replaced in place when that frame's step is still current, so the file matches the ended database. The file is rewritten when `match_records` has grown. That replacement is the only `UPDATE` this plan adds. It is one statement. It is not a transaction.
 
 Do not add `BEGIN`, `COMMIT`, or `SAVEPOINT` anywhere in this plan.
 
@@ -239,8 +241,8 @@ The table exists in a new database and in every database opened by this build, a
 3. `gameDb.ts`: call `ensureMatchRecordsTable((sql) => gameDbOps.run(sql));` directly after each of the three `ensurePendingAirDropOrdersTable(...)` calls. Update the comment on `EXPECTED_USER_VERSION` so its list of exceptions names this function. **Do not change the number. Do not add the table to `GAME_DB_REQUIRED_TABLES`:** validation runs before the ensure call, so a required table would make every existing database fail validation and be replaced.
 4. `gameConfigKv.ts`: add
    - `export const MATCH_ID_CONFIG_KEY = 'match_id';`
-   - `export function readMatchId(ops: GameConfigKvDbOps): string | null`, which returns the stored value, or null when the row is missing or empty. It logs `logTrace` with `{ found }` only.
-   - `export function ensureMatchId(ops: GameConfigKvDbOps): string`, which returns the stored id, or writes and returns a new `randomUUID()` (from `node:crypto`) when there is none. A match that began in an earlier build gets its id this way. If `GameConfigKvDbOps` has no `run`, widen this one function's parameter to include it.
+   - `export function readMatchId(ops: GameConfigKvDbOps): string | null`, which returns the stored value, or null when the row is missing or empty. It logs `logTrace` with `{ found }` only. Do not log the id.
+   - `export function ensureMatchId(ops: GameConfigKvDbOps): string`, which returns the stored id, or writes and returns a new `randomUUID()` (from `node:crypto`) when there is none. Write it with `upsertGameConfigValue` from `gameConfigRows.ts`. `GameConfigKvDbOps` already has `run`. Do not widen it. Log `logDebug` with `{ created }` only. A match that began in an earlier build gets its id this way.
 5. `resetGame.ts`, inside `resetGameForNewMatch`, between `run('BEGIN')` and `run('COMMIT')`:
    - Add `run('DELETE FROM match_records');` next to the other `DELETE FROM` lines.
    - Write a new match id: `upsertGameConfigValue({ run }, MATCH_ID_CONFIG_KEY, randomUUID());`.
@@ -332,7 +334,7 @@ A frame payload can be built from the open match, every table is classified, and
    Also export `FRAME_EXCLUDED_CONFIG_KEYS: readonly string[]`, which is every entry of `MACHINE_LOCAL_CONFIG_KEYS` plus `SAVE_APP_VERSION_CONFIG_KEY` and `SAVE_WRITTEN_AT_CONFIG_KEY` from `src/main/saveGame/saveFileFormat.ts`. Build it from those constants. Do not retype the key strings.
 
 2. `matchFrameCapture.ts`:
-   - `buildFramePayload(ops: BasicDbOps): FramePayload`. For each table whose mode is `frame`, in the order the policy lists them: read the column names with `PRAGMA table_info(<table>)`, read the rows with `SELECT * FROM <table> ORDER BY rowid`, and store `{ columns, rows }` where each row is an array in column order. Table names come only from the policy object, never from input.
+   - `buildFramePayload(ops: BasicDbOps): FramePayload`. For each table whose mode is `frame`, in the order the policy lists them: read the column names with `PRAGMA table_info`, then `SELECT` those columns in that order, quoted, `ORDER BY rowid`. Store `{ columns, rows }` where each row is an array in column order. Table names come only from the policy object, never from input. Quote every identifier. Reject a name that is not a plain identifier.
    - For `game_config`, drop every row whose `key` is in `FRAME_EXCLUDED_CONFIG_KEYS`.
    - Logs `logTrace` with the table count and the total row count only.
 
@@ -342,7 +344,7 @@ A frame payload can be built from the open match, every table is classified, and
 - `matchFrameCapture.test.ts`:
   - On a seated temp match, the payload has an entry for `units`, `seats`, `turn_state`, and `game_config`, and none for `hexes`. The `units` entry's row count equals `SELECT COUNT(*) FROM units`, and its `columns` start with `id`.
   - **Secrets:** write a sentinel value such as `SENTINEL-KEY-12345` into every key of `MACHINE_LOCAL_CONFIG_KEYS`, build the payload, and assert `JSON.stringify(payload)` does not contain the sentinel. Assert it does contain the value of a normal key written the same way (for example `match_id`).
-  - **Speed:** building the payload on a fresh global match takes under 500 ms.
+  - **Speed:** building the payload on a fresh global match takes under 2000 ms, so a busy machine does not fail the phase. The results file records the measured time. A capture over about 100 ms, or a compressed frame much larger than about 150 KB, is reported for the user to judge. It does not fail the phase.
 
 ### Verification
 
@@ -385,19 +387,18 @@ The game writes a `match_started` event, a frame at every step boundary, and a `
 
    `recordStepBoundary` does these in order, and returns early when the recorder is off, `step` is null, or the database is not ready:
    1. When `countMatchRecords` is 0: write `match_started` with `{ appVersion, matchId: ensureMatchId(...), firstRecordedTurn: step.turnNumber }`, visibility `everyone`. `firstRecordedTurn` is 1 for a match started in this build, and later for a match that began in an earlier build.
-   2. When `stepKeyText(step)` differs from `lastFrameStepKeyText(...)`: write a frame (`kind: 'frame'`, `recordType: MATCH_FRAME_RECORD_TYPE`, `formatVersion: MATCH_FRAME_FORMAT_VERSION`, visibility `engine`, payload from `buildFramePayload`).
-   3. When `game_config` has `game_over` equal to `'1'` and `matchHasEventOfType(..., 'match_ended')` is false: write a frame even if the key did not change, then write `match_ended` with `{ winner, reason }` read from the `winner` and `game_end_reason` rows (null when missing), visibility `everyone`.
+   2. When `stepKeyText(step)` differs from `lastFrameStepKeyText(...)`: write one frame (`kind: 'frame'`, `recordType: MATCH_FRAME_RECORD_TYPE`, `formatVersion: MATCH_FRAME_FORMAT_VERSION`, visibility `engine`, payload from `buildFramePayload`). Remember that this call inserted that frame.
+   3. When `game_config` has `game_over` equal to `'1'` and `matchHasEventOfType(..., 'match_ended')` is false: if step 2 did not insert a frame, insert one frame of the current database; then write `match_ended` with `{ winner, reason }`. Do not insert a second frame when step 2 already wrote one. `winner` is the stored string, or null when the row is missing. An empty string stays empty, because a tie is stored that way. `reason` is the stored `game_end_reason`, or null when the row is missing. Visibility is `everyone`.
 
    The clock is a module-level `let nowIso: () => string = () => new Date().toISOString();` with `setRecorderClockForTests(fn | null)`. Use `gameDbOps` and `hasDbHandle()` from `../gameDb/dbConnection`. "Database is not ready" means `hasDbHandle()` is false.
 
-   **Environment flag.** `isEnvFlagEnabled` in `src/main/openRouter/requestOrdersFlowSupport.ts` already parses an `AGENT_WARS_*` on/off flag, and its comment says every main-process flag should use it. The recorder may not import from `openRouter/`, so move that one function, with its comment, into a new `src/main/envFlag.ts`, keeping its name and behavior. In `requestOrdersFlowSupport.ts`, replace the body with a re-export (`export { isEnvFlagEnabled } from '../envFlag';`) so `openRouterModelCapabilities.ts` and the other callers need no change. Change the function's log label to match its new file. Its existing tests must pass unchanged. Add a small `src/main/envFlag.test.ts` only if no existing test covers the function.
+   **Environment flag.** `isEnvFlagEnabled` in `src/main/openRouter/requestOrdersFlowSupport.ts` already parses an `AGENT_WARS_*` on/off flag, and its comment says every main-process flag should use it. The recorder may not import from `openRouter/`, so move that one function, with its comment, into a new `src/main/envFlag.ts`, keeping its name and behavior. There is no test of it today. Add `src/main/envFlag.test.ts`. In `requestOrdersFlowSupport.ts`, import it and re-export it (`import { isEnvFlagEnabled } from '../envFlag'; export { isEnvFlagEnabled };`) so this file can still call it and `openRouterModelCapabilities.ts` needs no change. A bare `export { isEnvFlagEnabled } from '../envFlag'` does not create a local binding. Change the function's log label to `envFlag isEnvFlagEnabled`. No test asserts the old label.
 
 3. Hook the boundary. The call is `recordStepBoundary(currentStepKey(), app.getVersion())`. It is cheap when nothing changed: one count and one key read.
-   - `saveLoadIpcHandler.ts`, in `withAutoSaveAfter`: call it after `await work()` and **before** `maybeWriteTurnStartAutoSave(...)`, so an automatic save contains the frame for its own turn. Update the function's comment to say it records the step boundary and then saves. This one hook covers new game, Ready, melee resolution, a tactical commit, a battle start, and a battle end.
-   - `gameIpcHandlers.ts`, in `handleGameReady`: immediately after the `readyResult.awaitingMeleeDecision` block closes, and before `const playbackMoves`, call the boundary. This writes the new turn's frame before the handler waits on a model. `gameIpcHandlers.ts` has no `app` import: add an `appVersion: string` field to `ReadyDeps`, and set it in `buildSharedHumanReadyConsultationDeps` in `src/main/main.ts` from `app.getVersion()`. The deps objects in `src/main/gameIpcHandlers.test.ts` get `appVersion: 'test'`.
-   - `meleeInterceptResolveIpc.ts`, in `handleResolveMeleeIntercept`: the same call immediately after the `if (!resolveResult.success)` block. Both handlers receive the shared deps object, so the one `appVersion` field added to the shared builder reaches this handler too. Add the field to this handler's deps type.
-   - `endMatchIpcHandler.ts`: after `endMatchByHuman(state.turnNumber)` succeeds, call the boundary. This writes `match_ended`.
-   - `deferredResolutionPlaybackConsult.ts`, in `handleNotifyResolutionPlaybackComplete`: call the boundary once, as the first statement after the function's opening `logDebug`. The function has several return paths, and this placement covers them all. A step that advanced outside the six wrapped handlers is caught here. If this file has no access to the app version, read it the way the file's neighbors do, or import `app` from `electron` as `saveLoadIpcHandler.ts` does.
+   - `saveLoadIpcHandler.ts`, in `withAutoSaveAfter`: call it **before** `await work()` and **after** `work()`, and keep the after call **before** `maybeWriteTurnStartAutoSave(...)`. The before call records a loaded or resumed match at the turn that is about to change. The after call records the new step when the handler did not already record it. Update the function's comment to say it records the step before the work, records it again after, and then saves. This covers new game, Ready, melee resolution, a tactical commit, a battle start, and a battle end.
+   - `gameIpcHandlers.ts` has no `app` import. Add an `appVersion: string` field to `ReadyDeps`, and set it in `buildSharedHumanReadyConsultationDeps` in `src/main/main.ts` from `app.getVersion()`. The deps objects in `src/main/gameIpcHandlers.test.ts` get `appVersion: 'test'`. `ResolveMeleeInterceptDeps` is `Omit<ReadyDeps, 'ready'>`, so this one field covers that handler. Do not add a second field.
+   - `endMatchIpcHandler.ts`: after `endMatchByHuman(state.turnNumber)` succeeds, call the boundary. This writes the final frame and `match_ended`. Read the app version from `app` inside the registrar, the way `saveLoadIpcHandler.ts` does.
+   - Do not call the boundary from `deferredResolutionPlaybackConsult.ts`. That consult does not change the step. Phase 7 exports from the end of that handler instead.
 
 ### Tests
 
@@ -406,11 +407,12 @@ The game writes a `match_started` event, a frame at every step boundary, and a `
 - First call: one `match_started` event, then one frame with `step_key` `s1`. A second call with the same step writes nothing.
 - After `UPDATE turn_state SET turn_number = 2`, a call with `strategicStep(2)` writes a second frame.
 - A call with `tacticalStep(2, 'b1', 1)`, then `strategicStep(2)` again, writes two more frames (the state after a battle is its own frame).
-- After setting `game_over` to `'1'` (use `setGameOutcomeWithOps` from `gameConfigKv.ts`), one call writes a frame and a `match_ended` event. Another call writes nothing.
+- After setting `game_over` to `'1'` on the step that already has a frame (use `setGameOutcomeWithOps` from `gameConfigKv.ts`), one call writes one final frame and one `match_ended` event. Another call writes nothing.
+- A call that both enters a new step and finds `game_over` already set writes one frame for the new step and one `match_ended`, not two frames.
 - With `process.env.AGENT_WARS_DISABLE_RECORDER = '1'`, nothing is written. Restore the variable in a `finally`.
-- On a match whose turn is already 7 and whose `match_id` row was deleted (a match from an earlier build), the first call writes `match_started` with `firstRecordedTurn: 7` and a new id, then a frame with `step_key` `s7`.
+- On a match whose turn is already 7 and whose `match_id` row was deleted, the first call, made before any turn advance, writes `match_started` with `firstRecordedTurn: 7` and a new id, then a frame with `step_key` `s7`.
 - `recordMatchEvent` with a payload that cannot be encoded (a function as the whole payload) does not throw, and writes nothing.
-- A null step writes nothing.
+- A null step writes nothing. A tie stores `winner` as `''`, not null.
 
 ### Verification
 
@@ -440,9 +442,10 @@ The orders each side gave and the result of each resolution are recorded.
      readonly humanOrderTables: FramePayload['tables'];       // the human's queued orders
      readonly ordersByOwner: ReadonlyMap<string, unknown>;    // TurnOrdersByOwner
    }): void
-   // One 'orders_committed' event for the human seat with { owner, tables }, visibility seats:human,
+   // One 'orders_committed' event for the human seat with { owner, tables }, visibility seats of HUMAN_SEAT_ID,
    // written only when at least one of the tables has a row (an Observe match has no human orders).
-   // One per entry of ordersByOwner with { owner, orders }, visibility seats:{owner}.
+   // One per entry of ordersByOwner with { owner, orders }, visibility seats of that owner id.
+   // Production code uses HUMAN_SEAT_ID and the owner id from the map. It does not write a seat-id literal.
 
    export function recordStrategicResolution(step: StepKey, resolution: unknown): void   // 'strategic_resolution', engine
    export function recordTacticalBeat(args: {
@@ -456,12 +459,13 @@ The orders each side gave and the result of each resolution are recorded.
    Add `export function readHumanOrderTables(ops: BasicDbOps): FramePayload['tables']` to `matchFrameCapture.ts`. It reads these six tables with the same column-and-rows shape a frame uses: `pending_orders`, `pending_ranged_orders`, `pending_air_orders`, `pending_missile_launches`, `pending_ferry_orders`, `pending_air_drop_orders`. Reuse the private table reader `buildFramePayload` already has. Do not write a second one.
 
 2. `gameIpcHandlers.ts`, `handleGameReady`:
-   - Immediately before `const readyResult = deps.ready(ordersByOwner);`, capture `const resolvedStep = strategicStep(state.turnNumber);` and `const humanOrderTables = readHumanOrderTables(...)`. `state` is the snapshot read at the top of the function, so its turn is the turn about to be resolved.
+   - Immediately before `const readyResult = deps.ready(ordersByOwner);`, capture `const resolvedStep = strategicStep(state.turnNumber);` and `const humanOrderTables = readHumanOrderTables(...)`. Use this captured step for the order and resolution events. Do not call `currentStepKey()` after `ready`, because the turn has already advanced. `state` is the snapshot read at the top of the function.
    - Immediately after the `if (!readyResult.success)` block: call `recordStrategicOrders({ step: resolvedStep, humanOrderTables, ordersByOwner })`. This runs for a turn that then waits on a melee decision as well, because the orders are final at that point.
-   - Immediately after `const playbackMoves = buildReadyPlaybackMoves(readyResult);`: call `recordStrategicResolution(resolvedStep, { ...pickReadyResolutionIpcMirrorFields(readyResult), aiMoves: playbackMoves.aiMoves, humanMoves: playbackMoves.humanMoves })`. These are the fields the renderer plays back, so they are safe to store as JSON.
-   - Order matters: the two event calls come **before** the `recordStepBoundary` call added in Phase 4, so the resolution is recorded before the frame of the turn it produced. Move the Phase 4 call below `const playbackMoves` if needed to keep that order, and keep it above the consult block.
-3. `meleeInterceptResolveIpc.ts`, `handleResolveMeleeIntercept`: capture `strategicStep(state.turnNumber)` from the `state` read near the top. After the resolve succeeds, build the same resolution payload the handler returns to the renderer (read how the function builds its return value, and reuse those fields) and call `recordStrategicResolution`. Keep it above the Phase 4 boundary call. Do not record orders here. The first handler already did.
-4. `main.ts`, the `IPC_GAME.commitHumanTacticalDraftOrders` handler: before `const result = commitHumanTacticalDraftOrders({...})`, capture `const beatStep = currentStepKey();`. Right after the call, when `result.success` is true and `beatStep` is not null and `result.tacticalResolutionPlayback` exists, call `recordTacticalBeat({ step: beatStep, orders: { movementOrders: v.movementOrders, rangedAttacks: v.rangedAttacks, airStrikes: v.airStrikes, airDropOrders: v.airDropOrders, ferryOrders: v.ferryOrders, embarkOrders: v.embarkOrders, opponentTacticalDraft: v.opponentTacticalDraft }, playback: result.tacticalResolutionPlayback })`. `main.ts` is 644 lines. Keep the added code to those few lines.
+   - On the melee-pause return, do not record a resolution and do not call the boundary.
+   - Immediately after `const playbackMoves = buildReadyPlaybackMoves(readyResult);`, and before the consult block: call `recordStrategicResolution(resolvedStep, { ...pickReadyResolutionIpcMirrorFields(readyResult), aiMoves: playbackMoves.aiMoves, humanMoves: playbackMoves.humanMoves })`, then `recordStepBoundary(currentStepKey(), deps.appVersion)`. These are the fields the renderer plays back, so they are safe to store as JSON. The boundary writes the new turn's frame before the handler waits on a model. The after call in `withAutoSaveAfter` then sees the same step and writes nothing.
+3. `meleeInterceptResolveIpc.ts`, `handleResolveMeleeIntercept`: capture `strategicStep(state.turnNumber)` from the `state` read near the top. After the resolve succeeds, build the playback fields with `buildReadyPlaybackMoves(resolveResult)` before the consult block. `buildReadyPlaybackMoves` is synchronous and does not depend on the consult. Call `recordStrategicResolution`, then `recordStepBoundary(currentStepKey(), deps.appVersion)`, then leave the consult block where it is. Do not record orders here. The first handler already did.
+4. `main.ts`, the `IPC_GAME.commitHumanTacticalDraftOrders` handler: `const v = parsed.value` already exists. Before `const result = commitHumanTacticalDraftOrders({...})`, capture `const beatStep = currentStepKey();`. Immediately after that call, before the later `return` paths, when `result.success` is true and `beatStep` is not null and `result.tacticalResolutionPlayback` exists, call `recordTacticalBeat({ step: beatStep, orders: { movementOrders: v.movementOrders, rangedAttacks: v.rangedAttacks, airStrikes: v.airStrikes, airDropOrders: v.airDropOrders, ferryOrders: v.ferryOrders, embarkOrders: v.embarkOrders, opponentTacticalDraft: v.opponentTacticalDraft }, playback: result.tacticalResolutionPlayback })`. Those later returns still committed the beat. `main.ts` is 644 lines. Keep the added code to those few lines.
+5. `main.ts`, the `IPC_GAME.newGame` handler: before `resetGameForNewMatch`, when `getGameState().gameOver` is true, export the open match. Pass the deferred-consult flag as false so the rows that exist are written before the reset deletes them. A consult still in flight is absent from that file. Do not block the new game.
 
 ### Tests
 
@@ -512,9 +516,9 @@ Every model consult's telemetry summary is stored in the match database, and so 
 
    `ConsultTelemetrySummary` comes from `../openRouter/consultTelemetrySummary` with **`import type`**. A value import would break the import rule.
 
-2. `requestOrdersFlow.ts`: in the `finally` block that contains `logConsultTelemetrySummary(telemetry.summary());`, read the summary once into a `const`, pass it to the existing log call, and then call `recordConsultation({ step: stepForConsult(state.turnNumber, tacticalBattle), stage: 'orders', summary })`. The log line and its position do not change. This file is at 620 lines. Add only these lines.
+2. `requestOrdersFlow.ts`: in the `finally` block that contains `logConsultTelemetrySummary(telemetry.summary());`, read the summary once into a `const`, pass it to the existing log call, and then call `recordConsultation({ step: stepForConsult(state.turnNumber, tacticalBattle), stage: 'orders', summary })`. `state` and `tacticalBattle` are already in scope there. The log line and its position do not change. This file is at 620 lines. Add only these lines. Do not edit the local `markSuccessfulConsultation` wrapper. It already forwards `seatId`, `turnNumber`, and `tacticalBattle`, including the budget-exceeded call with a null strategy.
 
-3. `requestOrdersConsultationMarks.ts`, `markSuccessfulConsultation`: at the end of the function, on both the tactical and the strategic path, call `recordCommanderStrategy({ step: stepForConsult(args.turnNumber, args.tacticalBattle), seatId: args.seatId, strategy: args.strategyText ?? '' })`. Restructure the early `return` in the tactical branch if that is the simplest way to reach one call. The existing writes keep their order.
+3. `requestOrdersConsultationMarks.ts`, the exported `markSuccessfulConsultation`: after both note writes, call `recordCommanderStrategy({ step: stepForConsult(args.turnNumber, args.tacticalBattle), seatId: args.seatId, strategy: args.strategyText ?? '' })` once. Remove the early `return` in the tactical branch so that one call covers both paths. The existing writes keep their order. A blank strategy still writes nothing.
 
 ### Tests
 
@@ -559,10 +563,11 @@ A recording is gzip-compressed JSON Lines, UTF-8, one JSON object per line, with
 3. `matchRecordingExport.ts`:
    - `recordingFileName(matchId: string): string` returns `recording-{matchId}.agentwars-recording`. Characters outside `[A-Za-z0-9-]` in the id become `-`.
    - `writeMatchRecordingFile(args: { ops: BasicDbOps; targetPath: string; appVersion: string; exportedAt: string }): void`. Builds the lines, joins them with `\n`, compresses with `gzipSync`, writes to `targetPath + '.tmp'`, then renames over `targetPath`. The `hexes` line uses the same column-and-rows reader as a frame table. Record payloads come from `listMatchRecords`.
-   - `exportFinishedMatchRecordingIfNeeded(deps: { userDataDir: string; appVersion: string; now: () => Date }): void`. Does nothing unless the recorder is on, the database is ready, `game_over` is `'1'`, and a `match_ended` event exists. The target is `userData/recordings/` plus `recordingFileName(matchId)`. When that file already exists, it does nothing. Otherwise it creates the folder and writes the file. It never throws: catch, `logError` with the directory only, and return.
+   - `exportFinishedMatchRecordingIfNeeded(deps: { userDataDir: string; appVersion: string; now: () => Date; deferredConsultPending: boolean }): void`. Does nothing unless the recorder is on, the database is ready, `game_over` is `'1'`, a `match_ended` event exists, and `deferredConsultPending` is false. The export module does not import the deferred-consult module. Callers pass the flag. The target is `userData/recordings/` plus `recordingFileName(matchId)`. Before writing, replace the latest frame's payload in place when that frame's step key is the current step. When the file is missing, write it. When it exists and its record count equals `countMatchRecords`, leave it untouched, including its modified time. When the database has more records, rewrite the file. On Windows, delete the target before the rename, because a rename does not replace an existing file. It never throws: catch, `logError` with the directory only, and return.
 4. Hooks:
-   - `saveLoadIpcHandler.ts`, `withAutoSaveAfter`: call `exportFinishedMatchRecordingIfNeeded(...)` after the boundary call and after the automatic-save call.
-   - `endMatchIpcHandler.ts`: call it after the boundary call added in Phase 4.
+   - `saveLoadIpcHandler.ts`, `withAutoSaveAfter`: call `exportFinishedMatchRecordingIfNeeded(...)` after the after-boundary call and after the automatic-save call. Pass whether a deferred playback consult is pending.
+   - `endMatchIpcHandler.ts`: call it after the boundary call, with the pending flag false unless a deferred consult is still pending.
+   - `deferredResolutionPlaybackConsult.ts`: after each path that ran a consult and then cleared the pending slot, call the export. Do not import `electron` at the top of this file. Its tests load it under Node. Read `app.getVersion()` with a lazy `require` only inside that export call.
 5. `src/main/fixtures/recording-format-1.jsonl`: an **uncompressed** four-line file, written by hand, exactly:
 
    ```
@@ -580,7 +585,7 @@ A recording is gzip-compressed JSON Lines, UTF-8, one JSON object per line, with
 - `matchRecordingExport.test.ts`, on a seated temp match and a temp directory:
   - After two boundary calls, `writeMatchRecordingFile` then `readRecordingFile` returns the same number of records as `countMatchRecords`, in the same order, with equal payloads, and a `hexes` row count equal to `SELECT COUNT(*) FROM hexes`.
   - **Secrets:** with the sentinel in every `MACHINE_LOCAL_CONFIG_KEYS` row, the unzipped file text does not contain the sentinel.
-  - `exportFinishedMatchRecordingIfNeeded` writes nothing while the match is running. After the match is marked over and a boundary call has written `match_ended`, it writes one file. A second call leaves the file's modified time unchanged.
+  - `exportFinishedMatchRecordingIfNeeded` writes nothing while the match is running, and nothing while `deferredConsultPending` is true. After the match is marked over and a boundary call has written `match_ended`, it writes one file. A second call with no new rows leaves the file's modified time unchanged. After one more inserted event, the next call rewrites the file and the parsed recording contains that event.
   - `recordingFileName('a/b:c')` is `recording-a-b-c.agentwars-recording`.
 
 ### Verification
@@ -662,7 +667,7 @@ Run the Verification Bar. Then run `npm run build:main` and `npm run recording:s
    - `AGENT_WARS_DISABLE_RECORDER`.
    - What is derived and not stored: captures, production, treasury changes, knockouts, battle starts and ends.
 2. `doc/README.md`: add the new document to the index table with a role and a status, in the same form as the `save-files.md` row.
-3. `doc/save-files.md`: add a link to `match-recording.md` in the sentence added in Phase 1. In "Automatic saves", add one sentence: the step's frame is written before the automatic save, so the file holds it.
+3. `doc/save-files.md`: add a link to `match-recording.md` next to the `ensureMatchRecordsTable` sentence from Phase 1. In "Automatic saves", add one sentence: the step's frame is written before the automatic save, so the file holds it. Also say a finished match is not a save file (`SAVE_GAME_OVER_MESSAGE`); the recording under `userData/recordings` is the copy that leaves the match database.
 4. Run `node scripts/check-doc-links.cjs` if `package.json` or the docs reference it, and fix any link it reports in the files this phase touched.
 5. Search the whole diff for plan vocabulary and remove it: `git diff | Select-String -Pattern 'Phase \d|dispatches-1|execution plan|locked decision' -CaseSensitive:$false`. Nothing under `src/` or `doc/` may match.
 6. Run the Verification Bar one last time.
@@ -714,19 +719,33 @@ Check each item before you mark a phase complete:
 
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `check:circular` cycle list | |
-| `EXPECTED_USER_VERSION` (must not change) | |
-| Missing symbols | |
+| `git status --short` | Filled after the work. At the start, the code tree was clean aside from the other three dispatch spec files. |
+| `npm test` | Not re-run as a pre-change baseline in this session. The final run passed (exit 0, about 23 minutes). |
+| `npm run build:renderer` | The final run passed. |
+| `check:circular` cycle list | Three cycles, none of which include the recorder. The baseline file is empty. It was not edited. The cycles are the existing orderless-unit loop through `gameActions`, and two renderer loops through `openRouterUiHelpers`. |
+| `EXPECTED_USER_VERSION` (must not change) | 26. Unchanged. |
+| Missing symbols | None. The symbols this plan calls were present. |
 
 ## Defect Inventory
 
 | Phase | Command | First error | Action taken |
 |-------|---------|-------------|--------------|
+| 1 | `tsc -p tsconfig.main.json` | `matchRecordsTable.test.ts` imported `./gameDb` from inside `src/main/gameDb`. | Import `resetGameForNewMatch` from `../gameDb`. |
+| 2 | `tsc -p tsconfig.main.json` | `StoredMatchRecordRow` did not satisfy `getAll`'s `Record<string, unknown>` constraint. | The row type is a type alias instead of an interface. |
+| 5 | `eslint` | `require('electron')` in the deferred-consult export. | The same file-level disable used by the other lazy Electron require, with the reason that a top-level import loads Electron in the unit tests. |
+| 1 | `node dist/main/gameDb/matchRecordsTable.test.js` | `better_sqlite3.node` was built for Electron (`NODE_MODULE_VERSION` 143). | `npm run rebuild:native:node`. |
 
 ## Completion Log
 
 | Phase | Result | Sketch differences | Test files changed outside the Add/Edit lists | Docs updated |
 |-------|--------|--------------------|-----------------------------------------------|--------------|
+| 0 | Inventory filled after implementation. No code. | The full bar was not repeated before the first edit. | None | None |
+| 1 | Done. Final `npm test` passed. | `ensureMatchId` uses the existing `upsertGameConfigValue`. | None | `doc/save-files.md` mentions the table |
+| 2 | Done. Final `npm test` passed. | None | None | None |
+| 3 | Done. Final `npm test` passed. | The speed assert is 2000 ms. A fresh global frame was 32.0 ms and 27,169 deflated bytes. | None | None |
+| 4 | Done. Final `npm test` passed. | `currentStepKey` reads `activeTacticalBattleRef` rather than `tacticalBattleSession`, so the recorder does not import the `gameDb` barrel. | None | None |
+| 5 | Done. Final `npm test` passed. | No Ready assertion against a real database. The existing Ready tests use fakes, and a closed database makes the recorder return without writing. | None | None |
+| 6 | Done. Final `npm test` passed. | None | None | None |
+| 7 | Done. Final `npm test` passed. | The export takes `deferredConsultPending` so it does not import the deferred-consult module. That module loads Electron with `require` only inside the export call. A replace deletes the target first. | None | None |
+| 8 | Done. Final `npm test` passed. | The app was not played. Numbers are in `.spec/2026-11-14-dispatches-1-match-recorder-results.md`. The temporary measurement print was removed. | None | None |
+| 9 | Done. `npm test` and `npm run build:renderer` passed. `check:circular` still fails on the three cycles in the Phase 0 row. | The full bar ran once, at the end, rather than after every phase. | None | `doc/match-recording.md` added. `doc/README.md` and `doc/save-files.md` updated. `README.md` was not edited. |
