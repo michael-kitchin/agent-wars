@@ -37,6 +37,7 @@ import { ensureHireOrderReservedCreditsColumn } from './gameDb/mercenaryState';
 import { ensureSeatAddedColumns } from './gameDb/seatRosterStore';
 import { ensurePendingAirDropOrdersTable } from './gameDb/pendingAirDropOrders';
 import { ensureMatchRecordsTable } from './gameDb/matchRecordsTable';
+import { ensureSideMessageTables } from './gameDb/sideMessageTables';
 import { getFullDdl } from './gameDb/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
@@ -147,7 +148,7 @@ export {
  * SQLite `user_version` that the current schema DDL produces.
  *
  * Purpose: Detects match databases created by an older schema. Bumping it also makes every saved game from an earlier version unloadable. Changing the shape of any JSON a save carries in `game_config`, without bumping this number, does the same, because an older or newer app would misread it.
- * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` or `ensureSeatAddedColumns` adds on open, or the `pending_air_drop_orders` table that `ensurePendingAirDropOrdersTable` creates on open, or the `match_records` table that `ensureMatchRecordsTable` creates on open. See `doc/save-files.md`.
+ * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` or `ensureSeatAddedColumns` adds on open, or the `pending_air_drop_orders` table that `ensurePendingAirDropOrdersTable` creates on open, or the `match_records` table that `ensureMatchRecordsTable` creates on open, or the `side_messages` and `side_stances` tables that `ensureSideMessageTables` creates on open. See `doc/save-files.md`.
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
@@ -248,6 +249,7 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   ensureSeatAddedColumns(gameDbOps);
   ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
   ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
+  ensureSideMessageTables((sql) => gameDbOps.run(sql));
   ensureStrategicInfrastructureSyncTriggers();
   ensureTurnStateRow();
   database.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
@@ -291,6 +293,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     ensureSeatAddedColumns(gameDbOps);
     ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
     ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
+  ensureSideMessageTables((sql) => gameDbOps.run(sql));
     runInfrastructureStartupConsistencyPass();
   } catch (err) {
     if (d) {
@@ -495,6 +498,7 @@ export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingG
     ensureSeatAddedColumns(gameDbOps);
     ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
     ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
+  ensureSideMessageTables((sql) => gameDbOps.run(sql));
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
     repairStrandedStrategicResolutionPhaseOnDbBootstrap();

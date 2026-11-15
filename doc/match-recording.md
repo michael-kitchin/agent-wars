@@ -8,7 +8,7 @@ The engine is the authority. The symbols named below are the ones to check when 
 
 History lives in `match_records`, in the open match database. `ensureMatchRecordsTable` creates the table on open, the same way `ensurePendingAirDropOrdersTable` does. `EXPECTED_USER_VERSION` stays 26, and the table is not in `GAME_DB_REQUIRED_TABLES`. An older file at version 26 gains the table when it is opened. A save copies the table with the rest of the match. See [save-files.md](save-files.md).
 
-A frame is a snapshot of the match tables at one step. An event is one thing that happened at that step and cannot be recovered by comparing frames. Each row stores `record_id`, `kind` (`frame` or `event`), `record_type`, `format_version`, `step_key`, `scope` (`strategic` or `tactical`), `turn_number`, `battle_id` (empty outside a battle), `beat_number` (0 outside a battle), `visibility`, `display_text`, `recorded_at`, and a `payload`. The payload is zlib-compressed JSON. A frame's `record_type` is `state` (`MATCH_FRAME_RECORD_TYPE`) at format version `MATCH_FRAME_FORMAT_VERSION` (1). This build writes eight event types, each at format version 1 (`MATCH_EVENT_FORMAT_VERSIONS`):
+A frame is a snapshot of the match tables at one step. An event is one thing that happened at that step and cannot be recovered by comparing frames. Each row stores `record_id`, `kind` (`frame` or `event`), `record_type`, `format_version`, `step_key`, `scope` (`strategic` or `tactical`), `turn_number`, `battle_id` (empty outside a battle), `beat_number` (0 outside a battle), `visibility`, `display_text`, `recorded_at`, and a `payload`. The payload is zlib-compressed JSON. A frame's `record_type` is `state` (`MATCH_FRAME_RECORD_TYPE`) at format version `MATCH_FRAME_FORMAT_VERSION` (1). This build writes ten event types, each at format version 1 (`MATCH_EVENT_FORMAT_VERSIONS`):
 
 | `record_type` | When it is written |
 | --- | --- |
@@ -17,9 +17,11 @@ A frame is a snapshot of the match tables at one step. An event is one thing tha
 | `strategic_resolution` | A finished Ready, or a finished melee resolve. The payload is the resolution result. |
 | `tactical_orders_committed` | The drafts of one tactical beat, immediately after a successful commit. |
 | `tactical_resolution` | The playback of that beat, in the same call. |
-| `consultation` | One model consult, from the summary already written to the consult log. `stage` is `orders`. A consult that finishes after New or Load has replaced the database is not stored on the replacement, including when the loaded file still has this match's id. Creating the match id during the consult does not drop it, and stopping the model does not drop it. |
+| `consultation` | One model consult, from the summary already written to the consult log. `stage` is `orders` or `talk`. A consult that finishes after New or Load has replaced the database is not stored on the replacement, including when the loaded file still has this match's id. Creating the match id during the consult does not drop it, and stopping the model does not drop it. |
 | `commander_strategy` | The strategy line of that consult, when the line is not blank. The same New or Load rule as `consultation` applies. `display_text` is the line. |
 | `match_ended` | The match is over. The payload has `winner` and `reason` as stored, including an empty `winner` for a tie. |
+| `message_sent` | A side message was sent. The payload has `messageId`, `fromSeatId`, `toSeatId`, and `text`. Visibility is the sender and the recipient. `display_text` is the text. |
+| `stance_declared` | A commander changed its private stance or the reason for it. The payload has `seatId`, `towardSeatId`, `stance`, `reason`, and `previousStance`. Visibility is that commander. |
 
 Human strategic orders are copied from `pending_orders`, `pending_ranged_orders`, `pending_air_orders`, `pending_missile_launches`, `pending_ferry_orders`, and `pending_air_drop_orders` before resolution clears them. An owner with no rows writes no event.
 
@@ -39,13 +41,14 @@ When `game_over` is `1` and `match_ended` is missing, the boundary writes one fr
 
 ## Which tables a frame includes
 
-`MATCH_TABLE_RECORDING_POLICY` in `src/main/recorder/matchFramePolicy.ts` classifies every match table. A frame copies each table whose mode is `frame`. Three tables are excluded:
+`MATCH_TABLE_RECORDING_POLICY` in `src/main/recorder/matchFramePolicy.ts` classifies every match table. A frame copies each table whose mode is `frame`. Four tables are excluded:
 
 | Table | Reason |
 | --- | --- |
 | `hexes` | Terrain does not change during a match. The recording file writes it once. |
 | `turn_notes_history` | A growing log. A strategy is a `commander_strategy` event, and a loss is the difference between two frames. |
 | `match_records` | The history itself. |
+| `side_messages` | A growing log. Each sent message is a `message_sent` event. `side_stances` is a frame table. |
 
 A new table has to be added to `MATCH_TABLE_RECORDING_POLICY` in the same change, as a frame table or with an exclusion reason. `matchFramePolicy.test.ts` fails when `sqlite_master` and the policy disagree.
 

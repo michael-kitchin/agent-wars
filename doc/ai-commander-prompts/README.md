@@ -34,6 +34,7 @@ It records two things:
 | Read one full strategic emission, or one tactical system message | [`example-strategic-prompt.md`](example-strategic-prompt.md), [`example-tactical-prompt.md`](example-tactical-prompt.md) |
 | Read one captured strategic reply | [`example-strategic-response.md`](example-strategic-response.md) |
 | See anything after the system prompt | [`consultation-flow.md`](consultation-flow.md) |
+| See the diplomacy step before orders | [`talk-prompt.md`](talk-prompt.md) |
 | See a configuration, roster, or scenario case | [`variants.md`](variants.md) |
 | Find where an existing prompt section is specified | [`crosswalk.md`](crosswalk.md) |
 | Know what the builders emit today, and remaining engine-versus-copy gaps | [`source-inventory.md`](source-inventory.md) |
@@ -52,6 +53,7 @@ Two rules the builders actually enforce:
 - [`assembly-contract.md`](assembly-contract.md) — identity and coordinates, the shared prompt skeleton, the include and omit matrix, tools versus envelope writes, the response envelope, and shared coaching.
 - [`strategic-prompt.md`](strategic-prompt.md) — the strategic system prompt as emitted.
 - [`tactical-prompt.md`](tactical-prompt.md) — the tactical system prompt as emitted.
+- [`talk-prompt.md`](talk-prompt.md) — the diplomacy call that runs before an orders consult.
 - [`consultation-flow.md`](consultation-flow.md) — the opening message, tool results, the corrective message, the repair request, and outcomes with no prompt.
 - [`variants.md`](variants.md) — fog, tool groups, roster composition, scenarios, game size, consultation policy.
 - [`crosswalk.md`](crosswalk.md) — item to carrier, existing section to disposition, and closed or remaining defects.

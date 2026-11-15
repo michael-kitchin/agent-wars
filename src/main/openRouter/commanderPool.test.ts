@@ -15,7 +15,8 @@ import { describe, test } from 'node:test';
 import { resetActiveGameMap } from '../../shared/activeGameMap';
 import { setLoadedStrategicFootprint } from '../../shared/loadedStrategicFootprint';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
-import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, type AiSeatId } from '../../shared/seatIds';
+import { HUMAN_SEAT_KIND } from '../../shared/seatRoster';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import {
   closeGameDatabaseForTests,
@@ -45,6 +46,8 @@ import {
   startStrategicPlanning,
   waitForSeatsSettled,
 } from './commanderPool';
+import { setCommanderTalkRunnerForTests } from './commanderPoolRounds';
+import { speakAndAwaitTalkRound, type TalkRound } from './talk/talkRound';
 import { emptyConsultOutcome, type CommanderConsultOutcome, type CommanderConsultRequest } from './commanderPoolSupport';
 import { rememberOpenRouterModels, resetOpenRouterModelCapabilitiesForTests } from './openRouterModelCapabilities';
 
@@ -121,14 +124,18 @@ async function flushWrites(): Promise<void> {
  * Expected outcome: `runCase` sees the match. The pool and the database are cleared afterward.
  * Exceptions: Propagates a case error after cleanup.
  */
-async function withMatch(modelIds: readonly (string | null)[], runCase: () => Promise<void>): Promise<void> {
+async function withMatch(modelIds: readonly (string | null)[], runCase: () => Promise<void>, leadHuman = false): Promise<void> {
   const map = regionalMap();
   if (!map) throw new Error('no regional map');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-commander-pool-'));
   const options: ResetGameForNewMatchOptions = {
     gameMapId: map.id,
     fogOfWarEnabled: false,
-    seats: modelIds.map((modelId, index) => aiSeat(map.sideGroupIds[index] ?? '', modelId)),
+    seats: modelIds.map((modelId, index) =>
+      leadHuman && index === 0
+        ? { kind: HUMAN_SEAT_KIND, sideGroupId: map.sideGroupIds[index] ?? '' }
+        : aiSeat(map.sideGroupIds[index] ?? '', modelId)
+    ),
   };
   fs.mkdirSync(path.join(dir, 'user-data'));
   setRegionPackUserDataRootForTests(path.join(dir, 'user-data'));
@@ -324,6 +331,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         nowMs: () => now,
         wallClockMs: 40,
         waitTimeoutMs: 5_000,
+        talkRoundTimeoutMs: 75_000,
         schedule: (fn, delayMs) => {
           const timer = { at: now + delayMs, fn, cancelled: false };
           timers.push(timer);
@@ -458,6 +466,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         nowMs: () => now,
         wallClockMs: 60_000,
         waitTimeoutMs: 120_000,
+        talkRoundTimeoutMs: 75_000,
         schedule: () => ({ cancel: () => undefined }),
       });
       let release: () => void = () => undefined;
@@ -474,6 +483,150 @@ describe('commander pool', { concurrency: 1 }, () => {
       await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
       await flushWrites();
       assert.equal(getSeatRoster().find((seat) => seat.seatId === AI_SEAT_IDS[0])?.thinkTimeMs, 2_500);
+    });
+  });
+
+  test('talk finishes before orders and its cost is kept', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    const previous = process.env.AGENT_WARS_DISABLE_TALK;
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    await withMatch(['model-a', 'model-a', null], async () => {
+      setCommanderPoolTimingForTests({
+        nowMs: () => 1_000,
+        wallClockMs: 60_000,
+        waitTimeoutMs: 120_000,
+        talkRoundTimeoutMs: 75_000,
+        schedule: () => ({ cancel: () => undefined }),
+      });
+      const order: string[] = [];
+      setCommanderTalkRunnerForTests(async (request) => {
+        order.push(`talk:${request.seatId}`);
+        return { kind: 'spoke', reply: { messages: [], stances: [], droppedCount: 0 }, costUsd: 0.5 };
+      });
+      setCommanderConsultRunnerForTests(async (request) => {
+        await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
+        order.push(`orders:${request.seatId}`);
+        return finishedConsult(request.seatId);
+      });
+      try {
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
+        await flushWrites();
+        const firstOrders = order.findIndex((line) => line.startsWith('orders:'));
+        assert.equal(order.filter((line) => line.startsWith('talk:')).length, 2);
+        assert.equal(order.every((line, index) => !line.startsWith('talk:') || index < firstOrders), true);
+        const cost = getSeatRoster().find((seat) => seat.seatId === AI_SEAT_IDS[0])?.costUsd ?? 0;
+        assert.ok(Math.abs(cost - 1.75) < 0.001);
+      } finally {
+        setCommanderTalkRunnerForTests(null);
+        setCommanderConsultRunnerForTests(null);
+        setCommanderPoolTimingForTests(null);
+        if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+        else process.env.AGENT_WARS_DISABLE_TALK = previous;
+      }
+    });
+  });
+
+  test('a message to the human seat is the dispatch message, and a message to another AI is not', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    await withMatch([null, 'model-a', null], async () => {
+      setCommanderPoolTimingForTests({
+        nowMs: () => 1_000,
+        wallClockMs: 60_000,
+        waitTimeoutMs: 120_000,
+        talkRoundTimeoutMs: 75_000,
+        schedule: () => ({ cancel: () => undefined }),
+      });
+      const quiet = { ...finishedConsult(AI_SEAT_IDS[0]), message: null };
+      setCommanderConsultRunnerForTests(async (request) => {
+        await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
+        return quiet;
+      });
+      setCommanderTalkRunnerForTests(async () => ({
+        kind: 'spoke',
+        reply: { messages: [{ toSeatId: HUMAN_SEAT_ID, text: 'hello human' }], stances: [], droppedCount: 0 },
+        costUsd: 0,
+      }));
+      try {
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        await flushWrites();
+        const toHuman = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
+        assert.equal(toHuman?.message, 'hello human');
+        resetCommanderPool(getSeatRoster());
+        setCommanderTalkRunnerForTests(async () => ({
+          kind: 'spoke',
+          reply: { messages: [{ toSeatId: AI_SEAT_IDS[1], text: 'hello other' }], stances: [], droppedCount: 0 },
+          costUsd: 0,
+        }));
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        await flushWrites();
+        const toOther = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
+        assert.equal(toOther?.message, null);
+      } finally {
+        setCommanderTalkRunnerForTests(null);
+        setCommanderConsultRunnerForTests(null);
+        setCommanderPoolTimingForTests(null);
+      }
+    }, true);
+  });
+
+  test('a consult that never talks still closes the round, and the switch leaves the round null', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    const previous = process.env.AGENT_WARS_DISABLE_TALK;
+    await withMatch(['model-a', null, null], async () => {
+      setCommanderPoolTimingForTests({
+        nowMs: () => 1_000,
+        wallClockMs: 60_000,
+        waitTimeoutMs: 120_000,
+        talkRoundTimeoutMs: 75_000,
+        schedule: () => ({ cancel: () => undefined }),
+      });
+      let talkCalls = 0;
+      const rounds: TalkRound[] = [];
+      setCommanderTalkRunnerForTests(async () => {
+        talkCalls += 1;
+        return { kind: 'silent', reason: 'failed', costUsd: 0 };
+      });
+      setCommanderConsultRunnerForTests(async (request) => {
+        if (request.talkRound) rounds.push(request.talkRound);
+        return finishedConsult(request.seatId);
+      });
+      try {
+        delete process.env.AGENT_WARS_DISABLE_TALK;
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        await flushWrites();
+        assert.equal(talkCalls, 0);
+        assert.equal(rounds.length, 1);
+        await rounds[0]?.whenClosed();
+        process.env.AGENT_WARS_DISABLE_TALK = '1';
+        let disabledRound: CommanderConsultRequest['talkRound'] = undefined as unknown as CommanderConsultRequest['talkRound'];
+        setCommanderConsultRunnerForTests(async (request) => {
+          disabledRound = request.talkRound;
+          return finishedConsult(request.seatId);
+        });
+        startStrategicPlanning();
+        await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+        assert.equal(disabledRound, null);
+      } finally {
+        setCommanderTalkRunnerForTests(null);
+        setCommanderConsultRunnerForTests(null);
+        setCommanderPoolTimingForTests(null);
+        if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+        else process.env.AGENT_WARS_DISABLE_TALK = previous;
+      }
     });
   });
 });

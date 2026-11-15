@@ -83,7 +83,7 @@ reason?: string;
    */
   aiStrategy?: string;
   /**
-   * Player-facing taunt/threat from the post–tactical-beat LLM pass (IPC merge only).
+   * The message this commander sent to the human player in this wave, when there is one. From the post-beat consult (IPC merge only).
    *
    * Contract: Populated by `game:commitHumanTacticalDraftOrders` in the main process after consultation, mirroring `aiStrategy`.
    * When to use: Renderer Message toast section after a tactical Ready beat.

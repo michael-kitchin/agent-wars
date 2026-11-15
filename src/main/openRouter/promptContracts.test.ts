@@ -61,12 +61,10 @@ function testExampleBlockParsesWithParser(): void {
   assert.ok(!/\n {2}"/.test(block), 'example JSON must be compact, not pretty-printed');
   const jsonStart = block.indexOf('{');
   assert.ok(jsonStart >= 0, 'example should contain a JSON object');
-  const parsed = JSON.parse(block.slice(jsonStart)) as { message?: string; strategy?: string; orders?: unknown[] };
-  assert.strictEqual(parsed.message, 'You will not find safety in delay.');
+  const parsed = JSON.parse(block.slice(jsonStart)) as { strategy?: string; orders?: unknown[] };
+  assert.equal('message' in parsed, false);
   assert.strictEqual(typeof parsed.strategy, 'string');
-  const messageKeyAt = block.indexOf('"message"');
-  const strategyKeyAt = block.indexOf('"strategy"');
-  assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'example JSON must list message before strategy');
+  assert.equal(block.includes('"message"'), false);
   const airAt = block.indexOf('"airStrikes"');
   const ferryAt = block.indexOf('"ferryOrders"');
   const callbacksAt = block.indexOf('"callbacks"');
@@ -91,16 +89,14 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
   });
   assert.ok(block.includes('"explicit_move"'));
   assert.ok(!block.includes('"assign_order"'));
-  assert.ok(block.includes('This close, hesitation is already a casualty.'));
+  assert.equal(block.includes('"message"'), false);
   assert.ok(block.includes('a1-t1-s1'), 'tactical example must use a compact sub-unit id');
   assert.ok(!block.includes('opp-parent:01'), 'tactical example must not use live-looking parent ids');
   assert.ok(!block.includes('hum-parent:01'), 'tactical example must not use live-looking enemy ids');
   assert.ok(block.includes('"unitIds"'), 'tactical example teaches grouped unitIds');
   assert.ok(!block.includes('```'), 'tactical example must not be a markdown fence');
   assert.ok(!/\n {2}"/.test(block), 'tactical example JSON must be compact');
-  const messageKeyAt = block.indexOf('"message"');
-  const strategyKeyAt = block.indexOf('"strategy"');
-  assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'tactical example JSON must list message before strategy');
+  assert.ok(block.includes('"strategy"'));
 }
 
 /**
@@ -422,7 +418,7 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   });
   assert.ok(tactical.includes('tactical beat'));
   assert.ok(tactical.includes('event-driven'));
-  assert.ok(tactical.includes('"message" (string)'));
+  assert.ok(!tactical.includes('"message"'));
   assert.ok(tactical.includes('Do not emit assign_order'));
   assert.ok(tactical.includes('this beat'), 'tactical strategy field is a plan for this beat');
   assert.ok(!tactical.includes('plan for this turn'), 'tactical contract must not call the beat a turn');

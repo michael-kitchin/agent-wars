@@ -57,7 +57,8 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Active Operations` | `buildOperationsSection` (`briefingSectionsOperations.ts`), then `shiftMarkdownHeadings` inside the briefing | standing orders on, not a battle, and the seat has a campaign plan, a stored operation, a candidate, or a refusal note from the previous turn | omitted when it has none of those. A campaign plan alone prints the section, and that bullet comes first. The other bullets are present only when an operation is stored. The note line is present only on the following turn |
 | `## Operation Options` | `buildOperationOptionsSection` (`briefingSectionsOperations.ts`), fed by `operationCandidatesForSeat` with land included | standing orders on, not a battle, and the seat has a candidate | omitted. The section still prints when no operation is stored |
 | `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
-| `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 10 turns has a message, strategy, or loss | omitted |
+| `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 10 turns has a strategy or a loss | omitted |
+| `# Messages` | `buildOrdersMessagesBlock` (`talk/ordersMessagesBlock.ts`). Shifted to H2 when a briefing is attached | a visible message or a stored stance for this commander | omitted |
 | `## Production Status` | `buildProductionBriefingBlock`, then `shiftMarkdownHeadings` inside the briefing. `Production Priorities` is `buildProductionPriorityLines` | `flags.productionEnabled` | omitted |
 | `# Mercenaries` | `buildMercenariesBriefingBlock` | strategic, `mercenaryEconomy` present, and production on or the seat has a mercenary | omitted. Production off uses `buildMercenaryUpkeepRule` and skips hire tables. Production on, 0 credits, no mercenary, no rehire, and no raise row is `Treasury: 0 credits. No one to rehire.` |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
@@ -126,7 +127,8 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | `## Attention Flags` | `buildAttentionFlags(..., 'tactical', false)` | always | `None.` |
 | `## Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
 | `### Best Options This Turn` | same as strategic | at least one aggregated row | omitted |
-| `## Recent Turn Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'` | at least one of the previous 10 periods has a message, strategy, or loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
+| `## Recent Turn Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'` | at least one of the previous 10 periods has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
+| `# Messages` | `buildOrdersMessagesBlock` | a visible message or a stored stance for this commander | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
 
 Tactical unit status uses the same six columns and has **no** standing-order column. Best Options actions in battle: `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`.
@@ -139,7 +141,7 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 | Goal clause | `buildTacticalBattleGoalClause` |
 | Coordinate preamble | `buildTacticalLatLngPreamble` |
 | Combat paragraph | same composer and the same `combatRuleGatesForPrompt` gates; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, air drops, ranged fire, movement, ferry, cargo sync, melee, no production** (no missile launches); a known roster names only the types present; `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` when the roster has a missile; `buildFortificationRule` adds the tactical fortification sentence only when `hasFortifiedCells` is true; weather text has no strategic movement sentence and no strategic ferry sentence; no hold-fire (standing orders are not issuable) |
-| Coaching | `buildOrdersGuidanceSection` from `buildTacticalCoachingSections`, plus `# Battle Context` with engage-priority, doctrine, message |
+| Coaching | `buildOrdersGuidanceSection` from `buildTacticalCoachingSections`, plus `# Battle Context` with engage-priority, doctrine, message, and `Messages from other sides:` |
 | Scenario objective | omitted |
 | Scouting sentence | omitted in battle. Strategic orders guidance always includes the scouting bullet |
 | Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes`, `ferryOrders`, and `airDrops` listed when the roster has air; Best Options may list airport ferry dests and air-drop cells |
@@ -271,7 +273,7 @@ Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, 
 | Callback vocabulary excluding `territory_changed` | engine-true for taught events; parser still accepts the unfired name | `callbackEvaluation.ts` |
 | An explicit_move farther than this turn's budget becomes a standing march when standing orders are on | engine-true when a route of at least two turns exists and the first step is legal; otherwise the move is dropped. Air, missiles, an invalid distance, an armor halt, and a blocked land route are not converted | `convertOverBudgetExplicitMoveToMarch` |
 | A march or explicit_move onto the current cell is ignored as already arrived | engine-true; the unit holds and a standing order is not cancelled. A tactical shortened step onto the firing cell stays a drop | `explicitMoveAlreadyArrivedReason` |
-| Doctrine (speed, gaps, disruption, taunt) | unverifiable | none |
+| Doctrine (speed, gaps, disruption) | unverifiable | none |
 | Tactical unconsulted beat: "consulted when a subscribed event fires or when the engine forces a consultation" | engine-true | `UNCONSULTED_BEAT_BULLET` |
 
 ## 8. Discrepancy log

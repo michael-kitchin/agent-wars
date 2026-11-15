@@ -72,7 +72,6 @@ function isSubsequence(actual: readonly string[], expected: readonly string[]): 
 
 test('ENVELOPE_FIELD_ORDER is the canonical field sequence', () => {
   assert.deepEqual(ENVELOPE_FIELD_ORDER, [
-    'message',
     'strategy',
     'orders',
     'exitBattle',
@@ -120,7 +119,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeMemoryUpdates: false,
     includeProductionOrders: false,
   });
-  assert.deepEqual(noTails, ['message', 'strategy', 'orders', 'callbacks']);
+  assert.deepEqual(noTails, ['strategy', 'orders', 'callbacks']);
 
   const tacticalWithFlagsOn = envelopeFieldsForGates({
     coordinateMode: 'tactical',
@@ -215,7 +214,6 @@ test('every gate combination returns a subsequence of ENVELOPE_FIELD_ORDER', () 
       isSubsequence(fields, ENVELOPE_FIELD_ORDER),
       `reordered fields for ${JSON.stringify(gates)}: ${fields.join(',')}`
     );
-    assert.ok(fields.includes('message'));
     assert.ok(fields.includes('strategy'));
     assert.ok(fields.includes('orders'));
     assert.ok(fields.includes('callbacks'));

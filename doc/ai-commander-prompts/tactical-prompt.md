@@ -98,7 +98,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 
 #### `## Recent Turn Notes`
 
-Include when at least one of the previous ten periods in this battle has a message, strategy, or loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Scoped to this battle, not to the strategic timeline.
+Include when at least one of the previous ten periods in this battle has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Each block is the strategy and the loss lines. Scoped to this battle, not to the strategic timeline.
 
 #### `## Active Callbacks`
 
@@ -133,7 +133,9 @@ Tactical variant, bullets in this order:
 
 1. **Priority**, one line: engage enemy forces and inflict losses when advantageous.
 2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add `buildDoctrineBlock` immediately after the strategy list. A strategic prompt then adds one production-denial line for balanced and one for cautious. A battle prints `buildDoctrineBlock` only, and it does not name the campaign target.
-3. **Message guidance**, identical to strategic.
+3. **Message rules**, identical to strategic: `SIDE_MESSAGE_RULE_BLOCK`.
+
+`# Messages` is the same situation section as on the strategic prompt, immediately before the status sections. A battle has no Scenario Progress block, so the section still precedes Air Operations Status, Missile Forces, Mercenaries, Naval Transport Status, and Unit Roster. The history, the line limit, the visibility rule, the stance list, and the caution are the same.
 
 **Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing.
 
@@ -178,7 +180,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 
 ### 3.1 Fields
 
-`message`, `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, `airDrops` when the opponent has air sub-units, and `callbacks`. **No `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema. A human-versus-AI battle omits `exitBattle`. When it is present it is a required boolean, and the repair example sets it to false.
+`strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, `airDrops` when the opponent has air sub-units, and `callbacks`. **No `message`, no `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema. A stray `message` key is ignored. A human-versus-AI battle omits `exitBattle`. When it is present it is a required boolean, and the repair example sets it to false.
 
 ### 3.2 Legal actions this beat
 
@@ -229,7 +231,7 @@ Printed by `buildOrdersGuidanceSection` under `# Orders Guidance`.
 6. **Sealift works inside the footprint.** Included only when the naval status section is present. Carries `EMBARK_LEGALITY`, `EMBARK_STATE`.
 7. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. An empty Active Callbacks table means there are no self-chosen triggers; omitting callbacks or sending `[]` keeps it empty, so only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
 8. **A beat with no prompt is a beat not acted in.** Coaching says the model is consulted when a subscribed event fires or when the engine forces a consultation. Standing orders are inert in battle, so an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.
-9. **Keep the player-facing line clean.** Same message discipline as strategic. Carries `MESSAGE_DISCIPLINE`.
+9. **Answer messages in the diplomacy step.** Same rule as strategic. `SIDE_MESSAGE_RULE_BLOCK` carries it.
 10. **Leave when the battle is already decided.** Included only when the battle is between two AI commanders. The sentence is: set `exitBattle` to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give, and set it to false otherwise. Orders in this reply still resolve for this beat.
 
 Claims the builders **omit** from tactical coaching:

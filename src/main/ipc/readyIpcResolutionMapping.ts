@@ -13,7 +13,7 @@ import { activeAiSeatIds } from '../../shared/seatRoster';
 import { commanderModelId, getGameStateForPlayer, getSeatRoster, type GameStateSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { afterResolution, afterTacticalBeatResolution, type AfterResolutionResult, type AfterTacticalBeatResolutionResult } from '../openRouter/afterResolution';
-import { launchCommanderConsult, waitForSeatsSettled, type CommanderConsultRunner } from '../openRouter/commanderPool';
+import { launchCommanderConsult, openCommanderTalkRound, waitForSeatsSettled, type CommanderConsultRunner } from '../openRouter/commanderPool';
 import { emptyConsultOutcome } from '../openRouter/commanderPoolSupport';
 import type {
   ReadyResult,
@@ -219,12 +219,12 @@ export function toTacticalPostBeatConsultFields(
 ): TacticalPostBeatConsultFields {
   const attach = post.attachTacticalOpponentPlanToIpc === true;
   const strategyText = post.aiStrategy ?? post.strategy;
-  const messageText = post.message ?? post.aiMessage;
+  const shownMessage = post.message ?? post.aiMessage;
   logDebug('ipc toTacticalPostBeatConsultFields', {
     battleId,
     attachTacticalOpponentPlanToIpc: attach,
     hasStrategy: Boolean(strategyText?.trim()),
-    hasMessage: Boolean(messageText?.trim()),
+    hasMessage: Boolean(shownMessage?.trim()),
     hasToolInvocationCounts: Boolean(post.toolInvocationCounts),
     cost: typeof post.cost === 'number' && Number.isFinite(post.cost) ? post.cost : undefined,
   });
@@ -233,7 +233,7 @@ export function toTacticalPostBeatConsultFields(
     battleId,
     attachTacticalOpponentPlanToIpc: attach,
     ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
-    ...optionalConsultToastFields(messageText, strategyText),
+    ...optionalConsultToastFields(shownMessage, strategyText),
     ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
   };
@@ -442,6 +442,7 @@ export async function runEventDrivenAfterResolutionConsultation(
           enabledToolNames: args.enabledToolNames,
           hasKey: args.hasKey,
           signal: request.signal,
+          talkRound: request.talkRound,
           requestOrders: (orderState, orderModelId, options) =>
             args.requestOrders(orderState, orderModelId, { ...options, signal: request.signal }),
         },
@@ -516,6 +517,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
           enabledToolNames: args.enabledToolNames,
           hasKey: args.hasKey,
           signal: request.signal,
+          talkRound: request.talkRound,
           requestOrders: (orderState, orderModelId, options) =>
             args.requestOrders(orderState, orderModelId, { ...options, signal: request.signal }),
         },
@@ -618,8 +620,9 @@ async function consultSeatsThroughPool(
 ): Promise<void> {
   const launched: AiSeatId[] = [];
   let openToolCountWave = true;
+  const talkRound = openCommanderTalkRound(seatIds, theater, battle);
   for (const seatId of seatIds) {
-    if (launchCommanderConsult(seatId, theater, battle, runner, openToolCountWave)) {
+    if (launchCommanderConsult(seatId, theater, battle, runner, openToolCountWave, talkRound)) {
       openToolCountWave = false;
       launched.push(seatId);
     }

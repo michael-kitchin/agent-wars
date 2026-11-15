@@ -75,7 +75,7 @@ export type CommitHumanTacticalDraftOrdersIpcResult = {
   toolInvocationCounts?: Record<string, number>;
   aiStrategy?: string;
   /**
-   * Player-facing taunt/threat from the post–tactical-beat LLM pass (IPC merge only).
+   * The message this commander sent to the human player in this wave, when there is one. From the post-beat consult (IPC merge only).
    *
    * Contract: Same source as `aiStrategy`; omit when empty.
    * When to use: Renderer Message toast section after tactical Ready.

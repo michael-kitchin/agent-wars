@@ -113,11 +113,11 @@ export interface RequestOrdersResult {
    */
   strategy?: string;
   /**
-   * One-line in-character taunt or threat from the model when provided.
+   * The message this commander sent to the human player in this wave, when there is one.
    *
-   * Contract: Opaque prose for the player-facing toast and later prompts; not parsed for mechanics.
-   * When to use: Surface beside `strategy` after a successful consultation.
-   * Expected outcome: Trimmed string or omitted when the model did not emit a message.
+   * Contract: Optional. The orders reply does not set it.
+   * When to use: The commander pool, from the talk round.
+   * Expected outcome: The text, or omitted.
    * Exceptions: None.
    */
   message?: string;

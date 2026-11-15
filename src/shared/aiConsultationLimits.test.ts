@@ -14,14 +14,15 @@ import {
   AI_CONSULTATION_WALL_CLOCK_MS,
   AI_MODEL_REQUEST_RETRY_COUNT,
   AI_MODEL_REQUEST_TIMEOUT_MS,
+  AI_TALK_ROUND_TIMEOUT_MS,
 } from './aiConsultationLimits';
 
-test('consultation wait covers the wall clock, the in-flight round, and the repair call', () => {
+test('consultation wait covers the wall clock, the in-flight round, the repair call, and one talk round', () => {
   const attemptsPerCall = 1 + AI_MODEL_REQUEST_RETRY_COUNT;
   assert.equal(AI_MODEL_REQUEST_TIMEOUT_MS, 180_000);
   assert.equal(AI_CONSULTATION_WALL_CLOCK_MS, 600_000);
   assert.equal(
     AI_CONSULTATION_WAIT_TIMEOUT_MS,
-    AI_CONSULTATION_WALL_CLOCK_MS + 2 * attemptsPerCall * AI_MODEL_REQUEST_TIMEOUT_MS
+    AI_CONSULTATION_WALL_CLOCK_MS + 2 * attemptsPerCall * AI_MODEL_REQUEST_TIMEOUT_MS + AI_TALK_ROUND_TIMEOUT_MS
   );
 });

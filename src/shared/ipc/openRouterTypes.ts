@@ -251,7 +251,7 @@ embarkOrders?: EmbarkOrder[];
        */
 strategy?: string;
             /**
-       * One-line in-character taunt or threat from the model when provided.
+       * The message this commander sent to the human player in this wave, when there is one.
 
        * Contract: Opaque prose for the player-facing toast and later prompts; not parsed for mechanics.
        * When to use: Surface beside `strategy` after a successful consultation.

@@ -13,7 +13,9 @@ import type { GameStateSnapshot } from '../gameDb';
 import { buildConsultMessages, CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
 import { buildConsultPromptParts, joinConsultPromptParts } from './consultPromptParts';
 import { AIR_PLAN_ROUTE_PROMPT_SUFFIX } from './openRouterToolCatalog';
+import { SIDE_MESSAGE_RULE_BLOCK } from './promptSpec/sideMessageRuleText';
 import { TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS } from './tacticalPromptProjection';
+import { assertHeadingsNest, headingOutline } from '../testSupport/promptOutlineHelpers';
 
 /**
  * A small tactical snapshot whose clock and unit cell are the only moving parts.
@@ -195,4 +197,31 @@ test('an AI-only battle with a beat limit names the beats left in the situation'
     includeExitBattle: true,
   });
   assert.ok(!strategic.situationText.includes('Beats left'));
+});
+
+test('the messages block stays in the situation, and both system prompts carry the message rules', () => {
+  const state = battleState(1, 'March, Year 1', 'cell-a', 'infantry');
+  const coordMap = {
+    latLngByH3: new Map<string, [number, number]>([['cell-a', [1, 2]]]),
+    resolveToH3: () => 'cell-a',
+    format: (h3: string) => h3,
+  };
+  const block = '# Messages\n\nThese are the most recent messages.\n\n## With France (h1)\n- Turn 1, they said: "hello"';
+  const without = buildConsultPromptParts({ state, coordMap, coordinateContext: { mode: 'tactical', battleId: 'msgs', tacticalTurnNumber: 1 } });
+  const withNull = buildConsultPromptParts({ state, coordMap, coordinateContext: { mode: 'tactical', battleId: 'msgs', tacticalTurnNumber: 1 }, sideMessagesBlock: null });
+  const withBlock = buildConsultPromptParts({ state, coordMap, coordinateContext: { mode: 'tactical', battleId: 'msgs', tacticalTurnNumber: 1 }, sideMessagesBlock: block });
+  assert.equal(withNull.situationText, without.situationText);
+  assert.ok(withBlock.situationText.includes('These are the most recent messages.'));
+  assert.ok(!withBlock.staticSystemText.includes('These are the most recent messages.'));
+  assertHeadingsNest(headingOutline(withBlock.situationText));
+  const strategic = buildConsultPromptParts({ state, coordMap, coordinateContext: { mode: 'strategic' } });
+  for (const system of [withBlock.staticSystemText, strategic.staticSystemText]) {
+    assert.ok(system.includes('Messages from other sides:'));
+    assert.ok(system.includes('a human player or another AI model'));
+    assert.ok(system.includes('may or may not be telling the truth'));
+    assert.ok(system.includes('may or may not have your interests in mind'));
+  }
+  assert.equal(/\d/.test(SIDE_MESSAGE_RULE_BLOCK), false);
+  assertHeadingsNest(headingOutline(strategic.staticSystemText));
+  assertHeadingsNest(headingOutline(withBlock.staticSystemText));
 });

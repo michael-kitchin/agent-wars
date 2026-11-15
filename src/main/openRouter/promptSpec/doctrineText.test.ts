@@ -98,7 +98,7 @@ test('aggressive and cautious blocks follow the strategy list in both prompts', 
       const text = promptFor(doctrine, mode);
       const strategyAt = text.indexOf('- Your strategy is:');
       const doctrineAt = text.indexOf(`- Your doctrine is ${doctrine}:`);
-      const messageAt = text.indexOf('- Your message is:');
+      const messageAt = text.indexOf('- Messages from other sides:');
       assert.ok(strategyAt >= 0 && doctrineAt > strategyAt && messageAt > doctrineAt, `${mode} ${doctrine}`);
     }
   }

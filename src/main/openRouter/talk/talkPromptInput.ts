@@ -1,0 +1,181 @@
+/**
+ * Reads the match into the inputs a talk prompt is built from.
+ *
+ * Purpose: The talk call and the orders prompt share one reading of threads, stances, and side labels.
+ * When to use: Before `buildTalkSituationText`, and when the orders prompt needs the same threads.
+ * Expected outcome: Plain inputs. Message text is not logged.
+ * Exceptions: Propagates a SQLite error from the roster or the message tables.
+ */
+
+import { logTrace } from '../../logger';
+import { gameDbOps } from '../../gameDb/dbConnection';
+import { isFogOfWarEnabled } from '../../gameDb/fogState';
+import { listSideMessageThread, listSideStances } from '../../gameDb/sideMessageStore';
+import { readSeatRoster } from '../../gameDb/seatRosterStore';
+import { getRecentTurnNotes } from '../../gameDb/turnNotesHistory';
+import { buildRecentTurnNotesSection } from '../../briefing/recentTurnNotesSection';
+import { SECTION_TITLE_RECENT_TURN_NOTES } from '../promptSpec/sectionHeadings';
+import { isSeatId, type AiSeatId, type SeatId } from '../../../shared/seatIds';
+import { isSeatActive, sortSeatsByOrder, type SeatRecord } from '../../../shared/seatRoster';
+import { SIDE_MESSAGE_THREAD_PROMPT_LINES } from '../../../shared/aiConsultationLimits';
+import { sideMessageVisibleTo } from '../../../shared/sideMessages';
+import { playerIdCodeFor } from '../../../shared/unitIds';
+import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
+import type { TalkPromptInput, TalkPromptSide, TalkPromptThread } from './talkPrompt';
+
+/**
+ * The other owner in a battle, when that owner is a seat.
+ *
+ * Purpose: The situation text names who this commander is fighting.
+ * When to use: A talk call inside a battle.
+ * Expected outcome: The other seat, or null when the other owner is Neutral or missing.
+ * Exceptions: None.
+ */
+function battleOpponentSeatId(seatId: AiSeatId, battle: TacticalBattleSnapshot): SeatId | null {
+  const parties = [battle.leadPartyId, battle.opposingPartyId].filter((id): id is SeatId => typeof id === 'string' && isSeatId(id));
+  return parties.find((id) => id !== seatId) ?? null;
+}
+
+/**
+ * One roster row as a side in the talk table.
+ *
+ * Purpose: The label is the home region the orders prompt prints in its Side column.
+ * When to use: Every roster seat.
+ * Expected outcome: A `TalkPromptSide`. The commander's own stance cells stay empty.
+ * Exceptions: `playerIdCodeFor` throws when the id is not a seat. Callers pass roster ids.
+ */
+function sideFromRoster(seat: SeatRecord, ownSeatId: AiSeatId, stanceByTarget: ReadonlyMap<string, { stance: TalkPromptSide['stance']; reason: string }>): TalkPromptSide {
+  const stance = stanceByTarget.get(seat.seatId);
+  const own = seat.seatId === ownSeatId;
+  return {
+    code: playerIdCodeFor(seat.seatId),
+    label: seat.homeRegion,
+    isOwn: own,
+    outTurn: seat.outTurn,
+    stance: own ? null : stance?.stance ?? null,
+    stanceReason: own ? null : stance?.reason ?? null,
+  };
+}
+
+/**
+ * The message threads this commander may see.
+ *
+ * Purpose: The talk prompt and the orders prompt show the same history.
+ * When to use: Before either prompt is built for this seat.
+ * Expected outcome: Active other sides first, in seat order, then sides that have left and still have a visible line. Each line has passed `sideMessageVisibleTo`. A line is new when it is addressed to this seat and not yet seen.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function readSideMessageThreads(seatId: AiSeatId): TalkPromptThread[] {
+  const roster = sortSeatsByOrder(readSeatRoster(gameDbOps)).filter((seat) => isSeatId(seat.seatId) && seat.seatId !== seatId);
+  const fogOfWarEnabled = isFogOfWarEnabled(gameDbOps);
+  const threads = roster.map((seat) => {
+    const rows = listSideMessageThread(gameDbOps, seatId, seat.seatId, SIDE_MESSAGE_THREAD_PROMPT_LINES).filter((row) =>
+      sideMessageVisibleTo({
+        viewer: { kind: 'commander', seatId },
+        fogOfWarEnabled,
+        fromSeatId: row.fromSeatId,
+        toSeatId: row.toSeatId,
+      })
+    );
+    return {
+      active: isSeatActive(seat),
+      thread: {
+        sideCode: playerIdCodeFor(seat.seatId),
+        lines: rows.map((row) => ({
+          turnNumber: row.step.turnNumber,
+          fromOwnSide: row.fromSeatId === seatId,
+          text: row.body,
+          isNew: row.toSeatId === seatId && !row.seenByRecipient,
+          messageId: row.messageId,
+        })),
+      } satisfies TalkPromptThread,
+    };
+  });
+  const visible = [...threads.filter((row) => row.active), ...threads.filter((row) => !row.active && row.thread.lines.length > 0)];
+  logTrace('talkPromptInput readSideMessageThreads', { seatId, threadCount: visible.length });
+  return visible.map((row) => row.thread);
+}
+
+/**
+ * Counts unread messages this commander's next prompt would show.
+ *
+ * Purpose: An older unread message stays unread, and it does not by itself request another orders consult, because the line limit keeps it out of the prompt.
+ * When to use: The post-resolution decision, after the talk round has closed.
+ * Expected outcome: The number of lines `readSideMessageThreads` marks new. Zero when every visible line has been seen.
+ * Exceptions: Propagates a SQLite error from the message tables.
+ */
+export function countUnreadPromptMessages(seatId: AiSeatId): number {
+  const count = readSideMessageThreads(seatId).reduce((sum, thread) => sum + thread.lines.filter((line) => line.isNew).length, 0);
+  logTrace('talkPromptInput countUnreadPromptMessages', { seatId, count });
+  return count;
+}
+
+/**
+ * The sides table for this commander, including its own side.
+ *
+ * Purpose: The talk prompt and the orders prompt name sides the same way.
+ * When to use: Before either prompt prints a side label or a stance.
+ * Expected outcome: One row per roster seat. The label is the home region. A stance is this commander's stored stance toward that side.
+ * Exceptions: Propagates a SQLite error. `playerIdCodeFor` throws when a roster id is not a seat.
+ */
+export function readTalkSides(seatId: AiSeatId): TalkPromptSide[] {
+  const roster = sortSeatsByOrder(readSeatRoster(gameDbOps)).filter((seat) => isSeatId(seat.seatId));
+  const stanceByTarget = new Map(listSideStances(gameDbOps, seatId).map((row) => [row.towardSeatId, { stance: row.stance, reason: row.reason }] as const));
+  logTrace('talkPromptInput readTalkSides', { seatId, sideCount: roster.length });
+  return roster.map((seat) => sideFromRoster(seat, seatId, stanceByTarget));
+}
+
+/**
+ * Reads one talk prompt's inputs from the open match.
+ *
+ * Purpose: `requestTalk` does not assemble SQL itself.
+ * When to use: Once per talk call, before the model is called.
+ * Expected outcome: The prompt input, the seats still in the match including this commander, and the side codes of the other active seats.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function readTalkPromptInput(args: {
+  readonly seatId: AiSeatId;
+  readonly turnNumber: number;
+  readonly battle: TacticalBattleSnapshot | null;
+}): { readonly input: TalkPromptInput; readonly activeSeatIds: SeatId[]; readonly sideCodes: string[] } {
+  const roster = sortSeatsByOrder(readSeatRoster(gameDbOps)).filter((seat) => isSeatId(seat.seatId));
+  const own = roster.find((seat) => seat.seatId === args.seatId);
+  const sides = readTalkSides(args.seatId);
+  const activeSeatIds = roster.filter((seat) => isSeatActive(seat)).map((seat) => seat.seatId);
+  const sideCodes = sides.filter((side) => !side.isOwn && side.outTurn == null).map((side) => side.code);
+  const scope = args.battle ? 'tactical' as const : 'strategic' as const;
+  const battleId = args.battle?.battleId ?? '';
+  const noteTurn = args.battle ? args.battle.tacticalTurnNumber : args.turnNumber;
+  const notes = getRecentTurnNotes(gameDbOps, args.seatId, scope, battleId, noteTurn);
+  const newest = notes.length > 0 ? notes[notes.length - 1] : undefined;
+  const lastStrategy = newest?.strategyText?.trim() ? newest.strategyText : null;
+  const recentTurnsSection = buildRecentTurnNotesSection({
+    scope,
+    battleId,
+    currentTurnNumber: noteTurn,
+    heading: SECTION_TITLE_RECENT_TURN_NOTES,
+    seatId: args.seatId,
+  });
+  const opponentId = args.battle ? battleOpponentSeatId(args.seatId, args.battle) : null;
+  const opponent = opponentId ? roster.find((seat) => seat.seatId === opponentId) : undefined;
+  logTrace('talkPromptInput readTalkPromptInput', {
+    seatId: args.seatId,
+    turnNumber: args.turnNumber,
+    activeSeatCount: activeSeatIds.length,
+    sideCodeCount: sideCodes.length,
+    inBattle: args.battle !== null,
+  });
+  return {
+    input: {
+      ownSideLabel: own?.homeRegion ?? 'your side',
+      turnNumber: args.turnNumber,
+      battle: args.battle ? { beatNumber: args.battle.tacticalTurnNumber, opponentLabel: opponent?.homeRegion ?? null } : null,
+      sides,
+      lastStrategy,
+      recentTurnsSection,
+      threads: readSideMessageThreads(args.seatId),
+    },
+    activeSeatIds,
+    sideCodes,
+  };
+}

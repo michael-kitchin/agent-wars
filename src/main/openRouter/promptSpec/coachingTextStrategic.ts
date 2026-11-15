@@ -30,6 +30,7 @@ import {
 import { buildCampaignRuleBlock } from './campaignRuleText';
 import { buildOperationRuleBlock } from './operationRuleText';
 import { buildPostureRuleBlock } from './postureRuleText';
+import { SIDE_MESSAGE_RULE_BLOCK } from './sideMessageRuleText';
 
 /**
  * Five-goal list, doctrine, and message guidance for the strategic context block.
@@ -53,7 +54,7 @@ export function buildStrategicContextCoaching(gates: CoachingGates): string {
   const toolsLine = tools.length > 0 ? `\n${tools}` : '';
   const message = `${buildStrategicGoalsBlock(gates)}
 ${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
-${MESSAGE_BLOCK}`;
+${SIDE_MESSAGE_RULE_BLOCK}`;
   const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock(gates.operationsEnabled === true)}` : message;
   const withOperations = gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true)}` : withCampaign;
   return gates.postureEnabled === true ? `${withOperations}\n\n${buildPostureRuleBlock(gates.campaignEnabled === true)}` : withOperations;
@@ -107,7 +108,7 @@ export function buildStrategicCoachingSections(gates: CoachingGates): readonly {
     CALLBACK_BULLET,
     UNCONSULTED_TURN_BULLET,
   ];
-  const messages = [MESSAGE_DISCIPLINE_BULLET, TOOL_BUDGET_BULLET];
+  const messages = [TOOL_BUDGET_BULLET];
   return [
     { title: SECTION_TITLE_WINNING, bullets: winning },
     { title: SECTION_TITLE_USING_THE_BRIEFING, bullets: usingTheBriefing },
@@ -209,17 +210,6 @@ export function buildStrategyBlock(mode: 'strategic' | 'tactical'): string {
     (2) Strike gaps the enemy cannot reinforce quickly.
     (3) Keep the initiative: move toward your objective every ${period}.`;
 }
-
-/**
- * Player-facing message discipline for the context block.
- *
- * Purpose: `message` is psychological warfare and must not leak operations.
- * When to use: Both mode context builders.
- * Expected outcome: Taunt-or-threat wording with no cells, ids, or intent.
- * Exceptions: None.
- */
-export const MESSAGE_BLOCK = `- Your message is:
-    Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.`;
 
 /**
  * Names the two strategic win paths.
@@ -433,17 +423,6 @@ const CALLBACK_BULLET =
  */
 const UNCONSULTED_TURN_BULLET =
   '- The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.';
-
-/**
- * Message field discipline, as a section-4 item.
- *
- * Purpose: Same rule as the context-block message lines, restated where the model looks for "what to do".
- * When to use: Always in both modes.
- * Expected outcome: Taunt or threat; must not reveal orders, cells, ids, or intent.
- * Exceptions: None.
- */
-export const MESSAGE_DISCIPLINE_BULLET =
-  '- The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.';
 
 /**
  * Tool rounds are limited, and the last chance to submit is one reply with tools withdrawn.

@@ -542,15 +542,6 @@ export function parseOrdersResponse(
   missileLaunches: MissileLaunchOrder[];
   strategy?: string;
   /**
-   * One-line in-character taunt or threat from the orders envelope `"message"` field.
-   *
-   * Contract: Trimmed string; missing or non-string values become `''`. Read from the orders object, not the chat completion wrapper.
-   * When to use: Persist and surface beside `strategy` after a successful parse.
-   * Expected outcome: Empty string when the model omitted the field.
-   * Exceptions: None.
-   */
-  message?: string;
-  /**
    * Whether this commander asked to leave an AI-only battle.
    *
    * Contract: True only when the envelope field is boolean true. Missing and every other value are false.
@@ -673,12 +664,6 @@ export function parseOrdersResponse(
           });
         }
         const strategy = typeof obj.strategy === 'string' ? obj.strategy.trim() : '';
-        if (obj.message != null && typeof obj.message !== 'string') {
-          logDebug('openRouter parseOrdersResponse: non-string message coerced to empty', {
-            messageType: typeof obj.message,
-          });
-        }
-        const message = typeof obj.message === 'string' ? obj.message.trim() : '';
         const exitBattle = obj.exitBattle === true;
         logDebug('openRouter parseOrdersResponse: exitBattle', { exitBattle });
         const {
@@ -749,7 +734,6 @@ export function parseOrdersResponse(
           airDropOrders: normalizedAirDrops.airDropOrders,
           missileLaunches: normalizedMissileLaunches.missileLaunches,
           strategy,
-          message,
           exitBattle,
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,

@@ -515,6 +515,8 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM pending_ferry_orders');
   run('DELETE FROM pending_air_drop_orders');
   run('DELETE FROM match_records');
+  run('DELETE FROM side_messages');
+  run('DELETE FROM side_stances');
   upsertGameConfigValue({ run }, MATCH_ID_CONFIG_KEY, randomUUID());
   run('DELETE FROM unit_transport_assignments');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);

@@ -21,7 +21,6 @@ The capture stores the envelope as a string on `choices[0].message.content`. It 
 
 ```json
 {
-  "message": "Your Eastern territory will crumble before our advance.",
   "strategy": "Engage enemy forces at RE, establish air superiority, and set up production queues across all controlled urban hexes.",
   "orders": [
     {

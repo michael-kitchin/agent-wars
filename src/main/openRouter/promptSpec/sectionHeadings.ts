@@ -476,6 +476,16 @@ export const SECTION_TITLE_REHIRE_CANDIDATES = 'Rehire Candidates' as const;
 export const SECTION_TITLE_RAISE_OPTIONS = 'Raise Options' as const;
 
 /**
+ * Title of the message history, without ATX hashes.
+ *
+ * Purpose: The orders situation shows this commander the messages it may see, and its stances.
+ * When to use: `topLevelHeading` in the orders messages block. A briefing shifts that heading down one level.
+ * Expected outcome: H1 from the builder.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_MESSAGES = 'Messages' as const;
+
+/**
  * Formats a title as a Markdown H1 without surrounding blank lines.
  *
  * Purpose: Keeps hash level in one place for emitters that interpolate into their own spacing

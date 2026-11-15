@@ -742,7 +742,7 @@ controlLossLightningHexes?: string[];
    */
 aiStrategy?: string;
     /**
-   * Player-facing taunt/threat from the consultation that produced `aiStrategy`.
+   * The message this commander sent to the human player in this wave, when there is one.
 
    * Contract: Optional; omit when empty after trim.
    * When to use: Renderer upper-right toast Message section after Ready.

@@ -29,12 +29,44 @@ export const AI_MODEL_REQUEST_RETRY_COUNT = 1;
 export const AI_CONSULTATION_WALL_CLOCK_MS = 600_000;
 
 /**
+ * How long one talk call may run before it is aborted.
+ *
+ * Purpose: Diplomacy is one completion, shorter than an orders tool loop.
+ * When to use: The abort timer around one `requestTalk` call.
+ * Expected outcome: That call is aborted after 60 seconds.
+ * Exceptions: None.
+ */
+export const AI_TALK_REQUEST_TIMEOUT_MS = 60_000;
+
+/**
+ * How long a wave waits for every commander's talk call.
+ *
+ * Purpose: One slow talk call must not hold the turn past this.
+ * When to use: The timer that closes a talk round.
+ * Expected outcome: The round closes 75 seconds after it opens, and anyone still out is silent.
+ * Exceptions: None.
+ */
+export const AI_TALK_ROUND_TIMEOUT_MS = 75_000;
+
+/**
+ * How many recent messages between two sides a prompt shows.
+ *
+ * Purpose: A thread stays short enough to read.
+ * When to use: `readSideMessageThreads`.
+ * Expected outcome: The last 8 sent lines, oldest first.
+ * Exceptions: None.
+ */
+export const SIDE_MESSAGE_THREAD_PROMPT_LINES = 8;
+
+/**
  * How long callers may wait for one full `requestOrders` before treating it as hung.
  *
  * Purpose: Shorter outer races cancelled consultations the loop was still allowed to finish.
  * When to use: The outer wait around one `requestOrders` call, including post-resolution.
- * Expected outcome: Covers the 10-minute loop plus the in-flight round and the parse-repair call. Each of those two calls can be sent twice when the failure is a network error or a retryable HTTP status (1320s). A timeout is not sent twice, and the budget still covers the longer case.
+ * Expected outcome: 1_395_000 ms. That is the 10-minute orders loop, plus the in-flight round and the parse-repair call, each of which can be sent twice when the failure is a network error or a retryable HTTP status, plus one talk round of `AI_TALK_ROUND_TIMEOUT_MS` (75s). A timeout is not sent twice.
  * Exceptions: The waiter aborts the in-flight model call when it fires. The transport's own 180s abort still applies to each attempt.
  */
 export const AI_CONSULTATION_WAIT_TIMEOUT_MS =
-  AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;
+  AI_CONSULTATION_WALL_CLOCK_MS +
+  2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS +
+  AI_TALK_ROUND_TIMEOUT_MS;

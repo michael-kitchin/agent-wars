@@ -3,7 +3,7 @@
  */
 
 /**
- * Player-facing taunt/threat and plan-summary fields shown in `#ai-strategy-toast`.
+ * The message this commander sent to the human player in this wave, when there is one, and the plan summary, shown in `#ai-strategy-toast`.
  *
  * Purpose: One object for IPC, prefetch cache, and toast rendering so call sites cannot swap two strings.
  * When to use: The opponent message dialog and IPC mapping helpers.
@@ -12,10 +12,10 @@
  */
 export interface AiStrategyToastFields {
   /**
-   * In-character taunt or threat addressed to the human player.
+   * The message this commander sent to the human player in this wave, when there is one.
    *
    * Contract: Optional; whitespace-only is treated as absent.
-   * When to use: From parsed JSON `"message"` / IPC `aiMessage`.
+   * When to use: From IPC `aiMessage`, the message this commander sent to the human player in this wave.
    * Expected outcome: Becomes the Message section body when non-empty.
    * Exceptions: None.
    */
@@ -31,7 +31,7 @@ export interface AiStrategyToastFields {
   strategy?: string | null;
 }
 
-/** Bold section title for the player-facing taunt/threat. */
+/** Bold section title for the message sent to the human player. */
 export const AI_STRATEGY_TOAST_MESSAGE_TITLE = 'Message';
 
 /** Bold section title for the one-line plan summary. */

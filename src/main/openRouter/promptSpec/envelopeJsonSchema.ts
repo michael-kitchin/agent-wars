@@ -414,7 +414,6 @@ function callbackRowSchema(gates: EnvelopeGates): Record<string, unknown> {
  */
 function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string, unknown> {
   switch (field) {
-    case 'message':
     case 'strategy':
       return { ...STRING_SCHEMA };
     case 'orders':
@@ -471,14 +470,14 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
  *
  * Purpose: Constrains the final reply to the envelope the system prompt teaches.
  * When to use: Once per consultation for models that support structured outputs.
- * Expected outcome: Fields in `envelopeFieldsForGates` order; `message`, `strategy`, and `orders` required.
+ * Expected outcome: Fields in `envelopeFieldsForGates` order; `strategy` and `orders` required.
  * Exceptions: Throws only if the envelope field list contains a field with no schema.
  */
 export function buildOrdersEnvelopeResponseFormat(gates: EnvelopeGates): Record<string, unknown> {
   const fields = envelopeFieldsForGates(gates);
   logDebug('promptSpec buildOrdersEnvelopeResponseFormat', { ...gates, fieldCount: fields.length });
   const properties = Object.fromEntries(fields.map((field) => [field, envelopeFieldSchema(field, gates)]));
-  const required = ['message', 'strategy', 'orders'];
+  const required = ['strategy', 'orders'];
   if (gates.includeExitBattle === true) required.push('exitBattle');
   return {
     type: 'json_schema',

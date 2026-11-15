@@ -143,7 +143,6 @@ export interface EnvelopeGates {
  * Exceptions: None.
  */
 export const ENVELOPE_FIELD_ORDER: readonly string[] = [
-  'message',
   'strategy',
   'orders',
   'exitBattle',
@@ -162,13 +161,13 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
 /**
  * Fields always present in the envelope regardless of roster or tool flags.
  *
- * Purpose: `message`, `strategy`, and `orders` are mandatory; `callbacks` is always offered so
+ * Purpose: `strategy` and `orders` are mandatory; `callbacks` is always offered so
  * omitting it can clear the subscription list.
  * When to use: Inside `envelopeFieldsForGates`.
- * Expected outcome: These four keys appear in every returned list, in canonical order.
+ * Expected outcome: These three keys appear in every returned list, in canonical order.
  * Exceptions: None.
  */
-const ALWAYS_PRESENT_FIELDS: ReadonlySet<string> = new Set(['message', 'strategy', 'orders', 'callbacks']);
+const ALWAYS_PRESENT_FIELDS: ReadonlySet<string> = new Set(['strategy', 'orders', 'callbacks']);
 
 /**
  * Tactical prohibition on standing-order actions, worded once for the envelope and the opening message.
@@ -419,8 +418,7 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
         ? STRATEGIC_REPAIR_ORDERS
         : STRATEGIC_REPAIR_ORDERS_WITHOUT_STANDING;
   for (const field of fields) {
-    if (field === 'message') example.message = '...';
-    else if (field === 'strategy') example.strategy = '...';
+    if (field === 'strategy') example.strategy = '...';
     else if (field === 'orders') example.orders = orders;
     else if (field === 'exitBattle') example.exitBattle = false;
     else if (field === 'airStrikes') {

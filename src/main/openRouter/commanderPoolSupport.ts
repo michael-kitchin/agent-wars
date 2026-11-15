@@ -13,6 +13,7 @@ import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationP
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import type { AiSeatId } from '../../shared/seatIds';
+import type { TalkRound } from './talk/talkRound';
 import { logError } from '../logger';
 
 /**
@@ -78,6 +79,15 @@ export type CommanderConsultRequest = {
    * Exceptions: None.
    */
   readonly battle: TacticalBattleSnapshot | null;
+  /**
+   * The wave's talk round, when this process is running the talk stage.
+   *
+   * Contract: Null when talk is off, no runner is installed, or this launch is outside a wave.
+   * When to use: Before the orders call, to speak or abstain.
+   * Expected outcome: The round opened for this wave.
+   * Exceptions: None.
+   */
+  readonly talkRound: TalkRound | null;
 };
 
 /**
@@ -171,9 +181,9 @@ export type CommanderConsultOutcome = {
    */
   readonly missileLaunchOrders: readonly MissileLaunchOrder[];
   /**
-   * Player-facing message prose.
+   * The message this commander sent to the human player in this wave, when there is one.
    *
-   * Contract: Trimmed text, or null.
+   * Contract: The text, or null.
    * When to use: The dispatch only.
    * Expected outcome: Not written into the pending-order table.
    * Exceptions: None.

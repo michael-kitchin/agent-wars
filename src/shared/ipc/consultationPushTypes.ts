@@ -51,7 +51,7 @@ export type TacticalPostBeatConsultFields = {
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   aiStrategy?: string;
   /**
-   * Player-facing taunt/threat from the same consultation as `aiStrategy`.
+   * The message this commander sent to the human player in this wave, when there is one.
    *
    * Contract: Optional; omit when empty after trim.
    * When to use: Renderer strategy toast Message section after a tactical beat consult.
@@ -94,7 +94,7 @@ export type TacticalPostBeatConsultMergeSource = {
   strategy?: string;
   aiStrategy?: string;
   /**
-   * Player-facing taunt/threat from the merge source (`message` from afterResolution, or already-mapped `aiMessage`).
+   * The message this commander sent to the human player in this wave, when there is one. Taken from `message` or `aiMessage`.
    *
    * Contract: Optional; mapper prefers `message` then `aiMessage`.
    * When to use: `toTacticalPostBeatConsultFields`.
@@ -140,7 +140,7 @@ export type PostResolutionConsultationPushPayload = {
   planningTurnNumber: number;
   aiStrategy?: string;
   /**
-   * Player-facing taunt/threat from the deferred post-resolution consultation.
+   * The message this commander sent to the human player in this wave, when there is one.
    *
    * Contract: Optional; omit when empty after trim.
    * When to use: Renderer post-resolution consultation listener.

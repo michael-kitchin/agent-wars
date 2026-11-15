@@ -45,15 +45,6 @@ export interface TurnNoteRow {
    */
   strategyText: string | null;
   /**
-   * AI message (taunt/threat) text from the consultation that planned this turn/beat, if any.
-   *
-   * Contract: Nullable; empty/null treated as `(none)` in prompt formatting.
-   * When to use: Recent-turn prompt `Message:` bullet.
-   * Expected outcome: Updated with `strategyText` via the same upsert; loss JSON unchanged.
-   * Exceptions: None.
-   */
-  messageText: string | null;
-  /**
    * JSON blob of human {@link PlayerLossSummary} buckets for this turn/beat.
    *
    * Contract: Serialized via `serializePlayerLossSummary`; nullable until losses are recorded.
@@ -76,40 +67,31 @@ export interface TurnNoteRow {
 type TurnNotesDbOps = GuardedDbOps;
 
 /**
- * Strategy and message texts written together at consultation time.
+ * Strategy text written at consultation time.
  *
- * Purpose: Keeps `strategyText` and `messageText` named so callers cannot swap two adjacent strings.
+ * Purpose: The strategy note is one named field so a caller cannot pass a bare string.
  * When to use: Argument to `upsertTurnStrategyNote`.
- * Expected outcome: Both keys always present; values may be null/undefined (stored as SQL NULL).
+ * Expected outcome: `strategyText` may be null. `message_text` is not written. The column stays so an older save still opens.
  * Exceptions: None.
  */
 export interface TurnConsultationNoteTexts {
   /**
-   * Strategy summary from the consultation, or null/undefined when omitted.
+   * Strategy summary from the consultation, or null when omitted.
    *
-   * Contract: Stored in `strategy_text`; empty and null are equivalent for prompt `(none)`.
-   * When to use: Always pass this key, even when the model omitted strategy.
-   * Expected outcome: Overwrites any prior strategy on the same turn row.
+   * Contract: Stored in `strategy_text`. Empty and null are equivalent for the prompt's `(none)`.
+   * When to use: Always pass this key, even when the model omitted a strategy.
+   * Expected outcome: Overwrites any prior strategy on the same turn row. A stored `message_text` from an older build is left as it is.
    * Exceptions: None.
    */
   strategyText: string | null | undefined;
-  /**
-   * Player-facing taunt/threat from the consultation, or null/undefined when omitted.
-   *
-   * Contract: Stored in `message_text`; empty and null are equivalent for prompt `(none)`.
-   * When to use: Always pass this key, even when the model omitted message.
-   * Expected outcome: Overwrites any prior message on the same turn row.
-   * Exceptions: None.
-   */
-  messageText: string | null | undefined;
 }
 
 /**
  * Inserts or updates strategy and message text for one turn/beat row, preserving existing loss JSON columns.
  *
- * Purpose: Captures AI strategy and player-facing message at successful consultation time.
+ * Purpose: Captures the strategy at a successful consultation. `message_text` is no longer written and is kept so older saves and older builds still open the file.
  * When to use: `requestOrdersFlow` after `markSuccessfulConsultation`.
- * Expected outcome: Row exists with updated `strategy_text` and `message_text`; loss columns unchanged when already set.
+ * Expected outcome: The row's `strategy_text` is updated. Loss columns and `message_text` are left as they were.
  * Exceptions: Logs at error and skips when DB unavailable; does not throw to callers.
  */
 export function upsertTurnStrategyNote(
@@ -126,17 +108,15 @@ export function upsertTurnStrategyNote(
     battleId,
     turnNumber,
     hasStrategy: !!texts.strategyText?.trim(),
-    hasMessage: !!texts.messageText?.trim(),
   });
   if (!ops.hasDb()) return;
   try {
     ops.run(
-      `INSERT INTO turn_notes_history (seat_id, scope, battle_id, turn_number, strategy_text, message_text)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO turn_notes_history (seat_id, scope, battle_id, turn_number, strategy_text)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(seat_id, scope, battle_id, turn_number) DO UPDATE SET
-         strategy_text = excluded.strategy_text,
-         message_text = excluded.message_text`,
-      [seatId, scope, battleId, turnNumber, texts.strategyText ?? null, texts.messageText ?? null]
+         strategy_text = excluded.strategy_text`,
+      [seatId, scope, battleId, turnNumber, texts.strategyText ?? null]
     );
   } catch (err) {
     logError('turnNotesHistory upsertTurnStrategyNote failed', { seatId, scope, battleId, turnNumber, err });
@@ -197,11 +177,10 @@ export function getRecentTurnNotes(
   const rows = ops.getAll<{
     turn_number: number;
     strategy_text: string | null;
-    message_text: string | null;
     own_loss_json: string | null;
     enemy_loss_json: string | null;
   }>(
-    `SELECT turn_number, strategy_text, message_text, own_loss_json, enemy_loss_json
+    `SELECT turn_number, strategy_text, own_loss_json, enemy_loss_json
      FROM turn_notes_history
      WHERE seat_id = ? AND scope = ? AND battle_id = ? AND turn_number < ?
      ORDER BY turn_number DESC
@@ -212,7 +191,6 @@ export function getRecentTurnNotes(
     .map((r) => ({
       turnNumber: r.turn_number,
       strategyText: r.strategy_text,
-      messageText: r.message_text,
       humanLossJson: r.enemy_loss_json,
       aiLossJson: r.own_loss_json,
     }))

@@ -276,7 +276,7 @@ async function run(): Promise<void> {
       );
 
       assert.ok(
-        systemPrompt.includes('Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.'),
+        systemPrompt.includes('Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.'),
         `strict-schema prompt guidance missing for mask=${mask}`
       );
       const hasAir = state.units.some((u) => u.player === 'opponent' && u.unitType === 'air');
@@ -363,7 +363,7 @@ async function run(): Promise<void> {
         `goal (6) coaching missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
-      assert.ok(systemPrompt.includes('- Your message is:'), `message coaching header missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes('Messages from other sides:'), `message rules missing for mask=${mask}`);
       assert.ok(
         systemPrompt.includes('(1) Attack where you outnumber the defenders, and avoid fights where you do not.'),
         `strategy (1) coaching missing for mask=${mask}`
@@ -604,7 +604,7 @@ async function run(): Promise<void> {
       tacticalSystemPrompt.includes('move toward your objective every beat'),
       'tactical strategy line uses the beat'
     );
-    assert.ok(tacticalSystemPrompt.includes('- Your message is:'), 'tactical prompt includes message coaching');
+    assert.ok(tacticalSystemPrompt.includes('Messages from other sides:'), 'tactical prompt includes message rules');
     assert.ok(
       !tacticalSystemPrompt.includes('(4) Protect your home region'),
       'tactical prompt omits strategic five-goal list'

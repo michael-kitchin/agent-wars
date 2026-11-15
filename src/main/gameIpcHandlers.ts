@@ -26,6 +26,7 @@ import { readHumanOrderTables } from './recorder/matchFrameCapture';
 import { recordStepBoundary } from './recorder/matchRecorder';
 import { currentStepKey } from './recorder/recorderStepKey';
 import { recordStrategicOrders, recordStrategicResolution } from './recorder/matchRecordingEvents';
+import { sendStagedHumanSideMessages } from './sideMessages/humanSideMessages';
 import { strategicStep } from '../shared/matchRecording';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
@@ -254,6 +255,7 @@ export async function handleGameReady(
     return { success: false, reason: readyResult.reason };
   }
   recordStrategicOrders({ step: resolvedStep, humanOrderTables, ordersByOwner });
+  sendStagedHumanSideMessages(resolvedStep);
   if (readyResult.awaitingMeleeDecision) {
     const aiRangedByTypeAwait = computeAiRangedByTypeCounts(state, aiRangedOrders);
     const aiMovesAwait = buildDistinctAiMovesFromPlanningOrders(state, aiOrders);

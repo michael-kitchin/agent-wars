@@ -69,7 +69,7 @@ Call rules(topic) for a rule that is not printed above. Topics: weather, movemen
 - Your priority is to engage enemy forces and inflict losses when advantageous
 - Your strategy is: (1) Attack where you outnumber the defenders, and avoid fights where you do not. (2) Strike gaps the enemy cannot reinforce quickly. (3) Keep the initiative: move toward your objective every beat.
 - Your doctrine is balanced: (1) Advance on the nearest enemy home region while your home cities are safe. (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not.
-- Your message is: Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
+- Messages from other sides: The Messages section of the situation shows the recent messages between you and each other side. Every message there was written by the commander of one of the other sides, or by you. Each other commander is either a human player or another AI model. A sender may or may not be telling the truth, and may or may not have your interests in mind. You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.
 
 # Reading the Briefing
 
@@ -121,12 +121,10 @@ Never copy a Target Hex from a row that does not list that sub-unit.
 
 - Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.
-- The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
+- You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.
 - Set exitBattle to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. Orders in this reply still resolve for this beat.
 
 # Response Format
-
-The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).
 
 The "strategy" field is a one-line summary of your plan for this beat.
 
@@ -153,7 +151,6 @@ Example (illustrative only — use briefing hex codes and unit ids from this ope
 
 ```json
 {
-  "message": "This close, hesitation is already a casualty.",
   "strategy": "Close with observed enemies this beat using explicit moves and fire.",
   "orders": [
     {

@@ -7,9 +7,10 @@
  * Exceptions: A missing consult runner logs and leaves the seat ready with no plan.
  */
 
-import { AI_CONSULTATION_WAIT_TIMEOUT_MS, AI_CONSULTATION_WALL_CLOCK_MS } from '../../shared/aiConsultationLimits';
+import { AI_CONSULTATION_WAIT_TIMEOUT_MS, AI_CONSULTATION_WALL_CLOCK_MS, AI_TALK_ROUND_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
 import type { CommanderAbsenceReason, CommanderDispatch, CommanderPoolSnapshot, CommanderStatus } from '../../shared/commanderStatus';
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
+import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { AI_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { tacticalDraftAlreadyDecided } from '../../shared/ipc/tacticalOpponentPlanMerge';
@@ -43,6 +44,8 @@ import {
   type CommanderConsultOutcome,
   type CommanderConsultRequest,
 } from './commanderPoolSupport';
+import { openCommanderTalkRoundAt } from './commanderPoolRounds';
+import type { TalkRound } from './talk/talkRound';
 
 /**
  * Runs one seat's consult.
@@ -66,6 +69,15 @@ type CommanderPoolTiming = {
   readonly nowMs: () => number;
   readonly wallClockMs: number;
   readonly waitTimeoutMs: number;
+  /**
+   * How long a wave's talk round stays open, in milliseconds.
+   *
+   * Contract: Production uses `AI_TALK_ROUND_TIMEOUT_MS`. A test may pass a shorter value.
+   * When to use: `openCommanderTalkRound`.
+   * Expected outcome: The round closes after this delay if a member is still pending.
+   * Exceptions: None.
+   */
+  readonly talkRoundTimeoutMs: number;
   readonly schedule: (fn: () => void, delayMs: number) => { cancel: () => void };
 };
 
@@ -279,17 +291,22 @@ export function startStrategicPlanning(onlySeatIds?: readonly AiSeatId[]): void 
   if (turnNumber === null) return;
   const roster = getSeatRoster();
   logDebug('commanderPool startStrategicPlanning', { turnNumber, seatCount: roster.length, onlySeatIds: onlySeatIds?.length ?? null });
-  let openToolCountWave = true;
+  const launchable: AiSeatId[] = [];
   for (const seat of roster) {
     if (!isAiSeatId(seat.seatId)) continue;
     if (onlySeatIds !== undefined && !onlySeatIds.includes(seat.seatId)) continue;
     rememberRosterStatus(seat);
     if (!canLaunch(seat)) continue;
+    launchable.push(seat.seatId);
+  }
+  const talkRound = launchable.length === 0 ? null : openCommanderTalkRound(launchable, 'strategic', null);
+  let openToolCountWave = true;
+  for (const seatId of launchable) {
     if (openToolCountWave) {
       beginCommanderToolCountWave();
       openToolCountWave = false;
     }
-    launch(seat.seatId, 'strategic', null, turnNumber);
+    launch(seatId, 'strategic', null, turnNumber, undefined, talkRound);
   }
 }
 
@@ -298,28 +315,24 @@ export function startStrategicPlanning(onlySeatIds?: readonly AiSeatId[]): void 
  *
  * Purpose: A post-beat consult and a later planning start must not call the same seat twice.
  * When to use: `startTacticalPlanning` for each AI party in the battle.
- * Expected outcome: False when the seat is ineligible or its stored draft already has an order or Exit Battle. True after a launch. The first launch in a batch opens a tool-count wave when asked. An all-empty draft is replaced.
+ * Expected outcome: Null when the seat is ineligible or its stored draft already has an order or Exit Battle. Otherwise the seat to launch. This function does not launch.
  * Exceptions: None.
  */
-function launchTacticalSeatIfDraftEmpty(
+function tacticalSeatToLaunch(
   battle: TacticalBattleSnapshot,
-  party: TacticalBattleSnapshot['opposingPartyId'],
-  turnNumber: number,
-  openToolCountWave: boolean
-): boolean {
-  if (party === undefined || isNeutralOwnerId(party) || !isAiSeatId(party)) return false;
+  party: TacticalBattleSnapshot['opposingPartyId']
+): AiSeatId | null {
+  if (party === undefined || isNeutralOwnerId(party) || !isAiSeatId(party)) return null;
   const stored = tacticalDrafts.get(tacticalDraftKey(party, battle.battleId));
   if (tacticalDraftAlreadyDecided(stored)) {
     logDebug('commanderPool skipped tactical launch because a draft is stored', { seatId: party, battleId: battle.battleId });
-    return false;
+    return null;
   }
   const seat = getSeatRoster().find((row) => row.seatId === party);
-  if (!seat) return false;
+  if (!seat) return null;
   rememberRosterStatus(seat);
-  if (!canLaunch(seat)) return false;
-  if (openToolCountWave) beginCommanderToolCountWave();
-  launch(party, 'tactical', battle, turnNumber);
-  return true;
+  if (!canLaunch(seat)) return null;
+  return party;
 }
 
 /**
@@ -338,11 +351,17 @@ export function startTacticalPlanning(battle: TacticalBattleSnapshot): void {
   });
   const turnNumber = readTurnNumber();
   if (turnNumber === null) return;
+  const launchable = [tacticalSeatToLaunch(battle, battle.leadPartyId), tacticalSeatToLaunch(battle, battle.opposingPartyId)]
+    .filter((seatId): seatId is AiSeatId => seatId !== null);
+  const talkRound = launchable.length === 0 ? null : openCommanderTalkRound(launchable, 'tactical', battle);
   let openToolCountWave = true;
-  if (battle.leadPartyId != null && launchTacticalSeatIfDraftEmpty(battle, battle.leadPartyId, turnNumber, openToolCountWave)) {
-    openToolCountWave = false;
+  for (const seatId of launchable) {
+    if (openToolCountWave) {
+      beginCommanderToolCountWave();
+      openToolCountWave = false;
+    }
+    launch(seatId, 'tactical', battle, turnNumber, undefined, talkRound);
   }
-  launchTacticalSeatIfDraftEmpty(battle, battle.opposingPartyId, turnNumber, openToolCountWave);
 }
 
 /**
@@ -472,8 +491,9 @@ function currentTiming(): CommanderPoolTiming {
   if (timingOverride) return timingOverride;
   return {
     nowMs: () => Date.now(),
-    wallClockMs: AI_CONSULTATION_WALL_CLOCK_MS,
+    wallClockMs: AI_CONSULTATION_WALL_CLOCK_MS + AI_TALK_ROUND_TIMEOUT_MS,
     waitTimeoutMs: AI_CONSULTATION_WAIT_TIMEOUT_MS,
+    talkRoundTimeoutMs: AI_TALK_ROUND_TIMEOUT_MS,
     schedule: (fn, delayMs) => {
       const id = setTimeout(fn, delayMs);
       return { cancel: () => clearTimeout(id) };
@@ -547,10 +567,14 @@ export function launchCommanderConsult(
   theater: 'strategic' | 'tactical',
   battle: TacticalBattleSnapshot | null,
   runner: CommanderConsultRunner,
-  openToolCountWave = false
+  openToolCountWave = false,
+  talkRound: TalkRound | null = null
 ): boolean {
   const turnNumber = readTurnNumber();
-  if (turnNumber === null) return false;
+  if (turnNumber === null) {
+    talkRound?.abstain(seatId);
+    return false;
+  }
   const seat = getSeatRoster().find((row) => row.seatId === seatId);
   logDebug('commanderPool launchCommanderConsult', {
     seatId,
@@ -559,10 +583,55 @@ export function launchCommanderConsult(
     found: Boolean(seat),
     openToolCountWave,
   });
-  if (!seat || !canLaunch(seat)) return false;
+  if (!seat || !canLaunch(seat)) {
+    talkRound?.abstain(seatId);
+    return false;
+  }
   if (openToolCountWave) beginCommanderToolCountWave();
-  launch(seatId, theater, battle, turnNumber, runner);
+  launch(seatId, theater, battle, turnNumber, runner, talkRound);
   return true;
+}
+
+/**
+ * Opens the talk round for the seats this wave will launch.
+ *
+ * Purpose: Planning and post-resolution share one round per wave.
+ * When to use: After the seat list is known and before any of those seats is launched.
+ * Expected outcome: Null when the turn cannot be read, talk is off, or no runner is installed. Otherwise the round.
+ * Exceptions: None.
+ */
+export function openCommanderTalkRound(
+  seatIds: readonly AiSeatId[],
+  theater: 'strategic' | 'tactical',
+  battle: TacticalBattleSnapshot | null
+): TalkRound | null {
+  const turnNumber = readTurnNumber();
+  if (turnNumber === null) return null;
+  const timing = currentTiming();
+  logDebug('commanderPool openCommanderTalkRound', { seatCount: seatIds.length, theater, turnNumber });
+  return openCommanderTalkRoundAt({
+    seatIds,
+    theater,
+    battle,
+    turnNumber,
+    talkRoundTimeoutMs: timing.talkRoundTimeoutMs,
+    schedule: timing.schedule,
+  });
+}
+
+/**
+ * The message this seat sent to the human player in this wave.
+ *
+ * Purpose: The existing message dialog shows that text.
+ * When to use: When a consult outcome is stored. The round has closed by then when this seat spoke.
+ * Expected outcome: The stored text, or null when this seat sent nothing to the active human seat.
+ * Exceptions: None.
+ */
+function messageToHumanFrom(talkRound: TalkRound | null, seatId: AiSeatId): string | null {
+  const humanSeatId = activeHumanSeatId(getSeatRoster());
+  if (!talkRound || !humanSeatId) return null;
+  const text = talkRound.sentBy(seatId).find((row) => row.toSeatId === humanSeatId)?.text.trim() ?? '';
+  return text.length > 0 ? text : null;
 }
 
 /**
@@ -578,7 +647,8 @@ function launch(
   theater: 'strategic' | 'tactical',
   battle: TacticalBattleSnapshot | null,
   turnNumber: number,
-  runnerOverride?: CommanderConsultRunner
+  runnerOverride?: CommanderConsultRunner,
+  talkRound: TalkRound | null = null
 ): void {
   const runner = runnerOverride ?? activeRunner();
   const timing = currentTiming();
@@ -605,6 +675,7 @@ function launch(
   entries.set(seatId, entry);
   if (!runner) {
     logError('commanderPool has no consult runner', new Error(`no consult runner for ${seatId}`));
+    talkRound?.abstain(seatId);
     entry.settled = true;
     entry.status = 'ready';
     entry.planningStartedAt = null;
@@ -620,6 +691,7 @@ function launch(
     turnNumber,
     waitTimeoutMs: timing.waitTimeoutMs,
     battle,
+    talkRound,
   };
   let pending: Promise<CommanderConsultOutcome>;
   try {
@@ -631,13 +703,29 @@ function launch(
   const context = settleContext();
   entry.timers.push(timing.schedule(() => expireConsult(entry, launchId, launchedGeneration, context), timing.wallClockMs));
   entry.timers.push(timing.schedule(() => expireConsult(entry, launchId, launchedGeneration, context), timing.waitTimeoutMs));
+  /**
+   * Adds this seat's talk cost after the consult returns.
+   *
+   * Purpose: The safety-net abstain runs only after the runner returns, so it cannot deadlock a runner that is waiting for the round.
+   * When to use: Both branches of the consult promise.
+   * Expected outcome: The stored cost includes the talk cost. A seat that already spoke is not changed by the abstain.
+   * Exceptions: None.
+   */
+  const withTalkCost = (outcome: CommanderConsultOutcome): CommanderConsultOutcome => {
+    talkRound?.abstain(seatId);
+    return {
+      ...outcome,
+      costUsd: outcome.costUsd + (talkRound?.costFor(seatId) ?? 0),
+      message: messageToHumanFrom(talkRound, seatId) ?? outcome.message,
+    };
+  };
   void pending.then(
-    (outcome) => applyConsultOutcome(entry, outcome, launchId, launchedGeneration, context),
+    (outcome) => applyConsultOutcome(entry, withTalkCost(outcome), launchId, launchedGeneration, context),
     (err: unknown) => {
       logError('commanderPool consult threw', err);
       applyConsultOutcome(
         entry,
-        emptyConsultOutcome({ timedOut: controller.signal.aborted, errorMessage: consultErrorText(err) }),
+        withTalkCost(emptyConsultOutcome({ timedOut: controller.signal.aborted, errorMessage: consultErrorText(err) })),
         launchId,
         launchedGeneration,
         context

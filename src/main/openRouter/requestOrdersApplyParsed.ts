@@ -240,7 +240,7 @@ export interface ApplyParsedRequestOrdersArgs {
    * Expected outcome: Last-consultation turn and strategy note are written.
    * Exceptions: None.
    */
-  readonly markSuccessfulConsultation: (strategyText?: string | null, messageText?: string | null) => void;
+  readonly markSuccessfulConsultation: (strategyText?: string | null) => void;
 }
 
 /**
@@ -651,7 +651,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     dropReasons.push(...campaignResult.dropReasons);
   }
 
-  markSuccessfulConsultation(parsed.strategy, parsed.message);
+  markSuccessfulConsultation(parsed.strategy);
   logDebug('openRouter requestOrders: orders applied', {
     turnNumber: state.turnNumber,
     tacticalBattleId: tacticalBattle?.battleId ?? null,
@@ -712,7 +712,6 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     embarkOrders: outEmbark.length > 0 ? outEmbark : undefined,
     missileLaunches: outMissile.length > 0 ? outMissile : undefined,
     strategy: parsed.strategy,
-    message: parsed.message,
     ...(parsed.exitBattle ? { exitBattle: true } : {}),
     dropped: dropReasons.length,
     dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

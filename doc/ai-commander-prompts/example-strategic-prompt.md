@@ -142,7 +142,7 @@ Call rules(topic) for a rule that is not printed above. Topics: weather, movemen
 - Your strategy is: (1) Attack where you outnumber the defenders, and avoid fights where you do not. (2) Strike gaps the enemy cannot reinforce quickly. (3) Keep the initiative: move toward your objective every turn.
 - Your tools are: (1) Naval units shell any hex within 2 of them, and carry ground units to a coast the enemy has left open. (2) Air units strike within 3 hexes of their airport, carry one infantry unit between airports, and drop it within 3 hexes. (3) Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside the campaign target, or behind the enemy to split its force.
 - Your doctrine is balanced: (1) Advance on the campaign target while your home cities are safe. (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not. (3) Strike the cities, airports, and seaports your ground units cannot reach. Production the enemy loses is force it cannot bring.
-- Your message is: Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
+- Messages from other sides: The Messages section of the situation shows the recent messages between you and each other side. Every message there was written by the commander of one of the other sides, or by you. Each other commander is either a human player or another AI model. A sender may or may not be telling the truth, and may or may not have your interests in mind. You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.
 
 ## Campaign
 
@@ -327,12 +327,10 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 ## Messages and Rounds
 
-- The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
+- You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.
 - Rounds are limited. After the last round, tools are withdrawn and you get one reply to submit orders; once destinations are chosen, submit.
 
 # Response Format
-
-The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).
 
 The "strategy" field is a one-line summary of your plan for this turn.
 
@@ -380,7 +378,6 @@ Example (illustrative only — use briefing hex codes and unit ids from this ope
 
 ```json
 {
-  "message": "You will not find safety in delay.",
   "strategy": "Close with observed enemies and keep production moving.",
   "orders": [
     {
@@ -641,4 +638,4 @@ Treasury: 0 credits. No one to rehire.
 
 Enemy units (currently observed): Eastern Africa: h1-i1 (infantry) at NA; h1-t1 (armor) at NA; h1-a1 (air) at RE
 
-Use the Commander's Briefing above. Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination. Give the units in the orderless table standing orders. Launch an operation from Operation Options if one is worth its cost. Queue production for every hex named in the Production attention flag. Then submit JSON with "message", "strategy", "orders", "airStrikes", "ferryOrders", "airDrops", "callbacks", "memoryUpdates", "productionOrders".
+Use the Commander's Briefing above. Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination. Give the units in the orderless table standing orders. Launch an operation from Operation Options if one is worth its cost. Queue production for every hex named in the Production attention flag. Then submit JSON with "strategy", "orders", "airStrikes", "ferryOrders", "airDrops", "callbacks", "memoryUpdates", "productionOrders".

@@ -95,7 +95,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `TOOL_BUDGET_WARNING` | [`variants.md`](variants.md) | Consultation policy |
 | `JSON_ENVELOPE` | [`assembly-contract.md`](assembly-contract.md) | Shared response envelope |
 | `SUBMIT_INSTRUCTION` | [`consultation-flow.md`](consultation-flow.md) | Opening user message |
-| `MESSAGE_DISCIPLINE` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
+| Messages from other sides | [`assembly-contract.md`](assembly-contract.md) | Shared coaching, `SIDE_MESSAGE_RULE_BLOCK` |
 | `REPAIR_SCHEMA` | [`consultation-flow.md`](consultation-flow.md) | Repair schema contract |
 
 No item is unmatched.
@@ -121,6 +121,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
+| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Omitted when this commander has no visible message and no stance. |
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
 | `### Production Priorities` | Under Production Status, after Paused Queues and before Controlled Hex Queues, when `buildProductionPriorityLines` returns a line. |
@@ -176,6 +177,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 | `## Operational Map` with the tactical legend | Kept — 2.6 |
 | `### Best Options This Turn` | Kept, including airport ferry dests — 2.6 |
 | `## Recent Turn Notes` | Kept, battle-scoped — 2.6 |
+| `# Messages` | Added, same block as strategic, before the status sections — 2.8 |
 | `## Active Callbacks` | Kept with sub-unit ids — 2.6 |
 | `# Battle Context` | Kept — 2.8 |
 | `# Air Operations Status`, tactical form | Kept, roster-gated — 2.9 |

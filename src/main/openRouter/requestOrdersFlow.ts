@@ -37,6 +37,7 @@ import {
   subHeading,
 } from './promptSpec/sectionHeadings';
 import { buildConsultPromptParts } from './consultPromptParts';
+import { buildOrdersMessagesBlock } from './talk/ordersMessagesBlock';
 import { buildConsultMessages } from './consultPromptMessages';
 import { resolveEffectiveOpenRouterCompletionMaxTokens } from './openRouterCreditLimits';
 import { BASELINE_ORDERS_REQUEST_PROFILE } from './ordersRequestProfile';
@@ -355,6 +356,7 @@ export async function requestOrdersFlow(
     return failRequest('Operational map is required for AI prompting and was not generated.', toolInvocationCounts);
   }
   const includeExitBattle = tacticalBattle?.leadPartyId != null;
+  const messagesBlock = buildOrdersMessagesBlock({ seatId, inBattle: Boolean(tacticalBattle) });
   const promptParts = buildConsultPromptParts({
     state: planState,
     coordMap,
@@ -368,6 +370,7 @@ export async function requestOrdersFlow(
     campaignPlan,
     campaignAttention,
     hasOperationOptions,
+    sideMessagesBlock: messagesBlock.text,
   });
   const messages: RequestOrdersChatMessage[] = buildConsultMessages(
     promptParts,
@@ -460,15 +463,15 @@ export async function requestOrdersFlow(
   };
   const matchIdAtStart = readMatchId(gameDbOps);
   const generationAtStart = getMatchGeneration();
-  const markSuccessfulConsultation = (strategyText?: string | null, messageText?: string | null): void =>
+  const markSuccessfulConsultation = (strategyText?: string | null): void =>
     recordSuccessfulConsultation({
       seatId,
       turnNumber: state.turnNumber,
       tacticalBattle,
       strategyText,
-      messageText,
       matchIdAtStart,
       generationAtStart,
+      seenMessageIds: messagesBlock.shownMessageIds,
     });
   const failSettled = (error: string): RequestOrdersError =>
     settleConsultFailure(telemetry, error, REQUEST_ORDERS_WALL_CLOCK_ERROR, (failure) => failRequest(failure, toolInvocationCounts));
@@ -504,7 +507,7 @@ export async function requestOrdersFlow(
     if (loopResult.kind === 'budgetExceeded') {
       telemetry.setOutcome('budgetExceeded');
       setAiToolLimitExceededLastTurn(seatId);
-      markSuccessfulConsultation(null, null);
+      markSuccessfulConsultation(null);
       if (onLog) {
         onLog(
           `AI planning stopped after ${loopResult.iteration} round(s) without a completed order JSON (max tool rounds or empty final reply). Returning no movement orders.`,

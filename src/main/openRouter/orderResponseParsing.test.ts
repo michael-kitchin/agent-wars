@@ -60,7 +60,6 @@ function testAcceptsNullStrategyAndOmittedOrders(): void {
   const parsed = parseFixture(`{"strategy":null,"orders":[],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`);
   assert.ok(parsed);
   assert.strictEqual(parsed!.strategy, '');
-  assert.strictEqual(parsed!.message, '');
   assert.strictEqual(parsed!.movementOrders.length, 0);
   assert.strictEqual(parsed!.everyActorRowDropped, false);
 }
@@ -116,29 +115,25 @@ function testRejectsTopLevelJsonArray(): void {
 }
 
 /**
- * Verifies the orders-envelope `"message"` field is trimmed like `"strategy"`, with missing and non-string values coerced to empty.
+ * Verifies a reply parses the same way with or without a stray `message` key.
  *
- * Purpose: Guards player-facing taunt parse so omitted or invalid `message` does not fail the envelope.
- * When to use: After edits to `parseOrdersResponse` message coercion.
- * Expected outcome: Trimmed string when present; `''` for null, non-string, or omitted keys.
+ * Purpose: An older reply that still contains `message` is accepted and the key is ignored.
+ * When to use: After edits to `parseOrdersResponse`.
+ * Expected outcome: Both replies parse, and their strategy and orders match.
  * Exceptions: Assertion failure if parsing returns null.
  */
-function testCoercesMessageLikeStrategy(): void {
-  const present = parseFixture(
-    `{"message":"  You will break.  ","strategy":"hold","orders":[],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`
+function testIgnoresStrayMessageKey(): void {
+  const without = parseFixture(
+    `{"strategy":"hold","orders":[],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`
   );
-  assert.ok(present);
-  assert.strictEqual(present!.message, 'You will break.');
-  const nulled = parseFixture(
-    `{"message":null,"strategy":"hold","orders":[],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`
+  const withKey = parseFixture(
+    `{"message":"You will break.","strategy":"hold","orders":[],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`
   );
-  assert.ok(nulled);
-  assert.strictEqual(nulled!.message, '');
-  const nonString = parseFixture(
-    `{"message":12,"strategy":"hold","orders":[],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`
-  );
-  assert.ok(nonString);
-  assert.strictEqual(nonString!.message, '');
+  assert.ok(without);
+  assert.ok(withKey);
+  assert.strictEqual(withKey!.strategy, without!.strategy);
+  assert.strictEqual(withKey!.movementOrders.length, without!.movementOrders.length);
+  assert.equal('message' in withKey!, false);
 }
 
 /**
@@ -446,7 +441,7 @@ function testCampaignTargetCodeOrDropReason(): void {
 
 const tests = [
   { name: 'parseOrdersResponse null strategy and empty orders', fn: testAcceptsNullStrategyAndOmittedOrders },
-  { name: 'parseOrdersResponse coerces message like strategy', fn: testCoercesMessageLikeStrategy },
+  { name: 'parseOrdersResponse ignores a stray message key', fn: testIgnoresStrayMessageKey },
   { name: 'parseOrdersResponse balanced extract before trailing prose', fn: testExtractsJsonBeforeTrailingBraceInProse },
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },

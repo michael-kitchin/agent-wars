@@ -106,7 +106,7 @@ export function recordTacticalBeat(args: {
  */
 export function recordConsultation(args: {
   readonly step: StepKey;
-  readonly stage: 'orders';
+  readonly stage: 'orders' | 'talk';
   readonly summary: ConsultTelemetrySummary;
 }): void {
   logDebug('matchRecordingEvents recordConsultation', {
@@ -147,6 +147,74 @@ export function recordCommanderStrategy(args: {
     visibility: { seats: [args.seatId] },
     displayText: args.strategy,
     payload: { seatId: args.seatId, strategy: args.strategy },
+  });
+}
+
+/**
+ * Records one sent side message.
+ *
+ * Purpose: A sent message is not copied into a frame, so the recording keeps it as an event.
+ * When to use: After the message row is inserted, in the same transaction.
+ * Expected outcome: One `message_sent` event visible to the sender and the recipient. `display_text` is the text.
+ * Exceptions: None. `recordMatchEvent` swallows its own failure.
+ */
+export function recordSideMessageSent(args: {
+  readonly step: StepKey;
+  readonly messageId: number;
+  readonly fromSeatId: string;
+  readonly toSeatId: string;
+  readonly text: string;
+}): void {
+  logDebug('matchRecordingEvents recordSideMessageSent', {
+    step: stepKeyText(args.step),
+    messageId: args.messageId,
+    fromSeatId: args.fromSeatId,
+    toSeatId: args.toSeatId,
+    textLength: args.text.length,
+  });
+  recordMatchEvent({
+    type: 'message_sent',
+    step: args.step,
+    visibility: { seats: [args.fromSeatId, args.toSeatId] },
+    displayText: args.text,
+    payload: { messageId: args.messageId, fromSeatId: args.fromSeatId, toSeatId: args.toSeatId, text: args.text },
+  });
+}
+
+/**
+ * Records a change to one commander's private stance.
+ *
+ * Purpose: The stance table keeps only the current row. The recording keeps the change.
+ * When to use: When `upsertSideStance` reports that the stance or the reason changed.
+ * Expected outcome: One `stance_declared` event visible only to that commander.
+ * Exceptions: None. `recordMatchEvent` swallows its own failure.
+ */
+export function recordSideStanceDeclared(args: {
+  readonly step: StepKey;
+  readonly seatId: string;
+  readonly towardSeatId: string;
+  readonly stance: string;
+  readonly reason: string;
+  readonly previousStance: string | null;
+}): void {
+  logDebug('matchRecordingEvents recordSideStanceDeclared', {
+    step: stepKeyText(args.step),
+    seatId: args.seatId,
+    towardSeatId: args.towardSeatId,
+    stance: args.stance,
+    changed: true,
+  });
+  recordMatchEvent({
+    type: 'stance_declared',
+    step: args.step,
+    visibility: { seats: [args.seatId] },
+    payload: {
+      seatId: args.seatId,
+      towardSeatId: args.towardSeatId,
+      stance: args.stance,
+      reason: args.reason,
+      previousStance: args.previousStance,
+    },
   });
 }
 

@@ -182,7 +182,7 @@ function envelopeGatesFromOpening(gates: OpeningMessageGates): EnvelopeGates {
  *
  * Purpose: Item 3 of the opening-message contract is the field list, not a restated schema.
  * When to use: After `envelopeFieldsForGates`.
- * Expected outcome: `"message", "strategy", "orders", ...` with optional tails only when gated on.
+ * Expected outcome: `"strategy", "orders", ...` with optional tails only when gated on.
  * Exceptions: None.
  */
 function formatQuotedEnvelopeFields(gates: EnvelopeGates): string {

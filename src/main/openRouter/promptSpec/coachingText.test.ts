@@ -116,7 +116,6 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /replaces the entire subscription list/i);
   assert.match(text, /Omit the array or send \[\]/i);
   assert.match(text, /consulted when a subscribed event fires/i);
-  assert.match(text, /taunt or threat/i);
   assert.match(text, /tools are withdrawn and you get one reply/i);
 });
 
@@ -233,7 +232,6 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /engine forces a consultation/i);
   assert.match(text, /issued nothing/i);
   assert.doesNotMatch(text, /consulted only when/i);
-  assert.match(text, /taunt or threat/i);
 });
 
 test('tactical conditional items disappear when their gate is off', () => {

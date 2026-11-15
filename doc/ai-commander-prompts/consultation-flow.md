@@ -1,6 +1,8 @@
 # Consultation flow
 
-Every message the model sees after the system message: the fixed lead-in, the situation message, tool results, the corrective message after an unusable reply, the final orders request after the tool-round cap, and the repair request after unparseable output. The situation message holds the clock, the briefing, the live counts, and the opening instruction.
+A consultation that is about to ask for orders can start with a talk call. That call is one completion, with no tools and no repair. Its system text is `buildTalkSystemText` and its user text is `buildTalkSituationText`. The reply is one JSON object parsed by `parseTalkReply`. What that call says is in [`talk-prompt.md`](talk-prompt.md). The orders conversation below starts after every commander in the wave has finished that call, been skipped, failed, or timed out. A commander that is consulted only because `countUnreadPromptMessages` is above zero does not make the talk call.
+
+Every message the model sees after the system message of the orders stage: the fixed lead-in, the situation message, tool results, the corrective message after an unusable reply, the final orders request after the tool-round cap, and the repair request after unparseable output. The situation message holds the clock, the briefing, the Messages section when this commander has a visible message or a stance, the live counts, and the opening instruction.
 
 **One rule governs this whole file.** The system prompt owns every game rule and every heuristic. Messages contracted here are submit-only: they say what to do now and what shape to answer in. They must not add a rule, weaken one, or restate one in different words. A message that needs a rule points at the system section that holds it.
 
@@ -52,8 +54,8 @@ One contract per branch of the opening-message builder. The gate column names th
 
 | Gate | Contract |
 | --- | --- |
-| Planning tools on, briefing present, tactical | Point at the briefing for status, flags, and this beat's options. One clause: copy one move or approach row per sub-unit, and one ranged row only when the table lists one for that sub-unit; route only for an unlisted destination. Then name the envelope: message, strategy, orders with the beat's legal actions, and the callbacks tail. State that standing-order assignment and cancellation are not accepted this beat — this is the one prohibition the opening message repeats, because it is the most common carry-over error and the envelope contract already states it identically. |
-| Planning tools on, briefing present, strategic | Point at the briefing for status, flags, options, and hex intelligence. One clause: copy one option row per unit per action into the matching envelope field; route only for an unlisted destination. When standing-order tools are on, one clause: give the units in the orderless table standing orders. When Campaign Orders lists a unit, one clause: give each unit the order its row names. When Operation Options lists a row, one clause: launch an operation from Operation Options if one is worth its cost. When production is on and the Production attention flag is present, one clause points at that flag: queue production for every hex it names. That clause points at the briefing, which this submit-only message allows. Then name the envelope: message, strategy, orders with the strategic legal actions, plus the callbacks tail and, when their flags are on, the memory and production tails. The `campaignTarget` and `operations` fields are named in the system contract, not in this field list. **No production doctrine paragraph.** The cap and queue rules live in the production section of the briefing. |
+| Planning tools on, briefing present, tactical | Point at the briefing for status, flags, and this beat's options. One clause: copy one move or approach row per sub-unit, and one ranged row only when the table lists one for that sub-unit; route only for an unlisted destination. Then name the envelope: strategy, orders with the beat's legal actions, and the callbacks tail. State that standing-order assignment and cancellation are not accepted this beat — this is the one prohibition the opening message repeats, because it is the most common carry-over error and the envelope contract already states it identically. |
+| Planning tools on, briefing present, strategic | Point at the briefing for status, flags, options, and hex intelligence. One clause: copy one option row per unit per action into the matching envelope field; route only for an unlisted destination. When standing-order tools are on, one clause: give the units in the orderless table standing orders. When Campaign Orders lists a unit, one clause: give each unit the order its row names. When Operation Options lists a row, one clause: launch an operation from Operation Options if one is worth its cost. When production is on and the Production attention flag is present, one clause points at that flag: queue production for every hex it names. That clause points at the briefing, which this submit-only message allows. Then name the envelope: strategy, orders with the strategic legal actions, plus the callbacks tail and, when their flags are on, the memory and production tails. The `campaignTarget` and `operations` fields are named in the system contract, not in this field list. **No production doctrine paragraph.** The cap and queue rules live in the production section of the briefing. |
 | Planning tools on, briefing absent | Point at the tools as the way to derive destinations, since there is no options table. Then name the envelope with the same tails as the matching briefing-present branch. |
 | Planning tools off, standing-order tools on | State that movement planning is unavailable and that missions are issued as standing orders in the envelope. Then name the envelope, with `orders` expected to carry standing-order actions and an empty movement set. |
 | Planning tools off, standing-order tools off, fallback movement on | Point at the fallback adjacent-cell listing above as the only source of move destinations. Then name the envelope. |
@@ -95,11 +97,11 @@ When the model supports structured outputs and the developer flag `AGENT_WARS_DI
 
 ### 5.1 Repair schema contract
 
-The inlined schema is a single JSON object with fields in envelope order: `message`, `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then the air and ferry tails, then `missileLaunches` when that gate is on, then `callbacks`, then the memory tail, then the production tail.
+The inlined schema is a single JSON object with fields in envelope order: `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then the air and ferry tails, then `missileLaunches` when that gate is on, then `callbacks`, then the memory tail, then the production tail.
 
 | Field | Strategic | Tactical |
 | --- | --- | --- |
-| `message`, `strategy`, `orders` | always, in that order | always, in that order |
+| `strategy`, `orders` | always, in that order | always, in that order |
 | `exitBattle` | **never** | when the battle is between two AI commanders, immediately after `orders` |
 | `airStrikes`, `ferryOrders` | when the opponent has air units | when the opponent has air sub-units |
 | `missileLaunches` | when the opponent has a missile | **never** |
@@ -109,7 +111,7 @@ The inlined schema is a single JSON object with fields in envelope order: `messa
 
 Consistency requirements, each of which a contract test can assert:
 
-1. `message` precedes `strategy`, which precedes `orders`.
+1. `strategy` precedes `orders`. A `message` key is not in the schema.
 2. No field appears in the repair schema that the active mode's envelope contract forbids. In particular a tactical repair schema contains neither the production tail nor any standing-order action.
 3. No field the active mode's envelope contract requires is missing from the repair schema.
 4. Illustrative action entries in the schema use only actions the active mode permits: strategic may show standing-order assignment, cancellation, movement, and a ranged action; tactical may show movement and a ranged action only.

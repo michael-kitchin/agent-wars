@@ -92,7 +92,7 @@ These come from `.cursor/rules/` and `AGENTS.md`. Lint enforces some of them.
 - **`readonly`.** Mark parameter arrays and object fields `readonly` where they are not reassigned.
 - **Tests.** Test happy paths and essential failures only. A new test file copies the imports and structure of the nearest sibling test file.
 - **Docs.** `AGENTS.md` requires `doc/` to change in the same change as the code. A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase. Each phase names the documents it touches. Your final message names every document you updated.
-- **Large files.** `commanderPool.ts` (685 lines), `afterResolution.ts` (734), `requestOrdersFlow.ts` (620), `openRouter.ts` (618), and `main.ts` (644) are already past the 600-line target. This plan adds only call lines to them and puts all logic in new files. None may pass 1000 lines.
+- **Large files.** `commanderPool.ts` (685 lines), `afterResolution.ts` (734), `requestOrdersFlow.ts` (639), `openRouter.ts` (618), and `main.ts` (672) are already past the 600-line target. This plan adds only call lines to them and puts all logic in new files. None may pass 1000 lines.
 - **Cached prompt text.** The orders system prompt is cached between turns. Nothing this plan adds to a system prompt may contain a turn number, a count, a message, or any other fact that changes during a match.
 
 ---
@@ -240,7 +240,7 @@ Messages and stances can be stored and read. Nothing in the game calls this yet.
 
 ### Steps
 
-1. `sideMessageTables.ts`: export `SIDE_MESSAGE_TABLES_DDL`, the two `CREATE TABLE IF NOT EXISTS` statements from the Design section as one string, and `ensureSideMessageTables(exec: (sql: string) => void): void`, which runs each statement. Model it on `matchRecordsTable.ts`.
+1. `sideMessageTables.ts`: export `SIDE_MESSAGE_TABLES_DDL`, the two `CREATE TABLE IF NOT EXISTS` statements from the Design section as one string, and `ensureSideMessageTables(exec: (sql: string, params?: unknown[]) => void): void`, which runs each statement. Model it on `matchRecordsTable.ts`. Each statement ends with a semicolon. `getFullDdl` is applied with `database.exec`, so the whole string can sit in that script. `gameDbOps.run` uses `prepare` and rejects more than one statement, so `ensureSideMessageTables` calls `exec` once per statement. One call with the whole string fails.
 2. `schema.ts`: add `${SIDE_MESSAGE_TABLES_DDL}` to the end of `getFullDdl`.
 3. `gameDb.ts`: call `ensureSideMessageTables((sql) => gameDbOps.run(sql));` directly after each of the three `ensureMatchRecordsTable(...)` calls, and name it in the comment on `EXPECTED_USER_VERSION`. **Do not change the number, and do not add the tables to `GAME_DB_REQUIRED_TABLES`.**
 4. `resetGame.ts`: inside the transaction in `resetGameForNewMatch`, add `run('DELETE FROM side_messages');` and `run('DELETE FROM side_stances');`.
@@ -454,7 +454,7 @@ The texts sent to the model for a talk call, built from plain inputs.
    - `## Sides`, then a table `| Side | Code | Status | Your stance |`. The own side is first, labelled `{label} (you)`, with `-` for stance. Others follow in the order given. Status is `Active` or `Out since turn N`. Stance is `{stance}: {reason}`, or `not set`.
    - `## Your last plan`, then the strategy, or `(none yet)`.
    - The `recentTurnsSection` text as given, when it is not empty.
-   - `## Messages`, then the result of an exported `formatSideMessageThreads(threads, sides)`, which the orders prompt reuses: for each thread, in the order given, `### With {label} ({code})`, then one bullet per line, oldest first: `- Turn {n}, they said: "{text}"` or `- Turn {n}, you said: "{text}"`, with ` (new)` appended when `isNew`. A thread with no lines prints `- No messages yet.` A thread whose side has left the match adds ` (out of the match)` to its heading. There is a thread for every side still in the match, and for every side that has left it and has at least one line.
+   - `## Messages`, then the result of an exported `formatSideMessageThreads(threads, sides, headingLevel)`, which the orders prompt reuses. `headingLevel` is the number of `#` characters on each thread heading. This prompt passes `3`. For each thread, in the order given, a heading `With {label} ({code})`, then one bullet per line, oldest first: `- Turn {n}, they said: "{text}"` or `- Turn {n}, you said: "{text}"`, with ` (new)` appended when `isNew`. A thread with no lines prints `- No messages yet.` A thread whose side has left the match adds ` (out of the match)` to its heading. There is a thread for every side still in the match, and for every side that has left it and has at least one line.
 
    Inside quoted message text, replace `"` with `'` so a message cannot close its own quotes.
 
@@ -480,11 +480,11 @@ Run the Verification Bar.
 One commander's talk stage: read the match, build the prompt, call the model once, parse the reply, record the telemetry.
 
 **Add:** `src/main/openRouter/talk/talkPromptInput.ts`, `src/main/openRouter/talk/requestTalk.ts`, `src/main/openRouter/talk/requestTalk.test.ts`
-**Edit:** `src/main/openRouter/openRouter.ts`, `src/shared/aiConsultationLimits.ts`, `src/main/recorder/matchRecordingEvents.ts`, `doc/hybrid-ai.md`, `doc/ai-commander-prompts/README.md`, `doc/ai-commander-prompts/consultation-flow.md`, and a new `doc/ai-commander-prompts/talk-prompt.md`
+**Edit:** `src/main/openRouter/openRouter.ts`, `src/shared/aiConsultationLimits.ts`, `src/shared/aiConsultationLimits.test.ts`, `src/main/recorder/matchRecordingEvents.ts`, `doc/hybrid-ai.md`, `doc/ai-commander-prompts/README.md`, `doc/ai-commander-prompts/consultation-flow.md`, and a new `doc/ai-commander-prompts/talk-prompt.md`
 
 ### Steps
 
-1. `aiConsultationLimits.ts`: add `AI_TALK_REQUEST_TIMEOUT_MS = 60_000` and `AI_TALK_ROUND_TIMEOUT_MS = 75_000`. Change `AI_CONSULTATION_WAIT_TIMEOUT_MS` to its current expression plus `AI_TALK_ROUND_TIMEOUT_MS`, and update its comment's arithmetic. Add `SIDE_MESSAGE_THREAD_PROMPT_LINES = 8`, the number of most recent lines per side that a prompt shows.
+1. `aiConsultationLimits.ts`: add `AI_TALK_REQUEST_TIMEOUT_MS = 60_000` and `AI_TALK_ROUND_TIMEOUT_MS = 75_000`. Change `AI_CONSULTATION_WAIT_TIMEOUT_MS` to its current expression plus `AI_TALK_ROUND_TIMEOUT_MS`, and update its comment's arithmetic. Add `SIDE_MESSAGE_THREAD_PROMPT_LINES = 8`, the number of most recent lines per side that a prompt shows. `aiConsultationLimits.test.ts` asserts the wait equals the wall clock plus two retried model calls. Change that assertion to the same formula plus `AI_TALK_ROUND_TIMEOUT_MS`. Leave the `600_000` wall-clock assertion. The orders tool loop still uses `AI_CONSULTATION_WALL_CLOCK_MS` alone. Phase 6 is what lengthens the pool's own wall-clock timer.
 2. `matchRecordingEvents.ts`: widen `recordConsultation`'s `stage` to `'orders' | 'talk'`.
 3. `talkPromptInput.ts`: `export function readTalkPromptInput(args: { seatId: AiSeatId; turnNumber: number; battle: TacticalBattleSnapshot | null }): { input: TalkPromptInput; activeSeatIds: SeatId[]; sideCodes: string[] }`.
    - Seats come from `getSeatRoster()`. Active means `outTurn == null`. Labels come from the same function the orders prompt's Sides table uses for its Side column. Read `sidesSeatsForPrompt` in `consultPromptPartsHelpers.ts` and `buildSidesPromptBlock` in `promptSpec/sidesBlock.ts`, and use the same field (the home region).
@@ -524,7 +524,7 @@ One commander's talk stage: read the match, build the prompt, call the model onc
    - Messages are `[{ role: 'system', content: buildTalkSystemText(...) }, { role: 'user', content: buildTalkSituationText(input) }]`.
    - A transport failure returns `silent` / `failed`. An aborted signal returns `silent` / `cancelled`. A reply that `parseTalkReply` cannot parse returns `silent` / `unparsed`. **Do not retry and do not send a repair request.**
    - A parsed reply returns `spoke`, even when both lists are empty.
-   - In a `finally`: set the telemetry outcome, `logConsultTelemetrySummary(summary)`, and `recordConsultation({ step: stepForConsult(turnNumber, battle), stage: 'talk', summary })`.
+   - Before the first `await`, read `matchIdAtStart` with `readMatchId(gameDbOps)` and `generationAtStart` with `getMatchGeneration()`, the same pair `requestOrdersFlow` captures. In a `finally`: set the telemetry outcome, `logConsultTelemetrySummary(summary)`, and call `recordConsultation({ step: stepForConsult(turnNumber, battle), stage: 'talk', summary })` only when `consultStillOnOpenMatch(matchIdAtStart, generationAtStart)` is true. Import that function from `requestOrdersConsultationMarks.ts`. Do not import `openRouter.ts`. A talk call that finishes after New or Load must not write its `consultation` row onto the replacement match, including when the loaded file still has this match's id.
    - When `onLog` is given, log `Talking to the other sides…` at the start and one line at the end such as `Sent 2 messages.` or `Sent no messages.` Never put message text in a log line.
    - `costUsd` is always the usage cost, including for a silent result.
    - This function must not write to `side_messages` or `side_stances`. The round does that when it closes.
@@ -546,6 +546,7 @@ One commander's talk stage: read the match, build the prompt, call the model onc
 - An already-aborted signal returns `silent` / `cancelled`.
 - A match with every other seat out returns `silent` / `no_recipients`, and the fake is never called.
 - After each call that reached the model, `match_records` has one `consultation` row whose payload has `stage: 'talk'`.
+- The last case: the fake post calls `advanceMatchGeneration('new_game')` before it returns. The `finally` writes no `consultation` row. Later tests in this file capture the generation after that bump, so they still match their own match.
 - After every case, `side_messages` is still empty.
 
 ### Verification
@@ -660,7 +661,7 @@ Run the Verification Bar.
 Every wave the pool launches opens a round. Talk cost is added to the seat's cost. Nothing talks yet, because no consult path calls `speak` until the next phase. In this phase the safety net alone settles every member, so behavior is unchanged except for one extra tick.
 
 **Add:** `src/main/openRouter/commanderPoolTalk.ts`, `src/main/openRouter/commanderPoolTalk.test.ts`, `src/main/openRouter/commanderPoolRounds.ts`
-**Edit:** `src/main/openRouter/commanderPool.ts`, `src/main/openRouter/commanderPoolSupport.ts`, `src/main/openRouter/commanderPoolConsult.ts`, `src/main/ipc/readyIpcResolutionMapping.ts`, `src/main/openRouter/commanderPool.test.ts`
+**Edit:** `src/main/openRouter/commanderPool.ts`, `src/main/openRouter/commanderPoolSupport.ts`, `src/main/openRouter/commanderPoolConsult.ts`, `src/main/ipc/readyIpcResolutionMapping.ts`, `src/main/openRouter/commanderPool.test.ts`, `doc/hybrid-ai.md`
 
 `commanderPool.ts` is 685 lines. The talk runner slot and the round-opening function therefore go in a new sibling file, `commanderPoolRounds.ts`, which the pool imports. `commanderPoolRounds.ts` does not import `commanderPool.ts`. The pool passes it what it needs (the turn number and the timing) as arguments.
 
@@ -677,15 +678,17 @@ Every wave the pool launches opens a round. Talk cost is added to the seat's cos
    - In `commanderPoolRounds.ts`: `export function openCommanderTalkRoundAt(args: { seatIds; theater; battle; turnNumber; talkRoundTimeoutMs; schedule }): TalkRound | null`. In `commanderPool.ts`: `export function openCommanderTalkRound(seatIds, theater, battle): TalkRound | null`, which reads the turn and the current timing and calls it. The result is null when `isTalkStageEnabled()` is false, when there is no talk runner, when `seatIds` is empty, or when the turn cannot be read. Otherwise it captures `getMatchGeneration()` and calls `openTalkRound` with `step: stepForConsult(turnNumber, battle)`, `timeoutMs` from a new `talkRoundTimeoutMs` field of `CommanderPoolTiming` (default `AI_TALK_ROUND_TIMEOUT_MS`), the timing's `schedule`, and `persist: (step, results) => persistTalkRound(step, results, generationAtOpen)`.
    - In `currentTiming()`, the default `wallClockMs` becomes `AI_CONSULTATION_WALL_CLOCK_MS + AI_TALK_ROUND_TIMEOUT_MS`. Tests that pass their own timing are not affected. Add `talkRoundTimeoutMs` to the test timings in `commanderPool.test.ts`.
    - `launch(...)` takes the round. `launch` already has five parameters. Add the round as the sixth, or switch to a parameter object if lint objects. It puts the round in the request as `talkRound`.
-   - In `launch`, in **both** branches of `pending.then(...)`, before `applyConsultOutcome`: call `talkRound?.abstain(seatId)` and add the talk cost to the outcome: `{ ...outcome, costUsd: outcome.costUsd + (talkRound?.costFor(seatId) ?? 0) }`. The `abstain` is a safety net. It does nothing for a seat that already spoke, and it keeps a consult path that forgot to settle its seat from holding the round open until the timeout.
+   - In `launch`, in **both** branches of `pending.then(...)`, before `applyConsultOutcome`: call `talkRound?.abstain(seatId)` and add the talk cost to the outcome: `{ ...outcome, costUsd: outcome.costUsd + (talkRound?.costFor(seatId) ?? 0) }`. The `abstain` is a safety net. It does nothing for a seat that already spoke, and it keeps a consult path that forgot to settle its seat from holding the round open until the timeout. Do not wait for the round inside `pending.then`. A runner that is waiting for `whenClosed` cannot return until every member has settled, and this `abstain` runs only after that runner returns. A member that talks settles itself inside `speak`, before it waits. Waiting here deadlocks the wave.
    - In the `if (!runner)` early return inside `launch`, also call `talkRound?.abstain(seatId)`.
    - `startStrategicPlanning`: split the loop in two. First collect the seats that pass the existing checks (`isAiSeatId`, `onlySeatIds`, `rememberRosterStatus`, `canLaunch`), in roster order. Then open one round for those seats. Then run the existing launch loop over them, passing the round. Keep `beginCommanderToolCountWave()` before the first launch, as today. An empty list opens no round.
-   - `startTacticalPlanning`: the same split. Turn the checks in `launchTacticalSeatIfDraftEmpty` into a function that returns the seat to launch or null (keeping its log lines), collect the lead and opposing candidates, open one round, then launch each.
+   - `startTacticalPlanning`: the same split. `launchTacticalSeatIfDraftEmpty` launches today. The collection pass must not call `launch`. Turn its checks into a function that returns the seat to launch or null, keep its log lines, collect the lead and opposing candidates, open one round, then launch each. A collection pass that still launches gives the first seat no round.
    - `launchCommanderConsult`: add an optional last parameter `talkRound: TalkRound | null = null`, passed to `launch`. When the function returns false without launching, it calls `talkRound?.abstain(seatId)` first.
 
 4. `commanderPoolConsult.ts`, `installCommanderConsultRunner`: also call `setProductionCommanderTalkRunner(runCommanderTalk)`.
 
 5. `readyIpcResolutionMapping.ts`, `consultSeatsThroughPool`: open one round before the loop with `openCommanderTalkRound(seatIds, theater, battle)`, and pass it to each `launchCommanderConsult` call.
+
+6. `doc/hybrid-ai.md` says a consult that runs past `AI_CONSULTATION_WALL_CLOCK_MS` (600000 ms) is cut off, and that the pool uses that wall clock as its deadline. The orders tool loop still uses that constant. The pool's own wall-clock timer is that constant plus `AI_TALK_ROUND_TIMEOUT_MS`, so a talk round does not consume the orders stage's 10 minutes. Update that sentence. The wait number was already updated in Phase 4.
 
 ### Tests
 
@@ -710,7 +713,7 @@ Each consult path talks before it asks for orders, and a waiting message causes 
 **Add:** `src/main/openRouter/afterResolutionTalk.test.ts`
 **Edit:** `src/main/openRouter/commanderPoolConsult.ts`, `src/main/openRouter/afterResolution.ts`, `src/main/ipc/readyIpcResolutionMapping.ts`
 
-There are exactly three places where a consult asks for orders. Each gets the same two lines.
+There are exactly three places where a consult asks for orders. `runCommanderConsult` talks, then asks. `afterResolution` and `afterTacticalBeatResolution` talk only when the existing policy consults, abstain otherwise, and then ask for orders when the policy says so or an unread message is waiting. The post-resolution runners do not go through `runCommanderConsult`, so the talk has to be in those two functions. Putting it in both places would talk twice.
 
 ### Steps
 
@@ -732,8 +735,8 @@ There are exactly three places where a consult asks for orders. Each gets the sa
 
      and log, with `logDebug`, when the consult happens only because of an unread message (`{ turnNumber, seatId, unreadMessageCount }`). The rest of the function uses `shouldConsult` as before. The earlier log block uses `policyShouldConsult`.
    - `ops` is `gameDbOps` from `../gameDb/dbConnection`.
-   - In `afterTacticalBeatResolution`, find the `deps.requestOrders(` call. Immediately before it, add `await speakAndAwaitTalkRound(deps.talkRound, requestedSeatId, deps.signal ?? new AbortController().signal);`. Use whatever name the function has for its seat at that point. Every return above that call is an early skip, and the pool's safety net settles those.
-   - `afterResolution.ts` is 734 lines. These edits add about fifteen. Do not move anything.
+   - In `afterTacticalBeatResolution`, make the same decision at the policy result, and delete the early `if (!shouldConsult) return`. The hard skips above that result stay early returns: an ended battle, no model or key, annihilation, a neutral party, and a seat that is not in the battle. The pool's safety net settles those. An unread message does not override a hard skip. At the policy result, talk when the policy consults and abstain otherwise, then set `shouldConsult` from the policy or an unread message, and log the unread-only case the same way. The `deps.requestOrders(` call stays where it is and runs only after that wait. The seat at that point is the local `seatId`, not `requestedSeatId`.
+   - `afterResolution.ts` is 734 lines. These edits add about forty. Do not move anything.
 
 3. `readyIpcResolutionMapping.ts`: in both custom runners (the one inside `runEventDrivenAfterResolutionConsultation` and the one inside `runEventDrivenAfterTacticalBeatConsultation`), add `talkRound: request.talkRound` to the deps object passed to `afterResolution` and `afterTacticalBeatResolution`.
 
@@ -746,6 +749,7 @@ There are exactly three places where a consult asks for orders. Each gets the sa
 - **Policy does not consult, one unread message to the seat:** the talk runner is not called, and `requestOrders` **is** called. This is the user's rule.
 - **Two seats in one round, both consult:** neither `requestOrders` call starts before both talk runners have finished.
 - **No round (`talkRound: undefined`), unread message:** `requestOrders` is called.
+- The same three policy cases for `afterTacticalBeatResolution`: a policy consult talks before `requestOrders`; a policy skip with no unread message does not talk and does not call `requestOrders`; a policy skip with one unread message abstains and then calls `requestOrders`. A hard skip, such as annihilation, returns before either helper.
 
 ### Verification
 
@@ -754,7 +758,7 @@ Run the Verification Bar. Then, if you can run the app with a key: start an Obse
 ### If verification fails
 
 - An existing `afterResolution` test now hangs: it passes no round, so the helpers return at once. The hang is in the test's own fake. Read it before changing production code.
-- A tactical test reports the opponent's plan missing: the `speak` line was placed above an early return that used to run first. Move it to directly before `deps.requestOrders(`.
+- A tactical test reports the opponent's plan missing: the talk decision was placed above a hard skip that used to return first. Move it to the policy result, after those skips and before `deps.requestOrders(`. Do not put it only on the line before `requestOrders`, or an unread message never causes a tactical consult.
 
 ---
 
@@ -815,7 +819,7 @@ The orders stage shows the commander its message history with each side and its 
 5. `requestOrdersFlow.ts`: before the `buildConsultPromptParts({...})` call, add `const messagesBlock = buildOrdersMessagesBlock({ seatId, inBattle: Boolean(tacticalBattle) });` and pass `sideMessagesBlock: messagesBlock.text`. Change the `markSuccessfulConsultation` closure so it also passes `seenMessageIds: messagesBlock.shownMessageIds` to `recordSuccessfulConsultation`.
 
 6. Docs, in this phase: the Messages section is a new part of the situation message, and the messages rule is a new part of the system message. Add both to the section order in `assembly-contract.md`, describe the threads, the stances list, their omit conditions, the line limit (`SIDE_MESSAGE_THREAD_PROMPT_LINES`), the visibility rule (`sideMessageVisibleTo`), and the two cautions in `strategic-prompt.md` and `tactical-prompt.md`, and add its row to `crosswalk.md` and `source-inventory.md`, each in that document's existing form. Leave the two example prompts alone. They are reading copies of one past consultation.
-7. `requestOrdersConsultationMarks.ts`, `markSuccessfulConsultation`: accept `readonly seenMessageIds?: readonly number[];` and call `markSideMessagesSeen(ops, args.seenMessageIds ?? [])` at the start. Only a successful consult reaches this function, so a failed or timed-out consult leaves its messages unread, and they cause a consult again next time.
+7. `requestOrdersConsultationMarks.ts`, `markSuccessfulConsultation`: accept `readonly seenMessageIds?: readonly number[];`. Call `markSideMessagesSeen(ops, args.seenMessageIds ?? [])` only when this consult still belongs to the open match. That is the same `consultStillOnOpenMatch` check the strategy event already uses. When `generationAtStart` is omitted, mark the ids, so a caller that is not comparing matches keeps that behavior. A failed or timed-out consult never reaches this function, so its messages stay unread and cause a consult again next time. A consult that finishes after New or Load must not mark rows in the replacement match.
 
 ### Tests
 
@@ -905,7 +909,7 @@ The main process can hold a message the human player has written, and sends it w
    - The recipient must be an AI seat that is still in the match, otherwise `That side is no longer in the match.`
    - The text is cleaned with `cleanSideMessageText(rawText, SIDE_MESSAGE_MAX_CHARS)`. Empty after cleaning fails with `Type a message first.`
    - Staging stores the row with the current strategic turn as its step. Sending overwrites the step.
-   - `sendStagedHumanSideMessages` first deletes every staged row whose recipient is no longer in the match (the side was knocked out after the player wrote to it). Then it calls `sendStagedSideMessages`, then `recordSideMessageSent` for each row. It never throws: catch, log with counts only, return 0. With no active human seat it returns 0.
+   - `sendStagedHumanSideMessages` first deletes every staged row whose recipient is no longer in the match (the side was knocked out after the player wrote to it). Then it calls `sendStagedSideMessages`, then `recordSideMessageSent` for each row. Do the delete, the status change, and the events in one transaction, with the same `inTransaction` guard as `persistTalkRound`, so a failure does not leave a sent row without its event. It never throws: catch, roll back, log with counts only, return 0. With no active human seat it returns 0.
    - Put the three reason sentences in exported constants.
 
 2. Send on commit:
@@ -964,21 +968,21 @@ Give the user this list in your final message:
 
 Check each item before you mark a phase complete:
 
-- [ ] The phase's files were backed up before the first edit.
-- [ ] New modules were tested before any existing code called them.
-- [ ] No test called a real model.
-- [ ] `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` are unchanged.
-- [ ] No log line carries message text, a stance reason, or a prompt body.
-- [ ] Nothing was added to a cached system prompt that changes during a match.
-- [ ] `speak` and `abstain` settle a seat at most once, and the round closes at most once.
-- [ ] An AI commander's prompt contains only messages `sideMessageVisibleTo` allows that commander: today, the ones addressed to it and the ones it sent.
-- [ ] Both system prompts say that messages come from other sides' commanders, human or AI, who may or may not be truthful or have the reader's interests in mind.
-- [ ] No file under `src/main/openRouter/talk/` imports `openRouter.ts` or a `commanderPool*` file.
-- [ ] Every new function, type, interface, field, and constant has a full orienting comment that describes behavior and is not generic filler.
-- [ ] `npm run check:circular` shows only the baseline cycles.
-- [ ] No baseline file was edited.
-- [ ] No commit, push, stash, checkout, restore, reset, or clean was run.
-- [ ] No plan vocabulary appears in `src/` or `doc/`.
+- [ ] The phase's files were backed up before the first edit. Not done. The working tree was the only copy.
+- [x] New modules were tested before any existing code called them.
+- [x] No test called a real model.
+- [x] `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` are unchanged. Version stays 26. The required-table list does not name `side_messages` or `side_stances`.
+- [x] No log line carries message text, a stance reason, or a prompt body.
+- [x] Nothing was added to a cached system prompt that changes during a match. `SIDE_MESSAGE_RULE_BLOCK` has no turn number, count, or message text.
+- [x] `speak` and `abstain` settle a seat at most once, and the round closes at most once.
+- [x] An AI commander's prompt contains only messages `sideMessageVisibleTo` allows that commander: today, the ones addressed to it and the ones it sent.
+- [x] Both system prompts say that messages come from other sides' commanders, human or AI, who may or may not be truthful or have the reader's interests in mind.
+- [x] No file under `src/main/openRouter/talk/` imports `openRouter.ts` or a `commanderPool*` file.
+- [x] Every new function, type, interface, field, and constant has a full orienting comment that describes behavior and is not generic filler.
+- [x] `npm run check:circular` shows only the baseline cycles. Exit code 1, and the three cycles are the ones already known: orderless suggestions, renderer map helpers, and terrain tooltip selection. No new cycle.
+- [x] No baseline file was edited.
+- [x] No commit, push, stash, checkout, restore, reset, or clean was run.
+- [x] No plan vocabulary appears in `src/` or `doc/`. `git diff -- src doc` matched none of `Phase N`, `dispatches-2`, `execution plan`, or `locked decision`.
 
 ## Success Definition
 
@@ -990,7 +994,7 @@ Check each item before you mark a phase complete:
 - The talk system prompt and the orders system prompt both state where messages come from, that their senders are human players or other AI models, and that any sender may or may not be telling the truth or have the commander's interests in mind.
 - The orders reply has no `message` field, and no prompt asks for one.
 - Every sent message and every stance change is a recorder event, and every talk call is a `consultation` event with stage `talk`.
-- The Verification Bar passes. No renderer file changed. No shared IPC type changed.
+- The Verification Bar passes. No file under `src/renderer` changed, and no shared IPC type changed. `npm run build:renderer` may rewrite `static/renderer.js`, because the renderer imports `AI_CONSULTATION_WAIT_TIMEOUT_MS`.
 
 ---
 
@@ -998,20 +1002,41 @@ Check each item before you mark a phase complete:
 
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `check:circular` cycle list | |
-| `EXPECTED_USER_VERSION` (must not change) | |
-| Recorder prerequisite | |
-| Missing symbols | |
+| `git status --short` | Talk-stage work is uncommitted on `main`. The recorder prerequisite is already `01651be`. |
+| `npm test` | Passed. Exit 0. Lint, naming, renderer types, the main and shared node tests, the script tests, and the notices check. |
+| `npm run build:renderer` | Passed. Exit 0. It rewrote `static/renderer.js` because the renderer imports `AI_CONSULTATION_WAIT_TIMEOUT_MS`. No file under `src/renderer` changed. |
+| `check:circular` cycle list | Exit 1. Three existing cycles and no new one: `orderlessUnitSuggestions` through `promptText`; `openRouterUiHelpers` through `mapHelpers`; `terrainTooltipStrategicState` through `selection`. |
+| `EXPECTED_USER_VERSION` (must not change) | 26 |
+| Recorder prerequisite | Present. `match_records`, `recordMatchEvent`, and `consultStillOnOpenMatch` are on `main`. |
+| Missing symbols | None that blocked a phase. |
 
 ## Defect Inventory
 
 | Phase | Command | First error | Action taken |
 |-------|---------|-------------|--------------|
+| 7 | `afterResolutionTalk.test.js` | A policy-skip fixture still consulted, because every unit without a standing order is `unordered_unit`. | The skip fixture inserts an `active` standing order for each unit and sets the last consultation turn. |
+| 8 | `ordersMessagesBlock.test.js` | The intro sentence already contains `(new)`, so a count of that substring was 2. | The assertion matches the unread body followed by ` (new)`. |
+| 9 | `coachingText.test.js` | The message-rule sentence is in the context block, not the coaching bullet list. | Those two bullet assertions were removed. The system-prompt test covers the rule. |
+| 9 | `promptContracts.test.js` | The tactical example and the tactical contract still required a `"message"` field. | Both now require that field to be absent. |
+| 9 | `envelopeContract.test.js` | One edit duplicated the `strategy` key in the expected field list. | The list is `strategy`, then `orders`, then the gated tails. |
+| 10 | `tsc -p tsconfig.main.json` | `Set.has` expected `SeatId` and the staged recipient is a string. | The active-seat set is `Set<string>`. |
+| 11 | `promptSeats.test.js` | A three-seat prompt must not say `human player`, and the message rules do say `a human player`. | The assertion now forbids `the human player` and requires the message-rule sentence. |
+| review | `ordersMessagesBlock` | Unread messages older than the prompt window stayed unseen, and counting every unseen row would request orders for messages the prompt never shows. Marking those hidden rows seen would record them as read. | `countUnreadPromptMessages` counts the new lines the prompt would show. A successful consult marks those ids. Older rows stay unseen. |
 
 ## Completion Log
 
 | Phase | Result | Sketch differences | Test files changed outside the Add/Edit lists | Docs updated |
 |-------|--------|--------------------|-----------------------------------------------|--------------|
+| 1 | Done | `ensureSideMessageTables` takes `(sql: string) => void` and runs one statement at a time. | | `doc/save-files.md` |
+| 2 | Done | No exported fence stripper existed. The parser uses a private span from the first `{` to the last `}`. | | |
+| 3 | Done | `TalkPromptLine` carries `messageId` so a later block can collect shown ids. The formatter does not print it. | | `doc/ai-commander-prompts/talk-prompt.md`, `doc/ai-commander-prompts/README.md` |
+| 4 | Done | | | `doc/match-recording.md` (event rows and the `talk` stage, ahead of phase 11), `doc/hybrid-ai.md` (deadlines), `doc/ai-commander-prompts/consultation-flow.md` |
+| 5 | Done | `formatSideMessageThreads` prints a markdown separator row in the sides table. | | |
+| 6 | Done | `resetCommanderPool` does not move the match generation, so a pool-reset case would not prove that a late round stores nothing. The generation mismatch is covered by the persist test. | `src/main/openRouter/commanderPool.test.ts` (`withMatch` gained a lead-human option in phase 9) | `doc/hybrid-ai.md` |
+| 7 | Done | | `src/main/openRouter/afterResolutionTalk.test.ts` is the new file the phase asked for. | |
+| 8 | Done | The orders block omits a thread that has no lines, so a commander with nothing stored gets `text: null`. The talk prompt still prints "No messages yet". `inBattle` is traced and does not change the text. `readTalkSides` is the exported side lookup. | `src/main/openRouter/requestOrdersConsultationMarks.test.ts` (no existing test called `markSuccessfulConsultation`) | `doc/ai-commander-prompts/assembly-contract.md`, `strategic-prompt.md`, `tactical-prompt.md`, `crosswalk.md`, `source-inventory.md` |
+| 9 | Done | The orders flow no longer sets `message`. `withTalkCost` fills it from the message this commander sent to the active human seat. Shared IPC fields stay, with comments that say that. The search under `src` still names `message_text` in `schema.ts` and in four comments in `turnNotesHistory.ts`, and `messageText` in `src/renderer/openRouter/openRouterControls.ts` and `src/renderer/chrome/consoleReports.ts`. | `src/main/openRouter/openRouterMatrix.test.ts`, `src/main/openRouter/promptContracts.test.ts`, `src/main/openRouter/promptSpec/coachingText.test.ts`, `src/main/openRouter/promptSpec/doctrineText.test.ts`, `src/main/openRouter/promptSpec/envelopeContract.test.ts`, `src/main/openRouter/orderResponseParsing.test.ts`, `src/main/turnNotesHistory.test.ts`, `src/main/gameDb/turnNotesHistorySeats.test.ts`, `src/main/recentTurnNotesSection.test.ts`, `src/main/openRouter/commanderPool.test.ts` | `doc/save-files.md`, `doc/how-to-play.md`, `doc/ai-commander-prompts/assembly-contract.md`, `strategic-prompt.md`, `tactical-prompt.md`, `crosswalk.md`, `source-inventory.md`, `information-decision-model.md`, `example-strategic-prompt.md`, `example-tactical-prompt.md`, `example-strategic-response.md` |
+| 10 | Done | | | |
+| 11 | Done | The full verification bar runs once here, not after every phase. File backups were not taken. | | `doc/commander-messages.md`, `doc/README.md`, `doc/hybrid-ai.md`. `doc/match-recording.md` and `doc/save-files.md` were already current from earlier phases. `README.md` was not edited. |
+
+The largest edited files stay under the hard line cap: `commanderPool.ts` 737, `afterResolution.ts` 759, `openRouter.ts` 595, `requestOrdersFlow.ts` 630, `main.ts` 654, `consultPromptParts.ts` 582.

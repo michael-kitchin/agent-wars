@@ -30,5 +30,6 @@ test('a three-seat prompt names both enemies and includes the free-for-all bulle
   assert.match(prompt, /You command Western Asia in a WEGO \(simultaneous movement\) hex wargame with 3 sides/);
   assert.ok(prompt.includes('Enemy home regions: Northern America, Eastern Europe'));
   assert.ok(prompt.includes('Every other side is your enemy, and they are enemies of each other'));
-  assert.equal(prompt.includes('human player'), false);
+  assert.equal(prompt.includes('the human player'), false);
+  assert.ok(prompt.includes('a human player or another AI model'));
 });

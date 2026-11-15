@@ -79,23 +79,22 @@ function noteDisplayText(raw: string | null | undefined): string {
 /**
  * Returns whether a persisted row should appear in the recent-turn prompt section.
  *
- * Purpose: Suppresses turns with no message, no strategy, and no losses on either side.
+ * Purpose: Suppresses turns with no strategy and no losses on either side.
  * When to use: After loading rows from `getRecentTurnNotes`.
- * Expected outcome: False when message, strategy, and both loss summaries are empty; true when any of those has content.
+ * Expected outcome: False when the strategy and both loss summaries are empty; true when any of those has content.
  * Exceptions: None.
  */
 function rowHasPromptContent(row: TurnNoteRow): boolean {
   const strategy = row.strategyText?.trim() ?? '';
-  const message = row.messageText?.trim() ?? '';
   const human = parsePlayerLossSummaryJson(row.humanLossJson);
   const ai = parsePlayerLossSummaryJson(row.aiLossJson);
-  return strategy.length > 0 || message.length > 0 || playerHasAnyLoss(human) || playerHasAnyLoss(ai);
+  return strategy.length > 0 || playerHasAnyLoss(human) || playerHasAnyLoss(ai);
 }
 
 /**
- * Formats one turn block with Message, Strategy, and optional loss bullets.
+ * Formats one turn block with the strategy and optional loss bullets.
  *
- * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes.
+ * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes. A stored message from an older save is not printed.
  * When to use: For each qualifying row returned from the DB query.
  * Expected outcome: Multiline block starting with `Turn N:`.
  * Exceptions: None.
@@ -103,7 +102,6 @@ function rowHasPromptContent(row: TurnNoteRow): boolean {
 function formatTurnBlock(row: TurnNoteRow): string {
   const label = `Turn ${row.turnNumber}`;
   const lines: string[] = [`${label}:`];
-  lines.push(`- Message: ${noteDisplayText(row.messageText)}`);
   lines.push(`- Strategy: ${noteDisplayText(row.strategyText)}`);
   const human = parsePlayerLossSummaryJson(row.humanLossJson);
   const ai = parsePlayerLossSummaryJson(row.aiLossJson);

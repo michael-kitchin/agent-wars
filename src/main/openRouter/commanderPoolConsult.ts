@@ -12,8 +12,11 @@ import { commanderModelId, getGameStateForPlayer } from '../gameDb';
 import { executeAbortableConsult } from '../ipc/modelConsultAttempt';
 import { logDebug, logError } from '../logger';
 import { setProductionCommanderConsultRunner } from './commanderPool';
+import { setProductionCommanderTalkRunner } from './commanderPoolRounds';
+import { runCommanderTalk } from './commanderPoolTalk';
 import { emitCommanderConsultLog } from './commanderConsultLog';
 import { emptyConsultOutcome, type CommanderConsultOutcome, type CommanderConsultRequest } from './commanderPoolSupport';
+import { speakAndAwaitTalkRound } from './talk/talkRound';
 import { getSelectedModel, getToolNamesForEnabledGroups, hasKey, requestOrders, TOOL_GROUP_REGISTRY } from './openRouter';
 
 /**
@@ -27,6 +30,7 @@ import { getSelectedModel, getToolNamesForEnabledGroups, hasKey, requestOrders, 
 export function installCommanderConsultRunner(): void {
   logDebug('commanderPoolConsult installCommanderConsultRunner');
   setProductionCommanderConsultRunner(runCommanderConsult);
+  setProductionCommanderTalkRunner(runCommanderTalk);
 }
 
 /**
@@ -51,6 +55,7 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
     logError('commanderPoolConsult skipped', new Error(errorMessage));
     return emptyConsultOutcome({ errorMessage, modelId: modelId || null });
   }
+  await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
   let usedModelId = modelId;
   try {
     const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });

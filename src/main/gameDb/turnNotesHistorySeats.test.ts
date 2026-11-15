@@ -40,9 +40,9 @@ test('two seats keep separate notes and a tactical clear leaves strategic notes'
   withTempDb(() => {
     const first = AI_SEAT_IDS[0];
     const second = AI_SEAT_IDS[1];
-    upsertTurnStrategyNote(first, 'strategic', '', 1, { strategyText: 'Hold', messageText: null });
-    upsertTurnStrategyNote(second, 'strategic', '', 1, { strategyText: 'Push', messageText: null });
-    upsertTurnStrategyNote(second, 'tactical', 'tb-1', 1, { strategyText: 'Flank', messageText: null });
+    upsertTurnStrategyNote(first, 'strategic', '', 1, { strategyText: 'Hold' });
+    upsertTurnStrategyNote(second, 'strategic', '', 1, { strategyText: 'Push' });
+    upsertTurnStrategyNote(second, 'tactical', 'tb-1', 1, { strategyText: 'Flank' });
     const firstNotes = getRecentTurnNotes(first, 'strategic', '', 2, 3);
     const secondNotes = getRecentTurnNotes(second, 'strategic', '', 2, 3);
     assert.equal(firstNotes.length, 1);

@@ -10,7 +10,8 @@
 import { logTrace } from '../../logger';
 import type { CoachingGates } from './coachingGates';
 import { buildDoctrineBlock } from './doctrineText';
-import { buildStrategyBlock, MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET } from './coachingTextStrategic';
+import { buildStrategyBlock } from './coachingTextStrategic';
+import { SIDE_MESSAGE_RULE_BLOCK } from './sideMessageRuleText';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 import {
   SECTION_TITLE_AIR_AND_NAVAL_UNITS,
@@ -32,7 +33,7 @@ export function buildTacticalContextCoaching(gates: CoachingGates): string {
   const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
   return `${TACTICAL_PRIORITY_BLOCK}
 ${buildStrategyBlock('tactical')}${doctrineLine}
-${MESSAGE_BLOCK}`;
+${SIDE_MESSAGE_RULE_BLOCK}`;
 }
 
 /**
@@ -51,7 +52,6 @@ export function buildTacticalCoachingSections(gates: CoachingGates): readonly { 
   const callbacks = [
     CALLBACK_BULLET,
     UNCONSULTED_BEAT_BULLET,
-    MESSAGE_DISCIPLINE_BULLET,
     ...(gates.includeExitBattle === true ? [EXIT_BATTLE_BULLET] : []),
   ];
   return [

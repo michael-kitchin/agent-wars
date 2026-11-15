@@ -214,7 +214,6 @@ export function buildFinalJsonContractInstruction(args: {
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
-    message: '"message": "<one-line taunt or threat>"',
     strategy: '"strategy": "<one-line>"',
     orders: '"orders": [ ... ]',
     exitBattle: '"exitBattle": false',
@@ -234,8 +233,7 @@ export function buildFinalJsonContractInstruction(args: {
     .join(', ')} }.`;
   const periodNoun = coordinateMode === 'tactical' ? 'beat' : 'turn';
   const strictSchemaParagraphs = [
-    'Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.',
-    'The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).',
+    'Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.',
     `The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`,
   ];
   const standingOrdersIssuable = coordinateMode !== 'tactical' && includeStandingOrderActions;
@@ -402,7 +400,6 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   const tactical = coordinateMode === 'tactical';
   const standingOrdersIssuable = !tactical && includeStandingOrderActions;
   const values: Record<string, unknown> = {
-    message: tactical ? 'This close, hesitation is already a casualty.' : 'You will not find safety in delay.',
     strategy: tactical
       ? 'Close with observed enemies this beat using explicit moves and fire.'
       : 'Close with observed enemies and keep production moving.',

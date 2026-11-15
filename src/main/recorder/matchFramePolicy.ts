@@ -27,7 +27,7 @@ export type TableRecordingPolicy =
  *
  * Purpose: Frame capture iterates this object, and the policy test compares it with `sqlite_master`.
  * When to use: Adding a table, and building a frame. Key order is the order of tables in a frame.
- * Expected outcome: `hexes` and the two logs are excluded. Every other table is a frame table.
+ * Expected outcome: `hexes`, the two logs, and `side_messages` are excluded. Every other table is a frame table.
  * Exceptions: None.
  */
 export const MATCH_TABLE_RECORDING_POLICY: Readonly<Record<string, TableRecordingPolicy>> = {
@@ -63,6 +63,8 @@ export const MATCH_TABLE_RECORDING_POLICY: Readonly<Record<string, TableRecordin
     reason: 'A growing log. Strategies are commander_strategy events, and losses are found by comparing frames.',
   },
   match_records: { mode: 'excluded', reason: 'The recording itself.' },
+  side_stances: { mode: 'frame' },
+  side_messages: { mode: 'excluded', reason: 'A growing log. Each sent message is a message_sent event.' },
 };
 
 /**

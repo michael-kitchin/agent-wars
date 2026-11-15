@@ -15,6 +15,7 @@ import {
   upsertTurnStrategyNote,
 } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
+import { markSideMessagesSeen } from '../gameDb/sideMessageStore';
 import { readMatchId } from '../gameDb/gameConfigKv';
 import { logDebug, logTrace } from '../logger';
 import { getMatchGeneration } from '../matchGeneration';
@@ -75,7 +76,6 @@ export function markSuccessfulConsultation(args: {
   readonly turnNumber: number;
   readonly tacticalBattle: TacticalBattleSnapshot | undefined;
   readonly strategyText?: string | null;
-  readonly messageText?: string | null;
   /**
    * The match id at the start of the consult.
    *
@@ -94,28 +94,37 @@ export function markSuccessfulConsultation(args: {
    * Exceptions: None.
    */
   readonly generationAtStart?: number;
+  /**
+   * Unread message ids this consult showed.
+   *
+   * Contract: The lines marked new in the Messages section. Omit it when the consult showed none.
+   * When to use: The orders flow, with `shownMessageIds` from the Messages section.
+   * Expected outcome: Those rows become seen when this consult still belongs to the open match. When `generationAtStart` is omitted, the ids are marked.
+   * Exceptions: None.
+   */
+  readonly seenMessageIds?: readonly number[];
 }): void {
   logDebug('requestOrdersConsultationMarks markSuccessfulConsultation', {
     seatId: args.seatId,
     turnNumber: args.turnNumber,
     tacticalBattleId: args.tacticalBattle?.battleId ?? null,
+    seenMessageCount: args.seenMessageIds?.length ?? 0,
   });
   setAiLastConsultationTurn(args.seatId, args.turnNumber);
   clearAiLossEventsSinceConsultation(args.seatId);
   if (args.tacticalBattle) {
     upsertTurnStrategyNote(args.seatId, 'tactical', args.tacticalBattle.battleId, args.tacticalBattle.tacticalTurnNumber, {
       strategyText: args.strategyText,
-      messageText: args.messageText,
     });
   } else {
     upsertTurnStrategyNote(args.seatId, 'strategic', '', args.turnNumber, {
       strategyText: args.strategyText,
-      messageText: args.messageText,
     });
   }
-  const recordStrategy = args.generationAtStart === undefined
+  const stillThisMatch = args.generationAtStart === undefined
     || consultStillOnOpenMatch(args.matchIdAtStart ?? null, args.generationAtStart);
-  if (recordStrategy) {
+  if (stillThisMatch) {
+    markSideMessagesSeen(gameDbOps, args.seenMessageIds ?? []);
     recordCommanderStrategy({
       step: stepForConsult(args.turnNumber, args.tacticalBattle),
       seatId: args.seatId,

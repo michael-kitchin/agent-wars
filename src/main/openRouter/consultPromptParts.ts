@@ -154,6 +154,15 @@ export function buildConsultPromptParts(input: {
    * Exceptions: None.
    */
   readonly hasOperationOptions?: boolean;
+  /**
+   * The Messages section already built for this seat.
+   *
+   * Contract: Null or omitted when this commander has no messages and no stances.
+   * When to use: `requestOrdersFlow`, from `buildOrdersMessagesBlock`.
+   * Expected outcome: The text is placed before Scenario Progress and shifted with the other situation sections when a briefing is attached. The system text does not include it.
+   * Exceptions: None.
+   */
+  readonly sideMessagesBlock?: string | null;
 }): { staticSystemText: string; situationText: string } {
   const state = input.state;
   const coordMap = input.coordMap;
@@ -415,6 +424,9 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   const progressBlock = progressLines.length > 0
     ? `${underBriefing(`${topLevelHeading(SECTION_TITLE_SCENARIO_PROGRESS)}\n\n${progressLines.join('\n')}`)}\n\n`
     : '';
+  const messagesBlock = input.sideMessagesBlock
+    ? `${underBriefing(input.sideMessagesBlock)}\n\n`
+    : '';
   const scenarioRules = coordinateContext.mode === 'tactical'
     ? ''
     : buildScenarioObjectiveRulesBlock(state, { controlWinMinUrbanShare });
@@ -563,7 +575,7 @@ ${finalJsonExample}`);
 
 ${turnPhaseHeader}
 
-${beatsLeft === null ? '' : `${formatAiOnlyBeatsLeftPrompt(beatsLeft)}\n\n`}${warning}${liveStatus}${progressBlock}${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${hasPrecomputedBriefing ? subHeading(SECTION_TITLE_UNIT_ROSTER) : topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}
+${beatsLeft === null ? '' : `${formatAiOnlyBeatsLeftPrompt(beatsLeft)}\n\n`}${warning}${liveStatus}${messagesBlock}${progressBlock}${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${hasPrecomputedBriefing ? subHeading(SECTION_TITLE_UNIT_ROSTER) : topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}
 
 ${rosterBody}
 

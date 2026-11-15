@@ -26,6 +26,7 @@ import {
 } from '../oneStepMoveDestinations';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { requestTalk as runRequestTalk, type TalkSeatResult } from './talk/requestTalk';
 import { DEFAULT_PROVIDER_SORT } from '../../shared/openRouterProviderSort';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import { readSeatHasApiKey } from '../gameDb/seatApiKeyFlags';
@@ -604,6 +605,30 @@ export async function requestOrders(
     modelId,
     options
   );
+}
+
+/**
+ * One commander's talk call, using the same key, profile, and transport as `requestOrders`.
+ *
+ * Purpose: Production code does not assemble those dependencies itself.
+ * When to use: The commander pool's talk runner.
+ * Expected outcome: The result of `requestTalk`. Messages are not stored here.
+ * Exceptions: None. Failures resolve as a silent result.
+ */
+export async function requestTalk(args: {
+  readonly seatId: AiSeatId;
+  readonly modelId: string;
+  readonly turnNumber: number;
+  readonly battle: TacticalBattleSnapshot | null;
+  readonly signal?: AbortSignal;
+  readonly onLog?: (line: string, isError?: boolean) => void;
+}): Promise<TalkSeatResult> {
+  logDebug('openRouter requestTalk', { seatId: args.seatId, turnNumber: args.turnNumber, inBattle: args.battle !== null });
+  return runRequestTalk(args, {
+    loadKey,
+    postOpenRouterChatWithTimeoutAndRetry: resolveOpenRouterChatTransport(),
+    resolveOrdersRequestProfile: resolveSelectedModelOrdersRequestProfile,
+  });
 }
 
 registerLiveModelIdReader((seatId) => {

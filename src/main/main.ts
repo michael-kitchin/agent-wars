@@ -50,6 +50,7 @@ import { restorePersistedTacticalBattleSession } from './tacticalBattle/tactical
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 import { exportFinishedMatchRecordingIfNeeded } from './recorder/matchRecordingExport';
 import { recordTacticalBeat } from './recorder/matchRecordingEvents';
+import { sendStagedHumanSideMessages } from './sideMessages/humanSideMessages';
 import { currentStepKey } from './recorder/recorderStepKey';
 import {
   parseGroupedTargetPayload,
@@ -483,6 +484,7 @@ function registerIpcHandlers(): void {
         },
         playback: result.tacticalResolutionPlayback,
       });
+      sendStagedHumanSideMessages(beatStep);
     }
     if (
       !result.success ||

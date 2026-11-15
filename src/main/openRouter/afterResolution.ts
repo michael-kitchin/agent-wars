@@ -36,6 +36,8 @@ import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import { campaignAssaultMinUnitsFor, campaignAssaultReady } from './campaignRules';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getToolFlags } from './openRouterToolGroups';
+import { countUnreadPromptMessages } from './talk/talkPromptInput';
+import { abstainAndAwaitTalkRound, speakAndAwaitTalkRound, type TalkRound } from './talk/talkRound';
 import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../../shared/ipc/tacticalOpponentPlanMerge';
@@ -109,6 +111,15 @@ requestOrders: (
    * Exceptions: None.
    */
   signal?: AbortSignal;
+  /**
+   * The wave's talk round.
+   *
+   * Contract: Optional. Absent means this consult does not wait on a round.
+   * When to use: The post-resolution runner passes the round from the consult request.
+   * Expected outcome: The seat talks when the policy consults, and abstains otherwise, before orders.
+   * Exceptions: None.
+   */
+  readonly talkRound?: TalkRound | null;
 }
 
 /**
@@ -139,11 +150,11 @@ consulted: boolean;
    */
 strategy?: string;
     /**
-   * One-line in-character taunt or threat from the consultation, when provided.
-
-   * Contract: Opaque prose for the player-facing toast and later prompts; not parsed for mechanics.
+   * The message this commander sent to the human player in this wave, when there is one.
+   *
+   * Contract: Optional. The orders reply does not set it.
    * When to use: Map onto Ready IPC `aiMessage` after post-resolution consultation.
-   * Expected outcome: Undefined when the model did not emit a message.
+   * Expected outcome: The text, or absent.
    * Exceptions: None.
    */
 message?: string;
@@ -308,19 +319,29 @@ export async function afterResolution(
   const opponentHadUnitActions = seatHadStrategicResolutionUnitActions(resolutionResult, seatId);
   const consultBecauseOpponentIdle = !opponentHadUnitActions;
   const humanHadObservableActions = enemyHadStrategicResolutionObservableActions(resolutionResult, state, seatId);
-  const { shouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
+  const { shouldConsult: policyShouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
     mandatoryCount: mandatoryFired.length,
     subscriptionCount: subscriptionFired.length,
     seatIdle: consultBecauseOpponentIdle,
     enemyObservable: humanHadObservableActions,
   });
 
-  if (shouldConsult && policyOnlyConsult) {
+  if (policyShouldConsult && policyOnlyConsult) {
     logDebug('afterResolution: invoking LLM from post-resolution policy', {
       turnNumber: state.turnNumber,
       opponentIdle: consultBecauseOpponentIdle,
       humanObservableResolution: humanHadObservableActions,
     });
+  }
+  if (policyShouldConsult) {
+    await speakAndAwaitTalkRound(deps.talkRound, seatId, deps.signal ?? new AbortController().signal);
+  } else {
+    await abstainAndAwaitTalkRound(deps.talkRound, seatId);
+  }
+  const unreadMessageCount = countUnreadPromptMessages(seatId);
+  const shouldConsult = policyShouldConsult || unreadMessageCount > 0;
+  if (!policyShouldConsult && unreadMessageCount > 0) {
+    logDebug('afterResolution: consulting because a message is unread', { turnNumber: state.turnNumber, seatId, unreadMessageCount });
   }
 
   if (shouldConsult) {
@@ -460,6 +481,15 @@ export interface AfterTacticalBeatResolutionDeps {
    * Exceptions: None.
    */
   signal?: AbortSignal;
+  /**
+   * The wave's talk round.
+   *
+   * Contract: Optional. Absent means this beat does not wait on a round.
+   * When to use: The post-beat runner passes the round from the consult request.
+   * Expected outcome: The seat talks when the policy consults, and abstains otherwise, before orders.
+   * Exceptions: None.
+   */
+  readonly talkRound?: TalkRound | null;
 }
 
 /**
@@ -499,11 +529,11 @@ export interface AfterTacticalBeatResolutionResult {
    */
   strategy?: string;
   /**
-   * One-line in-character taunt or threat from the tactical consultation, when provided.
+   * The message this commander sent to the human player in this wave, when there is one.
    *
-   * Contract: Opaque prose for the player-facing toast and later prompts; not authoritative for game rules.
+   * Contract: Optional. The orders reply does not set it.
    * When to use: Map onto tactical IPC `aiMessage` after post-beat consultation.
-   * Expected outcome: Undefined when the model did not emit a message.
+   * Expected outcome: The text, or absent.
    * Exceptions: None.
    */
   message?: string;
@@ -633,12 +663,27 @@ export async function afterTacticalBeatResolution(
   const hadOpponentBeatActions = seatHadTacticalBeatResolutionActions(playback, tacticalBattle, seatId);
   const consultBecauseOpponentIdle = !hadOpponentBeatActions;
   const humanHadObservableBeatActions = enemyHadTacticalBeatResolutionActions(playback, tacticalBattle, seatId);
-  const { shouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
+  const { shouldConsult: policyShouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
     mandatoryCount: mandatoryFired.length,
     subscriptionCount: subscriptionFired.length,
     seatIdle: consultBecauseOpponentIdle,
     enemyObservable: humanHadObservableBeatActions,
   });
+  if (policyShouldConsult) {
+    await speakAndAwaitTalkRound(deps.talkRound, seatId, deps.signal ?? new AbortController().signal);
+  } else {
+    await abstainAndAwaitTalkRound(deps.talkRound, seatId);
+  }
+  const unreadMessageCount = countUnreadPromptMessages(seatId);
+  const shouldConsult = policyShouldConsult || unreadMessageCount > 0;
+  if (!policyShouldConsult && unreadMessageCount > 0) {
+    logDebug('afterTacticalBeatResolution: consulting because a message is unread', {
+      turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+      seatId,
+      unreadMessageCount,
+    });
+  }
   if (!shouldConsult) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
       reason: 'skip_should_consult_false',
