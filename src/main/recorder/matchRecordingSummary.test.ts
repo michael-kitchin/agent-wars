@@ -26,7 +26,7 @@ import { formatRecordingSummary, summarizeRecording } from './matchRecordingSumm
  * Expected outcome: A complete record.
  * Exceptions: None.
  */
-function record(row: Pick<MatchRecord, 'recordId' | 'kind' | 'recordType' | 'turnNumber' | 'payload'>): MatchRecord {
+function record(row: Pick<MatchRecord, 'recordId' | 'kind' | 'recordType' | 'turnNumber' | 'payload'> & Partial<Pick<MatchRecord, 'recordedAt'>>): MatchRecord {
   return {
     formatVersion: 1,
     stepKey: `s${row.turnNumber}`,
@@ -48,6 +48,7 @@ test('consult totals group by seat and a broken field counts as zero', () => {
       formatVersion: 1,
       appVersion: '0.0.0',
       matchId: 'summary-match',
+      playthroughId: '',
       exportedAt: '2026-01-01T00:00:00.000Z',
     },
     staticData: { line: 'static', hexes: { columns: [], rows: [] } },
@@ -97,6 +98,61 @@ test('consult totals group by seat and a broken field counts as zero', () => {
   assert.match(text, /Total\t\t4\t17\t5\t1\t1\.8500\t7/);
 });
 
+test('elapsed time and stage rows sum the consults', () => {
+  const header: ParsedRecording['header'] = {
+    line: 'header',
+    format: RECORDING_FILE_FORMAT,
+    formatVersion: 1,
+    appVersion: '0.0.0',
+    matchId: 'elapsed',
+    playthroughId: '',
+    exportedAt: '2026-01-01T00:00:00.000Z',
+  };
+  const talk = (recordId: number, seatId: string, recordedAt: string) => record({
+    recordId,
+    kind: 'event',
+    recordType: 'consultation',
+    turnNumber: 4,
+    recordedAt,
+    payload: { seatId, stage: 'talk', costUsd: 1, wallClockMs: 10 },
+  });
+  const recording: ParsedRecording = {
+    header,
+    staticData: { line: 'static', hexes: { columns: [], rows: [] } },
+    records: [
+      talk(1, 'opponent', '2026-11-15T00:00:00.000Z'),
+      talk(2, 'opponent2', '2026-11-15T00:10:00.000Z'),
+      record({
+        recordId: 3,
+        kind: 'event',
+        recordType: 'consultation',
+        turnNumber: 4,
+        recordedAt: 'not-a-time',
+        payload: { seatId: 'opponent', stage: 'orders', costUsd: 2, wallClockMs: 5 },
+      }),
+    ],
+  };
+  const summary = summarizeRecording(recording);
+  assert.equal(summary.elapsedMs, 600000);
+  assert.equal(summary.elapsedMsPerTurn, 150000);
+  assert.equal(summary.consultWallClockMsPerTurn, Math.round(25 / 4));
+  const talkStage = summary.stageTotals.find((row) => row.stage === 'talk');
+  const ordersStage = summary.stageTotals.find((row) => row.stage === 'orders');
+  assert.equal(talkStage?.seatId, 'Stage');
+  assert.equal(talkStage?.costUsd, 2);
+  assert.equal(ordersStage?.costUsd, 2);
+  const text = formatRecordingSummary(summary);
+  assert.match(text, /Elapsed ms 600000/);
+  assert.match(text, /Elapsed ms per turn 150000/);
+  assert.match(text, /Consult wall-clock ms per turn/);
+  assert.match(text, /Frame JSON characters/);
+  assert.match(text, /Stage\ttalk\t/);
+  assert.match(text, /Stage\torders\t/);
+  const one = summarizeRecording({ ...recording, records: [talk(1, 'opponent', 'not-a-time')] });
+  assert.equal(one.elapsedMs, 0);
+  assert.equal(one.elapsedMsPerTurn, 0);
+});
+
 test('the summary command reads a gzip recording and refuses a raw fixture', () => {
   const fixturePath = path.join(__dirname, '..', '..', '..', 'src', 'main', 'fixtures', 'recording-format-1.jsonl');
   const cli = path.join(__dirname, 'recordingSummaryCli.js');
@@ -112,6 +168,9 @@ test('the summary command reads a gzip recording and refuses a raw fixture', () 
     fs.writeFileSync(gzipPath, gzipSync(fs.readFileSync(fixturePath)));
     const gzip = spawnSync(process.execPath, [cli, gzipPath], { encoding: 'utf8' });
     assert.equal(gzip.status, 0, gzip.stderr);
+    assert.match(gzip.stdout, /Frame JSON characters/);
+    assert.match(gzip.stdout, /Recording file bytes \d+/);
+    assert.match(gzip.stdout, /Elapsed ms /);
     assert.match(gzip.stdout, /Frames 1/);
     assert.match(gzip.stdout, /Events 1/);
     assert.match(gzip.stdout, /Total\t\t0\t0\t0\t0\t0\.0000\t0/);

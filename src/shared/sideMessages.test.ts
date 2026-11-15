@@ -38,6 +38,13 @@ test('cleaning collapses whitespace, strips controls, and cuts at the limit', ()
   assert.equal(cleanSideMessageText('a\u0001b', 20), 'ab');
   assert.equal(cleanSideMessageText('x'.repeat(SIDE_MESSAGE_MAX_CHARS + 5), SIDE_MESSAGE_MAX_CHARS).length, SIDE_MESSAGE_MAX_CHARS);
   assert.equal(cleanSideMessageText(42, 20), '');
+  assert.equal(cleanSideMessageText(`${'a'.repeat(279)}😀`, 280), `${'a'.repeat(279)}😀`);
+  const cut = cleanSideMessageText(`${'a'.repeat(280)}😀`, 280);
+  assert.equal(cut, 'a'.repeat(280));
+  assert.equal([...cut].some((ch) => {
+    const code = ch.charCodeAt(0);
+    return code >= 0xD800 && code <= 0xDFFF;
+  }), false);
   assert.equal(isSideStance('wary'), true);
   assert.equal(isSideStance('allied'), false);
 });

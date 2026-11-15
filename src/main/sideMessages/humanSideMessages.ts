@@ -119,16 +119,20 @@ export function cancelStagedHumanSideMessage(toSeatId: string): void {
  * Purpose: A committed turn or beat delivers the drafts the player wrote.
  * When to use: Directly after the recorder writes that commit.
  * Expected outcome: The count of messages sent. A draft to a side that has left is deleted and not sent. Nothing is sent when no human seat is in the match.
- * Exceptions: None. A SQLite error rolls back and returns 0.
+ * Exceptions: None. A SQLite error rolls back when this call opened the transaction, logs a failed rollback, and returns 0.
  */
 export function sendStagedHumanSideMessages(step: StepKey): number {
-  const humanSeatId = activeHumanSeatId(readSeatRoster(gameDbOps));
-  if (!humanSeatId || !hasDbHandle()) {
-    logDebug('humanSideMessages sendStagedHumanSideMessages', { sent: 0, hasPlayer: humanSeatId !== null });
+  if (!hasDbHandle()) {
+    logDebug('humanSideMessages sendStagedHumanSideMessages', { sent: 0, hasPlayer: false });
     return 0;
   }
   const ownTransaction = getDbHandle()?.inTransaction !== true;
   try {
+    const humanSeatId = activeHumanSeatId(readSeatRoster(gameDbOps));
+    if (!humanSeatId) {
+      logDebug('humanSideMessages sendStagedHumanSideMessages', { sent: 0, hasPlayer: false });
+      return 0;
+    }
     if (ownTransaction) gameDbOps.run('BEGIN');
     const active = new Set<string>(readSeatRoster(gameDbOps).filter((seat) => isSeatActive(seat)).map((seat) => seat.seatId));
     for (const staged of listStagedSideMessages(gameDbOps, humanSeatId)) {
@@ -148,7 +152,13 @@ export function sendStagedHumanSideMessages(step: StepKey): number {
     logDebug('humanSideMessages sendStagedHumanSideMessages', { sent: sent.length, turnNumber: step.turnNumber });
     return sent.length;
   } catch (err) {
-    if (ownTransaction && getDbHandle()?.inTransaction) gameDbOps.run('ROLLBACK');
+    if (ownTransaction) {
+      try {
+        gameDbOps.run('ROLLBACK');
+      } catch (rollbackErr) {
+        logError('humanSideMessages rollback failed', { err: rollbackErr });
+      }
+    }
     logError('humanSideMessages sendStagedHumanSideMessages failed', err);
     return 0;
   }

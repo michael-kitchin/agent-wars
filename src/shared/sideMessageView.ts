@@ -2,7 +2,7 @@
  * Shapes and labels for messages a screen may show.
  *
  * Purpose: The history, the dialog bullets, and the chat panel share one view of a stored message.
- * When to use: After the main process has applied `sideMessageVisibleTo`. This module does not decide visibility.
+ * When to use: When a screen paints a stored message. This module does not decide visibility.
  * Expected outcome: Groups, labels, and a stable recipient order. No logging and no DOM.
  * Exceptions: None.
  */
@@ -10,7 +10,7 @@
 /**
  * One message a screen may show.
  *
- * Contract: The main process has already decided the viewer may see it. `text` is the stored body.
+   * Contract: A stored message a screen is painting. `text` is the stored body.
  * When to use: A history row, a staged row, or a dialog bullet.
  * Expected outcome: The ids, the text, and the step the message was stored with.
  * Exceptions: None.
@@ -167,7 +167,7 @@ export interface SideMessageTurnGroup {
   /**
    * The messages in this turn.
    *
-   * Contract: The order `groupSideMessagesByTurn` was given them.
+   * Contract: Sender seat order, then recipient seat order, then `messageId`.
    * When to use: The rows under the heading.
    * Expected outcome: One or more views.
    * Exceptions: None.
@@ -186,24 +186,27 @@ export interface SideMessageTurnGroup {
 export const SIDE_MESSAGES_TITLE = 'Messages';
 
 /**
- * The word before a dialog bullet's recipient.
+ * The arrow between two sides on a message line.
  *
- * Purpose: Every bullet starts the same way.
- * When to use: The message dialog.
- * Expected outcome: The string `To`.
+ * Purpose: The dialog, the history, and a pending line use one mark.
+ * When to use: At the start of a dialog line, and between the two sides of a history row or a pending line.
+ * Expected outcome: The character `→`.
  * Exceptions: None.
  */
-export const SIDE_MESSAGE_BULLET_PREFIX = 'To';
+export const SIDE_MESSAGE_ARROW = '→';
 
 /**
  * Groups sent messages under their turns.
  *
- * Purpose: The history is read by turn, oldest turn first.
+ * Purpose: The history is read by turn, oldest turn first, and each turn lists senders in seat order.
  * When to use: When painting the chat history.
- * Expected outcome: One group per turn that has a message, turns ascending. Messages inside a turn keep the order they were given. An empty list gives no groups.
+ * Expected outcome: One group per turn that has a message, turns ascending. Inside a turn, the sender's seat order, then the recipient's, then `messageId`. A missing seat sorts last. An empty list gives no groups.
  * Exceptions: None.
  */
-export function groupSideMessagesByTurn(messages: readonly SideMessageView[]): SideMessageTurnGroup[] {
+export function groupSideMessagesByTurn(
+  messages: readonly SideMessageView[],
+  seatOrderOf: (seatId: string) => number
+): SideMessageTurnGroup[] {
   const byTurn = new Map<number, SideMessageView[]>();
   for (const message of messages) {
     const existing = byTurn.get(message.turnNumber);
@@ -215,15 +218,18 @@ export function groupSideMessagesByTurn(messages: readonly SideMessageView[]): S
     .map(([turnNumber, group]) => ({
       turnNumber,
       heading: `Turn ${turnNumber}`,
-      messages: group,
+      messages: [...group].sort((left, right) =>
+        seatOrderOf(left.fromSeatId) - seatOrderOf(right.fromSeatId)
+        || seatOrderOf(left.toSeatId) - seatOrderOf(right.toSeatId)
+        || left.messageId - right.messageId),
     }));
 }
 
 /**
  * The name a history row uses for one seat.
  *
- * Purpose: The viewer's own seat reads You. Everyone else keeps the side's name.
- * When to use: The history and a dialog bullet.
+ * Purpose: A Reports line still reads You for the viewer's own seat. The message dialog and the chat panel do not use this.
+ * When to use: A Reports message line.
  * Expected outcome: `You` when `seatId` is the viewer's seat. Otherwise `nameOf(seatId)`. An observer never gets You.
  * Exceptions: None.
  */

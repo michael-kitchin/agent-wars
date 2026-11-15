@@ -24,6 +24,8 @@ test('step keys and visibility text round-trip', () => {
   assert.equal(stepKeyText(tacticalStep(3, 'battle-1', 2)), 's3-bbattle-1-t2');
   assert.equal(visibilityText('everyone'), 'everyone');
   assert.equal(visibilityText('engine'), 'engine');
+  assert.equal(parseVisibilityText('everyone'), 'everyone');
+  assert.equal(parseVisibilityText('engine'), 'engine');
   assert.deepEqual(parseVisibilityText(visibilityText({ seats: ['human', 'opponent'] })), { seats: ['human', 'opponent'] });
   assert.equal(parseVisibilityText('seats:'), 'engine');
   assert.equal(parseVisibilityText('later'), 'engine');

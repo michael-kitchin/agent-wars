@@ -9,12 +9,9 @@
 
 import type { CommanderDispatch, CommanderDispatchMessage } from '../../shared/commanderStatus';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
-import { activeHumanSeatId } from '../../shared/observeModeControls';
-import { sideMessageVisibleTo } from '../../shared/sideMessages';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
-import { clearAiPendingOrders, getSeatRoster, setAiPendingOrders } from '../gameDb';
+import { clearAiPendingOrders, setAiPendingOrders } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
-import { isFogOfWarEnabled } from '../gameDb/fogState';
 import { recordSeatConsultation, recordSeatThinkTime } from '../gameDb/seatRosterStore';
 import { logDebug, logError, logInfo } from '../logger';
 import { recordCommanderToolCounts } from './commanderToolCounts';
@@ -129,28 +126,20 @@ export function expireConsult(
 }
 
 /**
- * The messages from this consult that the current viewer may see.
+ * Every message this consult stored, for the human's dialog and Reports.
  *
- * Purpose: The dialog and Reports keep a snapshot. A later fog change does not rewrite it.
+ * Purpose: The player sees each message, with fog on and while only observing. A commander's prompt still uses `sideMessageVisibleTo`.
  * When to use: Both places that push a dispatch. Not the timeout path.
- * Expected outcome: Messages this seat stored, filtered for the active human seat, or every message when no human seat is playing.
+ * Expected outcome: The stored messages, including one addressed to another commander. An empty list stays empty. The debug log records the seat and the count, not the text.
  * Exceptions: None.
  */
-function visibleDispatchMessages(
+function playerDispatchMessages(
   seatId: string,
   sent: readonly CommanderDispatchMessage[] | undefined
 ): CommanderDispatchMessage[] {
-  const humanSeatId = activeHumanSeatId(getSeatRoster());
-  const viewer = humanSeatId === null
-    ? { kind: 'observer' as const }
-    : { kind: 'player' as const, seatId: humanSeatId };
-  const fogOfWarEnabled = isFogOfWarEnabled(gameDbOps);
-  return (sent ?? []).filter((row) => sideMessageVisibleTo({
-    viewer,
-    fogOfWarEnabled,
-    fromSeatId: seatId,
-    toSeatId: row.toSeatId,
-  }));
+  const messages = [...(sent ?? [])];
+  logDebug('commanderPool playerDispatchMessages', { seatId, messageCount: messages.length });
+  return messages;
 }
 
 /**
@@ -191,7 +180,7 @@ export function applyConsultOutcome(
       if (outcome.errorMessage) logError('commanderPool consult failed', new Error(outcome.errorMessage));
       if (outcome.costUsd > 0) recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
       const strategy = outcome.strategy?.trim() ? outcome.strategy.trim() : null;
-      const messages = visibleDispatchMessages(seatId, outcome.sentMessages);
+      const messages = playerDispatchMessages(seatId, outcome.sentMessages);
       if (strategy || messages.length > 0) {
         context.dispatches.push({
           seatId,
@@ -229,7 +218,7 @@ export function applyConsultOutcome(
     context.dispatches.push({
       seatId,
       strategy: outcome.strategy,
-      messages: visibleDispatchMessages(seatId, outcome.sentMessages),
+      messages: playerDispatchMessages(seatId, outcome.sentMessages),
       modelLabel: modelLabel(outcome.modelId),
       turnNumber: entry.turnNumber,
     });

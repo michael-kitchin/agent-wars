@@ -1,5 +1,5 @@
 /**
- * The chat panel at the map's bottom-right: the history, the staged draft, and the entry line.
+ * The chat panel at the map's bottom-right: the history, the pending lines, and the entry line.
  *
  * Purpose: The player reads what commanders say and writes a message that is sent on the next commit.
  * When to use: `wireChatPanel` once at startup, from the selection panel's wiring.
@@ -7,11 +7,12 @@
  * Exceptions: Missing elements are skipped. A stage failure is shown on the map toast and the typed text stays.
  */
 
-import { canStageText, stagedMessageFor } from '../../shared/chatPanelState';
-import { groupSideMessagesByTurn, sideMessagePartyLabel, type SideMessageView } from '../../shared/sideMessageView';
+import { canStageText, chatNamedSeatKey, stagedMessageFor, stagedMessagesInSeatOrder } from '../../shared/chatPanelState';
+import { groupSideMessagesByTurn, SIDE_MESSAGE_ARROW, type SideMessageView } from '../../shared/sideMessageView';
 import { sideDisplayName, type SideDisplaySeat } from '../../shared/sideNicknames';
+import { chatStagedCancelTooltipText, chatStagedEditTooltipText } from '../chrome/controlTooltipText';
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
-import { createSideNumberFlag } from '../chrome/sideNumberFlag';
+import { createMessagePartyFlag } from '../chrome/sideNumberFlag';
 import { rendererSharedState as S } from '../core/state';
 import { layoutMapChrome } from '../map/mapChromeLayout';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
@@ -77,6 +78,16 @@ let historyKey = '';
 let recipientKey = '';
 
 /**
+ * The drafts last painted above the entry bar.
+ *
+ * Purpose: A refresh that did not change those drafts must leave Edit and Cancel focused.
+ * When to use: `renderStaged`.
+ * Expected outcome: Empty until the first paint. The value contains message text, so nothing logs it.
+ * Exceptions: None.
+ */
+let stagedKey = '';
+
+/**
  * Whether the next history paint should scroll to the latest message.
  *
  * Purpose: Expanding the panel shows the latest messages. A later refresh keeps the reader's place.
@@ -112,13 +123,25 @@ function rosterSeats(): readonly ChatSeat[] {
  * The name shown for one seat.
  *
  * Purpose: The drop-down and the history use the match's side names.
- * When to use: `sideMessagePartyLabel` and each recipient option.
+ * When to use: Each recipient option, and each name in a message line.
  * Expected outcome: `sideDisplayName` for a roster seat, or the seat id when the seat is missing.
  * Exceptions: None.
  */
 function seatName(seatId: string): string {
   const seat = rosterSeats().find((row) => row.seatId === seatId);
   return seat ? sideDisplayName(seat) : seatId;
+}
+
+/**
+ * The roster order of one seat.
+ *
+ * Purpose: A turn lists messages by who sent them, then by who received them.
+ * When to use: `groupSideMessagesByTurn`.
+ * Expected outcome: That seat's `seatOrder`. A missing seat sorts after every known seat.
+ * Exceptions: None.
+ */
+function seatOrderOf(seatId: string): number {
+  return rosterSeats().find((row) => row.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
 }
 
 /**
@@ -134,7 +157,7 @@ function syncExpandControl(button: HTMLElement): void {
   button.setAttribute('aria-label', expanded ? 'Hide the message history' : 'Show the message history');
   button.setAttribute(
     'data-control-tooltip',
-    expanded ? 'Hide the message history.' : 'Show the messages sent and received this match.',
+    expanded ? 'Hide the message history.' : 'Show every message sent this match.',
   );
 }
 
@@ -196,6 +219,46 @@ function toggleChatPanel(panel: HTMLElement, bar: HTMLElement, button: HTMLEleme
 }
 
 /**
+ * The message field, when the page has the multiline control.
+ *
+ * Purpose: Enter, the send button, and Edit share one lookup.
+ * When to use: Any read or write of the text the player is composing.
+ * Expected outcome: The textarea, or null when the panel is absent.
+ * Exceptions: None.
+ */
+function chatMessageField(): HTMLTextAreaElement | null {
+  const input = document.getElementById('chat-panel-input');
+  return input instanceof HTMLTextAreaElement ? input : null;
+}
+
+/**
+ * Sizes the recipient list to its longest name.
+ *
+ * Purpose: The closed list stays as wide as the widest entry, including the menu arrow, and no wider.
+ * When to use: After the options are painted, including when the stored pick changes.
+ * Expected outcome: `width` is the longest option's text plus padding, borders, and the arrow. The stylesheet max-width still leaves the message field its minimum.
+ * Exceptions: None.
+ */
+function fitRecipientToWidestOption(select: HTMLSelectElement): void {
+  const probe = document.createElement('span');
+  probe.style.position = 'fixed';
+  probe.style.left = '-9999px';
+  probe.style.whiteSpace = 'nowrap';
+  probe.style.font = getComputedStyle(select).font;
+  document.body.append(probe);
+  const widest = Math.max(
+    0,
+    ...Array.from(select.options, (option) => {
+      probe.textContent = option.textContent ?? '';
+      return probe.offsetWidth;
+    }),
+  );
+  probe.remove();
+  const paddingBordersAndArrow = 28;
+  select.style.width = `${widest + paddingBordersAndArrow}px`;
+}
+
+/**
  * Enables the send button only when the field has stageable text.
  *
  * Purpose: A blank field cannot be staged.
@@ -204,9 +267,9 @@ function toggleChatPanel(panel: HTMLElement, bar: HTMLElement, button: HTMLEleme
  * Exceptions: None. Missing elements are skipped.
  */
 function syncSendEnabled(): void {
-  const input = document.getElementById('chat-panel-input');
+  const input = chatMessageField();
   const send = document.getElementById('chat-panel-send');
-  if (!(input instanceof HTMLInputElement) || !(send instanceof HTMLButtonElement)) return;
+  if (!input || !(send instanceof HTMLButtonElement)) return;
   send.disabled = !canStageText(input.value);
 }
 
@@ -219,8 +282,8 @@ function syncSendEnabled(): void {
  * Exceptions: None. A blank field returns without a request.
  */
 async function stageFromInput(): Promise<void> {
-  const input = document.getElementById('chat-panel-input');
-  if (!(input instanceof HTMLInputElement) || !canStageText(input.value)) return;
+  const input = chatMessageField();
+  if (!input || !canStageText(input.value)) return;
   const text = input.value;
   const failure = await stageChatMessage(text);
   if (failure) {
@@ -235,41 +298,109 @@ async function stageFromInput(): Promise<void> {
 }
 
 /**
- * Moves the staged draft back into the field and discards the draft.
+ * Moves one pending draft back into the field and discards that draft.
  *
- * Purpose: The player edits by staging the text again.
- * When to use: The edit button.
- * Expected outcome: The field holds the draft, the caret is at the end, and the staged row is gone.
- * Exceptions: None. No draft leaves the field unchanged.
+ * Purpose: The player edits by staging the text again, to the same side.
+ * When to use: The edit button on that line.
+ * Expected outcome: The drop-down points at that side, the field holds the draft, the caret is at the end, and that line is gone. Other pending lines stay.
+ * Exceptions: None. No draft for that side leaves the field unchanged.
  */
-async function editStaged(): Promise<void> {
-  const staged = stagedMessageFor(chatSnapshot().staged, chatRecipientSeatId());
-  const input = document.getElementById('chat-panel-input');
-  if (!staged || !(input instanceof HTMLInputElement)) return;
+async function editStaged(toSeatId: string): Promise<void> {
+  const staged = stagedMessageFor(chatSnapshot().staged, toSeatId);
+  const input = chatMessageField();
+  if (!staged || !input) return;
+  setChatRecipient(toSeatId);
   input.value = staged.text;
   syncSendEnabled();
-  await cancelStagedChatMessage();
+  await cancelStagedChatMessage(toSeatId);
   input.focus();
   const end = input.value.length;
   input.setSelectionRange(end, end);
 }
 
 /**
- * Paints one side's flag, unless the label is You, then the label.
+ * The pencil mark on an edit button.
  *
- * Purpose: The history names the sender and the recipient the same way, and You has no flag.
- * When to use: Each end of a history row.
- * Expected outcome: A flag element when the side is an opponent, then a text node of the label.
+ * Purpose: Each pending line uses the same mark the single row used.
+ * When to use: While building one pending line.
+ * Expected outcome: An SVG that does not get its own accessible name.
  * Exceptions: None.
  */
-function appendParty(parent: HTMLElement, seatId: string, viewerSeatId: string | null): void {
-  const label = sideMessagePartyLabel(seatId, viewerSeatId, seatName);
-  if (label !== 'You') {
-    const flag = createSideNumberFlag(seatId, rosterSeats());
-    if (flag) parent.append(flag);
-  }
+function stagedEditMark(): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'chrome-icon');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M9.5 2.5l4 4L6 14H2v-4L9.5 2.5z');
+  svg.append(path);
+  return svg;
+}
+
+/**
+ * One icon button for a pending line.
+ *
+ * Purpose: Edit and cancel share the control class and the tip installer.
+ * When to use: While building one pending line.
+ * Expected outcome: A button whose tip is the catalog sentence for that action.
+ * Exceptions: None.
+ */
+function stagedIconButton(label: string, tooltip: string, mark: Node): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'chat-panel-icon-btn';
+  button.setAttribute('aria-label', label);
+  button.setAttribute('data-control-tooltip', tooltip);
+  button.append(mark);
+  return button;
+}
+
+/**
+ * One pending line: the human's flag and name, an arrow, the target's flag and name, and the text.
+ *
+ * Purpose: The current-turn list names who each draft will go to.
+ * When to use: Once per draft, in recipient order.
+ * Expected outcome: The line's text is set with `textContent` and text nodes. Edit points the drop-down at that side and puts the text back in the field. Cancel discards that draft. The title is the full line, without the flags.
+ * Exceptions: None.
+ */
+function stagedRow(row: SideMessageView, viewerSeatId: string | null): HTMLElement {
+  const line = document.createElement('div');
+  line.className = 'chat-panel-staged-row';
+  const text = document.createElement('p');
+  text.className = 'chat-panel-staged-text';
+  const fromSeatId = viewerSeatId ?? row.fromSeatId;
+  appendParty(text, fromSeatId);
+  text.append(document.createTextNode(` ${SIDE_MESSAGE_ARROW} `));
+  appendParty(text, row.toSeatId);
+  const words = document.createElement('span');
+  words.textContent = `: ${row.text}`;
+  text.append(words);
+  text.title = `${seatName(fromSeatId)} ${SIDE_MESSAGE_ARROW} ${seatName(row.toSeatId)}: ${row.text}`;
+  const edit = stagedIconButton('Edit this message', chatStagedEditTooltipText, stagedEditMark());
+  edit.addEventListener('click', () => {
+    void editStaged(row.toSeatId);
+  });
+  const cancel = stagedIconButton('Cancel this message', chatStagedCancelTooltipText, document.createTextNode('×'));
+  cancel.addEventListener('click', () => {
+    void cancelStagedChatMessage(row.toSeatId);
+  });
+  line.append(text, edit, cancel);
+  return line;
+}
+
+/**
+ * Paints one side's flag, then that side's name.
+ *
+ * Purpose: The history and a pending line name the human the same way as every other side.
+ * When to use: Each end of a history row, and both ends of a pending line.
+ * Expected outcome: The seat-1 badge and `sideDisplayName` for the human. An opponent gets that opponent's number flag and name. A missing flag still leaves the name.
+ * Exceptions: None.
+ */
+function appendParty(parent: HTMLElement, seatId: string): void {
+  const flag = createMessagePartyFlag(seatId, rosterSeats());
+  if (flag) parent.append(flag);
   const name = document.createElement('span');
-  name.textContent = label;
+  name.textContent = seatName(seatId);
   parent.append(name);
 }
 
@@ -285,11 +416,11 @@ function appendHistoryRow(parent: HTMLElement, row: SideMessageView, viewerSeatI
   const line = document.createElement('p');
   line.className = 'chat-panel-row';
   if (viewerSeatId != null && row.fromSeatId === viewerSeatId) line.dataset.own = 'true';
-  appendParty(line, row.fromSeatId, viewerSeatId);
+  appendParty(line, row.fromSeatId);
   const arrow = document.createElement('span');
-  arrow.textContent = ' → ';
+  arrow.textContent = ` ${SIDE_MESSAGE_ARROW} `;
   line.append(arrow);
-  appendParty(line, row.toSeatId, viewerSeatId);
+  appendParty(line, row.toSeatId);
   if (row.scope === 'tactical') {
     const battle = document.createElement('span');
     battle.textContent = ' (battle)';
@@ -306,14 +437,15 @@ function appendHistoryRow(parent: HTMLElement, row: SideMessageView, viewerSeatI
  *
  * Purpose: Older messages stay on screen while the player is reading them.
  * When to use: From `renderChatPanel`.
- * Expected outcome: Groups from `groupSideMessagesByTurn`, or `No messages yet.` The view scrolls to the bottom when it was already there, or when the panel has just been expanded.
+ * Expected outcome: Groups from `groupSideMessagesByTurn`, each turn in source seat order, or `No messages yet.` The view is rebuilt when the side list or a side's name changes. It scrolls to the bottom when it was already there, or when the panel has just been expanded.
  * Exceptions: None. A missing history element is skipped.
  */
 function renderHistory(): void {
   const history = document.getElementById('chat-panel-history');
   if (!(history instanceof HTMLElement)) return;
   const snapshot = chatSnapshot();
-  const key = `${snapshot.viewerSeatId ?? ''}|${snapshot.messages.map((row) => row.messageId).join(',')}`;
+  const appearing = [...new Set(snapshot.messages.flatMap((row) => [row.fromSeatId, row.toSeatId]))];
+  const key = `${snapshot.viewerSeatId ?? ''}|${snapshot.messages.map((row) => row.messageId).join(',')}|${chatNamedSeatKey(appearing, seatName)}`;
   const followLatest = scrollHistoryToEnd;
   scrollHistoryToEnd = false;
   const nearBottom = history.scrollHeight - history.scrollTop - history.clientHeight <= HISTORY_BOTTOM_SLACK_PX;
@@ -329,7 +461,7 @@ function renderHistory(): void {
     empty.textContent = 'No messages yet.';
     history.append(empty);
   } else {
-    for (const group of groupSideMessagesByTurn(snapshot.messages)) {
+    for (const group of groupSideMessagesByTurn(snapshot.messages, seatOrderOf)) {
       const heading = document.createElement('p');
       heading.className = 'chat-panel-turn';
       heading.textContent = group.heading;
@@ -345,14 +477,14 @@ function renderHistory(): void {
  *
  * Purpose: An open list is not rebuilt on every refresh.
  * When to use: From `renderChatPanel`.
- * Expected outcome: One option per recipient seat id, labelled with `sideDisplayName`, and the stored pick selected.
+ * Expected outcome: One option per recipient seat id, labelled with `sideDisplayName`, and the stored pick selected. The list is rebuilt when the side list or a side's name changes, and its width follows the longest name.
  * Exceptions: None. A missing select is skipped.
  */
 function renderRecipient(): void {
   const select = document.getElementById('chat-panel-recipient');
   if (!(select instanceof HTMLSelectElement)) return;
   const ids = chatSnapshot().recipientSeatIds;
-  const key = ids.join('\n');
+  const key = chatNamedSeatKey(ids, seatName);
   if (key !== recipientKey) {
     recipientKey = key;
     select.textContent = '';
@@ -365,31 +497,38 @@ function renderRecipient(): void {
   }
   const picked = chatRecipientSeatId();
   if (picked && select.value !== picked) select.value = picked;
+  fitRecipientToWidestOption(select);
 }
 
 /**
- * Shows the draft for the picked side, or hides the row.
+ * Shows every unsent draft, in the recipient list's order.
  *
- * Purpose: The player sees the message that will be sent to that side.
+ * Purpose: The player sees each message that will be sent this turn, whichever side the drop-down shows.
  * When to use: From `renderChatPanel`. This function does not write the text field.
- * Expected outcome: The row's text and title are the draft. The row is hidden when that side has no draft, and while the viewer cannot send.
+ * Expected outcome: One line per draft from `stagedMessagesInSeatOrder`. The block is hidden when there is no draft, and while the viewer cannot send. An unchanged list keeps its buttons.
  * Exceptions: None.
  */
 function renderStaged(): void {
-  const row = document.getElementById('chat-panel-staged');
-  const text = document.getElementById('chat-panel-staged-text');
-  if (!(row instanceof HTMLElement) || !(text instanceof HTMLElement)) return;
+  const host = document.getElementById('chat-panel-staged');
+  if (!(host instanceof HTMLElement)) return;
   const snapshot = chatSnapshot();
-  const staged = snapshot.canSend ? stagedMessageFor(snapshot.staged, chatRecipientSeatId()) : null;
-  if (!staged) {
-    row.hidden = true;
-    text.textContent = '';
-    text.removeAttribute('title');
+  const staged = snapshot.canSend ? stagedMessagesInSeatOrder(snapshot.staged, snapshot.recipientSeatIds) : [];
+  const fromSeatId = snapshot.viewerSeatId ?? staged[0]?.fromSeatId ?? '';
+  const fromName = fromSeatId === '' ? '' : seatName(fromSeatId);
+  const rows = staged.map((row) => [row.messageId, row.toSeatId, seatName(row.toSeatId), row.text].join('\u0000')).join('\u0001');
+  const key = [fromSeatId, fromName, rows].join('\u0000');
+  if (key === stagedKey && (staged.length === 0 || host.childElementCount === staged.length)) {
+    host.hidden = staged.length === 0;
     return;
   }
-  row.hidden = false;
-  text.textContent = staged.text;
-  text.title = staged.text;
+  stagedKey = key;
+  host.replaceChildren();
+  if (staged.length === 0) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  for (const row of staged) host.append(stagedRow(row, snapshot.viewerSeatId));
 }
 
 /**
@@ -397,7 +536,7 @@ function renderStaged(): void {
  *
  * Purpose: A refresh, a drop-down change, and an expand all leave the panel matching the thread.
  * When to use: The thread listener, and the expand control before it measures the open height.
- * Expected outcome: The history, the drop-down, the staged row, and `data-can-send` match the snapshot. The text field is not written. The panel's visibility is synced.
+ * Expected outcome: The history, the drop-down, every pending line, and `data-can-send` match the snapshot. The text field is not written. The panel's visibility is synced.
  * Exceptions: None. A missing panel is skipped.
  */
 export function renderChatPanel(): void {
@@ -427,8 +566,8 @@ export function wireChatPanel(): void {
     syncExpandControl(button);
     button.addEventListener('click', () => toggleChatPanel(panel, bar, button));
   }
-  const input = document.getElementById('chat-panel-input');
-  if (input instanceof HTMLInputElement) {
+  const input = chatMessageField();
+  if (input) {
     input.addEventListener('input', () => syncSendEnabled());
     input.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
@@ -446,12 +585,6 @@ export function wireChatPanel(): void {
       renderChatPanel();
     });
   }
-  document.getElementById('chat-panel-staged-edit')?.addEventListener('click', () => {
-    void editStaged();
-  });
-  document.getElementById('chat-panel-staged-cancel')?.addEventListener('click', () => {
-    void cancelStagedChatMessage();
-  });
   subscribeChatThread(() => renderChatPanel());
   void refreshChatThread();
   syncChatPanelVisibility();

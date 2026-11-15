@@ -3,7 +3,7 @@
  *
  * Purpose: The renderer is given only what the viewer may see.
  * When to use: `npm run build:main`, then `node dist/main/ipc/sideMessageIpcHandler.test.js`.
- * Expected outcome: Fog on hides messages between AI sides. An observer sees every message and cannot send. A knocked-out side leaves the recipient list.
+ * Expected outcome: Fog on still lists a message between AI sides. An observer sees every message and cannot send. A knocked-out side leaves the recipient list.
  * Exceptions: None. The temporary match is closed afterward.
  */
 
@@ -14,9 +14,11 @@ import { strategicStep } from '../../shared/matchRecording';
 import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { upsertGameConfigValue } from '../gameDb/gameConfigRows';
-import { insertSentSideMessage, replaceStagedSideMessage } from '../gameDb/sideMessageStore';
+import { insertSentSideMessage, listStagedSideMessages, replaceStagedSideMessage } from '../gameDb/sideMessageStore';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
-import { buildSideMessageThreadSnapshot } from './sideMessageIpcHandler';
+import { IPC_GAME } from '../../shared/ipc/channels';
+import type { IpcMain } from 'electron';
+import { buildSideMessageThreadSnapshot, registerSideMessageIpcHandler } from './sideMessageIpcHandler';
 
 /**
  * The largest listed home regions.
@@ -50,7 +52,7 @@ function insertVisibilityRows(): void {
   insertSentSideMessage(gameDbOps, { fromSeatId: AI_SEAT_IDS[0], toSeatId: AI_SEAT_IDS[1], body: 'between', step });
 }
 
-test('fog of war hides messages between AI sides, and a draft stays out of the history', () => {
+test('the history lists every sent message, and a draft stays out of the history', () => {
   const regions = largestHomeRegions(3);
   assert.equal(regions.length, 3);
   withSeatedTempGameDb('aw-side-message-ipc-', {
@@ -65,7 +67,7 @@ test('fog of war hides messages between AI sides, and a draft stays out of the h
     const fogOn = buildSideMessageThreadSnapshot();
     assert.equal(fogOn.viewerSeatId, HUMAN_SEAT_ID);
     assert.equal(fogOn.canSend, true);
-    assert.deepEqual(fogOn.messages.map((message) => message.text), ['to-you', 'from-you']);
+    assert.deepEqual(fogOn.messages.map((message) => message.text), ['to-you', 'from-you', 'between']);
     assert.deepEqual(fogOn.recipientSeatIds, [AI_SEAT_IDS[0], AI_SEAT_IDS[1]]);
 
     upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '0');
@@ -101,5 +103,38 @@ test('an observer sees every message and cannot send', () => {
     assert.equal(snapshot.canSend, false);
     assert.deepEqual(snapshot.staged, []);
     assert.deepEqual(snapshot.messages.map((message) => message.text), ['to-you', 'from-you', 'between']);
+  });
+});
+
+test('a bad stage payload is refused and a bad cancel leaves the draft', () => {
+  const regions = largestHomeRegions(2);
+  assert.equal(regions.length, 2);
+  withSeatedTempGameDb('aw-side-message-ipc-refuse-', {
+    gameMapId: 'global',
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    replaceStagedSideMessage(gameDbOps, {
+      fromSeatId: HUMAN_SEAT_ID,
+      toSeatId: AI_SEAT_IDS[0],
+      body: 'keep',
+      step: strategicStep(1),
+    });
+    const handlers = new Map<string, (event: unknown, payload: unknown) => unknown>();
+    const ipc = {
+      handle: (channel: string, listener: (event: unknown, payload: unknown) => unknown) => {
+        handlers.set(channel, listener);
+      },
+    } as unknown as IpcMain;
+    registerSideMessageIpcHandler(ipc);
+    const stage = handlers.get(IPC_GAME.stageSideMessage);
+    const cancel = handlers.get(IPC_GAME.cancelStagedSideMessage);
+    assert.ok(stage && cancel);
+    assert.deepEqual(stage({}, null), { success: false, reason: 'Invalid message.' });
+    assert.deepEqual(stage({}, { toSeatId: 1, text: 'no' }), { success: false, reason: 'Invalid message.' });
+    cancel({}, { toSeatId: 1 });
+    assert.deepEqual(listStagedSideMessages(gameDbOps, HUMAN_SEAT_ID).map((row) => row.body), ['keep']);
   });
 });

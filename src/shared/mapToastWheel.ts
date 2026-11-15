@@ -1,7 +1,7 @@
 /**
  * Whether a wheel over the update toast should zoom the map.
  *
- * Purpose: The toast covers the + and − buttons. A wheel there still zooms, unless the toast itself can scroll in that
+ * Purpose: The toast takes the map's bottom-right corner, and the chat panel hides while it shows. A wheel there still zooms, unless the toast itself can scroll in that
  *   direction. This does not log: it runs on every wheel notch.
  * When to use: From the toast's wheel listener, with the toast's scroll metrics and the wheel's `deltaY`.
  * Expected outcome: True when the toast does not overflow, the wheel has no vertical delta, or the toast is already at

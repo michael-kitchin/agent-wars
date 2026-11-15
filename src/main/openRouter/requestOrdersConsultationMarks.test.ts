@@ -16,7 +16,14 @@ import { gameDbOps } from '../gameDb/dbConnection';
 import { insertSentSideMessage, listUnseenInboundSideMessages } from '../gameDb/sideMessageStore';
 import { advanceMatchGeneration, getMatchGeneration } from '../matchGeneration';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { markSuccessfulConsultation } from './requestOrdersConsultationMarks';
+import { consultStillOnOpenMatch, markSuccessfulConsultation } from './requestOrdersConsultationMarks';
+
+test('a missing config table reports that the consult is not on the open match', () => {
+  withTempGameDb('aw-consult-open-', () => {
+    gameDbOps.run('DROP TABLE game_config');
+    assert.equal(consultStillOnOpenMatch('match', getMatchGeneration()), false);
+  });
+});
 
 test('only the ids passed to a successful consult become seen', () => {
   withTempGameDb('aw-seen-messages-', () => {

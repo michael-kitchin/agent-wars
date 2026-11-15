@@ -7,6 +7,7 @@
  * Exceptions: None. Failures set `process.exitCode`.
  */
 
+import * as fs from 'fs';
 import { readRecordingFile } from './matchRecordingFile';
 import { formatRecordingSummary, summarizeRecording } from './matchRecordingSummary';
 
@@ -26,7 +27,8 @@ function main(): void {
     return;
   }
   try {
-    process.stdout.write(formatRecordingSummary(summarizeRecording(readRecordingFile(filePath))));
+    const summary = summarizeRecording(readRecordingFile(filePath));
+    process.stdout.write(formatRecordingSummary(summary, fs.statSync(filePath).size));
   } catch {
     process.stderr.write('The recording file could not be read.\n');
     process.exitCode = 1;

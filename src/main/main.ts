@@ -7,6 +7,7 @@ import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, protocol, screen } from 'electron';
 import * as path from 'path';
 import { AI_SEAT_IDS, isAiSeatId, type SeatId } from '../shared/seatIds';
+import { activeHumanSeatId } from '../shared/observeModeControls';
 import { fallbackConsultModelId, type TacticalBeatConsultArgs } from './ipc/readyIpcResolutionMapping';
 import { readMatchSnapshot } from './ipc/matchViewSnapshot';
 import {
@@ -50,7 +51,10 @@ import { restorePersistedTacticalBattleSession } from './tacticalBattle/tactical
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 import { exportFinishedMatchRecordingIfNeeded } from './recorder/matchRecordingExport';
 import { recordTacticalBeat } from './recorder/matchRecordingEvents';
+import { gameDbOps } from './gameDb/dbConnection';
+import { readSeatRoster } from './gameDb/seatRosterStore';
 import { sendStagedHumanSideMessages } from './sideMessages/humanSideMessages';
+import { battleHasPartySeat } from './tacticalBattle/opposingParty';
 import { currentStepKey } from './recorder/recorderStepKey';
 import {
   parseGroupedTargetPayload,
@@ -461,6 +465,7 @@ function registerIpcHandlers(): void {
     const parsed = parseHumanTacticalCommitPayload(payload);
     if (!parsed.ok) return { success: false, reason: parsed.reason };
     const v = parsed.value;
+    const preBattle = getActiveTacticalBattleSnapshot();
     const beatStep = currentStepKey();
     const result = commitHumanTacticalDraftOrders({
       movementOrders: v.movementOrders,
@@ -485,7 +490,11 @@ function registerIpcHandlers(): void {
         },
         playback: result.tacticalResolutionPlayback,
       });
-      sendStagedHumanSideMessages(beatStep);
+      const humanSeatId = activeHumanSeatId(readSeatRoster(gameDbOps));
+      // An AI-only beat commits through this channel too. The player's drafts wait for their own commit.
+      if (preBattle && humanSeatId && battleHasPartySeat(preBattle, humanSeatId)) {
+        sendStagedHumanSideMessages(beatStep);
+      }
     }
     if (
       !result.success ||
@@ -607,7 +616,7 @@ function registerIpcHandlers(): void {
   registerBasemapIpc(ipcMain);
   registerOpenRouterIpcHandler(ipcMain);
   registerCommanderPoolIpcHandler(ipcMain);
-  registerEndMatchIpcHandler(ipcMain);
+  registerEndMatchIpcHandler(ipcMain, { isDeferredConsultPending: hasDeferredPlaybackConsultPending });
   registerSideMessageIpcHandler(ipcMain);
   registerHumanNicknameIpcHandler(ipcMain);
   registerSeatCommanderIpcHandler(ipcMain);

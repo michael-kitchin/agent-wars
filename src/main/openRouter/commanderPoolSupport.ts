@@ -14,7 +14,8 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { TalkRound } from './talk/talkRound';
-import { logError } from '../logger';
+import { logError, logTrace } from '../logger';
+import { getMatchGeneration } from '../matchGeneration';
 
 /**
  * What one seat consult is asked to do.
@@ -262,6 +263,20 @@ export type CommanderConsultOutcome = {
  * Expected outcome: `finished` is false and every order list is empty.
  * Exceptions: None.
  */
+/**
+ * Whether Stop, New, or Load happened while a seat waited on its talk round.
+ *
+ * Purpose: Stop, New, and Load during a talk round must not start an orders call, because no orders scope exists yet for them to abort.
+ * When to use: After `speakAndAwaitTalkRound` returns and before `executeAbortableConsult`.
+ * Expected outcome: True when the signal is already aborted or the match generation has moved. False when the seat should start orders.
+ * Exceptions: None.
+ */
+export function consultStoppedWhileTalking(signal: AbortSignal, generationAtStart: number): boolean {
+  const stopped = signal.aborted || getMatchGeneration() !== generationAtStart;
+  logTrace('commanderPoolSupport consultStoppedWhileTalking', { aborted: signal.aborted, stopped });
+  return stopped;
+}
+
 export function emptyConsultOutcome(
   overrides: Partial<CommanderConsultOutcome> = {}
 ): CommanderConsultOutcome {

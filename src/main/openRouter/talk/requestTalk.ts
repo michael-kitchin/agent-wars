@@ -11,6 +11,7 @@ import { logDebug, logError } from '../../logger';
 import { gameDbOps } from '../../gameDb/dbConnection';
 import { readMatchId } from '../../gameDb/gameConfigKv';
 import { getMatchGeneration } from '../../matchGeneration';
+import { modelCallHitDeadline } from '../modelCallControl';
 import { consultStillOnOpenMatch } from '../requestOrdersConsultationMarks';
 import { recordConsultation, stepForConsult } from '../../recorder/matchRecordingEvents';
 import { readSeatApiKey } from '../commanderKeyMemory';
@@ -38,6 +39,20 @@ import { buildTalkReplyResponseFormat } from './talkReplySchema';
  * Exceptions: None.
  */
 export type TalkSilenceReason = 'abstained' | 'failed' | 'timed_out' | 'unparsed' | 'cancelled' | 'no_recipients';
+
+/**
+ * The log line for how many messages one reply sent.
+ *
+ * Purpose: One message is singular. Every other count, including zero, stays plural.
+ * When to use: The success log in `requestTalk`.
+ * Expected outcome: `Sent 1 message.`, `Sent no messages.`, or `Sent N messages.`
+ * Exceptions: None.
+ */
+export function sentMessagesLogLine(count: number): string {
+  if (count === 1) return 'Sent 1 message.';
+  if (count === 0) return 'Sent no messages.';
+  return `Sent ${count} messages.`;
+}
 
 /**
  * What one talk call decided.
@@ -98,6 +113,7 @@ export interface RequestTalkDeps {
  * Exceptions: None.
  */
 function silenceReasonForTransport(error: string, signal?: AbortSignal): TalkSilenceReason {
+  if (modelCallHitDeadline(signal)) return 'timed_out';
   if (signal?.aborted || error === 'Cancelled' || error.includes('AbortError')) return 'cancelled';
   if (error.toLowerCase().includes('timed out')) return 'timed_out';
   return 'failed';
@@ -201,11 +217,11 @@ export async function requestTalk(
       return outcome;
     }
     outcome = { kind: 'spoke', reply, costUsd: usage.requestCost };
-    args.onLog?.(reply.messages.length > 0 ? `Sent ${reply.messages.length} messages.` : 'Sent no messages.');
+    args.onLog?.(sentMessagesLogLine(reply.messages.length));
     return outcome;
   } catch (err) {
     logError('requestTalk requestTalk: exception', { seatId: args.seatId, err });
-    const reason = args.signal?.aborted ? 'cancelled' : 'failed';
+    const reason = modelCallHitDeadline(args.signal) ? 'timed_out' : args.signal?.aborted ? 'cancelled' : 'failed';
     outcome = { kind: 'silent', reason, costUsd: usage.requestCost };
     args.onLog?.('Sent no messages.', reason === 'failed');
     return outcome;

@@ -1,7 +1,7 @@
 /**
  * Sends a wheel over the update toast to the main map when the toast cannot use it.
  *
- * Purpose: The toast covers the + and − buttons and takes the pointer, so a wheel on it would otherwise miss the map.
+ * Purpose: The toast takes the map's bottom-right corner, and the chat panel hides while it shows. A wheel on it would otherwise miss the map.
  *   This module does not import the logger. The decision runs on every wheel notch.
  * When to use: Once, while the map toast's other listeners are attached.
  * Expected outcome: A wheel zooms the map, toward the pointer, when `mapToastWheelReachesMap` says so. A wheel that the

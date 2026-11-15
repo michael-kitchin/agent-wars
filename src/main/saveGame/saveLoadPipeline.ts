@@ -13,6 +13,9 @@ import { activeGameMap } from '../../shared/activeGameMap';
 import type { LoadGameResult, SaveGameResult } from '../../shared/ipc/saveLoadTypes';
 import { replaceGameDatabaseWithStagedFile, DATABASE_REPLACE_ROLLBACK_FAILED_MESSAGE } from '../gameDb/databaseReplace';
 import { dbGetOne } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { deleteGameConfigRow } from '../gameDb/gameConfigRows';
+import { PLAYTHROUGH_ID_CONFIG_KEY, storeNewPlaythroughId } from '../gameDb/gameConfigKv';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { deleteSqliteFileSet } from './sqliteFileSet';
@@ -251,6 +254,17 @@ async function loadBody(deps: SaveLoadDeps, stagingPath: string): Promise<LoadGa
     return failedLoad(LOAD_FAILED_MESSAGE);
   }
   resetMatchMemoryAfterDatabaseReplace();
+  try {
+    storeNewPlaythroughId(gameDbOps);
+  } catch (err) {
+    logError('saveLoadPipeline could not start a new playthrough', { err });
+    try {
+      deleteGameConfigRow(gameDbOps, PLAYTHROUGH_ID_CONFIG_KEY);
+    } catch (deleteErr) {
+      logError('saveLoadPipeline could not clear the saved playthrough', { err: deleteErr });
+      return failedLoad(LOAD_FAILED_MESSAGE);
+    }
+  }
   rememberCurrentAutoSaveTurnKey();
   if (!isInsideDirectory(chosen, autosaveDirectory(deps.userDataDir))) {
     writeRememberedSaveDirectory(deps.userDataDir, path.dirname(chosen));

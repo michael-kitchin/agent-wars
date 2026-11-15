@@ -12,7 +12,8 @@ import { test } from 'node:test';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { MACHINE_LOCAL_CONFIG_KEYS } from '../gameDb/machineLocalConfigKeys';
 import { upsertGameConfigValue } from '../gameDb/gameConfigRows';
-import { buildFramePayload } from './matchFrameCapture';
+import { buildFramePayload, readHumanOrderTables, readMatchTable } from './matchFrameCapture';
+import type { BasicDbOps } from '../gameDb/dbOps';
 import { withRegionVsRegionTempGameDb } from '../testSupport/withRegionVsRegionTempGameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
@@ -38,6 +39,21 @@ test('a frame omits hexes and machine-local config rows', () => {
     assert.equal(text.includes('match_id'), true);
     assert.ok(elapsedMs < 2000, `frame capture took ${elapsedMs} ms`);
   });
+});
+
+test('a missing table reads as an empty snapshot', () => {
+  withTempGameDb('aw-match-frame-missing-', () => {
+    assert.deepEqual(readMatchTable(gameDbOps, 'not_a_table'), { columns: [], rows: [] });
+  });
+});
+
+test('a failed human-order read returns no tables', () => {
+  const ops = {
+    getAll: () => {
+      throw new Error('boom');
+    },
+  } as unknown as BasicDbOps;
+  assert.deepEqual(readHumanOrderTables(ops), {});
 });
 
 test('a regional frame is measured the same way', () => {

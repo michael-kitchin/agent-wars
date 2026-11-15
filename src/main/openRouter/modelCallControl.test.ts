@@ -6,6 +6,7 @@ import {
   getLastModelCallCancelReason,
   getModelCallCancelEpoch,
   hasModelCallCancelSince,
+  modelCallHitDeadline,
 } from './modelCallControl';
 
 describe('modelCallControl', { concurrency: 1 }, () => {
@@ -46,5 +47,21 @@ describe('modelCallControl', { concurrency: 1 }, () => {
     assert.equal(hasModelCallCancelSince(secondEpoch, 'opponent2'), false);
     first.end();
     second.end();
+  });
+
+  it('a deadline abort is distinct from a stop', () => {
+    const deadline = beginModelCall('deadline', 'strategic', 'opponent');
+    deadline.abortForDeadline();
+    assert.equal(deadline.signal.aborted, true);
+    assert.equal(modelCallHitDeadline(deadline.signal), true);
+    deadline.end();
+    const stopped = beginModelCall('stopped', 'strategic', 'opponent');
+    stopped.abort();
+    assert.equal(modelCallHitDeadline(stopped.signal), false);
+    stopped.end();
+    const cancelled = beginModelCall('cancelled', 'tactical', 'opponent');
+    cancelModelCalls('run_off', 'all', 'opponent');
+    assert.equal(modelCallHitDeadline(cancelled.signal), false);
+    cancelled.end();
   });
 });

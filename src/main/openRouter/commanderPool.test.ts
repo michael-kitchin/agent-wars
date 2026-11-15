@@ -529,7 +529,7 @@ describe('commander pool', { concurrency: 1 }, () => {
     });
   });
 
-  test('fog on keeps a message to the human and hides a message to another side', async (t) => {
+  test('the dialog keeps a message to another side, with fog on', async (t) => {
     if (!regionalMap()) {
       t.skip('no regional map with three side groups is extracted');
       return;
@@ -570,7 +570,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
         await flushWrites();
         const toOther = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
-        assert.deepEqual(toOther?.messages, []);
+        assert.deepEqual(toOther?.messages.map((row) => row.text), ['hello other']);
       } finally {
         setCommanderTalkRunnerForTests(null);
         setCommanderConsultRunnerForTests(null);
@@ -579,7 +579,7 @@ describe('commander pool', { concurrency: 1 }, () => {
     }, true);
   });
 
-  test('a wave keeps the messages the viewer may see', async (t) => {
+  test('the dialog keeps every message this consult sent, with fog on and while observing', async (t) => {
     if (!regionalMap()) {
       t.skip('no regional map with three side groups is extracted');
       return;
@@ -617,7 +617,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
         await flushWrites();
         const fogOn = readCommanderPoolSnapshot(true).dispatches.find((row) => row.seatId === AI_SEAT_IDS[0]);
-        assert.deepEqual(fogOn?.messages.map((row) => row.toSeatId), [HUMAN_SEAT_ID]);
+        assert.deepEqual(fogOn?.messages.map((row) => row.text), ['hello human', 'hello other']);
         resetCommanderPool(getSeatRoster());
         upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '0');
         startStrategicPlanning();

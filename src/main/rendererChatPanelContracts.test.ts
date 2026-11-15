@@ -18,9 +18,6 @@ const CHAT_IDS = [
   'chat-panel',
   'chat-panel-history',
   'chat-panel-staged',
-  'chat-panel-staged-text',
-  'chat-panel-staged-edit',
-  'chat-panel-staged-cancel',
   'chat-panel-bar',
   'chat-panel-expand',
   'chat-panel-title',
@@ -74,8 +71,13 @@ test('the panel stages on Enter, paints text as text, and slides', () => {
   assert.equal(panel.includes('isComposing'), true);
   assert.equal(panel.includes('textContent'), true);
   assert.equal(panel.includes('groupSideMessagesByTurn'), true);
-  assert.equal(panel.includes('sideMessagePartyLabel'), true);
+  assert.equal(panel.includes('createMessagePartyFlag'), true);
+  assert.equal(panel.includes('sideMessagePartyLabel'), false);
   assert.equal(panel.includes('innerHTML'), false);
+  assert.equal(panel.includes('chatNamedSeatKey'), true);
+  assert.equal(panel.includes('stagedMessagesInSeatOrder'), true);
+  assert.equal(panel.includes('chatStagedEditTooltipText'), true);
+  assert.equal(panel.includes("ids.join('\\n')"), false);
   assert.equal(panel.includes('stopPropagation'), false);
   assert.equal(client.includes('currentRendererMatchEpoch'), true);
   assert.equal(client.includes('commanderPoolClient'), false);
@@ -85,6 +87,14 @@ test('the history refreshes from the pool, Ready, and a tactical commit', () => 
   assert.equal(readRendererSource('openRouter', 'commanderPoolClient.ts').includes('refreshChatThread'), true);
   assert.equal(readRendererSource('gameplay', 'readyHandler.ts').includes('refreshChatThread'), true);
   assert.equal(readRendererSource('gameplay', 'readyTacticalCommit.ts').includes('refreshChatThread'), true);
+});
+
+test('a snapshot repaints and syncs the chat panel after the state is stored', () => {
+  const source = readRendererSource('core', 'stateSnapshot.ts');
+  const assigned = source.indexOf('S.gameState = nextState;');
+  const repainted = source.indexOf('repaintChatThread()');
+  const synced = source.indexOf('syncChatPanelVisibility()');
+  assert.ok(assigned >= 0 && repainted > assigned && synced > assigned);
 });
 
 test('the map toast show and hide both sync the chat panel', () => {

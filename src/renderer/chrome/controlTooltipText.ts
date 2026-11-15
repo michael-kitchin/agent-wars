@@ -645,3 +645,19 @@ export const aiOnlyResultOkTooltipText =
  */
 export const aiOnlyTimedResultOkTooltipText =
   'Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.';
+
+/**
+ * Purpose: Edit puts that pending line back in the field, addressed to the same side.
+ * When to use: Each pending line's edit button in the chat panel.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const chatStagedEditTooltipText = 'Put this message back in the text field to change it.';
+
+/**
+ * Purpose: Cancel discards that pending line. The other lines stay.
+ * When to use: Each pending line's cancel button in the chat panel.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const chatStagedCancelTooltipText = 'Discard this message. It has not been sent.';

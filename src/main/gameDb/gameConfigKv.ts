@@ -313,3 +313,67 @@ export function ensureMatchId(ops: GameConfigKvDbOps): string {
   logDebug('gameConfigKv ensureMatchId', { created: true });
   return created;
 }
+
+/**
+ * `game_config` key for one run of the open match.
+ *
+ * Purpose: A second playthrough of the same match records to a different file.
+ * When to use: Reading or writing the playthrough id.
+ * Expected outcome: The string `playthrough_id`.
+ * Exceptions: None.
+ */
+export const PLAYTHROUGH_ID_CONFIG_KEY = 'playthrough_id';
+
+/**
+ * Reads the open playthrough's id.
+ *
+ * Purpose: The export names the recording from this id and must not create one when the caller only wants to look.
+ * When to use: When a missing row should stay missing.
+ * Expected outcome: The stored id, or null when the row is missing or empty. The id itself is not logged.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function readPlaythroughId(ops: GameConfigKvDbOps): string | null {
+  if (ops.hasDb && !ops.hasDb()) {
+    logTrace('gameConfigKv readPlaythroughId', { found: false });
+    return null;
+  }
+  const value = selectGameConfigValue(ops, PLAYTHROUGH_ID_CONFIG_KEY);
+  const found = value !== undefined && value.length > 0;
+  logTrace('gameConfigKv readPlaythroughId', { found });
+  return found ? value : null;
+}
+
+/**
+ * Returns the open playthrough's id, creating one when the row is missing.
+ *
+ * Purpose: A match from an earlier build gets an id the first time it is exported.
+ * When to use: The recording export. A load that must start a new playthrough uses `storeNewPlaythroughId` instead.
+ * Expected outcome: The stored id, unchanged when one is already present, or a new UUID. The log says whether one was created, not the id.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function ensurePlaythroughId(ops: GameConfigKvDbOps): string {
+  const existing = readPlaythroughId(ops);
+  if (existing) {
+    logDebug('gameConfigKv ensurePlaythroughId', { created: false });
+    return existing;
+  }
+  const created = randomUUID();
+  upsertGameConfigValue(ops, PLAYTHROUGH_ID_CONFIG_KEY, created);
+  logDebug('gameConfigKv ensurePlaythroughId', { created: true });
+  return created;
+}
+
+/**
+ * Replaces the open playthrough's id.
+ *
+ * Purpose: Loading a save starts a new playthrough, so the next recording does not replace the previous file.
+ * When to use: After a new match id is stored, and after a load has opened the saved database.
+ * Expected outcome: A new UUID is stored. The id itself is not logged.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function storeNewPlaythroughId(ops: GameConfigKvDbOps): string {
+  const created = randomUUID();
+  upsertGameConfigValue(ops, PLAYTHROUGH_ID_CONFIG_KEY, created);
+  logDebug('gameConfigKv storeNewPlaythroughId', { stored: true });
+  return created;
+}

@@ -11,7 +11,8 @@ import { logTrace } from '../../logger';
 import type { CoachingGates } from './coachingGates';
 import { buildDoctrineBlock } from './doctrineText';
 import { buildStrategyBlock } from './coachingTextStrategic';
-import { SIDE_MESSAGE_RULE_BLOCK } from './sideMessageRuleText';
+import { isTalkStageEnabled } from '../commanderPoolRounds';
+import { sideMessageRuleBlock } from './sideMessageRuleText';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 import {
   SECTION_TITLE_AIR_AND_NAVAL_UNITS,
@@ -33,7 +34,7 @@ export function buildTacticalContextCoaching(gates: CoachingGates): string {
   const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
   return `${TACTICAL_PRIORITY_BLOCK}
 ${buildStrategyBlock('tactical')}${doctrineLine}
-${SIDE_MESSAGE_RULE_BLOCK}`;
+${sideMessageRuleBlock({ talkStageEnabled: isTalkStageEnabled() })}`;
 }
 
 /**

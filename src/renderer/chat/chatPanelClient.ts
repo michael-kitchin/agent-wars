@@ -3,7 +3,7 @@
  *
  * Purpose: The panel reads, stages, and cancels through the game API. It does not decide who may see a message.
  * When to use: When the panel opens, after a stage or cancel, and after a consult or a commit that may have sent messages.
- * Expected outcome: Listeners see the latest snapshot the viewer is allowed to have. A reply for a match that has since changed is dropped.
+ * Expected outcome: Listeners see the latest snapshot: every sent message and the viewer's drafts. A reply for a match that has since changed is dropped.
  * Exceptions: A missing API method returns quietly. A rejected call is logged and leaves the last snapshot in place.
  */
 
@@ -28,7 +28,7 @@ const EMPTY_THREAD: SideMessageThreadSnapshot = {
 };
 
 /**
- * The last thread the viewer was allowed to see.
+ * The last thread read for the match on screen.
  *
  * Purpose: A redraw uses this instead of asking again.
  * When to use: `chatSnapshot` and the stage and cancel paths.
@@ -72,8 +72,8 @@ export function chatSnapshot(): SideMessageThreadSnapshot {
 /**
  * The side the entry line is addressed to.
  *
- * Purpose: The drop-down and the staged row share one pick.
- * When to use: While drawing, and before a stage or cancel.
+ * Purpose: The drop-down and a stage request share one pick. The pending list does not.
+ * When to use: While drawing the drop-down, and before a stage or cancel.
  * Expected outcome: The stored seat id, or null when nobody can be written to.
  * Exceptions: None.
  */
@@ -84,9 +84,9 @@ export function chatRecipientSeatId(): string | null {
 /**
  * Points the entry line at one side.
  *
- * Purpose: Changing the drop-down changes which draft is shown, without a new read.
- * When to use: The recipient drop-down's change event.
- * Expected outcome: Later stage and cancel calls use this seat.
+ * Purpose: The next message the player stages goes to this side.
+ * When to use: The recipient drop-down's change event, and Edit on a pending line.
+ * Expected outcome: Later stage calls use this seat. The pending list is unchanged.
  * Exceptions: None.
  */
 export function setChatRecipient(seatId: string): void {
@@ -122,7 +122,19 @@ function notifyChatThread(): void {
 }
 
 /**
- * Reads the thread the viewer may see.
+ * Repaints the panel from the stored thread without asking again.
+ *
+ * Purpose: Side names and flags come from the roster, which can arrive after the thread. A restored match reads the thread before its first snapshot.
+ * When to use: After a match snapshot is stored in the renderer, and after a seat's nickname changes.
+ * Expected outcome: Each listener runs once. With no listener, nothing happens.
+ * Exceptions: A listener that throws stops the rest.
+ */
+export function repaintChatThread(): void {
+  notifyChatThread();
+}
+
+/**
+ * Reads every sent message and the viewer's drafts.
  *
  * Purpose: The history and the staged row come from the database, not from a consult dispatch.
  * When to use: When the panel is wired, when a match starts, after a stage or cancel, and after a consult or a commit.
@@ -166,18 +178,18 @@ export async function stageChatMessage(text: string): Promise<string | null> {
 }
 
 /**
- * Drops the draft addressed to the picked side.
+ * Drops the draft addressed to one side.
  *
- * Purpose: Edit and the × button both discard that draft.
+ * Purpose: Edit and the × button both discard that draft, whichever side it names.
  * When to use: After Edit has copied the text into the field, and when × is clicked.
- * Expected outcome: The draft is gone and the thread is read again. Nothing happens when there is no recipient.
+ * Expected outcome: That draft is gone and the thread is read again. Other drafts stay.
  * Exceptions: A missing API returns. A rejection is logged.
  */
-export async function cancelStagedChatMessage(): Promise<void> {
+export async function cancelStagedChatMessage(toSeatId: string): Promise<void> {
   const cancel = window.gameApi?.cancelStagedSideMessage;
-  if (!cancel || recipientSeatId == null) return;
+  if (!cancel) return;
   try {
-    await cancel({ toSeatId: recipientSeatId });
+    await cancel({ toSeatId });
     await refreshChatThread();
   } catch (err) {
     console.error('cancelStagedSideMessage failed', err);

@@ -18,6 +18,7 @@ test('the format fixture parses, and a newer file or a broken line does not', ()
   const text = fs.readFileSync(fixturePath, 'utf8');
   const recording = parseRecordingLines(text);
   assert.equal(recording.header.matchId, 'fixture-match');
+  assert.equal(recording.header.playthroughId, '');
   assert.equal(recording.staticData.hexes.rows.length, 1);
   assert.equal(recording.records.length, 2);
   assert.equal(recording.records[1]?.kind, 'frame');

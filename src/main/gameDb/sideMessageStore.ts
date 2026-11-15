@@ -358,7 +358,7 @@ export function listSideMessageThread(ops: BasicDbOps, seatA: string, seatB: str
 /**
  * Lists every sent message.
  *
- * Purpose: A screen that must apply `sideMessageVisibleTo` itself starts from the full sent log.
+ * Purpose: The chat history shows this list as it stands. A prompt filters it with `sideMessageVisibleTo`.
  * When to use: When the caller is not already asking for one thread.
  * Expected outcome: Sent rows in `message_id` order.
  * Exceptions: Propagates a SQLite error.

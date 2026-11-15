@@ -42,9 +42,11 @@ export type BegunModelCall = {
   readonly controller: AbortController;
   end: () => void;
   abort: () => void;
+  abortForDeadline: () => void;
 };
 
 const scopes = new Set<ModelCallScope>();
+const deadlineSignals = new WeakSet<AbortSignal>();
 const seatCancelEpoch = new Map<AiSeatId, number>();
 let cancelEpochAll = 0;
 let lastCancelReason: ModelCallCancelReason | null = null;
@@ -75,7 +77,26 @@ export function beginModelCall(label: string, theater: ModelCallTheater, seatId:
     abort: () => {
       if (!scope.ended) controller.abort();
     },
+    abortForDeadline: () => {
+      if (scope.ended) return;
+      deadlineSignals.add(controller.signal);
+      controller.abort();
+    },
   };
+}
+
+/**
+ * Reports whether a deadline abort, rather than Stop, aborted this signal.
+ *
+ * Purpose: A talk call that hits its own deadline is a timeout. A stop is a cancel.
+ * When to use: When a talk transport sees an aborted signal.
+ * Expected outcome: True only for a signal passed to `abortForDeadline`. A plain abort and a cancel stay false.
+ * Exceptions: None.
+ */
+export function modelCallHitDeadline(signal: AbortSignal | undefined): boolean {
+  const hit = signal !== undefined && deadlineSignals.has(signal);
+  logTrace('modelCallControl modelCallHitDeadline', { hit });
+  return hit;
 }
 
 /**

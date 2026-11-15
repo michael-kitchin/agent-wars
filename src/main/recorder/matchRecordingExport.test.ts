@@ -16,7 +16,7 @@ import { gunzipSync } from 'node:zlib';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { MACHINE_LOCAL_CONFIG_KEYS } from '../gameDb/machineLocalConfigKeys';
 import { upsertGameConfigValue } from '../gameDb/gameConfigRows';
-import { readMatchId, setGameOutcomeWithOps } from '../gameDb/gameConfigKv';
+import { readMatchId, readPlaythroughId, setGameOutcomeWithOps, storeNewPlaythroughId } from '../gameDb/gameConfigKv';
 import { strategicStep } from '../../shared/matchRecording';
 import { readRecordingFile } from './matchRecordingFile';
 import { exportFinishedMatchRecordingIfNeeded, recordingFileName, writeMatchRecordingFile } from './matchRecordingExport';
@@ -58,7 +58,8 @@ test('a recording file round-trips and a finished match is exported once until n
       recordStepBoundary(strategicStep(2), '1.0.0');
       exportFinishedMatchRecordingIfNeeded({ ...exportDeps, deferredConsultPending: true });
       const matchId = readMatchId(gameDbOps) ?? '';
-      const finished = path.join(userData, 'recordings', recordingFileName(matchId));
+      const playthroughId = readPlaythroughId(gameDbOps) ?? '';
+      const finished = path.join(userData, 'recordings', recordingFileName(matchId, playthroughId));
       assert.equal(fs.existsSync(finished), false);
       exportFinishedMatchRecordingIfNeeded(exportDeps);
       assert.equal(fs.existsSync(finished), true);
@@ -81,5 +82,108 @@ test('a recording file round-trips and a finished match is exported once until n
 });
 
 test('a match id with path characters becomes a safe file name', () => {
-  assert.equal(recordingFileName('a/b:c'), 'recording-a-b-c.agentwars-recording');
+  assert.equal(recordingFileName('a/b:c', 'p/q'), 'recording-a-b-c-p-q.agentwars-recording');
+});
+
+test('the export renames over the target and end match passes the pending flag', () => {
+  const root = path.join(__dirname, '..', '..', '..');
+  const exportSource = fs.readFileSync(path.join(root, 'src', 'main', 'recorder', 'matchRecordingExport.ts'), 'utf8');
+  const writeStart = exportSource.indexOf('export function writeMatchRecordingFile');
+  const writeBody = exportSource.slice(writeStart, exportSource.indexOf('export function exportFinishedMatchRecordingIfNeeded'));
+  assert.equal(writeBody.includes('fs.rmSync(args.targetPath)'), false);
+  assert.equal(writeBody.includes('fs.existsSync(args.targetPath)'), false);
+  const endSource = fs.readFileSync(path.join(root, 'src', 'main', 'ipc', 'endMatchIpcHandler.ts'), 'utf8');
+  assert.equal(endSource.includes('deferredConsultPending: deps.isDeferredConsultPending()'), true);
+  const mainSource = fs.readFileSync(path.join(root, 'src', 'main', 'main.ts'), 'utf8');
+  assert.equal(
+    mainSource.includes('registerEndMatchIpcHandler(ipcMain, { isDeferredConsultPending: hasDeferredPlaybackConsultPending })'),
+    true
+  );
+});
+
+test('two playthroughs of one finished match leave two files', () => {
+  withTempGameDb('aw-match-playthroughs-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    setGameOutcomeWithOps(gameDbOps, { winnerSeatId: 'human', endReason: 'ended_by_human' });
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recording-plays-'));
+    const exportDeps = {
+      userDataDir: dir,
+      appVersion: '1.0.0',
+      now: () => new Date('2026-01-02T00:00:00.000Z'),
+      deferredConsultPending: false,
+    };
+    try {
+      const matchId = readMatchId(gameDbOps) ?? '';
+      const firstPlaythrough = readPlaythroughId(gameDbOps) ?? '';
+      exportFinishedMatchRecordingIfNeeded(exportDeps);
+      const firstPath = path.join(dir, 'recordings', recordingFileName(matchId, firstPlaythrough));
+      const firstBytes = fs.readFileSync(firstPath);
+      const secondPlaythrough = storeNewPlaythroughId(gameDbOps);
+      exportFinishedMatchRecordingIfNeeded({ ...exportDeps, now: () => new Date('2026-02-02T00:00:00.000Z') });
+      const secondPath = path.join(dir, 'recordings', recordingFileName(matchId, secondPlaythrough));
+      assert.notEqual(firstPath, secondPath);
+      assert.equal(fs.existsSync(secondPath), true);
+      assert.deepEqual(fs.readFileSync(firstPath), firstBytes);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+test('a file with the same count and a different last record id is rewritten', () => {
+  withTempGameDb('aw-match-tail-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    setGameOutcomeWithOps(gameDbOps, { winnerSeatId: 'human', endReason: 'ended_by_human' });
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recording-tail-'));
+    const exportDeps = {
+      userDataDir: dir,
+      appVersion: '1.0.0',
+      now: () => new Date('2026-01-02T00:00:00.000Z'),
+      deferredConsultPending: false,
+    };
+    try {
+      exportFinishedMatchRecordingIfNeeded(exportDeps);
+      const matchId = readMatchId(gameDbOps) ?? '';
+      const playthroughId = readPlaythroughId(gameDbOps) ?? '';
+      const finished = path.join(dir, 'recordings', recordingFileName(matchId, playthroughId));
+      const before = readRecordingFile(finished).records.length;
+      gameDbOps.run('DELETE FROM match_records WHERE record_id = (SELECT MIN(record_id) FROM match_records)');
+      recordMatchEvent({ type: 'consultation', step: strategicStep(1), visibility: 'engine', payload: { stage: 'orders' } });
+      exportFinishedMatchRecordingIfNeeded({ ...exportDeps, now: () => new Date('2026-03-02T00:00:00.000Z') });
+      const after = readRecordingFile(finished);
+      assert.equal(after.records.length, before);
+      assert.equal(after.records.at(-1)?.recordType, 'consultation');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+test('writing twice leaves the second file and a directory target keeps the directory', () => {
+  withTempGameDb('aw-match-replace-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recording-replace-'));
+    const target = path.join(dir, 'round.agentwars-recording');
+    try {
+      writeMatchRecordingFile({ ops: gameDbOps, targetPath: target, appVersion: '1.0.0', exportedAt: '2026-01-01T00:00:00.000Z' });
+      recordMatchEvent({ type: 'consultation', step: strategicStep(1), visibility: 'engine', payload: { stage: 'talk' } });
+      writeMatchRecordingFile({ ops: gameDbOps, targetPath: target, appVersion: '1.0.0', exportedAt: '2026-01-02T00:00:00.000Z' });
+      assert.equal(fs.existsSync(`${target}.tmp`), false);
+      assert.equal(readRecordingFile(target).records.at(-1)?.recordType, 'consultation');
+      const blocked = path.join(dir, 'blocked');
+      fs.mkdirSync(blocked);
+      assert.throws(() => writeMatchRecordingFile({
+        ops: gameDbOps,
+        targetPath: blocked,
+        appVersion: '1.0.0',
+        exportedAt: '2026-01-03T00:00:00.000Z',
+      }));
+      assert.equal(fs.statSync(blocked).isDirectory(), true);
+      assert.equal(fs.existsSync(`${blocked}.tmp`), false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

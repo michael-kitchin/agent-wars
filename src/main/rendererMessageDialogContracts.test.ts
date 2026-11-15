@@ -13,7 +13,13 @@ import { readRendererSource } from './testSupport/rendererSourceAssertions';
 
 test('the message dialog orders bullets and does not use innerHTML', () => {
   const source = readRendererSource('openRouter', 'commanderMessageTabsUi.ts');
+  const reports = readRendererSource('chrome', 'consoleReports.ts');
   assert.equal(source.includes('dispatchMessagesInSideOrder'), true);
   assert.equal(source.includes('createSideNumberFlag'), true);
-  assert.equal(source.includes('innerHTML'), false);
+  for (const file of [source, reports]) {
+    assert.equal(file.includes('innerHTML'), false);
+    assert.equal(file.includes('insertAdjacentHTML'), false);
+    assert.equal(file.includes('outerHTML'), false);
+  }
+  assert.equal(reports.includes('messageText'), false);
 });

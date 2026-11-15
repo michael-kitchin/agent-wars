@@ -20,6 +20,8 @@ import { dbGetAll, dbRun, setAiPendingOrders } from './gameDb';
 import { updateSeatCommander } from './gameDb/seatRosterStore';
 import { withSeatedTempGameDbAsync } from './testSupport/withSeatedTempGameDb';
 import { setCommanderConsultRunnerForTests } from './openRouter/commanderPool';
+import { listMatchRecords } from './recorder/matchRecordStore';
+import { gameDbOps } from './gameDb/dbConnection';
 import { emptyConsultOutcome } from './openRouter/commanderPoolSupport';
 import type { ReadyResult } from '../shared/ipcTypes';
 import type { TurnOrdersByOwner } from './gameActions/ownerTurnOrders';
@@ -219,6 +221,10 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
     assert.strictEqual(result.success, true);
     assert.strictEqual(result.aiOrderCount, 1);
     assert.strictEqual(result.aiConsulted, true);
+    const records = listMatchRecords(gameDbOps);
+    const orders = records.filter((row) => row.recordType === 'orders_committed');
+    assert.ok(orders.some((row) => (row.payload as { owner?: string }).owner === AI_SEAT_IDS[0]));
+    assert.ok(records.some((row) => row.kind === 'frame'));
   } finally {
     clearDeferredPlaybackConsultPending();
   }

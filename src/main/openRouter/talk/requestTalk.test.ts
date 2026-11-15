@@ -19,7 +19,14 @@ import { advanceMatchGeneration } from '../../matchGeneration';
 import { decodeRecordPayload } from '../../recorder/matchRecordCodec';
 import { withSeatedTempGameDbAsync } from '../../testSupport/withSeatedTempGameDb';
 import type { OpenRouterChatTransport, OpenRouterChatTransportPayload } from '../openRouterChatTransport';
-import { requestTalk, type RequestTalkDeps } from './requestTalk';
+import { beginModelCall } from '../modelCallControl';
+import { requestTalk, sentMessagesLogLine, type RequestTalkDeps } from './requestTalk';
+
+test('one sent message is singular', () => {
+  assert.equal(sentMessagesLogLine(0), 'Sent no messages.');
+  assert.equal(sentMessagesLogLine(1), 'Sent 1 message.');
+  assert.equal(sentMessagesLogLine(2), 'Sent 2 messages.');
+});
 
 /**
  * The largest listed home regions.
@@ -100,6 +107,33 @@ function consultationPayloads(): unknown[] {
     `SELECT payload FROM match_records WHERE record_type = 'consultation' ORDER BY record_id`
   ).map((row) => decodeRecordPayload(row.payload));
 }
+
+test('a deadline during the call is a timeout and a stop is a cancel', async () => {
+  await withThreeAi(async () => {
+    const deadline = beginModelCall('deadline', 'strategic', AI_SEAT_IDS[0]);
+    const timedOut = await requestTalk(
+      { seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: null, signal: deadline.signal },
+      deps(async () => {
+        deadline.abortForDeadline();
+        return { ok: false, error: 'aborted' };
+      })
+    );
+    assert.deepEqual(timedOut, { kind: 'silent', reason: 'timed_out', costUsd: 0 });
+    deadline.end();
+    const stopped = beginModelCall('stopped', 'strategic', AI_SEAT_IDS[0]);
+    const cancelled = await requestTalk(
+      { seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: null, signal: stopped.signal },
+      deps(async () => {
+        stopped.abort();
+        return { ok: false, error: 'aborted' };
+      })
+    );
+    assert.deepEqual(cancelled, { kind: 'silent', reason: 'cancelled', costUsd: 0 });
+    stopped.end();
+    const stored = consultationPayloads() as Array<{ outcome?: string }>;
+    assert.deepEqual(stored.map((row) => row.outcome), ['wallClock', 'cancelled']);
+  });
+});
 
 test('the talk body has two messages, no tools, and the other side code', async () => {
   await withThreeAi(async () => {

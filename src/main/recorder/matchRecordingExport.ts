@@ -12,14 +12,14 @@ import * as path from 'path';
 import { gzipSync } from 'node:zlib';
 import type { BasicDbOps } from '../gameDb/dbOps';
 import { gameDbOps, hasDbHandle } from '../gameDb/dbConnection';
-import { readMatchId } from '../gameDb/gameConfigKv';
+import { ensurePlaythroughId, readMatchId } from '../gameDb/gameConfigKv';
 import { selectGameConfigValue } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 import { RECORDING_FILE_EXTENSION, RECORDING_FILE_FORMAT, RECORDING_FILE_FORMAT_VERSION } from '../../shared/matchRecording';
 import { readMatchTable } from './matchFrameCapture';
 import { readRecordingFile } from './matchRecordingFile';
 import { isRecorderEnabled, refreshCurrentFramePayload } from './matchRecorder';
-import { countMatchRecords, listMatchRecords, matchHasEventOfType } from './matchRecordStore';
+import { countMatchRecords, lastMatchRecordId, listMatchRecords, matchHasEventOfType } from './matchRecordStore';
 
 /**
  * What the finished-match export needs from the app.
@@ -73,12 +73,12 @@ export interface FinishedMatchExportDeps {
  *
  * Purpose: A match id is usually a UUID, and a surprising character must not become a path.
  * When to use: The export path.
- * Expected outcome: `recording-{id}.agentwars-recording`, with characters outside letters, digits, and hyphen replaced by a hyphen.
+ * Expected outcome: `recording-{matchId}-{playthroughId}.agentwars-recording`, with characters outside letters, digits, and hyphen replaced by a hyphen in each id.
  * Exceptions: None.
  */
-export function recordingFileName(matchId: string): string {
-  const safe = matchId.replace(/[^A-Za-z0-9-]/g, '-');
-  return `recording-${safe}.${RECORDING_FILE_EXTENSION}`;
+export function recordingFileName(matchId: string, playthroughId: string): string {
+  const clean = (value: string): string => value.replace(/[^A-Za-z0-9-]/g, '-');
+  return `recording-${clean(matchId)}-${clean(playthroughId)}.${RECORDING_FILE_EXTENSION}`;
 }
 
 /**
@@ -86,8 +86,8 @@ export function recordingFileName(matchId: string): string {
  *
  * Purpose: Tests and the finished-match helper share the line layout and the atomic replace.
  * When to use: When the caller has already decided the file should be written.
- * Expected outcome: Gzip-compressed JSON lines at `targetPath`. The write lands in a temporary file and then replaces the target.
- * Exceptions: Throws when the database read or the file write fails. The temporary file is removed after a failed replace.
+ * Expected outcome: Gzip-compressed JSON lines at `targetPath`. The write lands in a temporary file, which is then renamed over the target. A failed rename leaves the old file in place and removes the temporary file.
+ * Exceptions: Throws when the database read or the file write fails. The temporary file is removed after a failed rename.
  */
 export function writeMatchRecordingFile(args: {
   ops: BasicDbOps;
@@ -97,12 +97,14 @@ export function writeMatchRecordingFile(args: {
 }): void {
   logDebug('matchRecordingExport writeMatchRecordingFile', { directory: path.dirname(args.targetPath) });
   const matchId = readMatchId(args.ops) ?? '';
+  const playthroughId = ensurePlaythroughId(args.ops);
   const header = {
     line: 'header',
     format: RECORDING_FILE_FORMAT,
     formatVersion: RECORDING_FILE_FORMAT_VERSION,
     appVersion: args.appVersion,
     matchId,
+    playthroughId,
     exportedAt: args.exportedAt,
   };
   const hexes = readMatchTable(args.ops, 'hexes');
@@ -128,7 +130,6 @@ export function writeMatchRecordingFile(args: {
   fs.mkdirSync(path.dirname(args.targetPath), { recursive: true });
   fs.writeFileSync(tmp, gzipSync(Buffer.from(text, 'utf8')));
   try {
-    if (fs.existsSync(args.targetPath)) fs.rmSync(args.targetPath);
     fs.renameSync(tmp, args.targetPath);
   } catch (err) {
     fs.rmSync(tmp, { force: true });
@@ -141,7 +142,7 @@ export function writeMatchRecordingFile(args: {
  *
  * Purpose: The file is written once the match is over and no deferred consult is still adding rows, then rewritten if more rows arrive.
  * When to use: After an automatic save, after the player ends the match, after a deferred consult, and before a new match deletes a finished one.
- * Expected outcome: Nothing while the match is running or a consult is pending. Otherwise one file, replaced only when the database has more rows. The latest frame is refreshed before a write.
+ * Expected outcome: Nothing while the match is running or a consult is pending. Otherwise one file per playthrough, replaced when the record count or the last record id differs. The latest frame is refreshed before a write.
  * Exceptions: None. A failure is logged with the directory only.
  */
 export function exportFinishedMatchRecordingIfNeeded(deps: FinishedMatchExportDeps): void {
@@ -155,9 +156,12 @@ export function exportFinishedMatchRecordingIfNeeded(deps: FinishedMatchExportDe
     if (selectGameConfigValue(gameDbOps, 'game_over') !== '1') return;
     if (!listHasMatchEnded()) return;
     const matchId = readMatchId(gameDbOps) ?? '';
-    const targetPath = path.join(directory, recordingFileName(matchId));
+    const playthroughId = ensurePlaythroughId(gameDbOps);
+    const targetPath = path.join(directory, recordingFileName(matchId, playthroughId));
     const count = countMatchRecords(gameDbOps);
-    if (fs.existsSync(targetPath) && recordingRecordCount(targetPath) === count) return;
+    const lastId = lastMatchRecordId(gameDbOps);
+    const tail = fs.existsSync(targetPath) ? recordingTail(targetPath) : null;
+    if (tail && tail.count === count && tail.lastRecordId === lastId) return;
     refreshCurrentFramePayload();
     writeMatchRecordingFile({
       ops: gameDbOps,
@@ -183,17 +187,19 @@ function listHasMatchEnded(): boolean {
 }
 
 /**
- * How many history rows a recording file contains.
+ * The record count and last record id stored in a recording file.
  *
- * Purpose: A file is rewritten only when the database has more rows than the file.
+ * Purpose: A file is current only when both match the database.
  * When to use: Before deciding to replace an existing file.
- * Expected outcome: The record count, or -1 when the file cannot be parsed, so it is rewritten.
- * Exceptions: None. A bad file returns -1.
+ * Expected outcome: The count and the last record's id, or null when the file cannot be read. An empty file has a null last id.
+ * Exceptions: None. A bad file returns null so it is rewritten.
  */
-function recordingRecordCount(filePath: string): number {
+function recordingTail(filePath: string): { count: number; lastRecordId: number | null } | null {
   try {
-    return readRecordingFile(filePath).records.length;
+    const records = readRecordingFile(filePath).records;
+    const last = records.length === 0 ? null : records[records.length - 1]?.recordId ?? null;
+    return { count: records.length, lastRecordId: last };
   } catch {
-    return -1;
+    return null;
   }
 }

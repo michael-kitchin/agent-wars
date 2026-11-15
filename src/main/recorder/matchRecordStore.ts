@@ -341,6 +341,21 @@ export function matchHasEventOfType(ops: BasicDbOps, recordType: MatchEventType)
 }
 
 /**
+ * The highest history row id.
+ *
+ * Purpose: A recording is current only when its last record id matches the database, not only its row count.
+ * When to use: The finished-match export, next to `countMatchRecords`.
+ * Expected outcome: The maximum `record_id`, or null when the table is empty. The trace logs that id. A match id is not logged.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function lastMatchRecordId(ops: BasicDbOps): number | null {
+  const row = ops.getOne<{ id: number | null }>('SELECT MAX(record_id) AS id FROM match_records');
+  const id = row?.id ?? null;
+  logTrace('matchRecordStore lastMatchRecordId', { recordId: id });
+  return id;
+}
+
+/**
  * Counts history rows.
  *
  * Purpose: An empty table is a match that has not been recorded yet, and the export compares this with the file.

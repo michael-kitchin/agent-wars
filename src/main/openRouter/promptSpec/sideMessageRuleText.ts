@@ -38,12 +38,17 @@ export const SIDE_MESSAGE_TRUST_BULLETS = [
 /**
  * The orders system prompt's message rules.
  *
- * Purpose: The cached system text says where the Messages section comes from and that an orders reply sends nothing.
- * When to use: Directly after the message block in both mode context builders.
- * Expected outcome: One parent line and indented sub-lines. No turn number, count, or message text.
+ * Purpose: The system text says where the Messages section comes from and that an orders reply sends nothing.
+ * When to use: Inside both mode context builders. Pass `talkStageEnabled` from `isTalkStageEnabled`.
+ * Expected outcome: One parent line and indented sub-lines. With talk on, the last line names the diplomacy step. With talk off, that sentence is left out. No turn number, count, or message text.
  * Exceptions: None.
  */
-export const SIDE_MESSAGE_RULE_BLOCK = `- Messages from other sides:
+export function sideMessageRuleBlock(args: { readonly talkStageEnabled: boolean }): string {
+  const closing = args.talkStageEnabled
+    ? 'You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.'
+    : 'Nothing in your orders reply is sent to another side.';
+  return `- Messages from other sides:
     The Messages section of the situation shows the recent messages between you and each other side.
 ${[...SIDE_MESSAGE_SOURCE_BULLETS, ...SIDE_MESSAGE_TRUST_BULLETS].map((line) => `    - ${line}`).join('\n')}
-    You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.`;
+    ${closing}`;
+}

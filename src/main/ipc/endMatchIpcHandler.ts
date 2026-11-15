@@ -22,10 +22,13 @@ import { logDebug, logError } from '../logger';
  *
  * Purpose: Keeps the handler body out of the main process entry file.
  * When to use: Once, from `registerIpcHandlers`.
- * Expected outcome: The channel ends the current match and returns the human snapshot.
+ * Expected outcome: The channel ends the current match and returns the human snapshot. The recording export receives the live deferred-consult flag.
  * Exceptions: A database error is logged and rethrown.
  */
-export function registerEndMatchIpcHandler(ipcMain: IpcMain): void {
+export function registerEndMatchIpcHandler(
+  ipcMain: IpcMain,
+  deps: { readonly isDeferredConsultPending: () => boolean }
+): void {
   logDebug('endMatchIpcHandler register');
   ipcMain.handle(IPC_GAME.endMatch, () => {
     const state = getGameState();
@@ -46,7 +49,7 @@ export function registerEndMatchIpcHandler(ipcMain: IpcMain): void {
       userDataDir: app.getPath('userData'),
       appVersion,
       now: () => new Date(),
-      deferredConsultPending: false,
+      deferredConsultPending: deps.isDeferredConsultPending(),
     });
     return readMatchSnapshot(undefined);
   });

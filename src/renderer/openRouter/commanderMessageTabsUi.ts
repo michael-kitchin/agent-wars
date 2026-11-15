@@ -3,13 +3,12 @@
  *
  * Purpose: Later opponents update their own tab instead of replacing the dialog.
  * When to use: A draining pool read that has kept dispatches.
- * Expected outcome: Tabs start disabled. A dispatch enables and selects its tab. The panel shows Messages, one bullet per message the viewer could see when the consult was stored, then Strategy.
+ * Expected outcome: Tabs start disabled. A dispatch enables and selects its tab. The panel shows Messages, one line per message that commander sent, then Strategy.
  * Exceptions: None. A missing toast is skipped.
  */
 
 import { buildAiStrategyToastSections } from '../../shared/aiStrategyToastContent';
-import { activeHumanSeatId } from '../../shared/observeModeControls';
-import { dispatchMessagesInSideOrder, SIDE_MESSAGE_BULLET_PREFIX, sideMessagePartyLabel } from '../../shared/sideMessageView';
+import { dispatchMessagesInSideOrder, SIDE_MESSAGE_ARROW } from '../../shared/sideMessageView';
 import { sideDisplayName, type SideDisplaySeat } from '../../shared/sideNicknames';
 import {
   applyCommanderAbsence,
@@ -26,8 +25,9 @@ import {
 import type { CommanderDispatch, CommanderStatusRow } from '../../shared/commanderStatus';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
+import { createMessagePartyFlag } from '../chrome/sideNumberFlag';
 import { createSideNumberFlag } from '../chrome/toastInlineMarks';
-import { appendMapToastSectionHeader, MAP_TOAST_SECTION_BULLET_INDENT, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
+import { appendMapToastSectionHeader, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
 
 /**
  * Tabs for the dialog that is open, or null after it hides.
@@ -58,7 +58,7 @@ export function bindCommanderMessageTabs(): void {
  *
  * Purpose: The pool's screen callback. This function does not file Reports.
  * When to use: `readCommanderPoolAndApply` when messages should show.
- * Expected outcome: The selected panel is that dispatch's Message, then Strategy, when the consult sent them. A skip enables its tab with one line and does not change the selection. An appearance with no prose does not open the dialog.
+ * Expected outcome: The selected panel is that dispatch's Messages, then Strategy, when the consult sent them. A skip enables its tab with one line and does not change the selection. An appearance with no prose does not open the dialog.
  * Exceptions: None.
  */
 export function showCommanderMessageTabs(
@@ -140,7 +140,7 @@ function seatIsOutsideThisBattle(seatId: string, statuses: readonly CommanderSta
  *
  * Purpose: A tab click repaints the panel and restarts the 24 second timer.
  * When to use: `showFilledAiStrategyToast`, and a click on an enabled tab.
- * Expected outcome: A tablist and, when a tab is selected, one tabpanel. Each tab starts with that opponent's number flag. Disabled tabs stay disabled.
+ * Expected outcome: A tablist and, when a tab is selected, one tabpanel. Each tab starts with that opponent's number flag. Disabled tabs stay disabled. Each message line starts with the arrow, then that side's flag and name. The first line is `1em` under Messages, and the lines sit against each other. The last line's bottom margin is the gap above Strategy.
  * Exceptions: None. A missing host is skipped.
  */
 export function renderCommanderMessageTabs(target?: HTMLElement): void {
@@ -178,34 +178,28 @@ export function renderCommanderMessageTabs(target?: HTMLElement): void {
   const panel = document.createElement('div');
   panel.setAttribute('role', 'tabpanel');
   const seats = S.gameState?.seats ?? [];
-  const viewerSeatId = activeHumanSeatId(seats);
-  sections.forEach((section, index) => {
-    if (index > 0) panel.appendChild(document.createElement('br'));
+  for (const section of sections) {
     appendMapToastSectionHeader(panel, section.title);
     if (section.bullets && section.bullets.length > 0) {
-      const list = document.createElement('ul');
       for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
-        const item = document.createElement('li');
-        item.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
-        const label = sideMessagePartyLabel(bullet.toSeatId, viewerSeatId, (seatId) => seatName(seats, seatId));
-        item.appendChild(document.createTextNode(`${SIDE_MESSAGE_BULLET_PREFIX} `));
-        if (label !== 'You') {
-          const flag = createSideNumberFlag(bullet.toSeatId, seats);
-          if (flag) item.appendChild(flag);
-        }
+        const item = document.createElement('div');
+        item.className = 'commander-message-line';
+        const label = seatName(seats, bullet.toSeatId);
+        item.appendChild(document.createTextNode(`${SIDE_MESSAGE_ARROW} `));
+        const flag = createMessagePartyFlag(bullet.toSeatId, seats);
+        if (flag) item.appendChild(flag);
         const words = document.createElement('span');
         words.textContent = `${label}: ${bullet.text}`;
         item.appendChild(words);
-        list.appendChild(item);
+        panel.appendChild(item);
       }
-      panel.appendChild(list);
     } else {
       const span = document.createElement('span');
-      span.style.display = 'block';
+      span.className = 'commander-message-body';
       span.textContent = section.body;
       panel.append(span);
     }
-  });
+  }
   if (absence) {
     const span = document.createElement('span');
     span.style.display = 'block';
@@ -218,7 +212,7 @@ export function renderCommanderMessageTabs(target?: HTMLElement): void {
 /**
  * The roster order of one recipient.
  *
- * Purpose: Dialog bullets follow `seatOrder`.
+ * Purpose: Message lines follow `seatOrder`.
  * When to use: `dispatchMessagesInSideOrder`.
  * Expected outcome: That seat's `seatOrder`. A missing seat sorts after every known seat.
  * Exceptions: None.
@@ -230,8 +224,8 @@ function seatOrder(seats: readonly { readonly seatId: string; readonly seatOrder
 /**
  * The name shown for one seat.
  *
- * Purpose: A bullet names the recipient the way the rest of the match does.
- * When to use: `sideMessagePartyLabel`.
+ * Purpose: A line names the recipient the way the rest of the match does.
+ * When to use: Each message line's name.
  * Expected outcome: `sideDisplayName` for a roster seat, or the seat id when the seat is missing.
  * Exceptions: None.
  */

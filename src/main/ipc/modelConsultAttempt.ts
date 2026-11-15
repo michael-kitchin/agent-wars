@@ -47,7 +47,7 @@ export async function executeAbortableConsult<T>(args: {
       const runPromise = args.run({ signal: scope.signal, modelId: liveModelId || args.fallbackModelId });
       const timeoutPromise = new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
-          scope.abort();
+          scope.abortForDeadline();
           reject(new Error(`${args.label} timed out after ${args.timeoutMs}ms`));
         }, args.timeoutMs);
       });

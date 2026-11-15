@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { isAirStrikeTargetType } from '../../shared/airStrikeTarget';
 import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
+import { mapZoomKeyStep } from '../../shared/mapKeyboardZoom';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
 import { observeMapContainerResize } from './mapContainerResize';
 import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
@@ -16,7 +17,7 @@ import { OFFLINE_HILLSHADE_ID } from './basemapLayer';
 import { bindMapLabelLayer } from './mapLabelLayer';
 import { mapAnnotationsUseDetailView } from './mapAnnotationView';
 import { applyActiveMapTheme } from './mapThemeApply';
-import { getMainLeafletMap, initWorldLeafletMaps } from './worldLeafletMap';
+import { getMainLeafletMap, initWorldLeafletMaps, zoomMainMapByKeyStep } from './worldLeafletMap';
 import {
   clearDeferredStackCalloutTimer,
   clearDeferredStackCalloutTimerForPressAway,
@@ -525,6 +526,12 @@ export function wireInitCore(deps: InitCoreDeps): void {
       return;
     }
     if (e.repeat) return;
+    const zoomStep = mapZoomKeyStep({ key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey });
+    if (zoomStep !== null) {
+      e.preventDefault();
+      zoomMainMapByKeyStep(zoomStep);
+      return;
+    }
     // Ctrl stays here so Ctrl+letter does not pan the map or hide terrain. It is not a game gesture.
     if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
     const key = e.key.toLowerCase();

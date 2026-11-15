@@ -136,14 +136,6 @@ export type CommanderStatusRow = {
 };
 
 /**
- * Prose from one consult, for the player-facing toast.
- *
- * Purpose: The pending-order table stores orders, not this prose.
- * When to use: A drained or peeked snapshot.
- * Expected outcome: One dispatch per finished consult, including a consult that sent no prose, and one per unfinished consult that sent prose. A draining read takes them. An absence line is not a dispatch.
- * Exceptions: None.
- */
-/**
  * One message a commander stored in a consult, for the dialog.
  *
  * Purpose: The dialog lists each recipient separately.
@@ -172,6 +164,14 @@ export type CommanderDispatchMessage = {
   readonly text: string;
 };
 
+/**
+ * Prose from one consult, for the player-facing toast.
+ *
+ * Purpose: The pending-order table stores orders, not this prose.
+ * When to use: A drained or peeked snapshot.
+ * Expected outcome: One dispatch per finished consult, including a consult that sent no prose, and one per unfinished consult that sent prose. A draining read takes them. An absence line is not a dispatch.
+ * Exceptions: None.
+ */
 export type CommanderDispatch = {
   /**
    * The AI seat that produced the prose.
@@ -183,11 +183,11 @@ export type CommanderDispatch = {
    */
   readonly seatId: AiSeatId;
   /**
-   * The messages this commander stored in this wave that the viewer may see.
+   * Every message this commander stored in this wave.
    *
-   * Contract: Filtered when the consult is stored. A later fog change does not rewrite this list.
-   * When to use: The Messages section of the dialog, in seat order at render time.
-   * Expected outcome: One entry per visible message. Empty when this consult stored none the viewer could see.
+   * Contract: Stored when the consult settles. Fog does not remove one, and observing does not either. A later fog change does not rewrite this list. A commander's prompt does not read it.
+   * When to use: The Messages section of the dialog, and the Reports entry filed from this dispatch, in seat order at render time.
+   * Expected outcome: One entry per stored message. Empty when this consult stored none.
    * Exceptions: None.
    */
   readonly messages: readonly CommanderDispatchMessage[];

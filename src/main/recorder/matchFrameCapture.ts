@@ -8,7 +8,7 @@
  */
 
 import type { BasicDbOps } from '../gameDb/dbOps';
-import { logTrace } from '../logger';
+import { logError, logTrace } from '../logger';
 import type { MatchTableSnapshot } from '../../shared/matchRecording';
 import { FRAME_EXCLUDED_CONFIG_KEYS, MATCH_TABLE_RECORDING_POLICY } from './matchFramePolicy';
 
@@ -68,11 +68,15 @@ function quoteIdent(name: string): string {
  * Purpose: Frames, the human order event, and the hex line of a recording share this read.
  * When to use: When the table name comes from this module, not from outside input.
  * Expected outcome: Columns from `PRAGMA table_info` and rows in `rowid` order.
- * Exceptions: Throws when the name is not a plain identifier or the query fails.
+ * Exceptions: Throws when the name is not a plain identifier or a later query fails. A table with no columns, including a missing table, returns an empty snapshot.
  */
 export function readMatchTable(ops: BasicDbOps, table: string): MatchTableSnapshot {
   const info = ops.getAll<{ name: string }>(`PRAGMA table_info(${quoteIdent(table)})`);
   const columns = info.map((column) => column.name);
+  if (columns.length === 0) {
+    logTrace('matchFrameCapture readMatchTable', { table, rowCount: 0 });
+    return { columns: [], rows: [] };
+  }
   const selected = columns.map(quoteIdent).join(', ');
   const records = ops.getAll<Record<string, unknown>>(
     `SELECT ${selected} FROM ${quoteIdent(table)} ORDER BY rowid`
@@ -112,13 +116,18 @@ export function buildFramePayload(ops: BasicDbOps): FramePayload {
  * Purpose: The order event has to be written before resolution clears these tables.
  * When to use: Immediately before `ready` resolves the turn.
  * Expected outcome: The six pending tables, in `HUMAN_ORDER_TABLES` order, using the same shape as a frame.
- * Exceptions: Throws when a query fails.
+ * Exceptions: None. A failed read is logged and returns an empty record, so the human order event is not written.
  */
 export function readHumanOrderTables(ops: BasicDbOps): FramePayload['tables'] {
-  const tables: Record<string, MatchTableSnapshot> = {};
-  for (const table of HUMAN_ORDER_TABLES) tables[table] = readMatchTable(ops, table);
-  logTrace('matchFrameCapture readHumanOrderTables', { tableCount: HUMAN_ORDER_TABLES.length });
-  return tables;
+  try {
+    const tables: Record<string, MatchTableSnapshot> = {};
+    for (const table of HUMAN_ORDER_TABLES) tables[table] = readMatchTable(ops, table);
+    logTrace('matchFrameCapture readHumanOrderTables', { tableCount: HUMAN_ORDER_TABLES.length });
+    return tables;
+  } catch (err) {
+    logError('matchFrameCapture readHumanOrderTables failed', { err });
+    return {};
+  }
 }
 
 /**

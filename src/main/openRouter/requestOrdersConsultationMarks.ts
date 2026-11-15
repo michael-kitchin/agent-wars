@@ -17,7 +17,7 @@ import {
 import { gameDbOps } from '../gameDb/dbConnection';
 import { markSideMessagesSeen } from '../gameDb/sideMessageStore';
 import { readMatchId } from '../gameDb/gameConfigKv';
-import { logDebug, logTrace } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import { getMatchGeneration } from '../matchGeneration';
 import { recordCommanderStrategy, stepForConsult } from '../recorder/matchRecordingEvents';
 import type { ConsultTelemetry, ConsultTelemetryOutcome } from './consultTelemetry';
@@ -53,14 +53,19 @@ export function settleConsultFailure(
  * Purpose: New and Load replace the database while a model call can still finish. Stopping the model does not.
  * When to use: Before writing a consultation or strategy row at the end of a model call.
  * Expected outcome: True when the generation is unchanged and the match id is unchanged. Also true when this match had no id yet and the generation is unchanged, so creating the id does not drop the consult. False after New or Load moves the generation, including when the loaded file still has this match's id.
- * Exceptions: None.
+ * Exceptions: None. A failed read is logged and returns false. False skips the consultation event in a consult's finally, and inside `markSuccessfulConsultation` it skips only the seen-mark and the strategy event. The turn stamp, the loss clear, the strategy note, and orders already applied still stand.
  */
 export function consultStillOnOpenMatch(matchIdAtStart: string | null, generationAtStart: number): boolean {
-  const sameId = readMatchId(gameDbOps) === matchIdAtStart;
-  const sameGeneration = getMatchGeneration() === generationAtStart;
-  const stillOpen = sameGeneration && (sameId || matchIdAtStart === null);
-  logTrace('requestOrdersConsultationMarks consultStillOnOpenMatch', { sameId, sameGeneration, stillOpen });
-  return stillOpen;
+  try {
+    const sameId = readMatchId(gameDbOps) === matchIdAtStart;
+    const sameGeneration = getMatchGeneration() === generationAtStart;
+    const stillOpen = sameGeneration && (sameId || matchIdAtStart === null);
+    logTrace('requestOrdersConsultationMarks consultStillOnOpenMatch', { sameId, sameGeneration, stillOpen });
+    return stillOpen;
+  } catch (err) {
+    logError('requestOrdersConsultationMarks consultStillOnOpenMatch failed', { err });
+    return false;
+  }
 }
 
 /**

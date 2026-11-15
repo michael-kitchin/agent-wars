@@ -6,7 +6,7 @@ import type { CommanderDispatchMessage } from './commanderStatus';
 import { SIDE_MESSAGES_TITLE } from './sideMessageView';
 
 /**
- * The message this commander sent to the human player in this wave, when there is one, and the plan summary, shown in `#ai-strategy-toast`.
+ * The messages this commander sent in this wave, when there are any, and the plan summary, shown in `#ai-strategy-toast`.
  *
  * Purpose: One object for IPC, prefetch cache, and toast rendering so call sites cannot swap two strings.
  * When to use: The opponent message dialog and IPC mapping helpers.
@@ -24,11 +24,11 @@ export interface AiStrategyToastFields {
    */
   strategy?: string | null;
   /**
-   * Messages this consult stored that the viewer could see.
+   * Every message this consult stored.
    *
-   * Contract: Optional. A later fog change does not rewrite a list already stored here.
+   * Contract: Optional. Fog and observing do not remove an entry. A later fog change does not rewrite a list already stored here.
    * When to use: The Messages section.
-   * Expected outcome: One bullet per entry when the list is not empty.
+   * Expected outcome: One line per entry when the list is not empty.
    * Exceptions: None.
    */
   messages?: readonly CommanderDispatchMessage[];
@@ -65,10 +65,10 @@ export interface AiStrategyToastSection {
    */
   body: string;
   /**
-   * One bullet per visible message.
+   * One line per stored message.
    *
    * Contract: Present on the Messages section. Absent on Strategy.
-   * When to use: The dialog's bullet list.
+   * When to use: The dialog's message lines.
    * Expected outcome: Recipient and text. The body is empty when this is set.
    * Exceptions: None.
    */
@@ -93,7 +93,7 @@ export function trimToastField(raw: string | null | undefined): string | undefin
  *
  * Purpose: Messages appear above Strategy when both exist; either may appear alone.
  * When to use: Before rendering `#ai-strategy-toast`.
- * Expected outcome: Zero, one, or two sections. Messages first when this consult stored a visible message. The legacy `message` field is ignored.
+ * Expected outcome: Zero, one, or two sections. Messages first when this consult stored a message. The legacy `message` field is ignored.
  * Exceptions: None.
  */
 export function buildAiStrategyToastSections(fields: AiStrategyToastFields): AiStrategyToastSection[] {

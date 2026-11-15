@@ -15,6 +15,7 @@ import { isAiSeatId, type AiSeatId } from '../../shared/seatIds';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { AI_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from '../../shared/seatRoster';
 import { sideDisplayName, defaultAiNickname } from '../../shared/sideNicknames';
+import { repaintChatThread } from '../chat/chatPanelClient';
 import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from './commanderPoolClient';
 import { commanderPopoverIsOpen, openCommanderPopover, reanchorCommanderPopover } from './commanderPopover';
@@ -275,7 +276,7 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
  *
  * Purpose: The card follows the seat the main process stored.
  * When to use: The popover's change.
- * Expected outcome: That seat in the snapshot is replaced and the cards render again.
+ * Expected outcome: That seat in the snapshot is replaced, the cards render again, and the message panel repaints with the new name.
  * Exceptions: A rejected IPC is logged and does not throw.
  */
 async function saveCommander(seatId: AiSeatId, commander: NewGameCommanderInput): Promise<void> {
@@ -284,6 +285,7 @@ async function saveCommander(seatId: AiSeatId, commander: NewGameCommanderInput)
     if (!updated || !S.gameState?.seats) return;
     S.gameState = { ...S.gameState, seats: S.gameState.seats.map((seat) => (seat.seatId === updated.seatId ? updated : seat)) };
     renderCommanderCards();
+    repaintChatThread();
     void syncOpenRouterRunToggle();
   } catch (err) {
     console.error('setSeatCommander failed', seatId, err);

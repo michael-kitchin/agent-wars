@@ -11,6 +11,7 @@ import { getRange } from '../../combatConstants';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../../productionCaps';
 import { PRODUCTION_EXPOSED_RADIUS } from '../productionExposure';
 import { logTrace } from '../../logger';
+import { isTalkStageEnabled } from '../commanderPoolRounds';
 import { missileRangeHexes } from '../../../shared/gameRules';
 import { AIR_STRIKE_RANGE_HEXES } from '../../../shared/tacticalRanges';
 import { regionalWinPathsBullet } from '../scenarioGoals';
@@ -30,7 +31,7 @@ import {
 import { buildCampaignRuleBlock } from './campaignRuleText';
 import { buildOperationRuleBlock } from './operationRuleText';
 import { buildPostureRuleBlock } from './postureRuleText';
-import { SIDE_MESSAGE_RULE_BLOCK } from './sideMessageRuleText';
+import { sideMessageRuleBlock } from './sideMessageRuleText';
 
 /**
  * Five-goal list, doctrine, and message guidance for the strategic context block.
@@ -54,7 +55,7 @@ export function buildStrategicContextCoaching(gates: CoachingGates): string {
   const toolsLine = tools.length > 0 ? `\n${tools}` : '';
   const message = `${buildStrategicGoalsBlock(gates)}
 ${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
-${SIDE_MESSAGE_RULE_BLOCK}`;
+${sideMessageRuleBlock({ talkStageEnabled: isTalkStageEnabled() })}`;
   const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock(gates.operationsEnabled === true)}` : message;
   const withOperations = gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true)}` : withCampaign;
   return gates.postureEnabled === true ? `${withOperations}\n\n${buildPostureRuleBlock(gates.campaignEnabled === true)}` : withOperations;

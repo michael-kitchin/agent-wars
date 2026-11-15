@@ -7,6 +7,8 @@ import { fetchMatchSnapshot } from './matchSnapshotClient';
 import { installRendererGameMap } from './installRendererGameMap';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { staleIntelViewer } from '../../shared/observeModeControls';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
+import { repaintChatThread } from '../chat/chatPanelClient';
 
 /**
  * Documents the `ApplySnapshotDeps` interface as a named contract surface (interface ApplySnapshotDeps).
@@ -365,6 +367,8 @@ export async function applyGameStateSnapshot(
   if (options.updateReadyButton) deps.updateReadyButtonState();
   if (options.redraw) deps.redraw();
   if (options.refreshBuildPopup) deps.refreshBuildPopupIfOpen();
+  repaintChatThread();
+  syncChatPanelVisibility();
 }
 
 /**

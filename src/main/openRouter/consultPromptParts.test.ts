@@ -13,7 +13,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { buildConsultMessages, CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
 import { buildConsultPromptParts, joinConsultPromptParts } from './consultPromptParts';
 import { AIR_PLAN_ROUTE_PROMPT_SUFFIX } from './openRouterToolCatalog';
-import { SIDE_MESSAGE_RULE_BLOCK } from './promptSpec/sideMessageRuleText';
+import { sideMessageRuleBlock } from './promptSpec/sideMessageRuleText';
 import { TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS } from './tacticalPromptProjection';
 import { assertHeadingsNest, headingOutline } from '../testSupport/promptOutlineHelpers';
 
@@ -221,7 +221,7 @@ test('the messages block stays in the situation, and both system prompts carry t
     assert.ok(system.includes('may or may not be telling the truth'));
     assert.ok(system.includes('may or may not have your interests in mind'));
   }
-  assert.equal(/\d/.test(SIDE_MESSAGE_RULE_BLOCK), false);
+  assert.equal(/\d/.test(sideMessageRuleBlock({ talkStageEnabled: true })), false);
   assertHeadingsNest(headingOutline(strategic.staticSystemText));
   assertHeadingsNest(headingOutline(withBlock.staticSystemText));
 });

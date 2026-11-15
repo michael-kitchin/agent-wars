@@ -15,6 +15,7 @@ import {
   countMatchRecords,
   insertMatchRecord,
   lastFrameStepKeyText,
+  lastMatchRecordId,
   listMatchRecords,
   matchHasEventOfType,
 } from './matchRecordStore';
@@ -22,6 +23,7 @@ import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 test('a frame and two events round-trip in record order', () => {
   withTempGameDb('aw-match-store-', () => {
+    assert.equal(lastMatchRecordId(gameDbOps), null);
     const step = strategicStep(1);
     insertMatchRecord(gameDbOps, {
       kind: 'frame',
@@ -61,5 +63,6 @@ test('a frame and two events round-trip in record order', () => {
     assert.equal(matchHasEventOfType(gameDbOps, 'match_ended'), true);
     assert.equal(matchHasEventOfType(gameDbOps, 'consultation'), false);
     assert.equal(countMatchRecords(gameDbOps), 3);
+    assert.equal(lastMatchRecordId(gameDbOps), 3);
   });
 });

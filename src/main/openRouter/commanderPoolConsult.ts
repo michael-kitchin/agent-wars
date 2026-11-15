@@ -15,7 +15,8 @@ import { setProductionCommanderConsultRunner } from './commanderPool';
 import { setProductionCommanderTalkRunner } from './commanderPoolRounds';
 import { runCommanderTalk } from './commanderPoolTalk';
 import { emitCommanderConsultLog } from './commanderConsultLog';
-import { emptyConsultOutcome, type CommanderConsultOutcome, type CommanderConsultRequest } from './commanderPoolSupport';
+import { consultStoppedWhileTalking, emptyConsultOutcome, type CommanderConsultOutcome, type CommanderConsultRequest } from './commanderPoolSupport';
+import { getMatchGeneration } from '../matchGeneration';
 import { speakAndAwaitTalkRound } from './talk/talkRound';
 import { getSelectedModel, getToolNamesForEnabledGroups, hasKey, requestOrders, TOOL_GROUP_REGISTRY } from './openRouter';
 
@@ -38,7 +39,7 @@ export function installCommanderConsultRunner(): void {
  *
  * Purpose: Strategic orders go back to the pool for `setAiPendingOrders`. A battle consult returns a tactical plan instead.
  * When to use: The production runner only.
- * Expected outcome: `finished` when the model returned a plan. `timedOut` when the wait race fired. Otherwise a logged failure and no plan.
+ * Expected outcome: `finished` when the model returned a plan. `timedOut` when the wait race fired. Otherwise a logged failure and no plan, or a cancelled outcome, with no model call, when the pool was stopped or the match changed while the seat waited on its talk round.
  * Exceptions: Does not throw. A missing key or model returns a failure outcome.
  */
 async function runCommanderConsult(request: CommanderConsultRequest): Promise<CommanderConsultOutcome> {
@@ -55,7 +56,12 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
     logError('commanderPoolConsult skipped', new Error(errorMessage));
     return emptyConsultOutcome({ errorMessage, modelId: modelId || null });
   }
+  const generationAtStart = getMatchGeneration();
   await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
+  if (consultStoppedWhileTalking(request.signal, generationAtStart)) {
+    logDebug('commanderPoolConsult stopped during the talk round', { seatId: request.seatId });
+    return emptyConsultOutcome({ errorMessage: 'Cancelled', modelId });
+  }
   let usedModelId = modelId;
   try {
     const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });

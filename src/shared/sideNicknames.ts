@@ -164,7 +164,19 @@ export function storedAiNickname(value: unknown, homeRegion: string, seatId: str
  */
 export function sideDisplayName(seat: SideDisplaySeat): string {
   const nickname = normalizeSideNickname(seat.nickname);
-  if (nickname.length > 0) return nickname;
-  if (seat.kind === HUMAN_SEAT_KIND) return HUMAN_NICKNAME_DEFAULT;
-  return defaultAiNickname(seat.homeRegion, seat.seatId);
+  if (nickname.length > 0) return withoutChatKeySeparators(nickname);
+  if (seat.kind === HUMAN_SEAT_KIND) return withoutChatKeySeparators(HUMAN_NICKNAME_DEFAULT);
+  return withoutChatKeySeparators(defaultAiNickname(seat.homeRegion, seat.seatId));
+}
+
+/**
+ * Removes the two characters `chatNamedSeatKey` uses as separators.
+ *
+ * Purpose: A nickname or a home name must not be able to forge another seat's cache key.
+ * When to use: Every name `sideDisplayName` returns.
+ * Expected outcome: The same text with NUL and U+0001 removed.
+ * Exceptions: None.
+ */
+function withoutChatKeySeparators(value: string): string {
+  return Array.from(value).filter((char) => char !== '\u0000' && char !== '\u0001').join('');
 }

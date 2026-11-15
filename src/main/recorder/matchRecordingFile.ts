@@ -72,6 +72,7 @@ function parseHeader(line: string, lineNumber: number): RecordingHeader {
     formatVersion,
     appVersion: typeof value.appVersion === 'string' ? value.appVersion : '',
     matchId: typeof value.matchId === 'string' ? value.matchId : '',
+    playthroughId: typeof value.playthroughId === 'string' ? value.playthroughId : '',
     exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : '',
   };
 }

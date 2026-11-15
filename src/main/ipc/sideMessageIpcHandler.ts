@@ -1,7 +1,7 @@
 /**
  * IPC for reading, staging, and cancelling the player's messages.
  *
- * Purpose: The chat panel asks the main process, which applies the visibility rule before anything is sent.
+ * Purpose: The chat panel asks the main process for every sent message. A commander's prompt does not use this snapshot.
  * When to use: `registerIpcHandlers`.
  * Expected outcome: A snapshot the viewer may see, or a stage result. Message text is never logged.
  * Exceptions: A database error is logged and returned as a refusal or an empty cancel. It is not thrown to the renderer.
@@ -11,11 +11,9 @@ import type { IpcMain } from 'electron';
 import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { IPC_GAME } from '../../shared/ipc/channels';
 import { activeAiSeatIds } from '../../shared/seatRoster';
-import { sideMessageVisibleTo } from '../../shared/sideMessages';
 import type { SideMessageThreadSnapshot, SideMessageView } from '../../shared/sideMessageView';
 import { getSeatRoster } from '../gameDb';
 import { gameDbOps, hasDbHandle } from '../gameDb/dbConnection';
-import { isFogOfWarEnabled } from '../gameDb/fogState';
 import { listSentSideMessages, listStagedSideMessages, type SideMessageRow } from '../gameDb/sideMessageStore';
 import { logDebug, logError, logTrace } from '../logger';
 import { cancelStagedHumanSideMessage, stageHumanSideMessage, type StageSideMessageResult } from '../sideMessages/humanSideMessages';
@@ -50,7 +48,7 @@ const EMPTY_SIDE_MESSAGE_SNAPSHOT: SideMessageThreadSnapshot = {
  * Copies one stored row into the view the renderer is allowed to hold.
  *
  * Purpose: The step columns are named on `row.step`, and the text column is `body`.
- * When to use: After `sideMessageVisibleTo` has accepted the row.
+ * When to use: Each sent row the history shows, and each of the viewer's drafts.
  * Expected outcome: A view with the stored text and step.
  * Exceptions: None.
  */
@@ -67,11 +65,11 @@ function viewFromRow(row: SideMessageRow): SideMessageView {
 }
 
 /**
- * Reads the thread the current viewer may see.
+ * Reads every sent message for the chat history.
  *
- * Purpose: The renderer never receives a message the viewer may not see.
+ * Purpose: The history lists every message between every side. Fog and observing do not remove one. A commander's prompt still uses `sideMessageVisibleTo`.
  * When to use: `game:readSideMessages`.
- * Expected outcome: Sent messages oldest first, the viewer's drafts, and the AI sides still in the match. An observer gets every sent message and cannot send. A closed database returns the empty snapshot.
+ * Expected outcome: Every sent message, oldest first, the viewer's drafts, and the AI sides still in the match. An observer gets the same messages and cannot send. A closed database returns the empty snapshot.
  * Exceptions: None. A closed database does not touch the store.
  */
 export function buildSideMessageThreadSnapshot(): SideMessageThreadSnapshot {
@@ -81,24 +79,13 @@ export function buildSideMessageThreadSnapshot(): SideMessageThreadSnapshot {
   }
   const roster = getSeatRoster();
   const viewerSeatId = activeHumanSeatId(roster);
-  const viewer = viewerSeatId === null
-    ? { kind: 'observer' as const }
-    : { kind: 'player' as const, seatId: viewerSeatId };
-  const fogOfWarEnabled = isFogOfWarEnabled(gameDbOps);
-  const messages = listSentSideMessages(gameDbOps)
-    .filter((row) => sideMessageVisibleTo({
-      viewer,
-      fogOfWarEnabled,
-      fromSeatId: row.fromSeatId,
-      toSeatId: row.toSeatId,
-    }))
-    .map(viewFromRow);
+  const messages = listSentSideMessages(gameDbOps).map(viewFromRow);
   const staged = viewerSeatId === null
     ? []
     : listStagedSideMessages(gameDbOps, viewerSeatId).map(viewFromRow);
   const recipientSeatIds = activeAiSeatIds(roster);
   logTrace('sideMessageIpcHandler buildSideMessageThreadSnapshot', {
-    viewerKind: viewer.kind,
+    viewerKind: viewerSeatId === null ? 'observer' : 'player',
     messageCount: messages.length,
     stagedCount: staged.length,
   });

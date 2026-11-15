@@ -83,7 +83,7 @@ export type SideMessageViewer =
        * The human player.
        *
        * Contract: The literal `player`.
-       * When to use: A screen that shows the player's messages.
+       * When to use: A view that follows the player's fog. The chat history and the message dialog show every message and do not ask.
        * Expected outcome: Fog of war limits this viewer to the player's own messages.
        * Exceptions: None.
        */
@@ -103,7 +103,7 @@ export type SideMessageViewer =
        * An observer of the whole match.
        *
        * Contract: The literal `observer`.
-       * When to use: A screen that is not playing a seat.
+       * When to use: A view that is not playing a seat. The chat history and the message dialog do not ask.
        * Expected outcome: Every message is visible.
        * Exceptions: None.
        */
@@ -127,7 +127,7 @@ export function isSideStance(value: unknown): value is SideStance {
  *
  * Purpose: A message and a stance reason share the same cleaning.
  * When to use: Before storing either one.
- * Expected outcome: Empty for a non-string. Otherwise whitespace runs become one space, other control characters are removed, and the result is cut to `maxChars` without an ellipsis.
+ * Expected outcome: Empty for a non-string. Otherwise whitespace runs become one space, other control characters are removed, and the result is cut to `maxChars` characters, counting each code point once, without an ellipsis.
  * Exceptions: None.
  */
 export function cleanSideMessageText(raw: unknown, maxChars: number): string {
@@ -137,14 +137,14 @@ export function cleanSideMessageText(raw: unknown, maxChars: number): string {
     const code = ch.codePointAt(0) ?? 0;
     return code >= 32 && code !== 127;
   }).join('');
-  return stripped.trim().slice(0, Math.max(0, maxChars));
+  return Array.from(stripped.trim()).slice(0, Math.max(0, maxChars)).join('');
 }
 
 /**
  * Reports whether this viewer may see one message.
  *
- * Purpose: Prompts and screens share one rule, so a later change to what the settings allow is a change here.
- * When to use: Before placing a stored message in a prompt or on a screen.
+ * Purpose: Every prompt shares one rule, so a later change to what the settings allow is a change here.
+ * When to use: Before placing a stored message in a prompt, or in a view that follows a viewer's fog. The chat history and the message dialog show every message and do not call this.
  * Expected outcome: A commander sees a message it sent or that was sent to it, with or without fog of war. A player sees the same when fog of war is on, and every message when it is off. An observer sees every message.
  * Exceptions: None.
  */

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resetGameForNewMatch } from '../gameDb';
 import { gameDbOps } from './dbConnection';
-import { ensureMatchId, MATCH_ID_CONFIG_KEY, readMatchId } from './gameConfigKv';
+import { ensureMatchId, MATCH_ID_CONFIG_KEY, readMatchId, readPlaythroughId } from './gameConfigKv';
 import { ensureMatchRecordsTable } from './matchRecordsTable';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
@@ -32,15 +32,20 @@ test('match_records is created on open and reset replaces the match id', () => {
     assert.equal(gameDbOps.getAll('PRAGMA table_info(match_records)').length, 13);
 
     const firstId = readMatchId(gameDbOps);
+    const firstPlaythrough = readPlaythroughId(gameDbOps);
     assert.ok(firstId);
+    assert.ok(firstPlaythrough);
     gameDbOps.run(
       `INSERT INTO match_records (kind, record_type, format_version, step_key, scope, turn_number, visibility, recorded_at, payload)
        VALUES ('event', 'match_started', 1, 's1', 'strategic', 1, 'everyone', '2026-01-01T00:00:00.000Z', X'00')`
     );
     resetGameForNewMatch();
     const secondId = readMatchId(gameDbOps);
+    const secondPlaythrough = readPlaythroughId(gameDbOps);
     assert.ok(secondId);
+    assert.ok(secondPlaythrough);
     assert.notEqual(secondId, firstId);
+    assert.notEqual(secondPlaythrough, firstPlaythrough);
     assert.equal(gameDbOps.getOne<{ n: number }>('SELECT COUNT(*) AS n FROM match_records')?.n, 0);
 
     gameDbOps.run('DELETE FROM game_config WHERE key = ?', [MATCH_ID_CONFIG_KEY]);

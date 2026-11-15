@@ -6,6 +6,7 @@ import { bindAdminBorderLayers } from './adminBorderLayers';
 import { bindOfflineBasemap, onBasemapNativeZoomChanged } from './basemapLayer';
 import type { VectorHostMap, VectorLeaflet } from './bucketedVectorLayer';
 import { bindCoastlineLayers, setCoastEdgeMaskNativeZoom } from './coastlineLayers';
+import { MAP_KEYBOARD_ZOOM_STEP } from '../../shared/mapKeyboardZoom';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
   alignLngToDrawReference,
@@ -212,7 +213,7 @@ export function initWorldLeafletMaps(
     minZoom: 1.5,
     maxZoom: 12,
     zoomSnap: 0.25,
-    zoomDelta: 0.5,
+    zoomDelta: MAP_KEYBOARD_ZOOM_STEP,
     wheelPxPerZoomLevel: 80,
     /* Max bounds keep the world view inside ±180°; the drag wrap would pull a battle drawn past 180° to another copy. */
     worldCopyJump: false,
@@ -220,7 +221,7 @@ export function initWorldLeafletMaps(
     maxBoundsViscosity: 1,
     /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
     keyboard: false,
-    /* The main map zooms from the wheel, from Shift-drag, and from the +/− buttons added below. There is no second control. */
+    /* The main map zooms from the wheel, from Shift-drag, and from the zoom keys. There is no on-screen control. */
     zoomControl: false,
     /* Elevation and Natural Earth credits stay in the notices file. The map does not print them. */
     attributionControl: false,
@@ -238,7 +239,7 @@ export function initWorldLeafletMaps(
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
   try {
-    // Show real-world distance on the scale, to the left of the zoom buttons.
+    // Show real-world distance on the scale, below the chat panel.
     leafletRef.control
       .scale({
         position: 'bottomright',
@@ -337,6 +338,19 @@ export function syncMinimapViewportRect(): void {
  */
 export function getMainLeafletMap(): VendorLeafletMap | null {
   return mainMap;
+}
+
+/**
+ * Zooms the main map by one keyboard step.
+ *
+ * Purpose: `+` and `-` replace the removed on-screen buttons. Strategic and tactical play share this map.
+ * When to use: The global keydown handler, after `mapZoomKeyStep` returns a direction.
+ * Expected outcome: The zoom moves by `step` times `MAP_KEYBOARD_ZOOM_STEP`. Leaflet clamps it to `minZoom` and `maxZoom`. Nothing happens when the map has not been created.
+ * Exceptions: None.
+ */
+export function zoomMainMapByKeyStep(step: 1 | -1): void {
+  if (!mainMap) return;
+  mainMap.setZoom(mainMap.getZoom() + step * MAP_KEYBOARD_ZOOM_STEP);
 }
 
 /**

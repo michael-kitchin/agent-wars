@@ -10,11 +10,32 @@
 import type { SideMessageView } from './sideMessageView';
 
 /**
- * The unsent draft addressed to the side the player has picked.
+ * Every unsent draft, in the recipient list's order.
  *
- * Purpose: The staged row shows one draft, the one for the current recipient.
- * When to use: While drawing the row above the entry line.
- * Expected outcome: That draft, or null when the pick has none or the pick is null.
+ * Purpose: The pending list shows each draft, and the drop-down does not choose which ones appear.
+ * When to use: While drawing the lines above the entry field.
+ * Expected outcome: Drafts whose recipient is in `recipientSeatIds` come first, in that order. A draft to anyone else follows, in `messageId` order. The input arrays are not changed.
+ * Exceptions: None.
+ */
+export function stagedMessagesInSeatOrder(
+  staged: readonly SideMessageView[],
+  recipientSeatIds: readonly string[],
+): SideMessageView[] {
+  const order = new Map(recipientSeatIds.map((seatId, index) => [seatId, index]));
+  return [...staged].sort((left, right) => {
+    const leftOrder = order.get(left.toSeatId) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = order.get(right.toSeatId) ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+    return left.messageId - right.messageId;
+  });
+}
+
+/**
+ * The unsent draft addressed to one side.
+ *
+ * Purpose: Edit reads the draft it is about to put back in the field.
+ * When to use: When the player edits one pending line.
+ * Expected outcome: That draft, or null when that side has none or the seat id is null.
  * Exceptions: None.
  */
 export function stagedMessageFor(
@@ -48,6 +69,18 @@ export function nextRecipientSeatId(current: string | null, recipientSeatIds: re
  */
 export function canStageText(text: string): boolean {
   return text.trim().length > 0;
+}
+
+/**
+ * A cache key for a list of seats and the names the panel is showing.
+ *
+ * Purpose: The recipient list and the history rebuild when a side is renamed, not only when the ids change.
+ * When to use: `renderRecipient` and `renderHistory`.
+ * Expected outcome: The same ids and names produce the same key. A renamed seat, or the same names in another order, produces a different key. The separators are NUL and U+0001, which `sideDisplayName` strips from a name.
+ * Exceptions: None.
+ */
+export function chatNamedSeatKey(seatIds: readonly string[], nameOf: (seatId: string) => string): string {
+  return seatIds.map((seatId) => `${seatId}\u0000${nameOf(seatId)}`).join('\u0001');
 }
 
 /**

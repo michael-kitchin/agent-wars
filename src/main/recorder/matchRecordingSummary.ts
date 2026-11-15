@@ -145,7 +145,34 @@ export interface RecordingSummary {
    * Expected outcome: The character count. A payload that cannot be stringified adds nothing.
    * Exceptions: None.
    */
-  readonly framePayloadJsonBytes: number;
+  readonly framePayloadJsonCharacters: number;
+  /**
+   * Milliseconds from the first parseable record time to the last, in record order.
+   *
+   * Contract: Floored at 0. Idle time between records is included. 0 when fewer than two times parse.
+   * When to use: The header block.
+   * Expected outcome: The span.
+   * Exceptions: None.
+   */
+  readonly elapsedMs: number;
+  /**
+   * `elapsedMs` divided by the last turn.
+   *
+   * Contract: Rounded. 0 when the last turn is 0.
+   * When to use: The header block.
+   * Expected outcome: Elapsed time per turn.
+   * Exceptions: None.
+   */
+  readonly elapsedMsPerTurn: number;
+  /**
+   * The summed consult wall-clock time divided by the last turn.
+   *
+   * Contract: Rounded. Overlapping consults are added. 0 when the last turn is 0.
+   * When to use: The header block.
+   * Expected outcome: Consult wall-clock time per turn.
+   * Exceptions: None.
+   */
+  readonly consultWallClockMsPerTurn: number;
   /**
    * Consult totals, one row per seat and stage.
    *
@@ -155,6 +182,15 @@ export interface RecordingSummary {
    * Exceptions: None.
    */
   readonly consultTotals: readonly ConsultTotals[];
+  /**
+   * Consult totals, one row per stage.
+   *
+   * Contract: Sorted by stage. `seatId` is `Stage`. Columns match a seat row, including cost.
+   * When to use: The table, before the Total row.
+   * Expected outcome: One row per distinct stage.
+   * Exceptions: None.
+   */
+  readonly stageTotals: readonly ConsultTotals[];
 }
 
 /**
@@ -189,13 +225,35 @@ export function summarizeRecording(recording: ParsedRecording): RecordingSummary
   const consultTotals = [...groups.values()].sort((left, right) =>
     left.seatId === right.seatId ? left.stage.localeCompare(right.stage) : left.seatId.localeCompare(right.seatId)
   );
+  const stageGroups = new Map<string, ConsultTotals>();
+  for (const row of consultTotals) {
+    const previous = stageGroups.get(row.stage);
+    stageGroups.set(row.stage, {
+      seatId: 'Stage',
+      stage: row.stage,
+      consults: (previous?.consults ?? 0) + row.consults,
+      inputTokens: (previous?.inputTokens ?? 0) + row.inputTokens,
+      outputTokens: (previous?.outputTokens ?? 0) + row.outputTokens,
+      cachedTokens: (previous?.cachedTokens ?? 0) + row.cachedTokens,
+      costUsd: (previous?.costUsd ?? 0) + row.costUsd,
+      wallClockMs: (previous?.wallClockMs ?? 0) + row.wallClockMs,
+    });
+  }
+  const stageTotals = [...stageGroups.values()].sort((left, right) => left.stage.localeCompare(right.stage));
+  const lastTurnNumber = recording.records.reduce((max, record) => Math.max(max, record.turnNumber), 0);
+  const elapsedMs = elapsedSpanMs(recording.records);
+  const wallClockMs = consultTotals.reduce((sum, row) => sum + row.wallClockMs, 0);
   return {
     matchId: recording.header.matchId,
     frames: frames.length,
     events: events.length,
-    lastTurnNumber: recording.records.reduce((max, record) => Math.max(max, record.turnNumber), 0),
-    framePayloadJsonBytes: frames.reduce((sum, record) => sum + jsonLength(record.payload), 0),
+    lastTurnNumber,
+    framePayloadJsonCharacters: frames.reduce((sum, record) => sum + jsonLength(record.payload), 0),
+    elapsedMs,
+    elapsedMsPerTurn: lastTurnNumber === 0 ? 0 : Math.round(elapsedMs / lastTurnNumber),
+    consultWallClockMsPerTurn: lastTurnNumber === 0 ? 0 : Math.round(wallClockMs / lastTurnNumber),
     consultTotals,
+    stageTotals,
   };
 }
 
@@ -204,20 +262,25 @@ export function summarizeRecording(recording: ParsedRecording): RecordingSummary
  *
  * Purpose: The command prints this text and nothing else on success.
  * When to use: After `summarizeRecording`.
- * Expected outcome: A header block, then one row per seat and stage, then a Total row. Costs have four decimals.
+ * Expected outcome: A header block, then one row per seat and stage, then one row per stage, then a Total row. Costs have four decimals.
  * Exceptions: None.
  */
-export function formatRecordingSummary(summary: RecordingSummary): string {
+export function formatRecordingSummary(summary: RecordingSummary, fileBytes?: number): string {
   const header = [
     `Match ${summary.matchId}`,
     `Frames ${summary.frames}`,
     `Events ${summary.events}`,
     `Last turn ${summary.lastTurnNumber}`,
-    `Frame JSON bytes ${summary.framePayloadJsonBytes}`,
+    `Elapsed ms ${summary.elapsedMs}`,
+    `Elapsed ms per turn ${summary.elapsedMsPerTurn}`,
+    `Consult wall-clock ms per turn ${summary.consultWallClockMsPerTurn}`,
+    `Frame JSON characters ${summary.framePayloadJsonCharacters}`,
+    ...(fileBytes === undefined ? [] : [`Recording file bytes ${fileBytes}`]),
     '',
     'Seat\tStage\tConsults\tInput\tOutput\tCached\tCost\tWall clock ms',
   ];
   const rows = summary.consultTotals.map((row) => formatConsultRow(row));
+  const stageRows = summary.stageTotals.map((row) => formatConsultRow(row));
   const total = summary.consultTotals.reduce(
     (sum, row) => ({
       seatId: 'Total',
@@ -231,13 +294,34 @@ export function formatRecordingSummary(summary: RecordingSummary): string {
     }),
     { seatId: 'Total', stage: '', consults: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, wallClockMs: 0 }
   );
-  return [...header, ...rows, formatConsultRow(total), ''].join('\n');
+  return [...header, ...rows, ...stageRows, formatConsultRow(total), ''].join('\n');
+}
+
+/**
+ * The span from the first parseable record time to the last, in record order.
+ *
+ * Purpose: Elapsed time is wall-clock of the recording, including idle time, not the sum of overlapping consults.
+ * When to use: `summarizeRecording`.
+ * Expected outcome: The difference in milliseconds, floored at 0. One record, or no parseable time, is 0.
+ * Exceptions: None.
+ */
+function elapsedSpanMs(records: readonly { recordedAt: string }[]): number {
+  let first: number | null = null;
+  let last: number | null = null;
+  for (const record of records) {
+    const parsed = Date.parse(record.recordedAt);
+    if (!Number.isFinite(parsed)) continue;
+    if (first === null) first = parsed;
+    last = parsed;
+  }
+  if (first === null || last === null) return 0;
+  return Math.max(0, last - first);
 }
 
 /**
  * One table row.
  *
- * Purpose: Seat rows and the Total row share the column order.
+ * Purpose: Seat rows, stage rows, and the Total row share the column order.
  * When to use: `formatRecordingSummary`.
  * Expected outcome: Tab-separated fields, with cost to four decimals.
  * Exceptions: None.

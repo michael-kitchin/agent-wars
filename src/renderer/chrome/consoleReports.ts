@@ -24,7 +24,7 @@ import { unavailableTooltipText } from './frameTooltipText';
  *
  * Purpose: The Reports row shows who sent it and which model, without parsing the toast text.
  * When to use: The fourth argument of `recordConsoleReport`.
- * Expected outcome: A message with `messageText` is drawn as a sender line. Other entries ignore this.
+ * Expected outcome: A message list is drawn as sender lines. Other entries ignore this.
  * Exceptions: None.
  */
 export interface ConsoleReportMeta {
@@ -46,15 +46,6 @@ export interface ConsoleReportMeta {
    * Exceptions: None.
    */
   readonly modelLabel?: string;
-  /**
-   * The message, without quotes.
-   *
-   * Contract: Plain text. When set, the entry body is built from this instead of `body`.
-   * When to use: A commander message.
-   * Expected outcome: Shown in quotes after the sender's name.
-   * Exceptions: None.
-   */
-  readonly messageText?: string;
   /**
    * The messages visible when the consult was stored.
    *
@@ -118,9 +109,9 @@ const listeners: Array<() => void> = [];
 /**
  * The sender line for a message entry.
  *
- * Purpose: The row names the side, then one line per message that was visible when the consult was stored.
- * When to use: `recordConsoleReport` when `messageText` or `messages` is set.
- * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name. Each message is `To {label}: {text}`, and You has no flag. A `messageText` with no message lines is still quoted. A strategy line follows when strategy is non-empty.
+ * Purpose: The row names the side, then one line per message that commander sent in that consult.
+ * When to use: `recordConsoleReport` when `messages` is set.
+ * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name. Each message is `To {label}: {text}`, and You has no flag. A strategy line follows when strategy is non-empty.
  * Exceptions: None.
  */
 function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
@@ -159,13 +150,6 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
     words.textContent = `To ${label}: ${text}`;
     item.appendChild(words);
     wrap.append(item);
-  }
-  const quoted = lines.length === 0 ? (meta.messageText?.trim() ?? '') : '';
-  if (quoted.length > 0) {
-    const legacy = document.createElement('p');
-    legacy.className = 'console-report-message';
-    legacy.textContent = `"${quoted}"`;
-    wrap.append(legacy);
   }
   const strategyText = meta.strategyText?.trim() ?? '';
   if (strategyText.length > 0) {
@@ -297,7 +281,7 @@ export function currentConsoleReportTag(): string {
  * Purpose: Keeps what a toast showed after the toast hides.
  * When to use: Right after a map toast or the AI strategy toast is filled. `body` is the toast's text element;
  *   it is copied, not moved.
- * Expected outcome: A new first entry with the tag and the kind. Without `messageText` and without `messages`, the body is a copy of the toast.
+ * Expected outcome: A new first entry with the tag and the kind. Without `messages`, the body is a copy of the toast.
  *   With either of those, the body is the sender's name and one line per stored message, plus a strategy line when the consult sent one.
  *   A message can show a model label. A turn report also gets a disabled Replay placeholder. The entry is marked new
  *   until the player next leaves the Reports tab, and counts as unread unless the tab is on screen. Past
@@ -333,7 +317,7 @@ export function recordConsoleReport(kind: ConsoleReportKind, tag: string, body: 
   if (kind === 'turn') head.append(createReplayPlaceholder());
   const content = document.createElement('div');
   content.className = 'console-report-body';
-  if (meta?.messageText !== undefined || meta?.messages !== undefined) content.append(messageReportBody(meta));
+  if (meta?.messages !== undefined) content.append(messageReportBody(meta));
   else content.append(...Array.from(body.cloneNode(true).childNodes));
   entry.append(head, content);
   entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);

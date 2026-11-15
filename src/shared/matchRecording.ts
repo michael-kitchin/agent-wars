@@ -444,6 +444,15 @@ export interface RecordingHeader {
    */
   readonly matchId: string;
   /**
+   * The playthrough id.
+   *
+   * Contract: The `playthrough_id` row at export time. Empty when the file was written before the field existed.
+   * When to use: Telling two runs of one match apart.
+   * Expected outcome: The id, or an empty string.
+   * Exceptions: None.
+   */
+  readonly playthroughId: string;
+  /**
    * When the file was written, as ISO text.
    *
    * Contract: The export clock.

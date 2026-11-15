@@ -28,7 +28,7 @@ import {
 } from './matchRecordingEvents';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
-test('strategic orders are one event per owner, and only when that owner has orders', () => {
+test('a human table with a row writes the human event, and every AI owner writes an event, including an empty order set', () => {
   withTempGameDb('aw-match-orders-', () => {
     gameDbOps.run("INSERT INTO pending_orders (unit_id, to_h3_index) VALUES ('u1', '8001')");
     const tables = readHumanOrderTables(gameDbOps);

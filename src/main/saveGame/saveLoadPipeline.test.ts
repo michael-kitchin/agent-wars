@@ -13,7 +13,8 @@ import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
 import { dbGetAll, dbGetOne, dbRun, resetGameForNewMatch } from '../gameDb';
-import { getDbHandle } from '../gameDb/dbConnection';
+import { gameDbOps, getDbHandle } from '../gameDb/dbConnection';
+import { readPlaythroughId } from '../gameDb/gameConfigKv';
 import { withSeatedTempGameDbAsync } from '../testSupport/withSeatedTempGameDb';
 import { LOAD_BUSY_MESSAGE, SAVE_BUSY_MESSAGE, SAVE_NOT_A_SAVE_MESSAGE } from './saveFileFormat';
 import { loadStagingPath, saveStagingPath } from './saveGamePaths';
@@ -73,6 +74,7 @@ test('a saved match loads back over a new match', async () => {
       const canonicalDbPath = getDbHandle()?.name;
       assert.ok(canonicalDbPath);
       const savedIds = unitIds();
+      const savedPlaythrough = readPlaythroughId(gameDbOps);
       const savePath = path.join(userDataDir, 'match.agentwars');
       const calls = { saveCalls: { count: 0 }, openCalls: { count: 0 } };
       const saved = await runSaveGame(depsFor({
@@ -95,6 +97,7 @@ test('a saved match loads back over a new match', async () => {
         ...calls,
       }));
       assert.deepEqual(loaded, { status: 'loaded', fileName: 'match.agentwars' });
+      assert.notEqual(readPlaythroughId(gameDbOps), savedPlaythrough);
       assert.equal(dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number, 1);
       assert.deepEqual(unitIds(), savedIds);
       assert.equal(fs.existsSync(saveStagingPath(userDataDir)), false);

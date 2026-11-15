@@ -100,3 +100,20 @@ test('a match with no human seat cannot stage a message', () => {
     assert.equal(sendStagedHumanSideMessages(tacticalStep(1, '', 0)), 0);
   });
 });
+
+test('a missing message table or roster sends nothing', () => {
+  const regions = largestHomeRegions(2);
+  assert.equal(regions.length, 2);
+  const seats = [
+    { kind: 'human' as const, homeRegion: regions[0] },
+    { kind: 'ai' as const, homeRegion: regions[1] },
+  ];
+  withSeatedTempGameDb('aw-human-messages-drop-', { gameMapId: 'global', seats }, () => {
+    gameDbOps.run('DROP TABLE side_messages');
+    assert.equal(sendStagedHumanSideMessages(tacticalStep(1, '', 0)), 0);
+  });
+  withSeatedTempGameDb('aw-human-messages-roster-', { gameMapId: 'global', seats }, () => {
+    gameDbOps.run('DROP TABLE seats');
+    assert.equal(sendStagedHumanSideMessages(tacticalStep(1, '', 0)), 0);
+  });
+});
