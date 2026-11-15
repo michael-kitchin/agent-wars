@@ -4,7 +4,7 @@
 
 **Purpose:** Say which plan runs when, what each one leaves behind, what has to be true before the next one starts, and what was decided along the way.
 
-This file is not an execution plan. A coding agent does not edit code from it.
+This file is not an execution plan. A coding agent does not edit code from it. All five files live in `.spec/todo/v3.1.0/`.
 
 ---
 
@@ -46,7 +46,7 @@ If you would rather run plan 3 whole, that works too. The only wrong order is pl
 
 ## Before You Start
 
-1. **Commit the messaging fixes.** The working tree holds the uncommitted fixes pass (86 changed files). These plans were audited against that tree. Plan 1 changes the talk reply, the talk prompt, and `side_stances`, all of which that work added.
+1. **Commit the current edits.** The messaging work is committed (through `d360008`). The working tree also holds uncommitted edits to the rule files, `AGENTS.md`, `CLAUDE.md`, and the talk stage (battle talk limited to the opponent). These plans were re-checked against that tree. Plan 1 changes the talk reply, the talk prompt, and `side_stances`, so commit those talk-stage edits first.
 2. **Commit before each plan.** The plans never commit, and they back up files to a temp folder instead.
 3. **Saves keep working.** `EXPECTED_USER_VERSION` does not change in any of the four. Plan 1 adds two columns on open, the way seat columns are added today. You said a version bump would be acceptable if needed. It was not needed.
 
@@ -54,7 +54,7 @@ If you would rather run plan 3 whole, that works too. The only wrong order is pl
 
 Use your usual cycle for each plan, one at a time: audit the plan, implement the phases, audit the implementation.
 
-- **Audit against the tree on the day you run the plan.** The plans were written and audited on 2026-11-15, against the working tree after the messaging fixes pass. Each Phase 0 lists the symbols the plan depends on.
+- **Audit against the tree on the day you run the plan.** The plans were written, audited, and re-checked on 2026-11-15, the last time against `d360008` plus the uncommitted rule and talk-stage edits. Each Phase 0 lists the symbols the plan depends on.
 - **Ask the auditing agent to confirm or deny** the claims each plan leans on hardest:
   - Plan 1: recording statistics cannot throw into a turn, the charts channel applies no fog filter, no prompt gains another side's statistics or another commander's stance, trust, or threat with fog of war off, and nothing changing was added to the cached system prompt.
   - Plan 2: no chart block can be taller than a quarter of the dialog, and no text reaches the DOM through `innerHTML`.
@@ -103,7 +103,7 @@ Use your usual cycle for each plan, one at a time: audit the plan, implement the
 
 ### Things to know that you did not ask for
 
-1. **Commanders' views stay private.** Trust and threat are private, as stances are. The talk prompt still calls a stance private and says no other commander is told it, trust, or threat. It does not mention that the player's charts show them.
+1. **Commanders' views stay private.** Trust and threat are private, as stances are. The talk prompt still calls a stance private and says no other commander is told it, trust, or threat. It does not mention that the player's charts show them. The loss lines in Recent Turn Notes are an older channel with no fog filter, outside this rule: `.spec/todo/v3.0.0/2026-11-15-loss-attribution-execution-plan.md` adds who was responsible to them, and that is not a breach of plan 1's Locked Decision 1.
 2. **Statistics are recorded each turn, not extracted from frames later.** Upkeep and production come from the same engine functions the top bar uses. Computing them at the turn boundary and storing one small event is far less likely to drift from the top bar than re-deriving them from a frame. The price is that charts start at the first turn recorded by plan 1.
 3. **"City cells held" is not a separate chart.** A side's production per turn is the sum of the city cells in the hexes it controls, so the two charts would be identical. The other two extras I suggested, units lost per turn and model cost, are in.
 4. **Replay shows recorded snapshots.** Plan 3 stores the exact snapshot the screen is given at every step, in two views, and the exact result each resolution handed to the renderer. Replay hands those back. This is why the recording has to exist before the Cup, and why it adds to the size of a match. Weather is stored with each snapshot, because it changes from turn to turn.

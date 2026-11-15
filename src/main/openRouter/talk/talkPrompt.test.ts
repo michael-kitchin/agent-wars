@@ -85,7 +85,8 @@ test('the situation text nests, marks one new line, and quotes safely', () => {
 });
 
 test('a battle input names the beat and the opponent', () => {
-  const text = buildTalkSituationText(input({ battle: { beatNumber: 2, opponentLabel: 'France' } }));
+  const text = buildTalkSituationText(input({ battle: { beatNumber: 2, opponentLabel: 'France', opponentCode: 'a2' } }));
   assert.match(text, /battle beat 2/);
   assert.match(text, /You are fighting France in this battle/);
+  assert.match(text, /During a battle you can write only to the side you are fighting, code a2, and set your stance only toward that side\./);
 });

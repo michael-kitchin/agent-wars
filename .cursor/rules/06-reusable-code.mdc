@@ -5,4 +5,6 @@ alwaysApply: true
 
 # 06 — Reusable Code
 
-Please look for, create, and evolve reusable code and other elements, to the extent this doesn't put reliability, performance, user experience, or other goals at significant risk.
+Before writing new code, look for existing code you can reuse. Search `src/shared/` and nearby modules for helpers, types, and other elements that already do the job, and extend them instead of copying them.
+
+When you write logic that other places also need, make it reusable. Skip reuse when it would put reliability, performance, user experience, or other goals at significant risk.

@@ -5,4 +5,6 @@ alwaysApply: true
 
 # 08 — Boilerplate Reduction
 
-Use boilerplate reduction techniques and related language features where reasonable (example: Lombok annotations and record classes in Java).
+Use boilerplate reduction techniques and related language features where they keep the code clear.
+
+In TypeScript, examples include destructuring, object shorthand, constructor parameter properties, and utility types such as `Pick` and `Readonly`. In Java, examples include Lombok annotations and record classes.

@@ -1,6 +1,6 @@
 'use strict';
 
-// ESLint plugin entry for orienting-comment enforcement (see .spec/orienting-comments-style-contract-v1.md).
+// ESLint plugin entry for orienting-comment enforcement (see .spec/completed/2026-04/2026-04-10-orienting-comments-style-contract-v1.md).
 
 const ORIENTING_RULE = require('./require-orienting-block.cjs');
 

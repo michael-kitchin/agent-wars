@@ -16,7 +16,7 @@
 
 - Run the phases in order, back to back. Do not pause between phases for review.
 - **Stop only when a verification fails** and the phase's "If verification fails" steps do not fix it. Then revert that phase (see Backup and Revert), record the failure in the Defect Inventory, and stop. Tell the user which phase failed and why.
-- Never commit, push, stash, or run `git checkout`, `git restore`, `git reset`, or `git clean`. The user reviews every change.
+- Never commit, push, stash, merge, rebase, or open a pull request, and never run `git checkout`, `git restore`, `git reset`, or `git clean`. Read-only commands such as `git status`, `git diff`, and `git log` are fine. The user reviews every change.
 - Read the whole phase before you edit anything. Each phase lists the files it **Adds** and **Edits**. Do not edit other files, except to remove an import that lint reports unused in a listed file, or to fix a test that fails only because of a change the phase names (record that file in the Completion Log).
 - Find code by the quoted text, not by a line number. Line numbers in this plan are approximate.
 - **Code blocks are sketches.** Write the real code from the file you just read. When a sketch and the file disagree, the file wins. Record the difference in the Completion Log. **User-facing strings and prompt text in this plan are not sketches.** Copy them exactly.
@@ -69,21 +69,35 @@ npm run check:circular
 
 ## Conventions
 
-These come from `.cursor/rules/` and `AGENTS.md`. Lint enforces some of them.
+These come from `.cursor/rules/` (which `CLAUDE.md` imports for Claude Code) and `AGENTS.md`. Read every rule file once before Phase 1. Lint enforces some of them.
 
-- **Orienting comments.** Every new function, constant, type, interface, and field needs a JSDoc block with a one-line summary, then `Purpose:` (or `Contract:` for types and interfaces), `When to use:`, `Expected outcome:`, and `Exceptions:`. **Do not copy the generic filler** that many existing blocks contain. Write what the code does, when to call it, what it returns, and what it throws.
-- **Logging in `src/main`.** A new **exported** function that changes state logs `logDebug` on entry. A new exported getter or pure builder logs `logTrace`. Log context carries ids, keys, and counts only. Never log message text, a prompt body, a payload body, or an API key. New **private** helpers add no log lines. A caught exception logs `logError`.
-- **No logging in `src/shared` or `src/renderer`** (the renderer may use `console.error` in a `catch`, as `commanderPoolClient.ts` does).
-- **Names.** camelCase files, directories, and functions, PascalCase types, UPPER_SNAKE constants. Follow `doc/naming-conventions-contract-v1.md`: the only role suffixes are `Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, and `Types`, and `Utils`, `Impl`, `Manager`, `Service`, `Processor`, and `Controller` are banned. Use the file names this plan gives. Names from this plan (phase numbers, plan file names) must never appear in code, comments, test names, or `doc/`.
+### Code
+
+- **Orienting comments.** Every new or changed field, property, function, method, and enum member gets a JSDoc block directly above it, private and non-exported ones included. So do new types, interfaces, and constants. The block is a one-line summary, then `Purpose:` (or `Contract:` for interface members), `When to use:`, `Expected outcome:`, and `Exceptions:`. Write what the code does, when to call it, what it returns, and what it throws.
+- **No filler.** Do not copy generic text such as "Supports maintainability by documenting why…" or "Use per team conventions…". When you change a declaration whose existing comment is filler (`applyGameStateSnapshot` and `wireInitCore` are two), replace that comment with specific text in the same edit.
+- **Logging in `src/main`.** Use `logTrace`, `logDebug`, `logInfo`, and `logError` from `src/main/logger.ts`, and add no `console` calls. Each new or changed exported function logs `logDebug` when it is called. One that only reads state logs `logTrace` instead. A caught exception logs `logError` with the error itself and the relevant ids and counts. Pass values as the extra argument (`logDebug('…', { seatId, count })`), not inside the message string. Never log message text, a prompt body, a payload body, or an API key. New private helpers add no log lines.
+- **No logging in `src/shared` or `src/renderer`.** Shared modules are bundled into the renderer, so they must never import `src/main/logger.ts`. The `src/main` code that calls a shared function logs at that boundary. The renderer may use `console.error` in a `catch`, as `commanderPoolClient.ts` does.
+- **Names.** camelCase files, directories, and functions, PascalCase types, UPPER_SNAKE constants. Follow `doc/naming-conventions-contract-v1.md`: the only role suffixes are `Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, and `Types`, and `Utils`, `Impl`, `Manager`, `Service`, `Processor`, and `Controller` are banned. Use the file names this plan gives.
+- **No plan labels.** Labels from this plan (phase and step numbers, plan file names) never appear in code, comments, test names, configuration, lint messages, or `doc/`. Describe what the code does instead.
 - **Seat ids.** Production code uses `HUMAN_SEAT_ID`, `AI_SEAT_IDS`, and the guards in `src/shared/seatIds.ts`, never string literals. Tests may use literals.
-- **Size limits.** Files should stay under 600 lines and must stay under 1000. Functions take 6 or fewer named parameters. Use a parameter object for more. Files already past 600 lines get call lines only. Put logic in new files.
-- **`readonly`.** Mark parameter arrays and object fields `readonly` where they are not reassigned. Use `const` unless a value is reassigned.
-- **Tests.** Test happy paths and essential failures only. A new test file copies the imports and structure of the nearest sibling test file.
+- **Size limits.** Every file, tests and scripts included, should stay at or under 600 lines and must never pass 1000. Count every line. A file already past 600 lines gets only the call lines and imports a phase names. Put new logic in new files. Never shorten a file by deleting comments or packing lines together.
+- **Parameters.** A function takes at most 6 named parameters. Past that, use a parameter object: a named interface with an orienting comment on the interface and on each field. The inline object types in this plan's sketches become such interfaces.
+- **Mutability.** Use `const` unless a value is reassigned, `readonly` for fields set once, and `readonly` array types for collections that are not changed.
+- **Reuse.** Before writing a helper, search `src/shared/` and the nearby modules for one that already does the job, and extend it instead of copying it.
+- **Tests.** Test the contract (inputs, outputs, and observable effects) on happy paths and essential failures only. Do not test private helpers, an IPC handler that only delegates, or other boilerplate. A new test file goes beside the code it covers and copies the imports and structure of the nearest sibling test file. A renderer source-contract test asserts that a wiring call or a guard is present. It does not assert the order of internal calls.
 - **Database access in the main process.** Modules under `src/main/recorder/` and `src/main/matchStatistics/` use `gameDbOps` and `hasDbHandle` from `src/main/gameDb/dbConnection.ts` and leaf files under `src/main/gameDb/`. They never import the barrel `src/main/gameDb.ts`. IPC handlers may import the barrel.
 - **Save format.** `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` do not change. A new column is added on open, the way `ensureSeatAddedColumns` does it.
 - **Side names, flags, and colors.** A side's name on screen is `sideDisplayName` (`src/shared/sideNicknames.ts`). Its flag is `createSideNumberFlag` (`src/renderer/chrome/toastInlineMarks.ts`). Its color is the color the top bar and the unit tokens already use for that side. Find it before drawing anything (read `src/renderer/chrome/topBar.ts` and `src/shared/topBarSides.ts`) and reuse it. Do not invent side colors.
 - **Text reaches the DOM through `textContent`.** Never build HTML from match text.
-- **Docs.** `AGENTS.md` requires `doc/` to change in the same change as the code, and the UX suite is normative. Before changing a surface, read its `doc/ux/` document and the cross-cutting documents `doc/ux-specification.md` routes it through. A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points. A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase. Your final message names every document you updated.
+
+### Documents
+
+- **Keep `doc/` current.** `AGENTS.md` requires `doc/` to change in the same change as the code, and the UX suite is normative. Before changing a surface, read its `doc/ux/` document and the cross-cutting documents `doc/ux-specification.md` routes it through.
+- **New UX documents.** A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points.
+- **Prompt documents.** A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase.
+- **Other facts.** When your change makes a fact wrong in `doc/project-instructions.md` or `doc/coding-prompts-1.md` (a moved file, a renamed script), fix that fact and leave the rest of the wording alone.
+- **Markdown structure.** Every markdown file you create or change, this plan's logs included, has one `#` title, heading levels in order with none skipped, headings that name their content, and a paragraph break wherever the topic changes.
+- **Final message.** It names every document you updated, or says that you checked and none needed changes.
 
 ---
 
@@ -216,10 +230,17 @@ collapsed:                                          expanded:
 
 1. Run `git status --short` and record the output in the Phase 0 Inventory.
 2. Run the Verification Bar and `npm run ui:smoke`. Record pass or fail for each, and the exact cycle list `check:circular` prints.
-3. **Prerequisite.** Confirm: `src/main/recorder/matchRecorder.ts` (`recordStepBoundary`, `recordMatchEvent`, `isRecorderEnabled`), `src/main/recorder/matchRecordStore.ts` (`listMatchRecords`), `src/shared/matchRecording.ts` (`MATCH_EVENT_TYPES`), `src/main/ipc/matchViewSnapshot.ts` (`readMatchSnapshot`, `omniscientSnapshot`), `src/shared/sideMessages.ts` (`sideMessageVisibleTo`), `src/shared/commanderStatus.ts` (`CommanderDispatch` with `messages`), `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot`), `src/renderer/gameplay/readyResolutionAnnouncements.ts` (`announceResolutionTurnUpdate`), `src/renderer/openRouter/commanderMessageTabsUi.ts` (`showCommanderMessageTabs`), `src/shared/chatPanelState.ts` (`chatPanelShouldShow`), `src/shared/observeModeControls.ts` (`activeHumanSeatId`), `src/renderer/map/mapClickSelectionPolicy.ts` (`clearSelectionLikeRightClick`), `src/renderer/wiredEntryCallbacks.ts` (`createReadyHandlerDeps`). **If any is missing, stop** and tell the user.
-   Phases 4 through 8 also need the charts dialog plan: `src/renderer/charts/chartsDialog.ts` exports `chartsDialogIsOpen`, and `src/renderer/chrome/blockingDialogGuards.ts` exports `blockingDialogIsOpen`. If those are missing, run Phases 0 through 3 only, then stop and tell the user. Phases 0 through 3 need nothing from the chart plans. `listMatchEventsOfType` in `matchRecordStore.ts` comes from the match statistics plan. If that plan has not run and the function is missing, add it in Phase 3 with its test: it returns the records of one type in `record_id` order with payloads decoded.
-4. Find every call of `recordStepBoundary(` outside `src/main/recorder/` and record the list. When this plan was written there were five: one in `src/main/gameIpcHandlers.ts`, one in `src/main/ipc/meleeInterceptResolveIpc.ts`, one in `src/main/ipc/endMatchIpcHandler.ts`, and two in `src/main/ipc/saveLoadIpcHandler.ts`. Phase 2 adds one line after each.
-5. Read, and do not edit: `doc/ux/selection-panel.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/input-map.md`, `doc/ux/resolution-playback.md`, `doc/ui-style-guide.md` section 2.10 (Replay Controls), `src/renderer/gameplay/selectionPanelExpand.ts`, `static/selectionChrome.css`, `src/renderer/gameplay/observeChrome.ts`, `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot` and `updateClientStaleEnemyIntel`), and `handleReadyButtonClick` in `src/renderer/gameplay/readyHandler.ts`, from the call to `deps.callReadyWithTimeout` to the end.
+3. **Prerequisite.** Confirm each of these. **If any is missing, stop** and tell the user.
+   - Main process: `src/main/recorder/matchRecorder.ts` (`recordStepBoundary`, `recordMatchEvent`, `isRecorderEnabled`), `src/main/recorder/matchRecordStore.ts` (`listMatchRecords`), `src/shared/matchRecording.ts` (`MATCH_EVENT_TYPES`), and `src/main/ipc/matchViewSnapshot.ts` (`readMatchSnapshot`, `omniscientSnapshot`).
+   - Shared: `src/shared/sideMessages.ts` (`sideMessageVisibleTo`), `src/shared/commanderStatus.ts` (`CommanderDispatch` with `messages`), `src/shared/chatPanelState.ts` (`chatPanelShouldShow`), and `src/shared/observeModeControls.ts` (`activeHumanSeatId`).
+   - Renderer: `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot`), `src/renderer/gameplay/readyResolutionAnnouncements.ts` (`announceResolutionTurnUpdate`), `src/renderer/openRouter/commanderMessageTabsUi.ts` (`showCommanderMessageTabs`), `src/renderer/map/mapClickSelectionPolicy.ts` (`clearSelectionLikeRightClick`), and `src/renderer/wiredEntryCallbacks.ts` (`createReadyHandlerDeps`).
+
+   Phases 4 through 8 also need the charts dialog plan: `src/renderer/charts/chartsDialog.ts` exports `chartsDialogIsOpen`, and `src/renderer/chrome/blockingDialogGuards.ts` exports `blockingDialogIsOpen`. If those are missing, run Phases 0 through 3 only, then stop and tell the user. Phases 0 through 3 need nothing from the chart plans.
+
+   `listMatchEventsOfType` in `matchRecordStore.ts` comes from the match statistics plan. If that plan has not run and the function is missing, add it in Phase 3 with its test: it returns the records of one type in `record_id` order with payloads decoded.
+4. Record the line counts of the files past 600 lines that this plan edits: `src/main/main.ts`, `src/main/preload.ts`, `src/shared/ipc/gameApiTypes.ts`, `src/renderer/renderer.ts`, `src/renderer/map/initCore.ts`, and `src/renderer/map/mainMapInteractions.ts`. When this plan was checked, `preload.ts` was 940 lines and `mainMapInteractions.ts` 955. If adding the lines a phase names would take any file past 1000, stop and tell the user.
+5. Find every call of `recordStepBoundary(` outside `src/main/recorder/` and record the list. When this plan was written there were five: one in `src/main/gameIpcHandlers.ts`, one in `src/main/ipc/meleeInterceptResolveIpc.ts`, one in `src/main/ipc/endMatchIpcHandler.ts`, and two in `src/main/ipc/saveLoadIpcHandler.ts`. Phase 2 adds one line after each.
+6. Read, and do not edit: `doc/ux/selection-panel.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/input-map.md`, `doc/ux/resolution-playback.md`, `doc/ui-style-guide.md` section 2.10 (Replay Controls), `src/renderer/gameplay/selectionPanelExpand.ts`, `static/selectionChrome.css`, `src/renderer/gameplay/observeChrome.ts`, `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot` and `updateClientStaleEnemyIntel`), and `handleReadyButtonClick` in `src/renderer/gameplay/readyHandler.ts`, from the call to `deps.callReadyWithTimeout` to the end.
 
 **Stop if** the bar fails before any edit.
 
@@ -274,7 +295,7 @@ Run the Verification Bar.
 
 Every step boundary stores the snapshots, and every resolution stores the result the renderer received. Nothing reads them yet.
 
-**Add:** `src/main/replay/replayRecording.ts`, `src/main/replay/replayRecording.test.ts`, `.spec/2026-11-15-history-3-replay-stepping-results.md`
+**Add:** `src/main/replay/replayRecording.ts`, `src/main/replay/replayRecording.test.ts`, and the results file named in step 5
 **Edit:** `src/main/ipc/matchViewSnapshot.ts`, `src/main/recorder/matchRecordStore.ts`, `src/main/recorder/matchRecordStore.test.ts`, `src/main/gameIpcHandlers.ts`, `src/main/ipc/meleeInterceptResolveIpc.ts`, `src/main/ipc/endMatchIpcHandler.ts`, `src/main/ipc/saveLoadIpcHandler.ts`, `src/main/main.ts`, `doc/match-recording.md`
 
 ### Steps
@@ -285,7 +306,7 @@ Every step boundary stores the snapshots, and every resolution stores the result
    - Add `export function playerViewSnapshot(seatId: SeatId): GameStateSnapshot`, which returns exactly what `readMatchSnapshot` returns for that seat. Move the statements after `if (decision.view === 'all') return omniscientSnapshot();` into it, and have `readMatchSnapshot` call it.
    - `readMatchSnapshot` must return the same values as before.
 2. `matchRecordStore.ts`: add `lastRecordIdOfType(ops, recordType: string): number | null` and `lastFrameRecordId(ops): number | null`.
-3. `replayRecording.ts`. Every exported function catches everything, logs with ids and counts only, and returns. **Recording must never break a turn.**
+3. `replayRecording.ts`. Every exported function catches everything, logs `logError` with the error and the record ids and counts, and returns. **Recording must never break a turn.**
    - `export function recordReplayViewsIfNeeded(): void`. It does nothing when the recorder is off or the database is not ready. It reads `lastFrameRecordId` and `lastRecordIdOfType(..., 'view_snapshot')`. When there is a frame and no view snapshot newer than it, it writes:
      - one `view_snapshot` for the `all` view, payload `{ view: 'all', seatId: null, snapshot }`, where `snapshot` is `omniscientSnapshot()` stored with a private helper `storedSnapshot(snapshot, dropFogLists)`: it removes `hexes` and adds `hexWeather` (see Design), and with `dropFogLists` true it also removes `visibleHexes`, `exploredHexes`, and `staleHexes`. Visibility `engine`;
      - and, when `activeHumanSeatId(getSeatRoster())` is not null, one for the `player` view, payload `{ view: 'player', seatId, snapshot }`, where `snapshot` is `storedSnapshot(playerViewSnapshot(seatId), false)`, visibility `{ seats: [seatId] }`.
@@ -297,7 +318,7 @@ Every step boundary stores the snapshots, and every resolution stores the result
    - `main.ts`, the `IPC_GAME.ready` handler: capture `const stepBefore = currentStepKey();` before the handler runs, await the result, and when `result.success` is true and `result.awaitingMeleeDecision` is not true, call `recordResolutionView(stepBefore, 'strategic', result)` before returning it. Do the same in the `IPC_GAME.resolveMeleeIntercept` handler. Keep `withAutoSaveAfter` and `runWithReadyInFlight` wrapped exactly as they are.
    - `main.ts`, the `IPC_GAME.commitHumanTacticalDraftOrders` handler: it already captures `beatStep` and records a tactical beat on success. Directly after that, call `recordResolutionView(beatStep, 'tactical', result)`. This is the value the handler goes on to return. If the handler adds fields to it afterwards (such as `tacticalPostBeatConsultDeferred`), record the object without them. Replay does not need them.
    `main.ts` is past 600 lines. Add only these lines.
-5. Results file. Write `.spec/2026-11-15-history-3-replay-stepping-results.md` with the compressed byte length of one `all` snapshot and one `player` snapshot for a fresh global match and for one regional match (add a temporary test case that prints `encodeRecordPayload(payload).length`, run it, then remove it), and an estimate for 150 turns. These numbers are reported, not gated.
+5. Results file. Write `.spec/todo/v3.1.0/YYYY-MM-DD-replay-stepping-results.md`, beside this plan, where `YYYY-MM-DD` is the local date on which you create it. Give it the compressed byte length of one `all` snapshot and one `player` snapshot for a fresh global match and for one regional match (add a temporary test case that prints `encodeRecordPayload(payload).length`, run it, then remove it), and an estimate for 150 turns. These numbers are reported, not gated.
 6. `doc/match-recording.md`: add both event types to the event table, say what is left out of a stored snapshot and why, and say that these two exist so a past turn can be shown again exactly as it was.
 
 ### Tests
@@ -396,11 +417,13 @@ Run the Verification Bar.
 4. **Last-seen markers.** On entering, `replayMode.ts` copies `S.lastObservedEnemyByUnitId`, `S.clientStaleEnemyIntelByUnitId`, and `S.lastRenderedVisibleEnemyByUnitId` (new `Map`s with the same entries), then clears all three, so no live marker is drawn over a past turn. On leaving, it puts the copies back before applying the live state.
 5. `replayMode.ts`:
    - `export async function toggleReplay(): Promise<void>`: leaves when active, otherwise tries to enter.
-   - **Entering.** Evaluate `replayMayEnter` with `matchLoaded` (`S.gameState` has seats), `inBattle` (`S.tacticalBattleSnapshot != null`), `readyInFlight` (`S.readyRequestInFlight`), `playbackRunning` (`S.resolutionMoveAnimation != null`), and `otherModalOpen` (`blockingDialogIsOpen() || chartsDialogIsOpen()`). On a refusal with a sentence, show it with `showMapToast(sentence, { isError: false, skipReport: true })` and stop. Fetch the timeline. With no steps, show `This match has no recorded turns to replay yet.` the same way and stop. Otherwise: close the build popup and the stack callout, clear the selection with `clearSelectionLikeRightClick(selectionDeps)`, save and clear the last-seen markers, call `setReplay` with `index` at the last step, set `document.body.dataset.replay = 'on'`, call `refreshConsoleHeader()` from `src/renderer/chrome/consoleFrame.ts`, and show that step (below).
+   - **Entering, the check.** Evaluate `replayMayEnter` with `matchLoaded` (`S.gameState` has seats), `inBattle` (`S.tacticalBattleSnapshot != null`), `readyInFlight` (`S.readyRequestInFlight`), `playbackRunning` (`S.resolutionMoveAnimation != null`), and `otherModalOpen` (`blockingDialogIsOpen() || chartsDialogIsOpen()`). On a refusal with a sentence, show it with `showMapToast(sentence, { isError: false, skipReport: true })` and stop.
+   - **Entering, the timeline.** Fetch the timeline. With no steps, show `This match has no recorded turns to replay yet.` the same way and stop.
+   - **Entering, the screen.** Close the build popup and the stack callout, clear the selection with `clearSelectionLikeRightClick(selectionDeps)`, and save and clear the last-seen markers. Then call `setReplay` with `index` at the last step, set `document.body.dataset.replay = 'on'`, call `refreshConsoleHeader()` from `src/renderer/chrome/consoleFrame.ts`, and show that step (below).
    - **Showing a step** (`export async function showReplayStep(index: number): Promise<void>`): do nothing while busy. Set `busy`, fetch `readReplayStep(steps[index].recordId)`, and drop the reply if replay ended or the match epoch changed while waiting. Apply `view.snapshot` with `{ refreshStandingOrders: false, updateGameStateSidebarUi: true, updateSelectionUi: false, updateGameOverUi: false, updateReadyButton: true, refreshBuildPopup: false, redraw: true, replay: 'step' }`, so the top bar and the map show that turn. Then set the index and clear `busy`. A null reply shows `That turn could not be loaded.` and leaves the index where it was. Phase 6 adds the dialogs here.
    - **Leaving** (`export async function leaveReplay(): Promise<void>`): show the last step (so the screen and, from Phase 6, the dialogs are the current turn's). Then call `setReplay(null)`, delete `document.body.dataset.replay`, put the last-seen markers back, fetch the live state with `fetchMatchSnapshot()`, and apply it with `{ refreshStandingOrders: true, updateGameStateSidebarUi: true, updateSelectionUi: true, updateGameOverUi: false, updateReadyButton: true, refreshBuildPopup: false, redraw: true, replay: 'leave' }`. Then call `refreshConsoleHeader()` and `syncChatPanelVisibility()`.
 6. **Map input.** Each of these gets `replayActive()` added to a guard that is already there. Change only that line and add the import:
-   - `mainMapInteractions.ts`: the `pointerdown`, `click`, `dblclick`, and `contextmenu` listeners on the map each begin with `if (newGameOverlayIsOpen()) return;` (in `contextmenu`, after `e.preventDefault();`). Make each `if (newGameOverlayIsOpen() || replayActive()) return;`. The file is 973 lines.
+   - `mainMapInteractions.ts`: the `pointerdown`, `click`, `dblclick`, and `contextmenu` listeners on the map each begin with `if (newGameOverlayIsOpen()) return;` (in `contextmenu`, after `e.preventDefault();`). Make each `if (newGameOverlayIsOpen() || replayActive()) return;`. The file is past 950 lines, so change only those four lines and add one import. A fifth copy of that line, in `scheduleHexDetailsTooltip`, stays as it is: hex tooltips keep working in replay.
    - `mapDoubleClickHandler.ts`, `handleMainMapDoubleClick`: after the `observeModeControls(...).observing` line, add `if (replayActive()) return;`.
    - `initCore.ts`: in the `buildEntryLayer?.addEventListener('click', ...)` listener, add `if (replayActive()) return;` as the first statement.
    - `tacticalEntryLayer.ts`: in the condition that reads `S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot || !observeModeControls(S.gameState.seats ?? []).magnifierEnabled`, add `|| replayActive()`, so the layer is hidden.
@@ -417,11 +440,10 @@ Run the Verification Bar.
 
 - `chatPanelState.test.ts`: `chatPanelShouldShow` is false when `replayActive` is true.
 - `rendererReplayContracts.test.ts` (use `getFunctionSource` and `assertMatches` from `rendererSourceAssertions.ts`):
-  - `applyGameStateSnapshot` checks `replayActive()` before it assigns `S.gameState`, and calls `updateClientStaleEnemyIntel` only when `options.replay` is not set.
+  - `applyGameStateSnapshot` calls `replayActive()`, and its `updateClientStaleEnemyIntel` call sits inside a branch that tests `options.replay`.
   - The `keydown` handler calls `toggleReplay` and `leaveReplay`.
   - `handleReadyButtonClick` returns when `replayActive()`.
   - Each of the four map listeners in `mainMapInteractions.ts`, `handleMainMapDoubleClick`, the build-entry click listener, the tactical entry layer, and `refreshConsoleHeader` calls `replayActive()`.
-  - `replayState.ts` imports nothing from `src/renderer/replay/`.
   - `static/replayChrome.css` hides both panels under `body[data-replay="on"]`.
 
 ### Verification
@@ -474,7 +496,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app in a match with a f
 
 ### Tests
 
-`rendererReplayContracts.test.ts`: `static/index.html` has each id above once; `replayPanel.ts` calls `parseTurnEntry`, `canStepBack`, `canStepForward`, `canPlay`, and `replayLabel`, sets `aria-invalid`, and does not contain `innerHTML`; `replayMode.ts` does not import `replayPanel`.
+`rendererReplayContracts.test.ts`: `static/index.html` has each id above once; `replayPanel.ts` calls `parseTurnEntry`, `canStepBack`, `canStepForward`, `canPlay`, and `replayLabel`, sets `aria-invalid`, and does not contain `innerHTML`. The import order in the Design section is enforced by `check:circular`, not by a test.
 
 ### Verification
 
@@ -527,7 +549,7 @@ Each step shows the message dialog and the update dialog that were shown when th
   - `handleReadyButtonClick` calls `planResolutionPlayback` (skip this assertion, with a comment, if step 1 took the fallback).
   - `resolutionPlaybackPlan.ts` contains no `S.` assignment, no `await`, and no `window.gameApi`.
   - `replayDialogs.ts` calls `announceResolutionTurnUpdate` with `skipReport: true` and `destroyedParents: []`, and calls `showCommanderMessageTabs`.
-  - `showCommanderMessageTabs` checks `replayActive()` before anything else.
+  - `showCommanderMessageTabs` calls `replayActive()`.
 
 ### Verification
 
@@ -556,7 +578,7 @@ Run the Verification Bar and `npm run ui:smoke`. This phase changes the live tur
 
 ### Tests
 
-`rendererReplayContracts.test.ts`: `maybeObserveAutoAdvance` checks `replayActive`; `openGameMenu` calls `requestReplayLeave`; `newGame.ts` calls `abandonReplay`; neither `gameMenu.ts` nor `newGame.ts` imports `replayMode`.
+`rendererReplayContracts.test.ts`: `maybeObserveAutoAdvance` checks `replayActive`; `openGameMenu` calls `requestReplayLeave`; `newGame.ts` calls `abandonReplay`.
 
 ### Verification
 
@@ -576,7 +598,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run an Observe match: `p` stops
 3. `doc/ui-style-guide.md` section 2.10: replace "Not shipped" with what shipped, and keep what is still a target.
 4. `doc/ux-specification.md`: the routing-table row and the list entry.
 5. `doc/how-to-play.md`: a short section on replay.
-6. Run `node scripts/check-doc-links.cjs` if the repo uses it.
+6. Run `node scripts/check-doc-links.cjs` and fix what it reports in the documents you changed.
 7. Search the whole diff for plan vocabulary and remove it: `git diff | Select-String -Pattern 'Phase \d|history-3|execution plan|locked decision' -CaseSensitive:$false`. Nothing under `src/`, `static/`, `scripts/`, or `doc/` may match.
 8. Run the Verification Bar and `npm run ui:smoke` one last time.
 9. Fill in the Completion Log.
@@ -612,7 +634,9 @@ Run the Verification Bar and `npm run ui:smoke`. Run an Observe match: `p` stops
 - [ ] `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` are unchanged.
 - [ ] Every new function, type, interface, field, and constant has a full orienting comment.
 - [ ] `npm run check:renderer-types` shows no new error, `check:circular` shows only the baseline cycles, and no baseline file was edited.
-- [ ] No commit, push, stash, checkout, restore, reset, or clean was run.
+- [ ] No commit, push, stash, merge, rebase, pull request, checkout, restore, reset, or clean was run.
+- [ ] Every changed declaration whose comment was generic filler now has a specific comment.
+- [ ] Every markdown file created or changed has one title, heading levels in order, and paragraph breaks where the topic changes.
 - [ ] No plan vocabulary appears in `src/`, `static/`, `scripts/`, or `doc/`.
 
 ## Success Definition
@@ -635,6 +659,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run an Observe match: `p` stops
 | `npm run build:renderer` | |
 | `check:circular` cycle list | |
 | Prerequisites | |
+| Line counts of the long files | |
 | Missing symbols | |
 
 ## Defect Inventory

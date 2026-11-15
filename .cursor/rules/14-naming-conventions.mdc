@@ -5,4 +5,11 @@ alwaysApply: true
 
 # 14 — Naming Conventions
 
-Follow `doc/naming-conventions-contract-v1.md`. Directories and TypeScript files under `src/` use camelCase. Exported functions are camelCase; exported types are PascalCase. Use only the allowed role suffixes (`Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, `Types`). Do not use `Utils` or `Impl`. Do not put milestone or tool-group numbers in identifiers. Do not rename frozen string values (IPC channels, LLM tool names, SQL columns, vendor JSON fields). Do not put identifiers used to name plans, workflows, or spec phases into product code, comments, configuration, or lint messages.
+Follow `doc/naming-conventions-contract-v1.md`. When an identifier disagrees with that contract, fix the identifier. The main points are:
+
+- Directories and TypeScript files under `src/` use camelCase.
+- Exported functions use camelCase, and exported types use PascalCase.
+- Use only the allowed role suffixes: `Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, and `Types`. Do not use the banned suffixes `Utils`, `Impl`, `Manager`, `Service`, `Processor`, or `Controller`.
+- Do not put milestone or tool-group numbers in identifiers.
+- Do not rename frozen string values, such as IPC channels, LLM tool names, SQL columns, and vendor JSON fields.
+- Do not put plan, workflow, or spec phase identifiers into product code, comments, configuration, or lint messages (see rule 12).

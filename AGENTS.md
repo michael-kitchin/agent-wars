@@ -4,6 +4,8 @@ Guidance for coding agents working in this repository.
 
 Coding rules live in `.cursor/rules/`. Cursor applies them automatically; other agents should read each `.mdc` file there and follow it.
 
+`CLAUDE.md` imports this file and every rule file for Claude Code. When you add, rename, or remove a rule file, update that import list in the same change.
+
 ## Keep `doc/` Current
 
 `doc/` holds the living product documentation. Before you change code, read the documents that describe the behavior you are about to change. When the change makes one of those documents wrong, update it in the same change as the code.

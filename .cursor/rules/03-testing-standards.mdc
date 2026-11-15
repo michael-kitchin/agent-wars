@@ -1,8 +1,12 @@
 ---
-description: "03 — Test happy paths and essential failure contracts only; skip boilerplate"
+description: "03 — Test happy paths and essential failure cases only; skip boilerplate"
 alwaysApply: true
 ---
 
 # 03 — Testing Standards
 
-Please ensure that we're only testing happy paths and essential failure cases for all new and updated code. We want to test essential code contracts and not implementation details. We do not need to test REST controller methods that directly delegate to component calls, DTO constructors, accessors, or similar boilerplate. Please remove any test cases or classes made unnecessary by these restrictions.
+For new and updated code, test only the happy paths and the essential failure cases. Test the code's contract, meaning its inputs, outputs, and observable effects. Do not test implementation details such as private helpers or the order of internal calls. TypeScript tests are `*.test.ts` files placed beside the code they cover.
+
+Do not test boilerplate. Boilerplate includes handlers that only delegate to another component (for example, REST controllers or IPC handlers), DTO constructors, accessors, and similar code.
+
+Remove existing test cases and test files for the code you changed when they fall outside these limits.

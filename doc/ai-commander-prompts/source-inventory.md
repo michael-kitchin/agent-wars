@@ -141,7 +141,7 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 | Goal clause | `buildTacticalBattleGoalClause` |
 | Coordinate preamble | `buildTacticalLatLngPreamble` |
 | Combat paragraph | same composer and the same `combatRuleGatesForPrompt` gates; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, air drops, ranged fire, movement, ferry, cargo sync, melee, no production** (no missile launches); a known roster names only the types present; `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` when the roster has a missile; `buildFortificationRule` adds the tactical fortification sentence only when `hasFortifiedCells` is true; weather text has no strategic movement sentence and no strategic ferry sentence; no hold-fire (standing orders are not issuable) |
-| Coaching | `buildOrdersGuidanceSection` from `buildTacticalCoachingSections`, plus `# Battle Context` with engage-priority, doctrine, message, and `Messages from other sides:` |
+| Coaching | `buildOrdersGuidanceSection` from `buildTacticalCoachingSections`, plus `# Battle Context` with engage-priority, doctrine, and the message rules (`sideMessageRuleBlock`, which opens with `Messages from other sides:`) |
 | Scenario objective | omitted |
 | Scouting sentence | omitted in battle. Strategic orders guidance always includes the scouting bullet |
 | Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes`, `ferryOrders`, and `airDrops` listed when the roster has air; Best Options may list airport ferry dests and air-drop cells |

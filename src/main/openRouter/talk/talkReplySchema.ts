@@ -13,7 +13,7 @@ import { SIDE_STANCES } from '../../../shared/sideMessages';
 /**
  * Builds the response format for one talk call.
  *
- * Purpose: The side-code enums are the other sides still in the match, so a code for a side that has left is not offered.
+ * Purpose: The side-code enums are the sides this reply may name, so a side that has left, or in a battle a side outside it, is not offered.
  * When to use: Once per talk call, with the codes `readTalkPromptInput` returns.
  * Expected outcome: `type` `json_schema`, name `talk_reply`, `strict` true, and both lists required. Each `to` and `toward` enum is `sideCodes`. Each `stance` enum is `SIDE_STANCES`.
  * Exceptions: None.

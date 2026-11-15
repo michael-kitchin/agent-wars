@@ -1,8 +1,10 @@
 ---
-description: "11 — Never commit or push; user reviews all changes before sharing"
+description: "11 — Never commit or push; the user reviews all changes before sharing"
 alwaysApply: true
 ---
 
 # 11 — No Commit or Push
 
-Never commit or push changes under any circumstances. I intend to review all changes before sharing them with other developers.
+Never commit or push changes under any circumstances. The user reviews every change before sharing it with other developers.
+
+Do not run commands that create or publish commits, such as `git commit`, `git push`, `git merge`, `git rebase`, or `gh pr create`, and do not create pull requests with any other tool. Read-only commands such as `git status`, `git diff`, and `git log` are fine.

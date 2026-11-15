@@ -1,8 +1,20 @@
 ---
-description: "02 — Backend logging levels for invocations, exceptions, and getters"
+description: "02 — Backend logging levels for calls, caught exceptions, and getters"
 alwaysApply: true
 ---
 
 # 02 — Backend Logging
 
-Please ensure that all new and updated public backend method invocations generate debug-level log messages, all caught exceptions generate error-level log messages, and all getter-style methods that don't modify state generate trace-level messages. Ensure all new and updated log messages include a reasonable level of detail for troubleshooting, and use the existing logging APIs. Note that these logging APIs check log levels before building message strings, so it's unnecessary to check the log level beforehand unless potentially large strings are being constructed inline with the logging call itself.
+Backend code is the Electron main process under `src/main/`, plus `src/shared/` code that runs in the main process. Log with the functions in `src/main/logger.ts`: `logTrace`, `logDebug`, `logInfo`, and `logError`. Outside `logger.ts`, do not add `console` calls or a new logging library.
+
+The renderer also bundles `src/shared/`, so shared modules must never import `src/main/logger.ts`. Instead, the `src/main/` code that calls a shared function logs that call at the boundary, following the levels below.
+
+In new and updated backend code, follow these levels:
+
+- Each public (exported) function or method logs a debug message with `logDebug` when it is called.
+- Each caught exception logs an error message with `logError`, and the message includes the error.
+- Each getter-style function that only reads state logs a trace message with `logTrace` instead of a debug message.
+
+Give each message enough detail to troubleshoot, such as the relevant IDs, counts, and inputs.
+
+The logger checks the level before it formats its extra arguments, so do not add your own level check. Pass large values as extra arguments instead of building them into the message string, for example `logDebug('Saved game', { gameId, turn })`.

@@ -1,7 +1,7 @@
 /**
  * Parsing a talk reply and the schema offered to the model.
  *
- * Purpose: A reply is accepted only when each entry names another active side, and the schema offers those codes.
+ * Purpose: A reply is accepted only when each entry names a side the caller allows, and the schema offers those codes.
  * When to use: `npm run build:main`, then `node dist/main/openRouter/talk/talkReply.test.js`.
  * Expected outcome: Clean replies become seat ids. Refused entries are counted. Text that is not an object returns null.
  * Exceptions: None.
@@ -20,7 +20,7 @@ test('a clean reply and a fenced reply become seat ids', () => {
   const clean = parseTalkReply({
     replyText: '{"messages":[{"to":"h1","text":"Hold the coast."},{"to":"a2","text":"Stay north."}],"stances":[{"toward":"h1","stance":"wary","reason":"Massing."}]}',
     ownSeatId: AI_SEAT_IDS[0],
-    activeSeatIds: active,
+    addressableSeatIds: active,
   });
   assert.deepEqual(clean?.messages.map((row) => row.toSeatId), [HUMAN_SEAT_ID, AI_SEAT_IDS[1]]);
   assert.equal(clean?.stances[0]?.stance, 'wary');
@@ -29,7 +29,7 @@ test('a clean reply and a fenced reply become seat ids', () => {
   const fenced = parseTalkReply({
     replyText: '```json\n{"messages":[{"to":"h1","text":"Hold."}],"stances":[]}\n```',
     ownSeatId: AI_SEAT_IDS[0],
-    activeSeatIds: active,
+    addressableSeatIds: active,
   });
   assert.equal(fenced?.messages[0]?.text, 'Hold.');
 });
@@ -50,7 +50,7 @@ test('codes are trimmed and cased, and bad entries are counted', () => {
       ],
     }),
     ownSeatId: AI_SEAT_IDS[0],
-    activeSeatIds: active,
+    addressableSeatIds: active,
   });
   assert.deepEqual(parsed?.messages.map((row) => row.text), ['North.']);
   assert.equal(parsed?.stances.length, 1);
@@ -62,12 +62,12 @@ test('long text is cut, and text that is not an object is null', () => {
   const long = parseTalkReply({
     replyText: JSON.stringify({ messages: [{ to: 'h1', text: 'x'.repeat(400) }], stances: [] }),
     ownSeatId: AI_SEAT_IDS[0],
-    activeSeatIds: active,
+    addressableSeatIds: active,
   });
   assert.equal(long?.messages[0]?.text.length, SIDE_MESSAGE_MAX_CHARS);
-  assert.equal(parseTalkReply({ replyText: 'not json', ownSeatId: AI_SEAT_IDS[0], activeSeatIds: active }), null);
-  assert.equal(parseTalkReply({ replyText: '[]', ownSeatId: AI_SEAT_IDS[0], activeSeatIds: active }), null);
-  const empty = parseTalkReply({ replyText: '{}', ownSeatId: AI_SEAT_IDS[0], activeSeatIds: active });
+  assert.equal(parseTalkReply({ replyText: 'not json', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active }), null);
+  assert.equal(parseTalkReply({ replyText: '[]', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active }), null);
+  const empty = parseTalkReply({ replyText: '{}', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active });
   assert.deepEqual(empty, { messages: [], stances: [], droppedCount: 0 });
 });
 

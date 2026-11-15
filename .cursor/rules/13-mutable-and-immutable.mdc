@@ -1,8 +1,10 @@
 ---
-description: "13 — Mutable and immutable symbols"
+description: "13 — Mark symbols with their intended mutability"
 alwaysApply: true
 ---
 
-# 13 — Mark symbols according to their purpose their intended mutability or immutability
+# 13 — Mutability Markers
 
-Classes, fields, variables, arguments, functions and other symbols should be marked according to their intended mutability or immutability, as appropriate for the chosen language level (examples: final in Java, const in TypeScript, and open in Kotlin).
+Mark classes, fields, variables, parameters, functions, and other symbols to show whether they are meant to change, using the features of the language version in use.
+
+In TypeScript, use `const` unless the variable is reassigned, `readonly` for fields and properties set only once, and `readonly` array types for collections that are not modified. In Java, use `final`. In Kotlin, leave classes and members final unless they are meant to be extended, and only then mark them `open`.

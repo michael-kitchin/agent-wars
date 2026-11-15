@@ -191,12 +191,12 @@ export interface TalkPromptInput {
   /**
    * The battle this call is inside, or null on the world map.
    *
-   * Contract: `opponentLabel` is null when the opponent has no label.
-   * When to use: The battle heading and the fighting line.
+   * Contract: `opponentLabel` is null when the opponent has no label. `opponentCode` is null when the opponent is not a seat still in the match, and then no message can be sent.
+   * When to use: The battle heading, the fighting line, and the line that limits messages to the opponent.
    * Expected outcome: The beat, or null.
    * Exceptions: None.
    */
-  readonly battle: { readonly beatNumber: number; readonly opponentLabel: string | null } | null;
+  readonly battle: { readonly beatNumber: number; readonly opponentLabel: string | null; readonly opponentCode: string | null } | null;
   /**
    * The sides table, including this commander's own side.
    *
@@ -317,6 +317,9 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
   if (input.battle) {
     const lines = [`# Diplomacy: turn ${input.turnNumber}, battle beat ${input.battle.beatNumber}`];
     if (input.battle.opponentLabel) lines.push(`You are fighting ${input.battle.opponentLabel} in this battle.`);
+    if (input.battle.opponentCode) {
+      lines.push(`During a battle you can write only to the side you are fighting, code ${input.battle.opponentCode}, and set your stance only toward that side.`);
+    }
     blocks.push(lines.join('\n'));
   } else {
     blocks.push(`# Diplomacy: turn ${input.turnNumber}`);

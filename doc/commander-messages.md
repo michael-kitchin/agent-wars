@@ -34,6 +34,8 @@ The talk call uses the same model, key, provider, and reasoning as the orders ca
 
 `AI_TALK_REQUEST_TIMEOUT_MS` (60_000) bounds one talk call. `AI_TALK_ROUND_TIMEOUT_MS` (75_000) bounds the wave. A seat that has not finished when the round closes is silent. The orders calls then start. A timeout does not hold the turn past that round. `AI_CONSULTATION_WAIT_TIMEOUT_MS` includes the round. The orders tool loop still stops at `AI_CONSULTATION_WALL_CLOCK_MS` (600_000). The pool's own wall clock is that constant plus the round timeout.
 
+In a battle, only the two sides fighting talk to each other. A battle commander can send a message to, and set a stance toward, the opposing side only, so a side outside the battle receives nothing from its beats (`readTalkPromptInput`). A battle against Neutral, or against a side that has left the match, makes no talk call and is silent with `no_recipients`.
+
 A silence reason is `abstained`, `failed`, `timed_out`, `unparsed`, `cancelled`, or `no_recipients`. None of those writes a message.
 
 ## The tables and the recording

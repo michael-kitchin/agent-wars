@@ -74,7 +74,7 @@ export function buildSignatureHint(sourceFile: ts.SourceFile, node: ts.Node): st
 /**
  * Produces the orienting comment block text for a declaration target.
  *
- * Purpose: Ensures generated comments match `.spec/orienting-comments-style-contract-v1.md`.
+ * Purpose: Ensures generated comments match `.spec/completed/2026-04/2026-04-10-orienting-comments-style-contract-v1.md`.
  * When to use: Whenever a declaration is missing or has an invalid orienting block.
  * Expected outcome: Returns a formatted orienting block comment string with required labeled lines.
  * Exceptions: None.

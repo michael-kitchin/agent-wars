@@ -128,21 +128,25 @@ export function readTalkSides(seatId: AiSeatId): TalkPromptSide[] {
 /**
  * Reads one talk prompt's inputs from the open match.
  *
- * Purpose: `requestTalk` does not assemble SQL itself.
+ * Purpose: `requestTalk` does not assemble SQL itself. In a battle, only the two sides fighting talk to each other, so a beat does not flood the sides that are not in it.
  * When to use: Once per talk call, before the model is called.
- * Expected outcome: The prompt input, the seats still in the match including this commander, and the side codes of the other active seats.
+ * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match.
  * Exceptions: Propagates a SQLite error.
  */
 export function readTalkPromptInput(args: {
   readonly seatId: AiSeatId;
   readonly turnNumber: number;
   readonly battle: TacticalBattleSnapshot | null;
-}): { readonly input: TalkPromptInput; readonly activeSeatIds: SeatId[]; readonly sideCodes: string[] } {
+}): { readonly input: TalkPromptInput; readonly addressableSeatIds: SeatId[]; readonly sideCodes: string[] } {
   const roster = sortSeatsByOrder(readSeatRoster(gameDbOps)).filter((seat) => isSeatId(seat.seatId));
   const own = roster.find((seat) => seat.seatId === args.seatId);
   const sides = readTalkSides(args.seatId);
   const activeSeatIds = roster.filter((seat) => isSeatActive(seat)).map((seat) => seat.seatId);
-  const sideCodes = sides.filter((side) => !side.isOwn && side.outTurn == null).map((side) => side.code);
+  const opponentId = args.battle ? battleOpponentSeatId(args.seatId, args.battle) : null;
+  const addressableSeatIds = activeSeatIds.filter((seatId) =>
+    seatId !== args.seatId && (args.battle === null || seatId === opponentId)
+  );
+  const sideCodes = addressableSeatIds.map((seatId) => playerIdCodeFor(seatId));
   const scope = args.battle ? 'tactical' as const : 'strategic' as const;
   const battleId = args.battle?.battleId ?? '';
   const noteTurn = args.battle ? args.battle.tacticalTurnNumber : args.turnNumber;
@@ -156,12 +160,12 @@ export function readTalkPromptInput(args: {
     heading: SECTION_TITLE_RECENT_TURN_NOTES,
     seatId: args.seatId,
   });
-  const opponentId = args.battle ? battleOpponentSeatId(args.seatId, args.battle) : null;
   const opponent = opponentId ? roster.find((seat) => seat.seatId === opponentId) : undefined;
   logTrace('talkPromptInput readTalkPromptInput', {
     seatId: args.seatId,
     turnNumber: args.turnNumber,
     activeSeatCount: activeSeatIds.length,
+    addressableSeatCount: addressableSeatIds.length,
     sideCodeCount: sideCodes.length,
     inBattle: args.battle !== null,
   });
@@ -169,13 +173,19 @@ export function readTalkPromptInput(args: {
     input: {
       ownSideLabel: own?.homeRegion ?? 'your side',
       turnNumber: args.turnNumber,
-      battle: args.battle ? { beatNumber: args.battle.tacticalTurnNumber, opponentLabel: opponent?.homeRegion ?? null } : null,
+      battle: args.battle
+        ? {
+          beatNumber: args.battle.tacticalTurnNumber,
+          opponentLabel: opponent?.homeRegion ?? null,
+          opponentCode: opponent && addressableSeatIds.includes(opponent.seatId) ? playerIdCodeFor(opponent.seatId) : null,
+        }
+        : null,
       sides,
       lastStrategy,
       recentTurnsSection,
       threads: readSideMessageThreads(args.seatId),
     },
-    activeSeatIds,
+    addressableSeatIds,
     sideCodes,
   };
 }

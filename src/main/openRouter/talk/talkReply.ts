@@ -139,20 +139,20 @@ function jsonObjectText(replyText: string): string | null {
 }
 
 /**
- * Resolves a side code or a seat id to an active seat.
+ * Resolves a side code or a seat id to a seat this reply may name.
  *
  * Purpose: The model is shown side codes, and sometimes repeats a seat id.
  * When to use: Each `to` and `toward` value.
- * Expected outcome: The seat, or null when the code is not an active side.
+ * Expected outcome: The seat, or null when the code does not name one of `addressableSeatIds`.
  * Exceptions: None.
  */
-function seatIdForSideCode(code: unknown, activeSeatIds: readonly SeatId[]): SeatId | null {
+function seatIdForSideCode(code: unknown, addressableSeatIds: readonly SeatId[]): SeatId | null {
   if (typeof code !== 'string') return null;
   const normalized = code.trim().toLowerCase();
   if (normalized.length === 0) return null;
-  const byCode = activeSeatIds.find((seatId) => playerIdCodeFor(seatId) === normalized);
+  const byCode = addressableSeatIds.find((seatId) => playerIdCodeFor(seatId) === normalized);
   if (byCode) return byCode;
-  if (isSeatId(normalized) && activeSeatIds.includes(normalized)) return normalized;
+  if (isSeatId(normalized) && addressableSeatIds.includes(normalized)) return normalized;
   return null;
 }
 
@@ -173,13 +173,13 @@ function entryList(value: unknown): readonly unknown[] {
  *
  * Purpose: The talk stage accepts one object and refuses the rest without a second model call.
  * When to use: After the model returns content.
- * Expected outcome: Null when the text has no JSON object or the value is not an object. Otherwise the accepted messages and stances, and a count of refused entries.
+ * Expected outcome: Null when the text has no JSON object or the value is not an object. Otherwise the accepted messages and stances, and a count of refused entries. An entry is kept only when it names one of `addressableSeatIds` other than `ownSeatId`.
  * Exceptions: None.
  */
 export function parseTalkReply(args: {
   readonly replyText: string;
   readonly ownSeatId: SeatId;
-  readonly activeSeatIds: readonly SeatId[];
+  readonly addressableSeatIds: readonly SeatId[];
 }): ParsedTalkReply | null {
   const slice = jsonObjectText(args.replyText);
   if (slice === null) {
@@ -206,7 +206,7 @@ export function parseTalkReply(args: {
 
   for (const entry of entryList(record.messages)) {
     const row = entry !== null && typeof entry === 'object' ? (entry as { readonly to?: unknown; readonly text?: unknown }) : null;
-    const toSeatId = row ? seatIdForSideCode(row.to, args.activeSeatIds) : null;
+    const toSeatId = row ? seatIdForSideCode(row.to, args.addressableSeatIds) : null;
     const text = cleanSideMessageText(row?.text, SIDE_MESSAGE_MAX_CHARS);
     if (!toSeatId || toSeatId === args.ownSeatId || text.length === 0 || seenRecipients.has(toSeatId)) {
       droppedCount += 1;
@@ -220,7 +220,7 @@ export function parseTalkReply(args: {
     const row = entry !== null && typeof entry === 'object'
       ? (entry as { readonly toward?: unknown; readonly stance?: unknown; readonly reason?: unknown })
       : null;
-    const towardSeatId = row ? seatIdForSideCode(row.toward, args.activeSeatIds) : null;
+    const towardSeatId = row ? seatIdForSideCode(row.toward, args.addressableSeatIds) : null;
     if (!towardSeatId || towardSeatId === args.ownSeatId || !isSideStance(row?.stance) || seenStances.has(towardSeatId)) {
       droppedCount += 1;
       continue;

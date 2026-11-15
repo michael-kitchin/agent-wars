@@ -16,7 +16,7 @@
 
 - Run the phases in order, back to back. Do not pause between phases for review.
 - **Stop only when a verification fails** and the phase's "If verification fails" steps do not fix it. Then revert that phase (see Backup and Revert), record the failure in the Defect Inventory, and stop. Tell the user which phase failed and why.
-- Never commit, push, stash, or run `git checkout`, `git restore`, `git reset`, or `git clean`. The user reviews every change.
+- Never commit, push, stash, merge, rebase, or open a pull request, and never run `git checkout`, `git restore`, `git reset`, or `git clean`. Read-only commands such as `git status`, `git diff`, and `git log` are fine. The user reviews every change.
 - Read the whole phase before you edit anything. Each phase lists the files it **Adds** and **Edits**. Do not edit other files, except to remove an import that lint reports unused in a listed file, or to fix a test that fails only because of a change the phase names (record that file in the Completion Log).
 - Find code by the quoted text, not by a line number. Line numbers in this plan are approximate.
 - **Code blocks are sketches.** Write the real code from the file you just read. When a sketch and the file disagree, the file wins. Record the difference in the Completion Log. **User-facing strings and prompt text in this plan are not sketches.** Copy them exactly.
@@ -67,21 +67,35 @@ npm run check:circular
 
 ## Conventions
 
-These come from `.cursor/rules/` and `AGENTS.md`. Lint enforces some of them.
+These come from `.cursor/rules/` (which `CLAUDE.md` imports for Claude Code) and `AGENTS.md`. Read every rule file once before Phase 1. Lint enforces some of them.
 
-- **Orienting comments.** Every new function, constant, type, interface, and field needs a JSDoc block with a one-line summary, then `Purpose:` (or `Contract:` for types and interfaces), `When to use:`, `Expected outcome:`, and `Exceptions:`. **Do not copy the generic filler** that many existing blocks contain. Write what the code does, when to call it, what it returns, and what it throws.
-- **Logging in `src/main`.** A new **exported** function that changes state logs `logDebug` on entry. A new exported getter or pure builder logs `logTrace`. Log context carries ids, keys, and counts only. Never log message text, a prompt body, a payload body, or an API key. New **private** helpers add no log lines. A caught exception logs `logError`.
-- **No logging in `src/shared` or `src/renderer`** (the renderer may use `console.error` in a `catch`, as `commanderPoolClient.ts` does).
-- **Names.** camelCase files, directories, and functions, PascalCase types, UPPER_SNAKE constants. Follow `doc/naming-conventions-contract-v1.md`: the only role suffixes are `Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, and `Types`, and `Utils`, `Impl`, `Manager`, `Service`, `Processor`, and `Controller` are banned. Use the file names this plan gives. Names from this plan (phase numbers, plan file names) must never appear in code, comments, test names, or `doc/`.
+### Code
+
+- **Orienting comments.** Every new or changed field, property, function, method, and enum member gets a JSDoc block directly above it, private and non-exported ones included. So do new types, interfaces, and constants. The block is a one-line summary, then `Purpose:` (or `Contract:` for interface members), `When to use:`, `Expected outcome:`, and `Exceptions:`. Write what the code does, when to call it, what it returns, and what it throws.
+- **No filler.** Do not copy generic text such as "Supports maintainability by documenting why…" or "Use per team conventions…". When you change a declaration whose existing comment is filler (`applyGameStateSnapshot` and `wireInitCore` are two), replace that comment with specific text in the same edit.
+- **Logging in `src/main`.** Use `logTrace`, `logDebug`, `logInfo`, and `logError` from `src/main/logger.ts`, and add no `console` calls. Each new or changed exported function logs `logDebug` when it is called. One that only reads state logs `logTrace` instead. A caught exception logs `logError` with the error itself and the relevant ids and counts. Pass values as the extra argument (`logDebug('…', { seatId, count })`), not inside the message string. Never log message text, a prompt body, a payload body, or an API key. New private helpers add no log lines.
+- **No logging in `src/shared` or `src/renderer`.** Shared modules are bundled into the renderer, so they must never import `src/main/logger.ts`. The `src/main` code that calls a shared function logs at that boundary. The renderer may use `console.error` in a `catch`, as `commanderPoolClient.ts` does.
+- **Names.** camelCase files, directories, and functions, PascalCase types, UPPER_SNAKE constants. Follow `doc/naming-conventions-contract-v1.md`: the only role suffixes are `Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, and `Types`, and `Utils`, `Impl`, `Manager`, `Service`, `Processor`, and `Controller` are banned. Use the file names this plan gives.
+- **No plan labels.** Labels from this plan (phase and step numbers, plan file names) never appear in code, comments, test names, configuration, lint messages, or `doc/`. Describe what the code does instead.
 - **Seat ids.** Production code uses `HUMAN_SEAT_ID`, `AI_SEAT_IDS`, and the guards in `src/shared/seatIds.ts`, never string literals. Tests may use literals.
-- **Size limits.** Files should stay under 600 lines and must stay under 1000. Functions take 6 or fewer named parameters. Use a parameter object for more. Files already past 600 lines get call lines only. Put logic in new files.
-- **`readonly`.** Mark parameter arrays and object fields `readonly` where they are not reassigned. Use `const` unless a value is reassigned.
-- **Tests.** Test happy paths and essential failures only. A new test file copies the imports and structure of the nearest sibling test file.
+- **Size limits.** Every file, tests and scripts included, should stay at or under 600 lines and must never pass 1000. Count every line. A file already past 600 lines gets only the call lines and imports a phase names. Put new logic in new files. Never shorten a file by deleting comments or packing lines together.
+- **Parameters.** A function takes at most 6 named parameters. Past that, use a parameter object: a named interface with an orienting comment on the interface and on each field. The inline object types in this plan's sketches become such interfaces.
+- **Mutability.** Use `const` unless a value is reassigned, `readonly` for fields set once, and `readonly` array types for collections that are not changed.
+- **Reuse.** Before writing a helper, search `src/shared/` and the nearby modules for one that already does the job, and extend it instead of copying it.
+- **Tests.** Test the contract (inputs, outputs, and observable effects) on happy paths and essential failures only. Do not test private helpers, an IPC handler that only delegates, or other boilerplate. A new test file goes beside the code it covers and copies the imports and structure of the nearest sibling test file. A renderer source-contract test asserts that a wiring call or a guard is present. It does not assert the order of internal calls.
 - **Database access in the main process.** Modules under `src/main/recorder/` and `src/main/matchStatistics/` use `gameDbOps` and `hasDbHandle` from `src/main/gameDb/dbConnection.ts` and leaf files under `src/main/gameDb/`. They never import the barrel `src/main/gameDb.ts`. IPC handlers may import the barrel.
 - **Save format.** `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` do not change. A new column is added on open, the way `ensureSeatAddedColumns` does it.
 - **Side names, flags, and colors.** A side's name on screen is `sideDisplayName` (`src/shared/sideNicknames.ts`). Its flag is `createSideNumberFlag` (`src/renderer/chrome/toastInlineMarks.ts`). Its color is the color the top bar and the unit tokens already use for that side. Find it before drawing anything (read `src/renderer/chrome/topBar.ts` and `src/shared/topBarSides.ts`) and reuse it. Do not invent side colors.
 - **Text reaches the DOM through `textContent`.** Never build HTML from match text.
-- **Docs.** `AGENTS.md` requires `doc/` to change in the same change as the code, and the UX suite is normative. Before changing a surface, read its `doc/ux/` document and the cross-cutting documents `doc/ux-specification.md` routes it through. A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points. A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase. Your final message names every document you updated.
+
+### Documents
+
+- **Keep `doc/` current.** `AGENTS.md` requires `doc/` to change in the same change as the code, and the UX suite is normative. Before changing a surface, read its `doc/ux/` document and the cross-cutting documents `doc/ux-specification.md` routes it through.
+- **New UX documents.** A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points.
+- **Prompt documents.** A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase.
+- **Other facts.** When your change makes a fact wrong in `doc/project-instructions.md` or `doc/coding-prompts-1.md` (a moved file, a renamed script), fix that fact and leave the rest of the wording alone.
+- **Markdown structure.** Every markdown file you create or change, this plan's logs included, has one `#` title, heading levels in order with none skipped, headings that name their content, and a paragraph break wherever the topic changes.
+- **Final message.** It names every document you updated, or says that you checked and none needed changes.
 
 ---
 
@@ -189,9 +203,14 @@ export interface TurnStatistics {
 
 1. Run `git status --short` and record the output in the Phase 0 Inventory. Uncommitted work already in the tree is the baseline.
 2. Run the Verification Bar. Record pass or fail for each command, and the exact cycle list `check:circular` prints.
-3. **Prerequisite.** The recorder and the talk stage must exist. Confirm: `src/main/recorder/matchRecorder.ts` (`recordStepBoundary`, `recordMatchEvent`), `src/main/recorder/matchRecordStore.ts` (`listMatchRecords`), `src/main/gameDb/mercenaryEconomyRead.ts` (`readMercenaryFunds`), `src/main/gameDb/seatRosterStore.ts` (`readSeatRoster`), `src/shared/matchRecording.ts` (`MATCH_EVENT_TYPES`, `MATCH_EVENT_FORMAT_VERSIONS`), `src/main/gameDb/sideMessageStore.ts` (`upsertSideStance`, `listSideStances`), `src/main/gameDb/sideMessageTables.ts` (`SIDE_MESSAGE_TABLES_DDL`, `ensureSideMessageTables`), `src/main/openRouter/talk/talkReply.ts` (`parseTalkReply`, `TalkReplyStance`), `src/main/openRouter/talk/talkReplySchema.ts`, `src/main/openRouter/talk/talkPrompt.ts` (the text `No other commander is told it`), `src/main/openRouter/talk/talkPromptInput.ts`, `src/main/openRouter/talk/ordersMessagesBlock.ts`, `src/main/openRouter/talk/talkRoundPersistence.ts`. **If any is missing, stop** and tell the user.
-4. Read, and do not edit: `src/main/gameDb/seatRosterStore.ts` (`ensureSeatAddedColumns`), `src/main/gameDb/mercenaryEconomyRead.ts` (`readMercenaryFunds`, `withMercenaryEconomy`), `src/shared/topBarStats.ts` (`computeTopBarStats`, for how production capacity is counted), and `doc/match-recording.md`.
-5. Record the value of `EXPECTED_USER_VERSION`. This plan does not change it.
+3. **Prerequisite.** The recorder and the talk stage must exist. **If any of these is missing, stop** and tell the user.
+   - Recorder: `src/main/recorder/matchRecorder.ts` (`recordStepBoundary`, `recordMatchEvent`), `src/main/recorder/matchRecordStore.ts` (`listMatchRecords`), and `src/shared/matchRecording.ts` (`MATCH_EVENT_TYPES`, `MATCH_EVENT_FORMAT_VERSIONS`).
+   - Economy and seats: `src/main/gameDb/mercenaryEconomyRead.ts` (`readMercenaryFunds`) and `src/main/gameDb/seatRosterStore.ts` (`readSeatRoster`).
+   - Stances: `src/main/gameDb/sideMessageStore.ts` (`upsertSideStance`, `listSideStances`) and `src/main/gameDb/sideMessageTables.ts` (`SIDE_MESSAGE_TABLES_DDL`, `ensureSideMessageTables`).
+   - Talk stage, all under `src/main/openRouter/talk/`: `talkReply.ts` (`parseTalkReply`, `TalkReplyStance`), `talkReplySchema.ts`, `talkPrompt.ts` (the text `No other commander is told it`), `talkPromptInput.ts`, `ordersMessagesBlock.ts`, and `talkRoundPersistence.ts`.
+4. Record the line counts of `src/main/gameDb.ts`, `src/main/main.ts`, `src/main/preload.ts`, and `src/shared/ipc/gameApiTypes.ts`. All four were past 600 lines when this plan was written, and `preload.ts` was 940. If adding the lines a phase names would take any file past 1000, stop and tell the user.
+5. Read, and do not edit: `src/main/gameDb/seatRosterStore.ts` (`ensureSeatAddedColumns`), `src/main/gameDb/mercenaryEconomyRead.ts` (`readMercenaryFunds`, `withMercenaryEconomy`), `src/shared/topBarStats.ts` (`computeTopBarStats`, for how production capacity is counted), and `doc/match-recording.md`.
+6. Record the value of `EXPECTED_USER_VERSION`. This plan does not change it.
 
 **Stop if** the bar fails before any edit.
 
@@ -299,7 +318,7 @@ Each strategic turn's statistics are stored as one event.
    - A unit is lost by seat S when its id was owned by S in `previous` and is absent from `current`, or is owned there by anyone else (a mercenary that deserted counts as lost).
    - A hex is taken by seat A from seat B when B controlled it in `previous`, A controls it in `current`, and both are seats in `seatIds` and differ. Neutral is not a seat.
    - `hexesTakenBetween` returns one entry per ordered pair with a count above 0.
-3. `statisticsRecording.ts`: `export function recordTurnStatistics(step: StepKey, seats: readonly SeatForStatistics[]): void`. It never throws: catch, `logError` with counts only, return.
+3. `statisticsRecording.ts`: `export function recordTurnStatistics(step: StepKey, seats: readonly SeatForStatistics[]): void`. It never throws: it catches, logs `logError` with the error and the seat count, and returns.
    - It does nothing unless `step.scope` is `'strategic'`.
    - It reads `readSideStatistics`, `listAllSideStances` (mapped to `RelationshipReport`, with `reportedTurn` from the row's `updated_turn`), and `readTurnOwnership` with `getMatchGeneration()` from `src/main/matchGeneration.ts`.
    - `previous` is `rememberedTurnOwnership(step.turnNumber - 1, generation)`. It fills `unitsLost` from `unitsLostBySeat(previous, current, ...)` (null for every seat when the function returns null) and `hexesTaken` from `hexesTakenBetween`.
@@ -437,7 +456,9 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 - [ ] Nothing under `src/main/matchStatistics/` or `src/main/recorder/` imports the barrel `src/main/gameDb.ts`.
 - [ ] Every new function, type, interface, field, and constant has a full orienting comment.
 - [ ] `npm run check:circular` shows only the baseline cycles. No baseline file was edited.
-- [ ] No commit, push, stash, checkout, restore, reset, or clean was run.
+- [ ] No commit, push, stash, merge, rebase, pull request, checkout, restore, reset, or clean was run.
+- [ ] Every changed declaration whose comment was generic filler now has a specific comment.
+- [ ] Every markdown file created or changed has one title, heading levels in order, and paragraph breaks where the topic changes.
 - [ ] No plan vocabulary appears in `src/` or `doc/`.
 
 ## Success Definition
@@ -459,6 +480,7 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 | `npm run build:renderer` | |
 | `check:circular` cycle list | |
 | Prerequisites | |
+| Line counts of the long files | |
 | Missing symbols | |
 
 ## Defect Inventory

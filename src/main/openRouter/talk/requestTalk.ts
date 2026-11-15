@@ -33,7 +33,7 @@ import { buildTalkReplyResponseFormat } from './talkReplySchema';
 /**
  * Why a commander sent nothing.
  *
- * Contract: One of the six reasons. `no_recipients` means no other seat is still in the match.
+ * Contract: One of the six reasons. `no_recipients` means the reply may name no seat: no other seat is still in the match, or a battle's opponent is Neutral or has left.
  * When to use: A `silent` result.
  * Expected outcome: The reason the round records.
  * Exceptions: None.
@@ -124,7 +124,7 @@ function silenceReasonForTransport(error: string, signal?: AbortSignal): TalkSil
  *
  * Purpose: The talk stage is one chat completion with no tools and no repair.
  * When to use: Inside a talk round, before that commander's orders call.
- * Expected outcome: `no_recipients` without a model call when no other seat is active. Otherwise one post. A parsed object returns `spoke`. A consultation row with stage `talk` is written only when the model was called and the match is still the one this call started on.
+ * Expected outcome: `no_recipients` without a model call when the reply may name no seat. Otherwise one post. A parsed object returns `spoke`. A consultation row with stage `talk` is written only when the model was called and the match is still the one this call started on.
  * Exceptions: None.
  */
 export async function requestTalk(
@@ -209,7 +209,7 @@ export async function requestTalk(
     const content = json?.choices?.[0]?.message?.content;
     const replyText = typeof content === 'string' ? content : '';
     const reply = replyText.length > 0
-      ? parseTalkReply({ replyText, ownSeatId: args.seatId, activeSeatIds: prepared.activeSeatIds })
+      ? parseTalkReply({ replyText, ownSeatId: args.seatId, addressableSeatIds: prepared.addressableSeatIds })
       : null;
     if (!reply) {
       outcome = { kind: 'silent', reason: 'unparsed', costUsd: usage.requestCost };

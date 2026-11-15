@@ -5,4 +5,6 @@ alwaysApply: true
 
 # 07 — Modern Coding Patterns
 
-Use the most reasonable, up-to-date coding patterns for the chosen language level (examples: Java stream APIs instead of for-loops).
+Use the most reasonable, up-to-date coding patterns for the language version the project uses.
+
+In TypeScript, examples include `map` and `filter` instead of index loops, `async`/`await` instead of promise chains, and optional chaining (`?.`). In Java, an example is stream APIs instead of for-loops.

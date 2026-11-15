@@ -184,7 +184,7 @@ module.exports = {
     },
     messages: {
       missingOrientingBlock:
-        'Missing or invalid orienting block comment (see .spec/orienting-comments-style-contract-v1.md).',
+        'Missing or invalid orienting block comment (see .spec/completed/2026-04/2026-04-10-orienting-comments-style-contract-v1.md).',
     },
     schema: [],
   },

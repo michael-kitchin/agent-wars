@@ -1,8 +1,24 @@
 ---
-description: "04 — Orienting comments on fields and non-overriding methods"
+description: "04 — Orienting comments on fields, functions, and non-overriding methods"
 alwaysApply: true
 ---
 
 # 04 — Orienting Comments
 
-Please ensure all new and updated fields and non-overriding methods of all cardinalities (static/instance, outer/inner) and access levels (public, private, and package-private) have correctly formatted orienting comments. An orienting comment explains why a field or method exists and generally when to use it, how to use it, and what to expect in terms of results and exceptions. Comments for interface and abstract methods focus on code contracts, while those for implementation methods focus on high-level implementation details.
+Every new or updated field, property, constructor, function, method, and enum member needs an orienting comment. This covers static and instance members, top-level and nested declarations, and every access level, including exported, non-exported, and private declarations. Only members marked with the `override` keyword are exempt.
+
+## Format
+
+In TypeScript, write one JSDoc `/** ... */` block directly above the declaration. `npm run lint` rejects blocks under `src/` that do not use this layout, which `.spec/completed/2026-04/2026-04-10-orienting-comments-style-contract-v1.md` describes in full:
+
+1. A one-line summary with no label.
+2. `Purpose:` why the declaration exists. Interface members and abstract methods use `Contract:` instead, stating what callers can rely on.
+3. `When to use:` when and how to use it.
+4. `Expected outcome:` what it returns or produces.
+5. `Exceptions:` which errors it can throw, or `None.`
+
+For concrete functions and methods, summarize how they work at a high level.
+
+## Content
+
+Write specific text for each declaration. Do not use generic filler such as "Use per team conventions." Existing filler comments may stay until you update their declarations; then replace them with specific text.

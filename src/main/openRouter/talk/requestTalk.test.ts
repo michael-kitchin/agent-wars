@@ -1,7 +1,7 @@
 /**
  * One talk call against a fake chat transport.
  *
- * Purpose: The call sends two messages and no tools, keeps other sides' private messages out, and records a talk consult only on the match it started on.
+ * Purpose: The call sends two messages and no tools, keeps other sides' private messages out, limits a battle to the side being fought, and records a talk consult only on the match it started on.
  * When to use: `npm run build:main`, then `node dist/main/openRouter/talk/requestTalk.test.js`.
  * Expected outcome: The cases below. The generation case is last because it moves the process-wide match generation.
  * Exceptions: None. The temporary match is closed afterward.
@@ -9,7 +9,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { AI_SEAT_IDS, type AiSeatId } from '../../../shared/seatIds';
+import { AI_SEAT_IDS, NEUTRAL_OWNER_ID, type AiSeatId } from '../../../shared/seatIds';
+import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { strategicStep } from '../../../shared/matchRecording';
 import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../../gameDb';
 import { gameDbOps } from '../../gameDb/dbConnection';
@@ -107,6 +108,55 @@ function consultationPayloads(): unknown[] {
     `SELECT payload FROM match_records WHERE record_type = 'consultation' ORDER BY record_id`
   ).map((row) => decodeRecordPayload(row.payload));
 }
+
+/**
+ * A battle snapshot with only the fields a talk call reads.
+ *
+ * Purpose: The battle cases need two parties and a beat without starting a battle.
+ * When to use: The battle cases in this file.
+ * Expected outcome: A snapshot whose lead is `leadPartyId` and whose opponent is `opposingPartyId`, on beat 1.
+ * Exceptions: None.
+ */
+function battleBetween(leadPartyId: string, opposingPartyId: string): TacticalBattleSnapshot {
+  return { battleId: 'tb-talk-test', tacticalTurnNumber: 1, leadPartyId, opposingPartyId } as unknown as TacticalBattleSnapshot;
+}
+
+test('in a battle a commander can message and set a stance only toward the side it is fighting', async () => {
+  await withThreeAi(async () => {
+    const seen: { body: Record<string, unknown> | null } = { body: null };
+    const reply = JSON.stringify({
+      messages: [{ to: 'a2', text: 'Stay out of this.' }, { to: 'a3', text: 'Yield the bridge.' }],
+      stances: [{ toward: 'a2', stance: 'wary', reason: 'Watching.' }, { toward: 'a3', stance: 'hostile', reason: 'Fighting us.' }],
+    });
+    const result = await requestTalk(
+      { seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: battleBetween(AI_SEAT_IDS[0], AI_SEAT_IDS[2]) },
+      deps(replyingPost(reply, 0.01, (payload) => { seen.body = payload.body; }))
+    );
+    assert.equal(result.kind, 'spoke');
+    if (result.kind === 'spoke') {
+      assert.deepEqual(result.reply.messages.map((row) => row.toSeatId), [AI_SEAT_IDS[2]]);
+      assert.deepEqual(result.reply.stances.map((row) => row.towardSeatId), [AI_SEAT_IDS[2]]);
+      assert.equal(result.reply.droppedCount, 2);
+    }
+    const messages = (seen.body?.messages ?? []) as readonly { role: string; content: string }[];
+    assert.match(messages[1]?.content ?? '', /During a battle you can write only to the side you are fighting, code a3/);
+  });
+});
+
+test('a battle against Neutral does not call the model', async () => {
+  await withThreeAi(async () => {
+    let posts = 0;
+    const result = await requestTalk(
+      { seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: battleBetween(AI_SEAT_IDS[0], NEUTRAL_OWNER_ID) },
+      deps(async () => {
+        posts += 1;
+        return { ok: false, error: 'should not post' };
+      })
+    );
+    assert.deepEqual(result, { kind: 'silent', reason: 'no_recipients', costUsd: 0 });
+    assert.equal(posts, 0);
+  });
+});
 
 test('a deadline during the call is a timeout and a stop is a cancel', async () => {
   await withThreeAi(async () => {

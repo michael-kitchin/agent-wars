@@ -5,4 +5,6 @@ alwaysApply: true
 
 # 09 — Source File Size Limits
 
-The desirable size limit for all source files is 600 lines, and a hard limit is 1000. When you reach these limits, move and/or decompose functionality to reasonably partitioned and organized sub-modules.
+Source files should stay at or under 600 lines and must never exceed 1000 lines. Count every line in the file, including comments and blank lines. The limits apply to all source files, including tests and scripts.
+
+When a file you create or edit grows past 600 lines, move or split its code into smaller modules, each grouped by a clear purpose. Do not meet the limit by deleting comments or packing code onto fewer lines.

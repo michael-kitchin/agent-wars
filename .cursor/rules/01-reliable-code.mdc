@@ -1,8 +1,10 @@
 ---
-description: "01 — Generate reliable, easy-to-understand code; double-check first-time generation"
+description: "01 — Write reliable, easy-to-understand code and double-check new code"
 alwaysApply: true
 ---
 
 # 01 — Reliable and Understandable Code
 
-Please ensure all generated code is reliable and easy to understand. Double-check if generating for the first time.
+Write code that is reliable and easy to understand. Prefer plain, direct logic over clever code.
+
+When you write new code, double-check it before you finish. Reread it against the request, look for unhandled edge cases, and run the relevant checks, such as `npm run lint` and the affected tests.

@@ -1,0 +1,10 @@
+---
+description: "16 — Paragraph breaks and headings in markdown documents"
+alwaysApply: true
+---
+
+# 16 — Markdown Structure
+
+Every markdown file you create or modify must have reasonable paragraph breaks and correct, logical headings. This applies whether the file is written for humans or agents.
+
+Split long paragraphs where the topic changes. Use one `#` title, then nest heading levels in order without skipping a level. Each heading must accurately name the content under it. When you fix breaks or headings, keep the meaning of the text unchanged.
