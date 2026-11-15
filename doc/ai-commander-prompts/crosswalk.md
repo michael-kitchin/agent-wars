@@ -95,7 +95,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `TOOL_BUDGET_WARNING` | [`variants.md`](variants.md) | Consultation policy |
 | `JSON_ENVELOPE` | [`assembly-contract.md`](assembly-contract.md) | Shared response envelope |
 | `SUBMIT_INSTRUCTION` | [`consultation-flow.md`](consultation-flow.md) | Opening user message |
-| Messages from other sides | [`assembly-contract.md`](assembly-contract.md) | Shared coaching, `SIDE_MESSAGE_RULE_BLOCK` |
+| Messages from other sides | [`assembly-contract.md`](assembly-contract.md) | Shared coaching, `sideMessageRuleBlock` |
 | `REPAIR_SCHEMA` | [`consultation-flow.md`](consultation-flow.md) | Repair schema contract |
 
 No item is unmatched.

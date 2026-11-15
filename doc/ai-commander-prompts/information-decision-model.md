@@ -29,7 +29,7 @@ The model is a weak model. Each job below must be answerable from information th
 9. **Keep production running.** Decide which controlled hexes queue what, given caps, and whether to queue credits or hire. Keep one city queued on credits. Queue what Production Priorities names before filling the other cities. At the caps, prefer credits. Read the Exposed column before queueing fortification. Needs `PRODUCTION_QUEUES`, `PRODUCTION_CAPS`, `PRODUCTION_CAP_QUEUE_RULE`, `PRODUCTION_PRIORITIES`, `PRODUCTION_RULES_COSTS`, `PRODUCTION_INCOME`, `PRODUCTION_TIMING`, the Paused Queues subsection, and the Mercenaries section when it is present.
 10. **Decide whether to call a tool at all.** Copy a listed option instead of re-deriving it; call a tool only for something the briefing does not list. Needs `BEST_OPTIONS_ROWS`, `TOOL_CATALOG`, `TOOL_BUDGET_WARNING`.
 11. **Choose re-consultation triggers.** Subscribe to the events that would change the plan. Needs `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_ACTIVE_LIST`, `CALLBACK_REPLACE_SEMANTICS`.
-12. **Write `strategy`.** One operational summary for its own future self. Messages to other sides are written in the diplomacy step, not in this reply. Needs `JSON_ENVELOPE`, `MEMORY_PERSISTENT`.
+12. **Write `strategy`.** One operational summary for its own future self. Nothing in this reply is sent to another side. With talk on, those messages are written in the diplomacy step. Needs `JSON_ENVELOPE`, `MEMORY_PERSISTENT`.
 13. **Record intent for next turn.** Persist what this turn was for. Needs `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`, `MEMORY_LIMITS`, `RECENT_TURN_NOTES`.
 14. **Handle an unresolved home boundary.** When home regions overlap, know that some hexes count for both sides. Needs `HOME_REGION_OVERLAP`.
 15. **Scout when blind.** When no enemy unit is observed, march toward the nearest passable enemy-home hex, or the nearest unexplored hex in that region when the unit is already inside it, rather than hold. Every orderless air unit defends on its current hex. Needs `ENEMY_ROSTER_OBSERVED`, `FOG_MODE`, `SUGGESTED_DESTINATION`, `HOME_REGION_HEXES`.
@@ -208,7 +208,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `TOOL_BUDGET_WARNING` | The previous consultation reached the tool-round limit before it submitted orders | `getAndClearAiToolLimitExceededLastTurn` | n/a | 10 | consult-only | conditional — flag set and planning or orders enabled |
 | `JSON_ENVELOPE` | The exact response object: field names, order, which are optional, which actions are legal | `buildFinalJsonContractInstruction`, `parseOrdersResponse` | n/a | 3, 5, 6, 7, 8, 9, 11, 12 | both | required |
 | `SUBMIT_INSTRUCTION` | What to do now: read the briefing, then emit the envelope | `getInitialUserMessage` | n/a | all | consult-only | required |
-| Messages from other sides | A message was written by a commander, human or AI, and may or may not be true or friendly. Nothing in the orders reply is sent | `SIDE_MESSAGE_RULE_BLOCK` | `# Messages` | 12 | both | required |
+| Messages from other sides | A message was written by a commander, human or AI, and may or may not be true or friendly. Nothing in the orders reply is sent | `sideMessageRuleBlock` | `# Messages` | 12 | both | required |
 | `REPAIR_SCHEMA` | On unparseable output, the exact object shape to re-emit | `buildJsonAssistantRepairSchema` | n/a | 12 | consult-only | required |
 
 ## 4. Gaps to close

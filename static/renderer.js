@@ -16150,9 +16150,12 @@
   }
   function sideDisplayName(seat) {
     const nickname = normalizeSideNickname(seat.nickname);
-    if (nickname.length > 0) return nickname;
-    if (seat.kind === HUMAN_SEAT_KIND) return HUMAN_NICKNAME_DEFAULT;
-    return defaultAiNickname(seat.homeRegion, seat.seatId);
+    if (nickname.length > 0) return withoutChatKeySeparators(nickname);
+    if (seat.kind === HUMAN_SEAT_KIND) return withoutChatKeySeparators(HUMAN_NICKNAME_DEFAULT);
+    return withoutChatKeySeparators(defaultAiNickname(seat.homeRegion, seat.seatId));
+  }
+  function withoutChatKeySeparators(value) {
+    return Array.from(value).filter((char) => char !== "\0" && char !== "").join("");
   }
 
   // src/shared/turnLossSections.ts
@@ -16408,14 +16411,24 @@
     const index = aiIndexForSeatId(seatId);
     const palette = paletteForOwner(seatId, seats);
     if (index == null || palette == null) return null;
+    return numberFlag(index, palette.map);
+  }
+  function createMessagePartyFlag(seatId, seats) {
+    if (!isHumanSeatId(seatId)) return createSideNumberFlag(seatId, seats);
+    const seat = seats.find((row) => row.seatId === seatId);
+    const palette = paletteForOwner(seatId, seats);
+    if (seat == null || palette == null) return null;
+    return numberFlag(seat.seatOrder, palette.map);
+  }
+  function numberFlag(digit, color) {
     const flag = document.createElement("span");
     flag.className = "side-number-flag";
-    flag.style.background = palette.map;
+    flag.style.background = color;
     flag.setAttribute("aria-hidden", "true");
-    const digit = document.createElement("span");
-    digit.textContent = String(index);
-    digit.style.color = "#ffffff";
-    flag.appendChild(digit);
+    const mark = document.createElement("span");
+    mark.textContent = String(digit);
+    mark.style.color = "#ffffff";
+    flag.appendChild(mark);
     return flag;
   }
 
@@ -17711,6 +17724,15 @@
     maskLayer?.setStyle(seam(theme.waterColor));
   }
 
+  // src/shared/mapKeyboardZoom.ts
+  var MAP_KEYBOARD_ZOOM_STEP = 0.5;
+  function mapZoomKeyStep(args) {
+    if (args.ctrlKey || args.altKey || args.metaKey) return null;
+    if (args.key === "+" || args.key === "=" || args.code === "NumpadAdd") return 1;
+    if (args.key === "-" || args.code === "NumpadSubtract") return -1;
+    return null;
+  }
+
   // src/renderer/map/worldLeafletMap.ts
   var mainMap4 = null;
   var miniMap2 = null;
@@ -17747,7 +17769,7 @@
       minZoom: 1.5,
       maxZoom: 12,
       zoomSnap: 0.25,
-      zoomDelta: 0.5,
+      zoomDelta: MAP_KEYBOARD_ZOOM_STEP,
       wheelPxPerZoomLevel: 80,
       /* Max bounds keep the world view inside ±180°; the drag wrap would pull a battle drawn past 180° to another copy. */
       worldCopyJump: false,
@@ -17755,7 +17777,7 @@
       maxBoundsViscosity: 1,
       /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
       keyboard: false,
-      /* The main map zooms from the wheel, from Shift-drag, and from the +/− buttons added below. There is no second control. */
+      /* The main map zooms from the wheel, from Shift-drag, and from the zoom keys. There is no on-screen control. */
       zoomControl: false,
       /* Elevation and Natural Earth credits stay in the notices file. The map does not print them. */
       attributionControl: false,
@@ -17833,6 +17855,10 @@
   }
   function getMainLeafletMap() {
     return mainMap4;
+  }
+  function zoomMainMapByKeyStep(step) {
+    if (!mainMap4) return;
+    mainMap4.setZoom(mainMap4.getZoom() + step * MAP_KEYBOARD_ZOOM_STEP);
   }
   function getMiniLeafletMap() {
     return miniMap2;
@@ -21973,6 +21999,15 @@ ${bonuses}`;
   }
 
   // src/shared/chatPanelState.ts
+  function stagedMessagesInSeatOrder(staged, recipientSeatIds) {
+    const order = new Map(recipientSeatIds.map((seatId, index) => [seatId, index]));
+    return [...staged].sort((left, right) => {
+      const leftOrder = order.get(left.toSeatId) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = order.get(right.toSeatId) ?? Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      return left.messageId - right.messageId;
+    });
+  }
   function stagedMessageFor(staged, recipientSeatId2) {
     if (recipientSeatId2 == null) return null;
     return staged.find((row) => row.toSeatId === recipientSeatId2) ?? null;
@@ -21983,6 +22018,9 @@ ${bonuses}`;
   }
   function canStageText(text) {
     return text.trim().length > 0;
+  }
+  function chatNamedSeatKey(seatIds, nameOf) {
+    return seatIds.map((seatId) => `${seatId}\0${nameOf(seatId)}`).join("");
   }
   function chatPanelShouldShow(input) {
     return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing;
@@ -22031,6 +22069,9 @@ ${bonuses}`;
   function notifyChatThread() {
     for (const listener of listeners) listener();
   }
+  function repaintChatThread() {
+    notifyChatThread();
+  }
   async function refreshChatThread() {
     const read = window.gameApi?.readSideMessages;
     if (!read) return;
@@ -22057,11 +22098,11 @@ ${bonuses}`;
       return "Invalid message.";
     }
   }
-  async function cancelStagedChatMessage() {
+  async function cancelStagedChatMessage(toSeatId) {
     const cancel = window.gameApi?.cancelStagedSideMessage;
-    if (!cancel || recipientSeatId == null) return;
+    if (!cancel) return;
     try {
-      await cancel({ toSeatId: recipientSeatId });
+      await cancel({ toSeatId });
       await refreshChatThread();
     } catch (err) {
       console.error("cancelStagedSideMessage failed", err);
@@ -23252,6 +23293,8 @@ ${bonuses}`;
   var annihilationExitTooltipText = "Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.";
   var aiOnlyResultOkTooltipText = "Close this result and return to the world map. The next turn does not start until you press Ready.";
   var aiOnlyTimedResultOkTooltipText = 'Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.';
+  var chatStagedEditTooltipText = "Put this message back in the text field to change it.";
+  var chatStagedCancelTooltipText = "Discard this message. It has not been sent.";
 
   // src/renderer/openRouter/openRouterModelRefresh.ts
   var refreshModels = null;
@@ -24275,6 +24318,7 @@ ${bonuses}`;
       if (!updated || !rendererSharedState.gameState?.seats) return;
       rendererSharedState.gameState = { ...rendererSharedState.gameState, seats: rendererSharedState.gameState.seats.map((seat) => seat.seatId === updated.seatId ? updated : seat) };
       renderCommanderCards();
+      repaintChatThread();
       void syncOpenRouterRunToggle();
     } catch (err) {
       console.error("setSeatCommander failed", seatId, err);
@@ -24350,8 +24394,8 @@ ${bonuses}`;
 
   // src/shared/sideMessageView.ts
   var SIDE_MESSAGES_TITLE = "Messages";
-  var SIDE_MESSAGE_BULLET_PREFIX = "To";
-  function groupSideMessagesByTurn(messages) {
+  var SIDE_MESSAGE_ARROW = "\u2192";
+  function groupSideMessagesByTurn(messages, seatOrderOf2) {
     const byTurn = /* @__PURE__ */ new Map();
     for (const message of messages) {
       const existing = byTurn.get(message.turnNumber);
@@ -24361,15 +24405,15 @@ ${bonuses}`;
     return [...byTurn.entries()].sort((left, right) => left[0] - right[0]).map(([turnNumber, group]) => ({
       turnNumber,
       heading: `Turn ${turnNumber}`,
-      messages: group
+      messages: [...group].sort((left, right) => seatOrderOf2(left.fromSeatId) - seatOrderOf2(right.fromSeatId) || seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId) || left.messageId - right.messageId)
     }));
   }
   function sideMessagePartyLabel(seatId, viewerSeatId2, nameOf) {
     if (viewerSeatId2 !== null && seatId === viewerSeatId2) return "You";
     return nameOf(seatId);
   }
-  function dispatchMessagesInSideOrder(messages, seatOrderOf) {
-    return [...messages].sort((left, right) => seatOrderOf(left.toSeatId) - seatOrderOf(right.toSeatId));
+  function dispatchMessagesInSideOrder(messages, seatOrderOf2) {
+    return [...messages].sort((left, right) => seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId));
   }
 
   // src/renderer/chrome/frameTooltipText.ts
@@ -24433,13 +24477,6 @@ ${bonuses}`;
       words.textContent = `To ${label}: ${text}`;
       item.appendChild(words);
       wrap.append(item);
-    }
-    const quoted = lines.length === 0 ? meta.messageText?.trim() ?? "" : "";
-    if (quoted.length > 0) {
-      const legacy = document.createElement("p");
-      legacy.className = "console-report-message";
-      legacy.textContent = `"${quoted}"`;
-      wrap.append(legacy);
     }
     const strategyText = meta.strategyText?.trim() ?? "";
     if (strategyText.length > 0) {
@@ -24530,7 +24567,7 @@ ${bonuses}`;
     if (kind === "turn") head2.append(createReplayPlaceholder());
     const content = document.createElement("div");
     content.className = "console-report-body";
-    if (meta?.messageText !== void 0 || meta?.messages !== void 0) content.append(messageReportBody(meta));
+    if (meta?.messages !== void 0) content.append(messageReportBody(meta));
     else content.append(...Array.from(body.cloneNode(true).childNodes));
     entry.append(head2, content);
     entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
@@ -32614,6 +32651,7 @@ ${bonuses}`;
   var slide2 = null;
   var historyKey = "";
   var recipientKey = "";
+  var stagedKey = "";
   var scrollHistoryToEnd = false;
   function rosterSeats() {
     return rendererSharedState.gameState?.seats ?? [];
@@ -32622,12 +32660,15 @@ ${bonuses}`;
     const seat = rosterSeats().find((row) => row.seatId === seatId);
     return seat ? sideDisplayName(seat) : seatId;
   }
+  function seatOrderOf(seatId) {
+    return rosterSeats().find((row) => row.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
+  }
   function syncExpandControl(button) {
     button.setAttribute("aria-expanded", String(expanded2));
     button.setAttribute("aria-label", expanded2 ? "Hide the message history" : "Show the message history");
     button.setAttribute(
       "data-control-tooltip",
-      expanded2 ? "Hide the message history." : "Show the messages sent and received this match."
+      expanded2 ? "Hide the message history." : "Show every message sent this match."
     );
   }
   function settleChat(panel) {
@@ -32660,15 +32701,37 @@ ${bonuses}`;
     const borders = panel.offsetHeight - panel.clientHeight;
     slideChat(panel, from, bar.offsetHeight + borders);
   }
-  function syncSendEnabled() {
+  function chatMessageField() {
     const input = document.getElementById("chat-panel-input");
+    return input instanceof HTMLTextAreaElement ? input : null;
+  }
+  function fitRecipientToWidestOption(select) {
+    const probe = document.createElement("span");
+    probe.style.position = "fixed";
+    probe.style.left = "-9999px";
+    probe.style.whiteSpace = "nowrap";
+    probe.style.font = getComputedStyle(select).font;
+    document.body.append(probe);
+    const widest = Math.max(
+      0,
+      ...Array.from(select.options, (option2) => {
+        probe.textContent = option2.textContent ?? "";
+        return probe.offsetWidth;
+      })
+    );
+    probe.remove();
+    const paddingBordersAndArrow = 28;
+    select.style.width = `${widest + paddingBordersAndArrow}px`;
+  }
+  function syncSendEnabled() {
+    const input = chatMessageField();
     const send = document.getElementById("chat-panel-send");
-    if (!(input instanceof HTMLInputElement) || !(send instanceof HTMLButtonElement)) return;
+    if (!input || !(send instanceof HTMLButtonElement)) return;
     send.disabled = !canStageText(input.value);
   }
   async function stageFromInput() {
-    const input = document.getElementById("chat-panel-input");
-    if (!(input instanceof HTMLInputElement) || !canStageText(input.value)) return;
+    const input = chatMessageField();
+    if (!input || !canStageText(input.value)) return;
     const text = input.value;
     const failure = await stageChatMessage(text);
     if (failure) {
@@ -32681,36 +32744,77 @@ ${bonuses}`;
     }
     input.focus();
   }
-  async function editStaged() {
-    const staged = stagedMessageFor(chatSnapshot().staged, chatRecipientSeatId());
-    const input = document.getElementById("chat-panel-input");
-    if (!staged || !(input instanceof HTMLInputElement)) return;
+  async function editStaged(toSeatId) {
+    const staged = stagedMessageFor(chatSnapshot().staged, toSeatId);
+    const input = chatMessageField();
+    if (!staged || !input) return;
+    setChatRecipient(toSeatId);
     input.value = staged.text;
     syncSendEnabled();
-    await cancelStagedChatMessage();
+    await cancelStagedChatMessage(toSeatId);
     input.focus();
     const end = input.value.length;
     input.setSelectionRange(end, end);
   }
-  function appendParty(parent, seatId, viewerSeatId2) {
-    const label = sideMessagePartyLabel(seatId, viewerSeatId2, seatName);
-    if (label !== "You") {
-      const flag = createSideNumberFlag(seatId, rosterSeats());
-      if (flag) parent.append(flag);
-    }
+  function stagedEditMark() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "chrome-icon");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M9.5 2.5l4 4L6 14H2v-4L9.5 2.5z");
+    svg.append(path);
+    return svg;
+  }
+  function stagedIconButton(label, tooltip, mark) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chat-panel-icon-btn";
+    button.setAttribute("aria-label", label);
+    button.setAttribute("data-control-tooltip", tooltip);
+    button.append(mark);
+    return button;
+  }
+  function stagedRow(row, viewerSeatId2) {
+    const line = document.createElement("div");
+    line.className = "chat-panel-staged-row";
+    const text = document.createElement("p");
+    text.className = "chat-panel-staged-text";
+    const fromSeatId = viewerSeatId2 ?? row.fromSeatId;
+    appendParty(text, fromSeatId);
+    text.append(document.createTextNode(` ${SIDE_MESSAGE_ARROW} `));
+    appendParty(text, row.toSeatId);
+    const words = document.createElement("span");
+    words.textContent = `: ${row.text}`;
+    text.append(words);
+    text.title = `${seatName(fromSeatId)} ${SIDE_MESSAGE_ARROW} ${seatName(row.toSeatId)}: ${row.text}`;
+    const edit = stagedIconButton("Edit this message", chatStagedEditTooltipText, stagedEditMark());
+    edit.addEventListener("click", () => {
+      void editStaged(row.toSeatId);
+    });
+    const cancel = stagedIconButton("Cancel this message", chatStagedCancelTooltipText, document.createTextNode("\xD7"));
+    cancel.addEventListener("click", () => {
+      void cancelStagedChatMessage(row.toSeatId);
+    });
+    line.append(text, edit, cancel);
+    return line;
+  }
+  function appendParty(parent, seatId) {
+    const flag = createMessagePartyFlag(seatId, rosterSeats());
+    if (flag) parent.append(flag);
     const name = document.createElement("span");
-    name.textContent = label;
+    name.textContent = seatName(seatId);
     parent.append(name);
   }
   function appendHistoryRow(parent, row, viewerSeatId2) {
     const line = document.createElement("p");
     line.className = "chat-panel-row";
     if (viewerSeatId2 != null && row.fromSeatId === viewerSeatId2) line.dataset.own = "true";
-    appendParty(line, row.fromSeatId, viewerSeatId2);
+    appendParty(line, row.fromSeatId);
     const arrow = document.createElement("span");
-    arrow.textContent = " \u2192 ";
+    arrow.textContent = ` ${SIDE_MESSAGE_ARROW} `;
     line.append(arrow);
-    appendParty(line, row.toSeatId, viewerSeatId2);
+    appendParty(line, row.toSeatId);
     if (row.scope === "tactical") {
       const battle = document.createElement("span");
       battle.textContent = " (battle)";
@@ -32725,7 +32829,8 @@ ${bonuses}`;
     const history = document.getElementById("chat-panel-history");
     if (!(history instanceof HTMLElement)) return;
     const snapshot3 = chatSnapshot();
-    const key = `${snapshot3.viewerSeatId ?? ""}|${snapshot3.messages.map((row) => row.messageId).join(",")}`;
+    const appearing = [...new Set(snapshot3.messages.flatMap((row) => [row.fromSeatId, row.toSeatId]))];
+    const key = `${snapshot3.viewerSeatId ?? ""}|${snapshot3.messages.map((row) => row.messageId).join(",")}|${chatNamedSeatKey(appearing, seatName)}`;
     const followLatest = scrollHistoryToEnd;
     scrollHistoryToEnd = false;
     const nearBottom = history.scrollHeight - history.scrollTop - history.clientHeight <= HISTORY_BOTTOM_SLACK_PX;
@@ -32741,7 +32846,7 @@ ${bonuses}`;
       empty.textContent = "No messages yet.";
       history.append(empty);
     } else {
-      for (const group of groupSideMessagesByTurn(snapshot3.messages)) {
+      for (const group of groupSideMessagesByTurn(snapshot3.messages, seatOrderOf)) {
         const heading = document.createElement("p");
         heading.className = "chat-panel-turn";
         heading.textContent = group.heading;
@@ -32755,7 +32860,7 @@ ${bonuses}`;
     const select = document.getElementById("chat-panel-recipient");
     if (!(select instanceof HTMLSelectElement)) return;
     const ids = chatSnapshot().recipientSeatIds;
-    const key = ids.join("\n");
+    const key = chatNamedSeatKey(ids, seatName);
     if (key !== recipientKey) {
       recipientKey = key;
       select.textContent = "";
@@ -32768,22 +32873,29 @@ ${bonuses}`;
     }
     const picked = chatRecipientSeatId();
     if (picked && select.value !== picked) select.value = picked;
+    fitRecipientToWidestOption(select);
   }
   function renderStaged() {
-    const row = document.getElementById("chat-panel-staged");
-    const text = document.getElementById("chat-panel-staged-text");
-    if (!(row instanceof HTMLElement) || !(text instanceof HTMLElement)) return;
+    const host = document.getElementById("chat-panel-staged");
+    if (!(host instanceof HTMLElement)) return;
     const snapshot3 = chatSnapshot();
-    const staged = snapshot3.canSend ? stagedMessageFor(snapshot3.staged, chatRecipientSeatId()) : null;
-    if (!staged) {
-      row.hidden = true;
-      text.textContent = "";
-      text.removeAttribute("title");
+    const staged = snapshot3.canSend ? stagedMessagesInSeatOrder(snapshot3.staged, snapshot3.recipientSeatIds) : [];
+    const fromSeatId = snapshot3.viewerSeatId ?? staged[0]?.fromSeatId ?? "";
+    const fromName = fromSeatId === "" ? "" : seatName(fromSeatId);
+    const rows = staged.map((row) => [row.messageId, row.toSeatId, seatName(row.toSeatId), row.text].join("\0")).join("");
+    const key = [fromSeatId, fromName, rows].join("\0");
+    if (key === stagedKey && (staged.length === 0 || host.childElementCount === staged.length)) {
+      host.hidden = staged.length === 0;
       return;
     }
-    row.hidden = false;
-    text.textContent = staged.text;
-    text.title = staged.text;
+    stagedKey = key;
+    host.replaceChildren();
+    if (staged.length === 0) {
+      host.hidden = true;
+      return;
+    }
+    host.hidden = false;
+    for (const row of staged) host.append(stagedRow(row, snapshot3.viewerSeatId));
   }
   function renderChatPanel() {
     const panel = document.getElementById("chat-panel");
@@ -32803,8 +32915,8 @@ ${bonuses}`;
       syncExpandControl(button);
       button.addEventListener("click", () => toggleChatPanel(panel, bar, button));
     }
-    const input = document.getElementById("chat-panel-input");
-    if (input instanceof HTMLInputElement) {
+    const input = chatMessageField();
+    if (input) {
       input.addEventListener("input", () => syncSendEnabled());
       input.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
@@ -32822,12 +32934,6 @@ ${bonuses}`;
         renderChatPanel();
       });
     }
-    document.getElementById("chat-panel-staged-edit")?.addEventListener("click", () => {
-      void editStaged();
-    });
-    document.getElementById("chat-panel-staged-cancel")?.addEventListener("click", () => {
-      void cancelStagedChatMessage();
-    });
     subscribeChatThread(() => renderChatPanel());
     void refreshChatThread();
     syncChatPanelVisibility();
@@ -41931,6 +42037,8 @@ ${bonuses}`;
     if (options.updateReadyButton) deps.updateReadyButtonState();
     if (options.redraw) deps.redraw();
     if (options.refreshBuildPopup) deps.refreshBuildPopupIfOpen();
+    repaintChatThread();
+    syncChatPanelVisibility();
   }
   function updateClientStaleEnemyIntel(previousState, state) {
     const viewer = staleIntelViewer(state.playerPerspective);
@@ -42534,34 +42642,28 @@ ${bonuses}`;
     const panel = document.createElement("div");
     panel.setAttribute("role", "tabpanel");
     const seats = rendererSharedState.gameState?.seats ?? [];
-    const viewerSeatId2 = activeHumanSeatId(seats);
-    sections.forEach((section, index) => {
-      if (index > 0) panel.appendChild(document.createElement("br"));
+    for (const section of sections) {
       appendMapToastSectionHeader(panel, section.title);
       if (section.bullets && section.bullets.length > 0) {
-        const list2 = document.createElement("ul");
         for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
-          const item = document.createElement("li");
-          item.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
-          const label = sideMessagePartyLabel(bullet.toSeatId, viewerSeatId2, (seatId) => seatName2(seats, seatId));
-          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_BULLET_PREFIX} `));
-          if (label !== "You") {
-            const flag = createSideNumberFlag(bullet.toSeatId, seats);
-            if (flag) item.appendChild(flag);
-          }
+          const item = document.createElement("div");
+          item.className = "commander-message-line";
+          const label = seatName2(seats, bullet.toSeatId);
+          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_ARROW} `));
+          const flag = createMessagePartyFlag(bullet.toSeatId, seats);
+          if (flag) item.appendChild(flag);
           const words = document.createElement("span");
           words.textContent = `${label}: ${bullet.text}`;
           item.appendChild(words);
-          list2.appendChild(item);
+          panel.appendChild(item);
         }
-        panel.appendChild(list2);
       } else {
         const span = document.createElement("span");
-        span.style.display = "block";
+        span.className = "commander-message-body";
         span.textContent = section.body;
         panel.append(span);
       }
-    });
+    }
     if (absence) {
       const span = document.createElement("span");
       span.style.display = "block";
@@ -45122,6 +45224,12 @@ ${bonuses}`;
         return;
       }
       if (e.repeat) return;
+      const zoomStep = mapZoomKeyStep({ key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey });
+      if (zoomStep !== null) {
+        e.preventDefault();
+        zoomMainMapByKeyStep(zoomStep);
+        return;
+      }
       if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
       const key = e.key.toLowerCase();
       if (key === "t") {

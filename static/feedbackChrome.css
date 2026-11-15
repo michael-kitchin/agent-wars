@@ -149,3 +149,18 @@
 #ai-strategy-toast .ai-strategy-tab-bar button[aria-selected="true"]:hover {
   background: var(--chrome-bg);
 }
+/* The first line sits 1em under Messages. Later lines sit against the line above. The last line's bottom margin is the gap above Strategy. These divs are the only divs in the panel. */
+#ai-strategy-toast .commander-message-line {
+  margin-top: 1em;
+  margin-bottom: 0;
+}
+#ai-strategy-toast .commander-message-line + .commander-message-line {
+  margin-top: 0;
+}
+#ai-strategy-toast .commander-message-line:last-of-type {
+  margin-bottom: 1em;
+}
+#ai-strategy-toast .commander-message-body {
+  display: block;
+  margin-top: 1em;
+}

@@ -133,7 +133,7 @@ Tactical variant, bullets in this order:
 
 1. **Priority**, one line: engage enemy forces and inflict losses when advantageous.
 2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add `buildDoctrineBlock` immediately after the strategy list. A strategic prompt then adds one production-denial line for balanced and one for cautious. A battle prints `buildDoctrineBlock` only, and it does not name the campaign target.
-3. **Message rules**, identical to strategic: `SIDE_MESSAGE_RULE_BLOCK`.
+3. **Message rules**, identical to strategic: `sideMessageRuleBlock`.
 
 `# Messages` is the same situation section as on the strategic prompt, immediately before the status sections. A battle has no Scenario Progress block, so the section still precedes Air Operations Status, Missile Forces, Mercenaries, Naval Transport Status, and Unit Roster. The history, the line limit, the visibility rule, the stance list, and the caution are the same.
 
@@ -165,7 +165,7 @@ Tactical variant, bullets in this order:
 - **`# Orders Guidance`**, after the tools section (`buildTacticalCoachingSections`). Subsections, in this order, each omitted when it has no bullet:
   1. Using the Briefing: the tempo rule (section 4 item 1), standing orders inert (item 2), copy option rows (item 3), and the clamped destination (item 4). The copy bullet maps a move or approach target into the move field, a ranged target into a `ranged_attack` entry, and, when air is present, an air strike, air drop, or ferry target into its list. An air sub-unit picks only one of air strike, air drop, and ferry, and embarks one infantry sub-unit from its cell in the same orders when Aboard is none.
   2. Air and Naval Units: the air bullet when air is present (item 5), and the sealift bullet when the naval status section is present (item 6).
-  3. Callbacks and Messages: callbacks (item 7), the unconsulted beat (item 8), message discipline (item 9), and leaving a decided battle when it applies (item 10).
+  3. Callbacks and Messages: callbacks (item 7), the unconsulted beat (item 8), and leaving a decided battle when it applies (item 10). Item 9 is carried by the message rule block in Battle Context (`sideMessageRuleBlock`).
 - **Empty-state:** the heading plus `No tools available.`
 
 ### 2.12 Observed enemy roster line
@@ -231,7 +231,7 @@ Printed by `buildOrdersGuidanceSection` under `# Orders Guidance`.
 6. **Sealift works inside the footprint.** Included only when the naval status section is present. Carries `EMBARK_LEGALITY`, `EMBARK_STATE`.
 7. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. An empty Active Callbacks table means there are no self-chosen triggers; omitting callbacks or sending `[]` keeps it empty, so only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
 8. **A beat with no prompt is a beat not acted in.** Coaching says the model is consulted when a subscribed event fires or when the engine forces a consultation. Standing orders are inert in battle, so an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.
-9. **Answer messages in the diplomacy step.** Same rule as strategic. `SIDE_MESSAGE_RULE_BLOCK` carries it.
+9. **Answer messages in the diplomacy step.** Same rule as strategic, including the sentence left out when `AGENT_WARS_DISABLE_TALK` is set. `sideMessageRuleBlock` carries it.
 10. **Leave when the battle is already decided.** Included only when the battle is between two AI commanders. The sentence is: set `exitBattle` to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give, and set it to false otherwise. Orders in this reply still resolve for this beat.
 
 Claims the builders **omit** from tactical coaching:

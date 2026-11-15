@@ -251,6 +251,12 @@ const MAP_CHROME_CHECKS = Object.freeze([
     },
   },
   {
+    name: 'minimap-has-no-zoom',
+    scenes: PLACEMENT_SCENES,
+    needs: ['#minimap'],
+    run: (p) => (p.minimapHasZoom ? 'the minimap has zoom buttons' : null),
+  },
+  {
     name: 'chat-panel-bottom-right',
     scenes: PLACEMENT_SCENES,
     needs: ['#canvas-container', '#chat-panel', LEAFLET.scale],

@@ -11,7 +11,7 @@
 
 const { SCENES, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
 const { checkBeatLimitControl, runBeatLimitBattleScenes } = require('./ui-smoke-beat-limit.cjs');
-const { clickStartGame, openNewGameOverlay, startObservedMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
+const { clickStartGame, openNewGameOverlay, setSideHome, startObservedMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const { readGameState } = require('./ui-smoke-map.cjs');
 const { editSavedMatch, launchApp } = require('./ui-smoke-session.cjs');
 
@@ -24,6 +24,16 @@ const { editSavedMatch, launchApp } = require('./ui-smoke-session.cjs');
  * Exceptions: None.
  */
 const FOUR_SIDE_REGION = 'central_america';
+
+/**
+ * Homes with land on every side, so the beat-limit battle can always pair two land armies.
+ *
+ * Purpose: Antarctica and Polynesia have no passable land, and a random home can put a side there.
+ * When to use: The Global observe setup, after the four rows exist.
+ * Expected outcome: One home name per side, in row order.
+ * Exceptions: None.
+ */
+const OBSERVED_HOMES = Object.freeze(['Southern Europe', 'Northern Africa', 'South America', 'Eastern Asia']);
 
 /**
  * Marks the third AI seat knocked out and gives its units to Neutral.
@@ -241,6 +251,9 @@ async function runMultiCommanderScenes(ctx) {
     await page.click('#new-game-observe-only');
     await page.waitForFunction(() => document.getElementById('new-game-observe-only')?.checked === true, null, { timeout: 10000 });
     await addSidesUntil(page, 4);
+    for (const [index, home] of OBSERVED_HOMES.entries()) {
+      await setSideHome(page, `Side ${index + 1}`, home);
+    }
     await checkBeatLimitControl(page);
     await startObservedMatch(page, 120000);
     await page.click('#console-tab-reports');

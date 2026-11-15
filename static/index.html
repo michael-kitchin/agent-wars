@@ -300,17 +300,13 @@
     </section>
     <section id="chat-panel" class="chat-panel" aria-label="Messages" data-state="compact" data-can-send="false" hidden>
       <div id="chat-panel-bar" class="chat-panel-bar">
-        <button type="button" id="chat-panel-expand" class="chat-panel-expand" aria-expanded="false" aria-controls="chat-panel-history" aria-label="Show the message history" data-control-tooltip="Show the messages sent and received this match."><svg class="chrome-icon chat-panel-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"></path></svg></button>
+        <button type="button" id="chat-panel-expand" class="chat-panel-expand" aria-expanded="false" aria-controls="chat-panel-history" aria-label="Show the message history" data-control-tooltip="Show every message sent this match."><svg class="chrome-icon chat-panel-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"></path></svg></button>
         <p id="chat-panel-title" class="chat-panel-title">Messages</p>
         <select id="chat-panel-recipient" class="chat-panel-recipient" aria-label="Send to" data-control-tooltip="Choose the side this message goes to."></select>
-        <input type="text" id="chat-panel-input" class="chat-panel-input" maxlength="280" autocomplete="off" spellcheck="true" placeholder="Write a message" aria-label="Message" data-control-tooltip="Write to that side's commander. Press Enter to stage the message. It is sent when you press Ready." />
+        <textarea id="chat-panel-input" class="chat-panel-input" maxlength="280" rows="1" autocomplete="off" spellcheck="true" placeholder="Write a message" aria-label="Message" data-control-tooltip="Write to that side's commander. Press Enter to stage the message. Shift+Enter starts a new line. It is sent when you press Ready."></textarea>
         <button type="button" id="chat-panel-send" class="chat-panel-icon-btn" aria-label="Stage this message" data-control-tooltip="Stage this message. It is sent when you press Ready." disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"></path></svg></button>
       </div>
-      <div id="chat-panel-staged" class="chat-panel-staged" hidden>
-        <p id="chat-panel-staged-text" class="chat-panel-staged-text"></p>
-        <button type="button" id="chat-panel-staged-edit" class="chat-panel-icon-btn" aria-label="Edit this message" data-control-tooltip="Put this message back in the text field to change it."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5l4 4L6 14H2v-4L9.5 2.5z"></path></svg></button>
-        <button type="button" id="chat-panel-staged-cancel" class="chat-panel-icon-btn" aria-label="Cancel this message" data-control-tooltip="Discard this message. It has not been sent.">×</button>
-      </div>
+      <div id="chat-panel-staged" class="chat-panel-staged" hidden></div>
       <div id="chat-panel-history" class="chat-panel-history" role="log" aria-live="polite"></div>
     </section>
   </div>

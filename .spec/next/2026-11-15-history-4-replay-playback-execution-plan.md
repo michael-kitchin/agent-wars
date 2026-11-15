@@ -1,0 +1,405 @@
+# Replay: Playback and Battles Execution Plan
+
+**Audience:** A coding agent that runs this plan from start to finish without asking questions.
+
+**Goal:** The replay panel's Play button plays the recorded turns forward with their resolution animations, and replay works inside a tactical battle, where it steps and plays through that battle's beats.
+
+**Shape:** Phase 0 records a baseline and an inventory of the code to be shared. Phases 1 through 4 each add one piece that can be verified on its own or with earlier phases. Phase 5 runs the final verification, the doc check, and hands the user a manual checklist.
+
+**Tech:** TypeScript (esbuild-bundled renderer, Electron main), plain DOM and canvas animation, `node:test`, ESLint with the local `orienting-comments` rule, `scripts/ui-smoke/`.
+
+**Order:** This is the fourth of four plans. It needs the replay stepping plan finished first. `2026-11-15-history-0-meta-plan.md` explains the order.
+
+---
+
+## How to Use This Plan
+
+- Run the phases in order, back to back. Do not pause between phases for review.
+- **Stop only when a verification fails** and the phase's "If verification fails" steps do not fix it. Then revert that phase (see Backup and Revert), record the failure in the Defect Inventory, and stop. Tell the user which phase failed and why.
+- Never commit, push, stash, or run `git checkout`, `git restore`, `git reset`, or `git clean`. The user reviews every change.
+- Read the whole phase before you edit anything. Each phase lists the files it **Adds** and **Edits**. Do not edit other files, except to remove an import that lint reports unused in a listed file, or to fix a test that fails only because of a change the phase names (record that file in the Completion Log).
+- Find code by the quoted text, not by a line number. Line numbers in this plan are approximate.
+- **Code blocks are sketches.** Write the real code from the file you just read. When a sketch and the file disagree, the file wins. Record the difference in the Completion Log. **User-facing strings and prompt text in this plan are not sketches.** Copy them exactly.
+- **Tests come first.** Tests under `src/renderer` are not run by `npm test`. So every rule that can be wrong lives in a pure function under `src/shared` (or a main-process module), with a test, written and run before anything calls it. Renderer files only read the DOM and state, call those functions, and write the DOM.
+
+### Backup and Revert
+
+Nothing is committed. Before each phase, copy every file the phase **edits** into a backup folder outside the repo. Run this from the repo root. Set `$step` to the phase number and `$files` to that phase's **Edit** list.
+
+```powershell
+$step = '1'
+$files = @('src/main/gameDb.ts')
+$backup = Join-Path $env:TEMP "aw-replay-playback\step-$step"
+foreach ($f in $files) {
+  $dest = Join-Path $backup $f
+  New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+  Copy-Item $f $dest -Force
+}
+```
+
+To revert a phase:
+
+```powershell
+foreach ($f in $files) { Copy-Item (Join-Path $backup $f) $f -Force }
+# Then delete every file the phase added (its "Add" list).
+```
+
+---
+
+## Verification Bar
+
+Every phase ends with all three commands, run from the repo root:
+
+```powershell
+npm test
+npm run build:renderer
+npm run check:circular
+```
+
+- `npm test` runs the native rebuild, `build:main`, `lint`, `naming:check`, `check:renderer-types`, every compiled `dist/main/**/*.test.js` and `dist/shared/**/*.test.js`, and `notices:check`. It takes about 20 minutes. New `*.test.ts` files under `src/main` or `src/shared` are discovered automatically. Tests under `src/renderer` are **not** run.
+- `npm run check:circular` passes when it prints **exactly** the cycles recorded in Phase 0 and no others. Type-only imports are erased and cannot cause a cycle.
+- `npm run check:renderer-types` compares renderer type errors with a baseline. A **new** error fails. Never refresh `scripts/renderer-typecheck-baseline.json`, `scripts/circular-deps-baseline.json`, or any other baseline file to make a gate pass.
+- **Quick loop while you work:** `npm run build:main`, then `node dist/main/<path>.test.js` (or `dist/shared/...`). This is a shortcut only. The full bar decides pass or fail.
+- **Native module lock.** If `npm test` fails in `rebuild:native:node` with `EBUSY` on `better_sqlite3.node`, close any running Electron app, rename `node_modules/better-sqlite3/build/Release/better_sqlite3.node` to `better_sqlite3.node.locked`, rerun `npm test`, then delete the `.locked` file.
+- **No test may call a real model.**
+- **Renderer phases also run `npm run ui:smoke`** when the phase says so. If `ui:smoke` cannot run on this machine, say so in the Completion Log. The user's manual checklist covers it.
+- **Source contracts.** Renderer wiring is checked by tests under `src/main` that read renderer source with `readRendererSource`, `getFunctionSource`, and `assertMatches` from `src/main/testSupport/rendererSourceAssertions.ts`. Read `src/main/rendererChatPanelContracts.test.ts` for the style before writing one.
+
+---
+
+## Conventions
+
+These come from `.cursor/rules/` and `AGENTS.md`. Lint enforces some of them.
+
+- **Orienting comments.** Every new function, constant, type, interface, and field needs a JSDoc block with a one-line summary, then `Purpose:` (or `Contract:` for types and interfaces), `When to use:`, `Expected outcome:`, and `Exceptions:`. **Do not copy the generic filler** that many existing blocks contain. Write what the code does, when to call it, what it returns, and what it throws.
+- **Logging in `src/main`.** A new **exported** function that changes state logs `logDebug` on entry. A new exported getter or pure builder logs `logTrace`. Log context carries ids, keys, and counts only. Never log message text, a prompt body, a payload body, or an API key. New **private** helpers add no log lines. A caught exception logs `logError`.
+- **No logging in `src/shared` or `src/renderer`** (the renderer may use `console.error` in a `catch`, as `commanderPoolClient.ts` does).
+- **Names.** camelCase files, directories, and functions, PascalCase types, UPPER_SNAKE constants. Follow `doc/naming-conventions-contract-v1.md`: the only role suffixes are `Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, and `Types`, and `Utils`, `Impl`, `Manager`, `Service`, `Processor`, and `Controller` are banned. Use the file names this plan gives. Names from this plan (phase numbers, plan file names) must never appear in code, comments, test names, or `doc/`.
+- **Seat ids.** Production code uses `HUMAN_SEAT_ID`, `AI_SEAT_IDS`, and the guards in `src/shared/seatIds.ts`, never string literals. Tests may use literals.
+- **Size limits.** Files should stay under 600 lines and must stay under 1000. Functions take 6 or fewer named parameters. Use a parameter object for more. Files already past 600 lines get call lines only. Put logic in new files.
+- **`readonly`.** Mark parameter arrays and object fields `readonly` where they are not reassigned. Use `const` unless a value is reassigned.
+- **Tests.** Test happy paths and essential failures only. A new test file copies the imports and structure of the nearest sibling test file.
+- **Database access in the main process.** Modules under `src/main/recorder/` and `src/main/matchStatistics/` use `gameDbOps` and `hasDbHandle` from `src/main/gameDb/dbConnection.ts` and leaf files under `src/main/gameDb/`. They never import the barrel `src/main/gameDb.ts`. IPC handlers may import the barrel.
+- **Save format.** `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` do not change. A new column is added on open, the way `ensureSeatAddedColumns` does it.
+- **Side names, flags, and colors.** A side's name on screen is `sideDisplayName` (`src/shared/sideNicknames.ts`). Its flag is `createSideNumberFlag` (`src/renderer/chrome/toastInlineMarks.ts`). Its color is the color the top bar and the unit tokens already use for that side. Find it before drawing anything (read `src/renderer/chrome/topBar.ts` and `src/shared/topBarSides.ts`) and reuse it. Do not invent side colors.
+- **Text reaches the DOM through `textContent`.** Never build HTML from match text.
+- **Docs.** `AGENTS.md` requires `doc/` to change in the same change as the code, and the UX suite is normative. Before changing a surface, read its `doc/ux/` document and the cross-cutting documents `doc/ux-specification.md` routes it through. A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points. A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase. Your final message names every document you updated.
+
+---
+
+## Non-Goals
+
+- No new recording. This plan plays what the previous plan records.
+- No speed control, no reverse playback, and no playback from a file.
+- No moving between the strategic game and a battle inside replay.
+- No change to how a live turn or a live beat looks.
+- No change to `README.md`.
+- Do not edit anything under `.spec/completed/`.
+- Do not "improve" code next to a phase's target. Make only the edits listed.
+
+---
+
+## Locked Decisions
+
+The user made these. Do not revisit them.
+
+1. **Play is step forward, repeated, with the turn-resolution animations** (movement, combat, and the rest), and with no pause between turns.
+2. **Play is enabled only when there is a turn after the one showing.**
+3. **Replay is scoped to one level.** In a battle, the controls step through that battle's beats and nothing else. In the strategic game, they step through strategic turns and never enter a battle.
+4. **Leaving replay in a battle returns to the current beat,** with its dialogs showing.
+5. **Each step shows its two dialogs,** in playback as in stepping.
+
+### Decisions this plan makes
+
+Tell the user about these in your final message.
+
+- **Play becomes Pause while it runs.** Pressing it stops playback after the turn that is animating. The step buttons, the slider, and the turn field are disabled while playback runs.
+- **`p` or Escape during playback** stops it at once and leaves replay.
+- **Playback stops by itself at the current turn.**
+- **In a battle the label reads "Beat", and the turn field takes a beat number.**
+- **A past turn's order arrows are not drawn during playback.** The live animation keeps the player's march and ferry arrows on screen until the units move. Replay passes empty order lists, because those arrows belong to the present.
+- **A battle's own state is put back after replay.** The battle view, the queued sub-unit marches, and the pending order lists are copied on entering and restored on leaving.
+
+---
+
+## Design
+
+### Sharing the animation with the live turn
+
+The stepping plan already moved the part of `handleReadyButtonClick` that decides what a resolution shows into `planResolutionPlayback` (`src/renderer/gameplay/resolutionPlaybackPlan.ts`). What is left inline is the object that becomes `S.resolutionMoveAnimation` and the lines that start the frames. Phase 1 moves those for a strategic turn, and Phase 4 does the same for a tactical beat in `runTacticalReadyCommit`, so replay builds the same animation the live game built.
+
+**Behavior rule (strict) for Phases 1 and 4:** the live turn must look and behave exactly as before. The statements move with their order and their text. Nothing is added, removed, or reordered. If a stretch cannot be moved without changing the order of effects, the phase says what to do instead.
+
+### What a played step does
+
+```
+for each step after the one showing, until the last step or a stop:
+  fetch the step's view
+  apply its snapshot (the units are now where the turn ended)
+  show its two dialogs
+  build the resolution animation from its recorded result and start it
+  wait for the animation to finish
+```
+
+This is the order the live turn uses: the new state is applied, the update is announced, then the animation runs.
+
+### What replay must not set off
+
+When a resolution animation ends, `tickResolutionMoveAnimation` in `src/renderer/rendering/gameScene.ts` runs `flushResolutionPlaybackCompleteNotifyCallbacks()`. That runs every queued callback and then every `onResolutionPlaybackFinished` listener.
+- The queue is filled only by `scheduleResolutionPlaybackCompleteNotify`, which the live turn calls to tell the main process to start a deferred consult. Replay never calls it. Replay cannot start while a live animation runs (`replayMayEnter`), so the queue is empty whenever replay animates.
+- The one listener today is in `observeChrome.ts`. It frames the camera and calls `maybeObserveAutoAdvance`, which returns at once in replay (the stepping plan added that check). The camera framing is harmless.
+Phase 0 confirms both are still true.
+
+### Module map
+
+| File | Holds |
+| --- | --- |
+| `src/shared/replayNavigation.ts` | `canPlay` and the playback rules. Pure, tested |
+| `src/renderer/gameplay/resolutionAnimationStart.ts` | Builds a strategic resolution animation and starts its frames. Used by the live turn and by replay |
+| `src/renderer/gameplay/tacticalAnimationStart.ts` | The same for a tactical beat |
+| `src/renderer/replay/replayPlayback.ts` | The play loop. Imports `replayMode.ts`. Nothing in `src/renderer/replay/` except `replayPanel.ts` imports it |
+| `src/main/replay/replayReading.ts` | The tactical timeline and tactical steps |
+
+---
+
+## Phase 0 — Baseline, Prerequisites, and Reading
+
+**Add:** nothing. **Edit:** nothing.
+
+1. Run `git status --short` and record the output in the Phase 0 Inventory.
+2. Run the Verification Bar and `npm run ui:smoke`. Record pass or fail for each, and the exact cycle list `check:circular` prints.
+3. **Prerequisite.** Confirm the stepping plan is done: `src/renderer/replay/replayMode.ts` exports `showReplayStep`, `leaveReplay`, and `toggleReplay`; `src/renderer/replay/replayState.ts` exports `currentReplay` and `setReplay`; `src/renderer/replay/replayDialogs.ts` exports `showReplayStepDialogs`; `src/renderer/gameplay/resolutionPlaybackPlan.ts` exports `planResolutionPlayback`; `src/shared/replayNavigation.ts` exports `canPlay`; `src/main/replay/replayReading.ts` exports `readReplayTimeline` and `readReplayStep`; and `match_records` in a played match holds `view_snapshot` and `resolution_view` rows of both kinds. **If not, stop** and tell the user. If the stepping plan's Completion Log says it took the fallback for `planResolutionPlayback`, also stop: this plan needs that function.
+4. **Read and write down.** Before any edit, read these and record in the Completion Log:
+   - In `handleReadyButtonClick`, the block `if (needsAnimation) { ... }`: which statements build the animation object (`marchArrowsUntilMovementEnds`, `ferryArrowsUntilMovementEnds`, and the `S.resolutionMoveAnimation = { ... }` literal), which ones only the live turn needs (`syncChatPanelVisibility()`, the epoch check, `playbackFinished`, `holdObserveAutoAdvanceForBattleEntry`), and the four lines that start the frames (from `if (S.resolutionMoveAnimation) {` to `requestAnimationFrame(deps.tickResolutionMoveAnimation);`).
+   - `runTacticalReadyCommit` in `src/renderer/gameplay/readyTacticalCommit.ts`: the stretch from `const hasMoves =` to the `S.resolutionMoveAnimation = { ... }` literal, where that function starts the frames for a beat, and how it builds the beat's update dialog (`buildTacticalCommitReadyResultForToast`).
+   - `flushResolutionPlaybackCompleteNotifyCallbacks` and every `onResolutionPlaybackFinished(` call in `src/renderer`. Confirm the two facts under "What replay must not set off". If either is no longer true, stop and tell the user.
+   - `clearResolutionPlaybackAnimationState` in `src/renderer/tactical/tacticalUiOrchestration.ts`, which cancels a running animation and releases anyone waiting on it.
+   - For Phase 3: what `applyGameStateSnapshot` does when a snapshot has a `tacticalBattleSession` (`applyRestoredTacticalBattleFromMain`), and every `S` field `runTacticalReadyCommit` sets after a commit (`S.tacticalBattleSnapshot`, `S.tacticalPendingMarches`, and the pending order lists).
+5. Take screenshots, or a screen recording, of one live strategic turn with combat and one live battle beat. Phases 1 and 4 compare against them.
+
+**Stop if** the bar fails before any edit.
+
+---
+
+## Phase 1 — One Function Builds a Strategic Animation
+
+The live turn's animation object and frame start move into two functions. Nothing else changes.
+
+**Add:** `src/renderer/gameplay/resolutionAnimationStart.ts`
+**Edit:** `src/renderer/gameplay/readyHandler.ts`, `src/main/rendererReplayContracts.test.ts`
+
+### Steps
+
+1. Create `resolutionAnimationStart.ts` with:
+
+   ```ts
+   export function buildStrategicResolutionAnimation(input: {
+     readonly plan: ResolutionPlaybackPlan;
+     readonly readyResult: ReadyResult;
+     readonly visibleHexesBeforeTurn: ReadonlySet<string>;
+     readonly marchArrowsUntilMovementEnds: ReturnType<typeof ordersHeldUntilMovementEnds>;
+     readonly ferryArrowsUntilMovementEnds: ReturnType<typeof ferriesHeldUntilMovementEnds>;
+   }): NonNullable<typeof S.resolutionMoveAnimation>
+   export function startResolutionAnimationFrames(tick: FrameRequestCallback): void
+   ```
+
+2. Move the object literal assigned to `S.resolutionMoveAnimation` in `handleReadyButtonClick` into `buildStrategicResolutionAnimation`, as its return value, with the same text. Its names now come from `input` and `input.plan`. In the handler, the assignment becomes `S.resolutionMoveAnimation = buildStrategicResolutionAnimation({ ... });`, in the same place.
+3. Move the four frame-start lines (from `if (S.resolutionMoveAnimation) {` through `S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);`) into `startResolutionAnimationFrames`, and call it with `deps.tickResolutionMoveAnimation` in their place.
+4. Everything else in the block stays where it is, in its order: the `cancelAnimationFrame` line, the two arrow lines, `syncChatPanelVisibility()`, the epoch check, `playbackFinished`, and `holdObserveAutoAdvanceForBattleEntry`.
+
+### Tests
+
+`rendererReplayContracts.test.ts`: `handleReadyButtonClick` calls `buildStrategicResolutionAnimation` and `startResolutionAnimationFrames`; `readyHandler.ts` no longer contains `requestAnimationFrame(`; `resolutionAnimationStart.ts` contains `requestAnimationFrame(` once.
+
+### Verification
+
+Run the Verification Bar and `npm run ui:smoke`. Then play the same kind of turn you recorded in Phase 0, live: movement, combat dice, strike lines, the update dialog, and the moment Ready becomes available again must all match. Play one Observe match for five turns and confirm turns still advance by themselves and battles still open.
+
+### If verification fails
+
+- Any difference in the live turn: restore `readyHandler.ts` from the backup, delete the new file, and stop. Tell the user what differed. Do not go on to Phase 2 with a changed live turn.
+
+---
+
+## Phase 2 — Play
+
+The Play button plays the strategic turns forward.
+
+**Add:** `src/renderer/replay/replayPlayback.ts`
+**Edit:** `src/shared/replayNavigation.ts`, `src/shared/replayNavigation.test.ts`, `src/renderer/replay/replayState.ts`, `src/renderer/replay/replayMode.ts`, `src/renderer/replay/replayPanel.ts`, `static/index.html`, `static/replayChrome.css`, `src/main/rendererReplayContracts.test.ts`, `doc/ux/replay-panel.md`
+
+### Steps
+
+1. `replayNavigation.ts`:
+   - `ReplayPosition` gains `readonly playing: boolean`.
+   - `canPlay(position)`: true when playing (so the button can pause), or when `index < stepCount - 1` and not busy.
+   - `canStepBack` and `canStepForward` are false while playing. Add `canSeek(position)`, false while playing or busy, for the slider and the turn field.
+   - `export function nextPlaybackIndex(position: ReplayPosition, stopRequested: boolean): number | null`: the next index, or null when a stop was requested or the last step is showing.
+2. `replayState.ts`: `ReplayState` gains `readonly playing: boolean` and `readonly stopRequested: boolean`, both false when replay is entered.
+3. `replayMode.ts`:
+   - Split `showReplayStep` into two exported functions, and have `showReplayStep` call them: `loadReplayStep(index): Promise<ReplayStepView | null>` (the fetch and the epoch check) and `presentReplayStep(index, view): Promise<void>` (apply the snapshot, show the dialogs, set the index).
+   - `showReplayStep` does nothing while `playing`.
+   - `leaveReplay`: when `playing`, first call `clearResolutionPlaybackAnimationState()` from `src/renderer/tactical/tacticalUiOrchestration.ts`. It stops the animation and releases the play loop's wait. The loop then sees that replay ended and returns. `replayMode.ts` does not import `replayPlayback.ts`.
+4. `replayPlayback.ts`:
+   - `export async function startReplayPlayback(): Promise<void>`. It sets `playing`, then loops on `nextPlaybackIndex`:
+     1. `loadReplayStep` the next index. A null reply ends playback with `That turn could not be loaded.`;
+     2. `presentReplayStep` it, which applies the snapshot and shows its dialogs;
+     3. when the view has a resolution: build `plan` with `planResolutionPlayback` exactly as `replayDialogs.ts` does. When `plan.needsAnimation` is true, set `S.resolutionMoveAnimation = buildStrategicResolutionAnimation({ plan, readyResult, visibleHexesBeforeTurn, marchArrowsUntilMovementEnds: ordersHeldUntilMovementEnds([], view.snapshot.units, humanMoves), ferryArrowsUntilMovementEnds: ferriesHeldUntilMovementEnds([], humanMoves) })`. Empty order lists, because a past turn's orders are not drawn. Then create `const finished = waitForNextResolutionPlaybackFinished();`, call `startResolutionAnimationFrames(readyDeps().tickResolutionMoveAnimation)`, and `await finished`;
+     4. go round again with no delay.
+     After every `await`, stop if replay has ended, the match epoch changed, or `playing` was cleared. On the way out, set `playing` and `stopRequested` false.
+   - `export function requestReplayPlaybackStop(): void` sets `stopRequested`. The loop ends after the turn in progress.
+   - Replay calls neither `scheduleResolutionPlaybackCompleteNotify` nor `notifyResolutionPlaybackComplete`. The Design section says why nothing else needs guarding.
+5. `replayPanel.ts`: the Play button calls `startReplayPlayback()` when not playing and `requestReplayPlaybackStop()` when playing. While playing, its icon is a pause glyph, its `aria-label` is `Pause`, and its tooltip is `Stop after this turn.` Otherwise they are `Play` and `Play the turns forward with their animations.` The step buttons use `canStepBack` and `canStepForward`, and the slider and the turn field are disabled when `canSeek` is false. Remove the hard-coded `disabled` from the Play button in `static/index.html`.
+6. `doc/ux/replay-panel.md`: add Play, Pause, what is disabled while playing, and how playback ends.
+
+### Tests
+
+- `replayNavigation.test.ts`: `canPlay` at the last step (false), at an earlier step (true), while playing (true), and while busy and not playing (false); the step and seek functions are false while playing; `nextPlaybackIndex` returns the next index, null at the last step, and null on a stop request.
+- `rendererReplayContracts.test.ts`: `replayPlayback.ts` calls `planResolutionPlayback`, `buildStrategicResolutionAnimation`, `startResolutionAnimationFrames`, `waitForNextResolutionPlaybackFinished`, and `nextPlaybackIndex`, and contains no `setTimeout`, no `setInterval`, and no `scheduleResolutionPlaybackCompleteNotify`; `leaveReplay` calls `clearResolutionPlaybackAnimationState`; `replayMode.ts` does not import `replayPlayback`.
+
+### Verification
+
+Run the Verification Bar and `npm run ui:smoke`. Run the app on a match with eight or more turns: enter replay, go to the first turn, press Play. Units move and fight turn after turn with each turn's dialogs, with no pause between turns, and playback stops at the current turn with Play disabled. Press Pause mid-way: the turn in progress finishes and playback stops. Press `p` mid-animation: replay is left at once and the present is shown. After all of that, play a live turn and confirm it is normal, and check `debug.log` for no playback-complete notification sent during replay.
+
+---
+
+## Phase 3 — Stepping Inside a Battle
+
+In a battle, `p` enters replay over that battle's beats. This phase is the riskiest in the plan, because the battle view keeps state of its own outside `S.gameState`. It has a stop rule.
+
+**Add:** nothing.
+**Edit:** `src/main/replay/replayReading.ts`, `src/main/replay/replayReading.test.ts`, `src/shared/replayNavigation.ts`, `src/shared/replayNavigation.test.ts`, `src/renderer/replay/replayMode.ts`, `src/renderer/replay/replayPanel.ts`, `src/renderer/replay/replayDialogs.ts`, `src/main/rendererReplayContracts.test.ts`, `doc/ux/replay-panel.md`
+
+### Steps
+
+1. `replayReading.ts`:
+   - `readReplayTimeline`: when a battle is open (`getActiveTacticalBattleSnapshot()` is not null), the scope is `'tactical'` and the steps are the `view_snapshot` events of the current view whose scope is `tactical` and whose `battle_id` is the open battle's, one per `beat_number` (the last for each), in beat order. Otherwise it behaves as before.
+   - `readReplayStep`, for a tactical step: `resolution` is the `result` of the last `resolution_view` of kind `tactical` with this battle's id and the beat before this one. `visibleHexesBefore` comes from the step before in the tactical timeline. `dispatches` are built from the events at this beat's step key, as for a strategic step. The first beat of the timeline has a null resolution.
+2. `replayNavigation.ts`:
+   - `replayMayEnter` no longer refuses in a battle. Remove that case and its sentence constant.
+   - `replayLabel` takes the scope: `Replay · Beat 3 of 7` for tactical.
+   - `parseTurnEntry` matches a step's `beatNumber` when the timeline's scope is tactical.
+3. `replayMode.ts`, entering in a battle:
+   - **Save** `S.tacticalBattleSnapshot`, `S.tacticalPendingMarches`, and each pending order list that `runTacticalReadyCommit` clears (`S.pendingRangedAttacks`, `S.pendingAirStrikes`, `S.pendingAirDrops`, `S.pendingMissileLaunches`, `S.pendingFerryOrders`, `S.pendingEmbarkOrders`), as copies. **Restore** them on leaving, before applying the live state with `replay: 'leave'`.
+   - A recorded tactical snapshot carries `tacticalBattleSession`, so `applyGameStateSnapshot` calls `applyRestoredTacticalBattleFromMain` for it. Read that function. Set `S.tacticalBattleSnapshot` from the recorded session the same way it does, so the battle view draws that beat's sub-units.
+   - **Stop rule.** Step through four beats and leave. If anything outside the battle view changed (the camera leaves the battle, the strategic map shows, the pending orders or the selected sub-units differ after leaving, or the Exit Battle button changes state), revert this phase, keep the refusal in battles from the stepping plan, skip Phase 4, and tell the user what happened.
+4. `replayDialogs.ts`: for a tactical step with a resolution, the update dialog is built the way `runTacticalReadyCommit` builds it: `buildTacticalCommitReadyResultForToast(result.tacticalResolutionPlayback)`, then the same announcement call that function makes, with the same `skipReport` wrapper and empty log function the strategic dialog uses. The message dialog is unchanged.
+5. `replayPanel.ts`: the turn field's `aria-label` and the slider's are `Beat` in a battle.
+6. `doc/ux/replay-panel.md`: add the battle scope to Availability and to Strategic and Tactical Differences.
+
+### Tests
+
+- `replayReading.test.ts`: with a battle open and three recorded beats, the timeline is tactical with three steps for that battle only, a step's resolution is the previous beat's result, and the first has none. With no battle, the timeline is strategic and contains no tactical step.
+- `replayNavigation.test.ts`: the label and the turn entry for a tactical timeline; `replayMayEnter` allows a battle.
+- `rendererReplayContracts.test.ts`: `leaveReplay` restores `S.tacticalPendingMarches` before it applies the live state.
+
+### Verification
+
+Run the Verification Bar and `npm run ui:smoke`. Run the app, fight a battle for four beats, queue a sub-unit march, and press `p`: the panel reads `Beat`, stepping back shows each beat's sub-unit positions and its dialogs, the slider and the field work with beat numbers, and leaving returns to the current beat with its dialogs and the queued march still there. Leave the battle, press `p`, and step through the strategic turns: the turn in which the battle was fought shows the strategic map, not the battle.
+
+---
+
+## Phase 4 — Play Inside a Battle
+
+**Add:** `src/renderer/gameplay/tacticalAnimationStart.ts`
+**Edit:** `src/renderer/gameplay/readyTacticalCommit.ts`, `src/renderer/replay/replayPlayback.ts`, `src/main/rendererReplayContracts.test.ts`, `doc/ux/replay-panel.md`
+
+### Steps
+
+1. Using the Phase 0 inventory, move two pieces of `runTacticalReadyCommit` into `tacticalAnimationStart.ts`, and have `runTacticalReadyCommit` call them in their place:
+   - `export function tacticalPlaybackNeeded(playback): boolean`: the statements from `const hasMoves =` through `const needsResolutionPlayback = ...;`, returning that value.
+   - `export function buildTacticalResolutionAnimation(input: { playback; subUnitsBefore; deps }): NonNullable<typeof S.resolutionMoveAnimation>`: the statements from `const tacticalMarchPlaybackUnits =` through the object literal assigned to `S.resolutionMoveAnimation`, returning the literal.
+   The same strict behavior rule as Phase 1 applies. If the pieces cannot be moved without changing the order of effects, stop this phase, restore the file, and leave Play disabled in a battle (`canPlay` false for a tactical timeline). Record that and tell the user.
+2. `replayPlayback.ts`: for a tactical step, the loop uses `tacticalPlaybackNeeded(result.tacticalResolutionPlayback)` and `buildTacticalResolutionAnimation`, with `subUnitsBefore` taken from the previous step's battle session, and then starts the frames the way the live beat does (Phase 0 inventory) and awaits the end as in Phase 2.
+3. `doc/ux/replay-panel.md`: Play in a battle.
+
+### Tests
+
+`rendererReplayContracts.test.ts`: `runTacticalReadyCommit` calls `tacticalPlaybackNeeded` and `buildTacticalResolutionAnimation`; `replayPlayback.ts` calls both.
+
+### Verification
+
+Run the Verification Bar and `npm run ui:smoke`. Fight a live battle beat and compare it with the Phase 0 recording: it must match. Then, in a battle with four or more beats, enter replay, go to the first beat, and press Play: the beats animate in order with their dialogs and stop at the current beat.
+
+### If verification fails
+
+- Any difference in the live beat: restore `readyTacticalCommit.ts`, delete the new file, take the fallback in step 1, and continue to Phase 5.
+
+---
+
+## Phase 5 — Docs, Final Verification, and Hand-Off
+
+**Add:** nothing.
+**Edit:** `doc/ux/replay-panel.md`, `doc/ux/resolution-playback.md`, `doc/ux/tactical-battle-controls.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/control-tooltips.md`, `doc/ui-style-guide.md`, `doc/how-to-play.md`
+
+### Steps
+
+1. Finish `doc/ux/replay-panel.md`: every control in both scopes, Play and Pause, and the Code Entry Points for the new files.
+2. `doc/ux/resolution-playback.md`: resolution playback now also runs in replay, from a recorded result, and sends nothing to the main process there. Name `planResolutionPlayback`, `buildStrategicResolutionAnimation`, and `buildTacticalResolutionAnimation` in its Code Entry Points.
+3. `doc/ux/tactical-battle-controls.md` and `doc/ux/modes-and-transitions.md`: replay can be entered from Tactical planning, and what is disabled there.
+4. `doc/ux/control-tooltips.md`: the Play and Pause tips. `doc/ui-style-guide.md` section 2.10: update. `doc/how-to-play.md`: add Play and battles to the replay section.
+5. Run `node scripts/check-doc-links.cjs` if the repo uses it.
+6. Search the whole diff for plan vocabulary and remove it: `git diff | Select-String -Pattern 'Phase \d|history-4|execution plan|locked decision' -CaseSensitive:$false`. Nothing under `src/`, `static/`, `scripts/`, or `doc/` may match.
+7. Run the Verification Bar and `npm run ui:smoke` one last time.
+8. Fill in the Completion Log.
+9. In your final message, name every document you updated, every decision under "Decisions this plan makes", whether Phase 3 hit its stop rule, and whether Phase 4 took the fallback.
+
+### Manual checklist for the user
+
+1. Play a live strategic turn and a live battle beat. Expect both to look exactly as before this plan.
+2. In a match of ten turns, enter replay, go to turn 1, and press Play. Expect every turn to animate with its dialogs, no pause between turns, and a stop at the current turn.
+3. Pause in the middle, step back twice, and press Play again.
+4. Press `p` in the middle of an animation. Expect the present at once.
+5. In a battle, step and play through its beats. Leave replay, then leave the battle, and step through the strategic turns. Expect no battle view.
+6. Run an Observe match, enter replay, play from the start, and leave. Expect the match to carry on by itself.
+7. Record a Cup-style video from replay of a finished match: enter replay from the game-over screen, go to turn 1, and press Play.
+
+---
+
+## Reliability Checklist
+
+- [ ] The phase's files were backed up before the first edit.
+- [ ] The Phase 0 inventory was written before any edit.
+- [ ] Phases 1 and 4 moved statements without changing their order or text, and the live turn and the live beat were compared with the Phase 0 recording.
+- [ ] Replay never sends the end-of-animation notification, and never calls an IPC channel that changes the match.
+- [ ] The play loop has no timer and no delay between turns.
+- [ ] Leaving replay cancels a running animation with `clearResolutionPlaybackAnimationState`.
+- [ ] Queued marches and pending orders are the same after replay inside a battle as before it.
+- [ ] `replayMode.ts` does not import `replayPlayback.ts`.
+- [ ] Every rule that can be wrong is a pure function under `src/shared` with a test.
+- [ ] Every surface changed has its `doc/ux/` document updated in the same phase.
+- [ ] Every new function, type, interface, field, and constant has a full orienting comment.
+- [ ] `npm run check:renderer-types` shows no new error, `check:circular` shows only the baseline cycles, and no baseline file was edited.
+- [ ] No commit, push, stash, checkout, restore, reset, or clean was run.
+- [ ] No plan vocabulary appears in `src/`, `static/`, `scripts/`, or `doc/`.
+
+## Success Definition
+
+- Play animates each recorded strategic turn in order, with its dialogs, with no pause between turns, and stops at the current turn.
+- Play becomes Pause while it runs, and `p` or Escape stops playback and leaves replay at once.
+- In a battle, replay steps and plays that battle's beats and nothing else. In the strategic game it never shows a battle.
+- The live turn and the live beat are unchanged.
+- The Verification Bar and `ui:smoke` pass.
+
+---
+
+## Phase 0 Inventory
+
+| Item | Value |
+|------|-------|
+| `git status --short` | |
+| `npm test` | |
+| `npm run build:renderer` | |
+| `check:circular` cycle list | |
+| Prerequisites | |
+| Missing symbols | |
+
+## Defect Inventory
+
+| Phase | Command | First error | Action taken |
+|-------|---------|-------------|--------------|
+
+## Completion Log
+
+| Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
+|-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|

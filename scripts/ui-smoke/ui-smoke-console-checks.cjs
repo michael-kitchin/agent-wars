@@ -128,7 +128,7 @@ const MAP_OVERLAY_INSET = 12;
 /**
  * Distance from the map's bottom edge to the map toast's bottom edge, in CSS pixels.
  *
- * Purpose: The update toast covers the zoom buttons at the map's lower-right corner.
+ * Purpose: The toast takes the map's bottom-right corner, and the chat panel hides while it shows.
  * When to use: The message-band and update-toast check, for the update toast's lower-right anchor.
  * Expected outcome: Matches `bottom` on `#map-toast` in `static/feedbackChrome.css`.
  * Exceptions: None.

@@ -79,23 +79,25 @@ async function checkBeatLimitControl(page) {
 }
 
 /**
- * Moves one active side's land units onto the other side's first land hex.
+ * Moves one side's land units onto the first land hex of another side that still has land.
  *
- * Purpose: An observed match offers a battle only where two sides share a hex, and a fresh match has none.
+ * Purpose: An observed match offers a battle only where two sides share a hex, and a fresh match has none. A side with no land unit cannot be one of those two.
  * When to use: With the game state read just before the app closes.
- * Expected outcome: One update per land unit of the second side still playing.
- * Exceptions: Throws when either side has no land unit.
+ * Expected outcome: One update per land unit of the second qualifying side, onto the first qualifying side's first land hex.
+ * Exceptions: Throws when fewer than two active sides have a land unit. The message lists each active side's land-unit count.
  */
 function aiContestedHexStatements(state) {
   const isLand = (unit) => LAND_UNIT_TYPES.includes(unit.unitType);
+  const units = state.units || [];
   const active = (state.seats || []).filter((seat) => seat.outTurn == null);
-  const first = active[0]?.seatId;
-  const second = active[1]?.seatId;
-  const firstLand = (state.units || []).filter((unit) => unit.player === first && isLand(unit));
-  const secondLand = (state.units || []).filter((unit) => unit.player === second && isLand(unit));
-  if (!first || !second || firstLand.length === 0 || secondLand.length === 0) {
-    throw new Error('a battle needs a land unit on each side');
-  }
+  const landCount = (seatId) => units.filter((unit) => unit.player === seatId && isLand(unit)).length;
+  const counts = active.map((seat) => `${seat.seatId} ${landCount(seat.seatId)}`).join(', ');
+  const qualified = active.filter((seat) => landCount(seat.seatId) > 0);
+  if (qualified.length < 2) throw new Error(`a battle needs a land unit on each side (land units by side: ${counts})`);
+  const first = qualified[0].seatId;
+  const second = qualified[1].seatId;
+  const firstLand = units.filter((unit) => unit.player === first && isLand(unit));
+  const secondLand = units.filter((unit) => unit.player === second && isLand(unit));
   const h3Index = firstLand[0].h3Index;
   return secondLand.map((unit) => ({ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [h3Index, unit.id] }));
 }
