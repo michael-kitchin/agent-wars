@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * The landings a seat could start, and the campaign cities it could turn to.
  *
@@ -156,7 +157,7 @@ export function operationCandidatesForSeat(args: {
     const protectedUnitIds = new Set<string>([...(plan?.defenderUnitIds ?? []), ...(args.withheldIds ?? [])]);
     for (const unit of seen.units) {
       if (unit.player !== args.seatId) continue;
-      if (unit.unitType !== 'infantry' && unit.unitType !== 'armor') continue;
+      if (!isLandUnitType(unit.unitType)) continue;
       if (terrain.enemyUnitsWithin(unit.h3Index, CAMPAIGN_CONTACT_RADIUS) > 0) protectedUnitIds.add(unit.id);
     }
     const onlyObjectiveH3 = args.only?.objectiveH3;

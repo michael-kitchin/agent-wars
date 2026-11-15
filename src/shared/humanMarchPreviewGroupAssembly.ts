@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Shared primitives for assembling grouped human march hover previews (`HumanOrderGroupPreviewResult`).
  *
@@ -94,7 +95,7 @@ export function groupedStrategicMarchPreviewUnitIds(args: {
  */
 export function selectionHasMixedLandAndNaval(units: ReadonlyArray<{ unitType: string }>): boolean {
   const hasNaval = units.some((unit) => unit.unitType === 'naval');
-  const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
+  const hasLand = units.some((unit) => isLandUnitType(unit.unitType));
   return hasNaval && hasLand;
 }
 

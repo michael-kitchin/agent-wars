@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Pure helpers to project movement onto a GameStateSnapshot clone for tactical AI order validation.
  */
@@ -26,7 +27,7 @@ export function applyMovementOrdersToPlanState(
     const debarkingIndependently =
       u.player !== HUMAN_SEAT_ID &&
       !!u.embarkedOnSubUnitId &&
-      (u.unitType === 'infantry' || u.unitType === 'armor') &&
+      (isLandUnitType(u.unitType)) &&
       to !== u.h3Index;
     if (debarkingIndependently) {
       return { ...u, h3Index: to, embarkedOnSubUnitId: undefined };

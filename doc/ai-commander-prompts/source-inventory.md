@@ -9,7 +9,7 @@ Every row cites a symbol or file so a later reader can re-verify. Paths are repo
 1. **Live engine behavior is first authority** for facts, stats, ranges, caps, phase order, and legality.
 2. **Builders under `src/main/openRouter/` are first authority for wording.** This file describes those emissions.
 3. [`example-strategic-prompt.md`](example-strategic-prompt.md) is a reading copy of one strategic consultation. `debug-last-strategic-prompt-N.txt` and `debug-last-user-prompt-N.txt` are runtime captures of emitted shape. N is `aiIndexForSeatId` of the seat being consulted. Opponent 1 writes `debug-last-strategic-prompt-1.txt`. None of these is a contract.
-4. [`example-tactical-prompt.md`](example-tactical-prompt.md) is a reading copy of one tactical consultation. Tactical catalogs below are derived from code. `debug-last-tactical-prompt-N.txt` **is not used as a source.**
+4. [`example-tactical-prompt.md`](example-tactical-prompt.md) is a reading copy of one tactical system message. Its situation message is not in the logs. Tactical catalogs below are derived from code. `debug-last-tactical-prompt-N.txt` **is not used as a source** for those catalogs.
 5. [`example-strategic-response.md`](example-strategic-response.md) is a reading copy of one strategic completion. `debug-last-openrouter-response-body-N.txt` is the runtime capture for opponent N. Neither is a contract.
 6. [`doc/devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) is historical architecture and is not prompt authority.
 

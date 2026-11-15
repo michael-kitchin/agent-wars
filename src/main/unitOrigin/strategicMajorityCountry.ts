@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 import type { BirthCountry } from '../../shared/unitOriginTypes';
-import { compareOrdinal } from './tacticalBirthCountry';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 
 /**
  * Picks the country name that covers the most tactical cells of each parent strategic hex.
@@ -30,7 +30,7 @@ export function buildStrategicMajorityCountryNameByH3(
   }
   const majorityByParent = new Map<string, string>();
   for (const [parent, counts] of countsByParent) {
-    const [winner] = [...counts].sort(([nameA, countA], [nameB, countB]) => countB - countA || compareOrdinal(nameA, nameB));
+    const [winner] = [...counts].sort(([nameA, countA], [nameB, countB]) => countB - countA || compareCodeUnits(nameA, nameB));
     if (winner) majorityByParent.set(parent, winner[0]);
   }
   return majorityByParent;

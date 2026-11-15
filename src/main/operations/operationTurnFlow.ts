@@ -7,6 +7,7 @@
  * Exceptions: None. A thrown error is logged. The turn continues, and a seat that throws keeps the operations it already had.
  */
 
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
@@ -54,20 +55,6 @@ import { listKnownEnemyCities } from './seaOperationCandidates';
  * Exceptions: None.
  */
 const configOps = { getOne: dbGetOne, run: dbRun };
-
-/**
- * Orders two ids by their raw string order.
- *
- * Purpose: `localeCompare` follows the machine locale and can reorder operations between runs.
- * When to use: Operation ids and ship hexes.
- * Expected outcome: Negative when `left` is first.
- * Exceptions: None.
- */
-function compareIds(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 /**
  * Standing orders reduced to the type and hex the advance compares.
@@ -135,7 +122,7 @@ function chooseReturnPort(args: {
     if (distance === null) continue;
     ports.push({ hex: row.h3Index, distance });
   }
-  ports.sort((left, right) => left.distance - right.distance || compareIds(left.hex, right.hex));
+  ports.sort((left, right) => left.distance - right.distance || compareCodeUnits(left.hex, right.hex));
   let best: { readonly hex: string; readonly sail: number } | null = null;
   for (const port of ports.slice(0, OPERATION_MUSTER_CANDIDATE_LIMIT)) {
     const sail = args.terrain.sailTurns(args.fromH3, port.hex);
@@ -228,7 +215,7 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
   const kept: Operation[] = [];
   const withheldIds = new Set<string>();
   let seatEvent = false;
-  const stored = [...(readOperations(configOps).get(seatId) ?? [])].sort((left, right) => compareIds(left.id, right.id));
+  const stored = [...(readOperations(configOps).get(seatId) ?? [])].sort((left, right) => compareCodeUnits(left.id, right.id));
   for (const operation of stored) {
     const startedPhase = operation.phase;
     const facts = buildOperationFacts({ state, seatId, operation, coordinates });
@@ -244,7 +231,7 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
     const shipHexes = (step.next?.carrierIds ?? [])
       .map((shipId) => unitHexById.get(shipId))
       .filter((hex): hex is string => hex !== undefined)
-      .sort(compareIds);
+      .sort(compareCodeUnits);
     logDebug('operationTurnFlow advanced', {
       seatId,
       id: operation.id,

@@ -18,6 +18,7 @@ import {
   setKeepBuildingForHex,
   setHexController,
 } from '../gameDb';
+import { readTurnNumberOrFirst } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { isNeutralOwnerId, isSeatId, NEUTRAL_OWNER_ID, type OwnerId, type SeatId } from '../../shared/seatIds';
 import { DEPLOYMENT_CAP_TYPE_ORDER } from '../productionCaps';
@@ -39,6 +40,7 @@ import type { QueuePause, QueuePauseReason } from '../../shared/queuePauseTypes'
 import { maxedUnitTypesFor, pointsKeptAfterPass, recordQueuePause, selectNewlyPausedQueues } from './queuePauseRecording';
 import { readPausedQueueHexes, writePausedQueueHexes } from '../gameDb/queuePauseMemory';
 import { spawnProducedUnitsForHex } from './strategicUnitSpawn';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Documents the `DeployedUnitsByType` type alias (type DeployedUnitsByType).
@@ -151,7 +153,7 @@ const CONTROL_UNIT_TYPE_SET = new Set<string>(CONTROL_UNIT_TYPES);
  * Exceptions: None.
  */
 function currentPlanningTurnNumber(): number {
-  return dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
+  return readTurnNumberOrFirst(dbGetOne);
 }
 
 /**
@@ -556,7 +558,7 @@ export function collectTraversedHexesByPlayer(
  */
 function traversalOwner(player: string, unitType: string): OwnerId | null {
   if (isSeatId(player)) return CONTROL_UNIT_TYPE_SET.has(unitType) ? player : null;
-  if (isNeutralOwnerId(player)) return unitType === 'infantry' || unitType === 'armor' ? NEUTRAL_OWNER_ID : null;
+  if (isNeutralOwnerId(player)) return isLandUnitType(unitType) ? NEUTRAL_OWNER_ID : null;
   return null;
 }
 

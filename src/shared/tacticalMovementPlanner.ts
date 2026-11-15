@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Tactical tactical march planning: least movement-point paths inside a footprint (combat rules §12.4).
  */
@@ -164,7 +165,7 @@ function enterCostForHex(
   if (unitTypeForMovement === 'naval') {
     return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
   }
-  if ((unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') && fromH3 != null) {
+  if ((isLandUnitType(unitTypeForMovement)) && fromH3 != null) {
     return landInfantryArmorEnterCost({
       toH3: h,
       unitTypeForMovement,
@@ -181,7 +182,7 @@ function enterCostForHex(
   const raw = terrain.effectiveKindForTacticalHex(h);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
-  const urbanDest = !!(unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') && !!terrain.isUrbanTactical?.(h);
+  const urbanDest = !!(isLandUnitType(unitTypeForMovement)) && !!terrain.isUrbanTactical?.(h);
   if (urbanDest) return 1;
   return tacticalWeatherOpenGroundCost({
     unitType: unitTypeForMovement,
@@ -318,7 +319,7 @@ function planTacticalMarchWithoutTerrainBonus(args: TacticalMarchPlanArgs): Tact
     };
   }
 
-  const isLandInfantryOrArmor = unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor';
+  const isLandInfantryOrArmor = isLandUnitType(unitTypeForMovement);
 
   if (isLandInfantryOrArmor) {
     const landResult = planInfantryArmorLandContinuityMarch({

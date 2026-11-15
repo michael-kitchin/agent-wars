@@ -207,7 +207,7 @@ export function validateOrder(
       return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
     }
   }
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !landUnitCanOccupyHex(toH3Index, getStrategicLandMassByH3())) {
+  if ((isLandUnitType(unit.unit_type)) && !landUnitCanOccupyHex(toH3Index, getStrategicLandMassByH3())) {
     return { valid: false, reason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON };
   }
   if (isLandUnitType(unit.unit_type)) {
@@ -257,7 +257,7 @@ export function validateRangedAttack(
   const range = getRange(unit.unit_type);
   if (unit.unit_type === 'air') return { valid: false, reason: 'Air units use Strike mode, not ranged attack mode' };
   if (range < 1) return { valid: false, reason: `${unit.unit_type} has no ranged attack (melee only)` };
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && landUnitSitsOutCombat(unitId)) {
+  if ((isLandUnitType(unit.unit_type)) && landUnitSitsOutCombat(unitId)) {
     return { valid: false, reason: 'Embarked land units cannot attack while at sea.' };
   }
 

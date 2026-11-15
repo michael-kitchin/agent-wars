@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Tactical snapshot guard helpers shared by movement projection and composite order application.
  */
@@ -123,7 +124,7 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
     terrainBonusCategory: args.terrainBonusCategory ?? null,
   });
   if (args.movementPointBudget < 1) return null;
-  if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
+  if (!isLandUnitType(args.moveType)) return null;
   const d0 = computeGridDistanceWithPathFallbackPure(args.fromH3, args.orderedToH3);
   if (d0 === null || d0 <= 1) return null;
   const neighbors = landTacticalFootprintRing1Neighbors(args.fromH3, args.tacticalSet);
@@ -205,7 +206,7 @@ function logTacticalMarchPlanOk(args: {
 }): void {
   const path = args.plan.pathToDestination;
   const terrain =
-    args.moveType === 'infantry' || args.moveType === 'armor'
+    isLandUnitType(args.moveType)
       ? buildTacticalTerrainKindResolverFromSnapshot(args.battle)
       : null;
   const landMarch =
@@ -368,7 +369,7 @@ export function tacticalComputeMovementOrderOutcomeForPlayer(
   let pathfindUnit = u;
   if (player === HUMAN_SEAT_ID) {
     if (
-      (u.unitType === 'infantry' || u.unitType === 'armor') &&
+      (isLandUnitType(u.unitType)) &&
       u.embarkedOnSubUnitId &&
       args.order.toH3Index !== u.h3Index
     ) {
@@ -380,7 +381,7 @@ export function tacticalComputeMovementOrderOutcomeForPlayer(
     }
   } else {
     const opponentDebarkingIndependently =
-      (u.unitType === 'infantry' || u.unitType === 'armor') &&
+      (isLandUnitType(u.unitType)) &&
       !!u.embarkedOnSubUnitId &&
       args.order.toH3Index !== u.h3Index;
     pathfindUnit = opponentDebarkingIndependently ? { ...u, embarkedOnSubUnitId: undefined } : u;

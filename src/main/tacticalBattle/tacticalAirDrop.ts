@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Tactical air-drop legality and resolution.
  *
@@ -202,7 +203,7 @@ export function resolveTacticalAirDrops(args: {
         row.h3Index === order.targetH3Index &&
         row.player !== attacker.player &&
         !removedIds.has(row.id) &&
-        ((row.unitType !== 'infantry' && row.unitType !== 'armor') ||
+        ((!isLandUnitType(row.unitType)) ||
           !tacticalEmbarkedLandExcludedFromRangedInput(battleNow, sub, row))
     );
     const shooters = defenders.filter((row) => unitHasTacticalRangedBaseline(row.unitType));

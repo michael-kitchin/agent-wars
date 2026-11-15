@@ -47,3 +47,15 @@ export function spanForProjectedHex(pts: { x: number; y: number }[]): number {
   }
   return Math.max(1, Math.min(maxX - minX, maxY - minY));
 }
+
+/**
+ * Returns the map zoom stroke scale factor used for terrain and ownership borders.
+ *
+ * Purpose: Centralizes the zoom-to-stroke mapping shared by terrain hexes and home-region outlines.
+ * When to use: Any canvas stroke that should track Leaflet zoom like `drawTerrainHexes`.
+ * Expected outcome: Value in `[0.88, 1.22]` for typical game zoom levels.
+ * Exceptions: None.
+ */
+export function getMapZoomStrokeScale(zoom: number): number {
+  return Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+}

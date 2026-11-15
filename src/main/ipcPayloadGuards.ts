@@ -7,17 +7,9 @@ import type {
 import { isBuildQueueItemType, type BuildQueueItemType } from '../shared/ipc/productionTypes';
 import type { HireOrderRequest } from '../shared/ipc/mercenaryTypes';
 import { HIRE_COUNT_MAX, HIRE_COUNT_MIN, isHireableUnitType } from '../shared/mercenaryRules';
+import type { AirStrikeTargetType } from '../shared/ipc/ordersTypes';
+import { isAirStrikeTargetType } from '../shared/airStrikeTarget';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPushTypes';
-
-/**
- * Documents the `GroupTargetType` type alias (type GroupTargetType).
-
- * Purpose: Supports maintainability by documenting why `GroupTargetType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type GroupTargetType = 'units' | 'urban' | 'airport' | 'seaport';
 
 /**
  * Defines the `parseUnitIdList` function shape (export function parseUnitIdList(unitIds: unknown): string[] | null).
@@ -62,19 +54,13 @@ export function parseGroupedStrikePayload(payload: {
   unitIds?: unknown;
   targetH3Index?: unknown;
   targetType?: unknown;
-}): { unitIds: string[]; targetH3Index: string; targetType: GroupTargetType } | null {
+}): { unitIds: string[]; targetH3Index: string; targetType: AirStrikeTargetType } | null {
   const unitIds = parseUnitIdList(payload?.unitIds);
   if (unitIds === null) return null;
   if (typeof payload?.targetH3Index !== 'string') return null;
-  if (
-    payload?.targetType !== 'units' &&
-    payload?.targetType !== 'urban' &&
-    payload?.targetType !== 'airport' &&
-    payload?.targetType !== 'seaport'
-  ) {
-    return null;
-  }
-  return { unitIds, targetH3Index: payload.targetH3Index, targetType: payload.targetType };
+  const targetType = payload?.targetType;
+  if (!isAirStrikeTargetType(targetType)) return null;
+  return { unitIds, targetH3Index: payload.targetH3Index, targetType };
 }
 
 /**
@@ -250,16 +236,10 @@ function parseAirStrikeRows(
     if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
     const record = row as Record<string, unknown>;
     const targetType = record.targetType;
-    if (
-      typeof record.unitId !== 'string' ||
-      typeof record.targetH3Index !== 'string' ||
-      (targetType !== 'units' &&
-        targetType !== 'urban' &&
-        targetType !== 'airport' &&
-        targetType !== 'seaport')
-    ) {
+    if (typeof record.unitId !== 'string' || typeof record.targetH3Index !== 'string') {
       return { ok: false, reason: invalid };
     }
+    if (!isAirStrikeTargetType(targetType)) return { ok: false, reason: invalid };
     rows.push({
       unitId: record.unitId,
       targetH3Index: record.targetH3Index,

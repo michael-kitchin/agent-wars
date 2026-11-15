@@ -12,6 +12,7 @@ import type { LatLng } from '../tools/pathfinding';
 import { executeProductionTools } from '../tools/productionTools';
 import { applyProductionOrdersFromEnvelope } from './productionOrdersApply';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import { isAirStrikeTargetType } from '../../shared/airStrikeTarget';
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
 import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
@@ -442,10 +443,9 @@ function normalizeAirStrikeOrders(
     normalizeOne: (raw) => {
       const unitId = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
       const targetTypeRaw = typeof raw.targetType === 'string' ? raw.targetType.trim().toLowerCase() : '';
-      const targetType: AirStrikeTargetType | undefined =
-        targetTypeRaw === 'units' || targetTypeRaw === 'urban' || targetTypeRaw === 'airport' || targetTypeRaw === 'seaport'
-          ? targetTypeRaw
-          : undefined;
+      const targetType: AirStrikeTargetType | undefined = isAirStrikeTargetType(targetTypeRaw)
+        ? targetTypeRaw
+        : undefined;
       const hexCode = (raw as { targetHexCode?: unknown }).targetHexCode;
       const unitTarget = (raw as { targetUnitId?: unknown }).targetUnitId;
       const hasHex = typeof hexCode === 'string' && HEX_CODE_PATTERN.test(hexCode);

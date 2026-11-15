@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Tactical pathfinding: plan_route / check_distance via tactical march planner (not strategic land-mass).
  */
@@ -282,7 +283,7 @@ export function executeTacticalPlanRoute(
       }
     }
 
-    if (!plan.reachable && (unit.unitType === 'infantry' || unit.unitType === 'armor') && budget >= 1) {
+    if (!plan.reachable && (isLandUnitType(unit.unitType)) && budget >= 1) {
       const bestEffort = tacticalLandMarchBestEffortPlanTowardOrderedHex({
         battle,
         fromH3: originH3,

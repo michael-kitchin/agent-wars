@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Battle combat input rules shared by tactical resolution and the tactical AI tools.
  *
@@ -27,7 +28,7 @@ export function tacticalEmbarkedLandExcludedFromRangedInput(
   subUnits: readonly TacticalSubUnitSnapshot[],
   u: TacticalSubUnitSnapshot
 ): boolean {
-  if (u.unitType !== 'infantry' && u.unitType !== 'armor') return false;
+  if (!isLandUnitType(u.unitType)) return false;
   const emb = u.embarkedOnSubUnitId;
   if (!emb) return false;
   const carrier = subUnits.find((x) => x.id === emb);

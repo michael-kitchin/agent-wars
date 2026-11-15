@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Suggested missions for units the AI has left without a standing order.
  *
@@ -501,7 +502,7 @@ export function suggestApproachDestinationsForOrderlessUnits(
   for (const unitId of unitIds) {
     const unit = unitsById.get(unitId);
     if (!unit) continue;
-    if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && unit.embarkedOnCarrierUnitId) {
+    if ((isLandUnitType(unit.unitType)) && unit.embarkedOnCarrierUnitId) {
       logTrace('orderlessUnitSuggestions suggestApproachDestinationsForOrderlessUnits: embarked unit omitted', { unitId: unit.id });
       continue;
     }

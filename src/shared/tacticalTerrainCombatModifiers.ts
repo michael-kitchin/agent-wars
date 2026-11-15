@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Tactical terrain combat modifiers (movement point budgets and ranged LOS / range caps).
  *
@@ -214,7 +215,7 @@ export function tacticalMovementTerrainAnchorH3(
   subUnits: readonly Pick<TacticalSubUnitSnapshot, 'id' | 'h3Index' | 'unitType'>[]
 ): string {
   const emb = u.embarkedOnSubUnitId;
-  if (emb && (u.unitType === 'infantry' || u.unitType === 'armor')) {
+  if (emb && (isLandUnitType(u.unitType))) {
     const naval = subUnits.find((x) => x.id === emb && x.unitType === 'naval');
     if (naval) return naval.h3Index;
   }
@@ -248,7 +249,7 @@ export function effectiveTacticalRangedMaxRangeForAttacker(
   attackerAnchorH3: string
 ): number {
   const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-  if ((unitType === 'infantry' || unitType === 'armor') && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
+  if ((isLandUnitType(unitType)) && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
     return Math.min(baseline, 1);
   }
   return baseline;
@@ -348,7 +349,7 @@ export function effectiveTacticalMovementPointBudgetForMarchLeg(
   const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
   const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
   let budget: number;
-  if (subUnit.unitType === 'infantry' || subUnit.unitType === 'armor') {
+  if (isLandUnitType(subUnit.unitType)) {
     if (tacticalCellIsUrbanOrRubble(battle, anchor)) {
       budget = Math.max(0, 1);
     } else if (subUnit.unitType === 'armor' && tacticalCellIsForestClass(battle, anchor)) {

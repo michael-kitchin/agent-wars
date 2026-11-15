@@ -10,7 +10,7 @@
  * Exceptions: None. A missing button or popover leaves the screen unchanged.
  */
 
-import { placeBelowAnchor } from '../../shared/popoverPlacement';
+import { placePopoverBelowAnchor, attachAnchoredPopoverListeners } from '../chrome/anchoredPopoverLifecycle';
 import { closeCommanderPopover } from '../openRouter/commanderPopover';
 
 /** Popover element while it is open. Null while it is hidden. */
@@ -70,26 +70,11 @@ export function toggleNewGameOptionsPopover(button: HTMLButtonElement): void {
   anchor = button;
   root.hidden = false;
   placeNewGameOptionsPopover();
-  const onKey = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') closeNewGameOptionsPopover();
-  };
-  const onPointer = (event: Event): void => {
-    const target = event.target;
-    if (!(target instanceof Node)) return;
-    if (popover?.contains(target) || anchor?.contains(target)) return;
-    closeNewGameOptionsPopover();
-  };
-  const onMove = (): void => placeNewGameOptionsPopover();
-  document.addEventListener('keydown', onKey);
-  document.addEventListener('pointerdown', onPointer);
-  document.addEventListener('scroll', onMove, true);
-  window.addEventListener('resize', onMove);
-  detachListeners = () => {
-    document.removeEventListener('keydown', onKey);
-    document.removeEventListener('pointerdown', onPointer);
-    document.removeEventListener('scroll', onMove, true);
-    window.removeEventListener('resize', onMove);
-  };
+  detachListeners = attachAnchoredPopoverListeners({
+    containsTarget: (target) => !!(popover?.contains(target) || anchor?.contains(target)),
+    close: closeNewGameOptionsPopover,
+    reposition: placeNewGameOptionsPopover,
+  });
 }
 
 /**
@@ -123,13 +108,5 @@ export function wireNewGameOptionsPopover(): void {
  */
 function placeNewGameOptionsPopover(): void {
   if (!popover || popover.hidden || !anchor) return;
-  const rect = anchor.getBoundingClientRect();
-  const box = popover.getBoundingClientRect();
-  const placed = placeBelowAnchor(
-    { top: rect.top, bottom: rect.bottom, left: rect.left },
-    { width: box.width, height: box.height },
-    { width: window.innerWidth, height: window.innerHeight }
-  );
-  popover.style.top = `${placed.top}px`;
-  popover.style.left = `${placed.left}px`;
+  placePopoverBelowAnchor(popover, anchor);
 }

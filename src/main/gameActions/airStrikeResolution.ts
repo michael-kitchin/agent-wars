@@ -14,6 +14,7 @@ import {
   setKeepBuildingForHex,
   updateTacticalFeatureOverrideRow,
 } from '../gameDb';
+import { readTurnNumberOrFirst } from '../gameDb/turnStateReads';
 import { logDebug } from '../logger';
 import { getAvailableBuildQueueItemTypes } from '../productionRules';
 import { compareCasualtyOrder } from '../combatConstants';
@@ -41,6 +42,7 @@ import { applyTransportLossForRemovedNavalUnits } from './sealift';
 import { isLandUnitEmbarkedOnAir, landUnitSitsOutCombat } from './airlift';
 import { rollAntiAirCounterFire } from './airCounterFire';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Removes illegal build-queue rows after infrastructure changes and syncs Keep building.
@@ -427,7 +429,7 @@ function penaltyForDbUnit(input: {
   targetH3Index?: string;
 }): WeatherAttackPenalty {
   const settings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
-  const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
+  const turnNumber = readTurnNumberOrFirst(dbGetOne);
   const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [input.unitId])?.birth_h3_index;
   return weatherPenaltyForRoll({
     unitType: input.unitType,
@@ -465,7 +467,7 @@ function resolveAirStrikeAgainstUnits(
     [targetH3Index, attacker.player]
   );
   const eligibleDefenders = defenders.filter((defender) => {
-    if (defender.unit_type !== 'infantry' && defender.unit_type !== 'armor') return true;
+    if (!isLandUnitType(defender.unit_type)) return true;
     return !landUnitSitsOutCombat(defender.id);
   });
   let success = false;

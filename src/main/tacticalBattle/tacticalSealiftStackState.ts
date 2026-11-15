@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Sealift stack UI state derived from the active tactical snapshot (sub-unit ids) instead of strategic `units` rows.
  */
@@ -53,7 +54,7 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
         infantryPresent || at.some((land) => land.unitType === 'infantry' && land.embarkedOnSubUnitId === unit.id)
     )
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const landSubs = at.filter((u) => u.unitType === 'infantry' || u.unitType === 'armor');
+  const landSubs = at.filter((u) => isLandUnitType(u.unitType));
   const visibleLand = navalSubs.length > 0 ? landSubs : landSubs.filter((unit) => unit.unitType === 'infantry');
   const landOptions: SealiftLandUnitOption[] = visibleLand
     .map((u) => ({ unitId: u.id, unitType: u.unitType as 'infantry' | 'armor' }))

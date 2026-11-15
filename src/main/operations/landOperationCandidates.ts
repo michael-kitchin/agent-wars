@@ -7,7 +7,6 @@
  * Exceptions: None. A missing campaign row reads as no current target.
  */
 
-import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne } from '../gameDb';
@@ -22,7 +21,7 @@ import {
   type CampaignCity,
 } from '../openRouter/campaignTargetSelection';
 import type { OperationCandidate } from '../../shared/operationTypes';
-import { LIFT_OBJECTIVE_CLEAR_RADIUS } from './liftRules';
+import { countObjectiveReinforcers, LIFT_OBJECTIVE_CLEAR_RADIUS } from './liftRules';
 import type { LiftTerrain } from './liftTerrain';
 import { OPERATION_MENU_LAND_ROWS } from './operationRules';
 
@@ -42,31 +41,6 @@ function scoreBeats(city: CampaignCity, steps: number, other: CampaignCity, othe
   const right =
     other.urbanHexCount * otherWeight * (steps + 2) * (CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP + city.knownFortifiedCount);
   return left > right;
-}
-
-/**
- * Enemy ground units that can reach the city after the march, beyond the clear radius.
- *
- * Purpose: The risk column matches a sea row without sharing that file's private helper.
- * When to use: Once per land candidate.
- * Expected outcome: A count. Units already inside the clear radius are defenders, not reinforcers.
- * Exceptions: None.
- */
-function countReinforcers(args: {
-  readonly state: GameStateSnapshot;
-  readonly seatId: string;
-  readonly cityH3: string;
-  readonly etaTurns: number;
-}): number {
-  let count = 0;
-  for (const unit of args.state.units) {
-    if (unit.player === args.seatId) continue;
-    if (unit.unitType !== 'infantry' && unit.unitType !== 'armor') continue;
-    if (!isWithinGridRangePure(args.cityH3, unit.h3Index, args.etaTurns)) continue;
-    if (isWithinGridRangePure(args.cityH3, unit.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS)) continue;
-    count += 1;
-  }
-  return count;
 }
 
 /**
@@ -133,7 +107,7 @@ export function listLandOperationCandidates(args: {
       inEnemyHome: city.inEnemyHome,
       knownFortifiedCount: city.knownFortifiedCount,
       defenders,
-      reinforcers: countReinforcers({ state: args.state, seatId: args.seatId, cityH3: city.h3Index, etaTurns }),
+      reinforcers: countObjectiveReinforcers({ state: args.state, seatId: args.seatId, cityH3: city.h3Index, etaTurns }),
       clear: defenders === 0,
     };
   }));

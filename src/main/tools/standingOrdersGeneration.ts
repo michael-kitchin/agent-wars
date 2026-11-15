@@ -20,6 +20,7 @@ import {
   toComputedRoutePayload,
   type StandingOrderRow,
 } from './standingOrdersShared';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Options for `generateOrdersForStandingOrders` so tactical resolution can preview routes without advancing DB state.
@@ -243,7 +244,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
       continue;
     }
     const embarkedHold = state.units.find((unit) => unit.id === row.unit_id);
-    if (embarkedHold && (embarkedHold.unitType === 'infantry' || embarkedHold.unitType === 'armor') && embarkedHold.embarkedOnCarrierUnitId) {
+    if (embarkedHold && (isLandUnitType(embarkedHold.unitType)) && embarkedHold.embarkedOnCarrierUnitId) {
       logTrace('standingOrders expireAndUpdateStatus: embarked unit holds', { unitId: embarkedHold.id });
       continue;
     }
@@ -358,7 +359,7 @@ export function generateOrdersForStandingOrders(
     if (!existingUnitIds.has(row.unit_id)) continue;
     const unit = state.units.find((u) => u.id === row.unit_id);
     if (!unit) continue;
-    if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && unit.embarkedOnCarrierUnitId) {
+    if ((isLandUnitType(unit.unitType)) && unit.embarkedOnCarrierUnitId) {
       logTrace('standingOrders generateOrdersForStandingOrders: embarked unit holds', { unitId: unit.id });
       continue;
     }

@@ -10,6 +10,8 @@ import {
   type OwnershipBorderStyle,
 } from '../../shared/homeRegionRules';
 import { drawClosedPolygonPath } from './polygonOutline';
+import { getMapZoomStrokeScale } from './renderGeometry';
+export { getMapZoomStrokeScale };
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { drawFortifiedCellTicks } from './fortificationTickDrawing';
@@ -35,18 +37,6 @@ import {
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import { areControlBordersShown } from '../map/mapViewModeState';
-
-/**
- * Returns the map zoom stroke scale factor used for terrain and ownership borders.
- *
- * Purpose: Centralizes the zoom-to-stroke mapping shared by terrain hexes and home-region outlines.
- * When to use: Any canvas stroke that should track Leaflet zoom like `drawTerrainHexes`.
- * Expected outcome: Value in `[0.88, 1.22]` for typical game zoom levels.
- * Exceptions: None.
- */
-export function getMapZoomStrokeScale(zoom: number): number {
-  return Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
-}
 
 /**
  * Returns the solid outer home-region ownership border width in screen pixels.

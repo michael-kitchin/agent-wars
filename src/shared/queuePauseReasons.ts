@@ -7,6 +7,7 @@
  * Exceptions: None. This module has no logger.
  */
 
+import { compareCodeUnits } from './codeUnitOrder';
 import { joinWithSerialComma } from './consolidatedTurnUpdateToast';
 import { FORTIFICATION_QUEUE_ITEM } from './fortificationRules';
 import { isBuildUnitType } from './ipc/productionTypes';
@@ -146,7 +147,7 @@ export function formatQueuePausedLines(entries: readonly QueuePauseLineEntry[]):
     groups.set(key, group);
   }
   return [...groups.entries()]
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .sort(([left], [right]) => compareCodeUnits(left, right))
     .map(([, group]) => {
       const noun = group.codes.length === 1 ? 'Queue' : 'Queues';
       const reasons = joinWithSerialComma(group.reasons.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]));

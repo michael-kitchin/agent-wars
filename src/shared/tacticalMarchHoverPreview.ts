@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Pure construction of march hover preview payloads for tactical battles so the renderer can
  * mirror strategic `HumanOrderGroupPreviewResult` without calling `previewHumanMarchOrders` (blocked in main).
@@ -105,7 +106,7 @@ function tacticalMarchUnreachableReason(args: {
   readonly terrainBonusCategory: TacticalMovementCategory | null;
 }): string {
   if (args.hoveredH3Index === args.originH3Index) return 'No valid tactical route';
-  if (args.moveType !== 'infantry' && args.moveType !== 'armor' && args.moveType !== 'naval') {
+  if (!isLandUnitType(args.moveType) && args.moveType !== 'naval') {
     return 'No valid tactical route';
   }
   const blocks = tacticalDestinationBlocksMarch({
@@ -172,7 +173,7 @@ function buildPreviewForSubUnit(args: {
     return { preview: { valid: true, showInvalidMarker: false, segments: [] }, pathH3Indexes: [origin] };
   }
   if (
-    (sub.unitType === 'infantry' || sub.unitType === 'armor') &&
+    (isLandUnitType(sub.unitType)) &&
     sub.embarkedOnSubUnitId &&
     args.hoveredH3Index !== origin
   ) {

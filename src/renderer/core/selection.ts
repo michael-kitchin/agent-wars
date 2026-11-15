@@ -3,6 +3,7 @@ import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from './state';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Returns whether a unit id refers to embarked cargo that must not be newly selected.
@@ -15,11 +16,11 @@ import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 export function isEmbarkedLandUnitBlockedForSelection(unitId: string): boolean {
   if (S.tacticalBattleSnapshot) {
     const sub = S.tacticalBattleSnapshot.subUnits.find((u) => u.id === unitId);
-    if (!sub || (sub.unitType !== 'infantry' && sub.unitType !== 'armor')) return false;
+    if (!sub || (!isLandUnitType(sub.unitType))) return false;
     return !!sub.embarkedOnSubUnitId;
   }
   const unit = S.gameState?.units.find((u) => u.id === unitId);
-  if (!unit || (unit.unitType !== 'infantry' && unit.unitType !== 'armor')) return false;
+  if (!unit || (!isLandUnitType(unit.unitType))) return false;
   return !!(unit.embarkedOnCarrierUnitId && unit.embarkedOnCarrierUnitId.length > 0);
 }
 

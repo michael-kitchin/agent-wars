@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Land infantry/armor tactical march helpers: transport continuity and stateful shortest-path search.
  *
@@ -78,7 +79,7 @@ export function landTerrainBlocksWithoutTransport(
   terrain: TacticalTerrainKindResolver,
   h: string
 ): boolean {
-  if (unitTypeForMovement !== 'infantry' && unitTypeForMovement !== 'armor') return false;
+  if (!isLandUnitType(unitTypeForMovement)) return false;
   return !tacticalLandUnitMayOccupyCellWithoutTransport(unitTypeForMovement, h, terrain);
 }
 
@@ -156,7 +157,7 @@ export function blockedHexLandTransitAllowsRelaxation(args: {
   marchGoalH3: string;
 }): boolean {
   const { unitTypeForMovement, terrain, h, prev, nb, marchStartH3, marchGoalH3 } = args;
-  if (unitTypeForMovement !== 'infantry' && unitTypeForMovement !== 'armor') return true;
+  if (!isLandUnitType(unitTypeForMovement)) return true;
   if (prev == null) return true;
   if (h === marchStartH3 || h === marchGoalH3) return true;
   if (!landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h)) return true;

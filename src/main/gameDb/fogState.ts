@@ -13,6 +13,7 @@ import { loadedStrategicFootprint } from '../../shared/loadedStrategicFootprint'
 import { logDebug, logError, logTrace } from '../logger';
 import type { StrategicInfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
+import { readTurnNumberOrFirst, readTurnStateRow } from './turnStateReads';
 import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { gameMapLoadError } from '../gameMap/loadGameMap';
@@ -182,8 +183,7 @@ export function isHexExploredForPlayer(ops: FogDbOps, playerId: string, h3Index:
  * Exceptions: None.
  */
 function getCurrentTurnNumberFromDb(ops: FogDbOps): number {
-  const turnRow = ops.getOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1');
-  return turnRow?.turnNumber ?? 1;
+  return readTurnNumberOrFirst(ops.getOne);
 }
 
 /**
@@ -251,7 +251,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     });
   }
   const unitRows = deps.listUnitsForSnapshot();
-  const turnRow = ops.getOne<{ phase: string; turnNumber: number }>('SELECT phase, turn_number AS turnNumber FROM turn_state WHERE id = 1');
+  const turnRow = readTurnStateRow(ops.getOne);
   const orderRows = ops.getAll<{ unitId: string; toH3Index: string }>('SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders');
   const gameOverRow = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_over'");
   const winnerRow = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'winner'");
@@ -298,7 +298,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const weatherOn = originBonusSettings.weatherBonusEnabled === true;
   const techOn = originBonusSettings.techBonusEnabled === true;
   const startMonth = parseStartMonth(originBonusSettings.startMonth);
-  const turnNumber = turnRow?.turnNumber ?? 1;
+  const turnNumber = turnRow?.turn_number ?? 1;
   const calendarKind = gameCalendarKindForMap(activeGameMap().id);
   const currentDateLabel = formatGameDateForTurn(turnNumber, startMonth, calendarKind);
   const aiOnlyBeatLimit = readAiOnlyBeatLimit(ops);

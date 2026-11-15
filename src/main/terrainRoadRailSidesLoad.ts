@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import { logDebug, logError } from './logger';
 import { tacticalH3Resolution } from '../shared/h3Resolutions';
+import { isNonNullObject } from '../shared/objectGuards';
 import { resolveTerrainTacticalRoadRailSidesPathOptional } from './terrainMetadataPaths';
 
 /**
@@ -46,18 +47,6 @@ railSides: boolean[];
 }
 
 /**
- * Defines the `isRecord` function shape (function isRecord(x: unknown): x is Record<string, unknown>).
-
- * Purpose: Narrows unknown JSON nodes to string-keyed records for field validation.
- * When to use: Inside `parseTerrainTacticalRoadRailSidesJson` while walking the envelope.
- * Expected outcome: Type guard success only for non-null objects.
- * Exceptions: None.
- */
-function isRecord(x: unknown): x is Record<string, unknown> {
-  return typeof x === 'object' && x !== null;
-}
-
-/**
  * Defines the `readBoolArray` function shape (function readBoolArray(r: Record<string, unknown>, key: string): boolean[]).
 
  * Purpose: Validates a JSON array contains only booleans with pentagon/hexagon side counts.
@@ -89,7 +78,7 @@ function readBoolArray(r: Record<string, unknown>, key: string): boolean[] {
  */
 export function parseTerrainTacticalRoadRailSidesJson(text: string): TerrainRoadRailSidesRecord[] {
   const root = JSON.parse(text) as unknown;
-  if (!isRecord(root)) throw new Error('terrain road/rail sides: root must be an object');
+  if (!isNonNullObject(root)) throw new Error('terrain road/rail sides: root must be an object');
   const schemaVersion = root.schema_version;
   if (typeof schemaVersion !== 'string' || !schemaVersion) {
     throw new Error('terrain road/rail sides: schema_version must be a non-empty string');
@@ -104,7 +93,7 @@ export function parseTerrainTacticalRoadRailSidesJson(text: string): TerrainRoad
   const out: TerrainRoadRailSidesRecord[] = [];
   for (let i = 0; i < recordsRaw.length; i++) {
     const row = recordsRaw[i];
-    if (!isRecord(row)) throw new Error(`terrain road/rail sides: records[${i}] must be an object`);
+    if (!isNonNullObject(row)) throw new Error(`terrain road/rail sides: records[${i}] must be an object`);
     const h3 = row.h3_index;
     if (typeof h3 !== 'string' || !h3) {
       throw new Error(`terrain road/rail sides: records[${i}].h3_index must be a non-empty string`);

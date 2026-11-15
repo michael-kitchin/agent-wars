@@ -11,6 +11,7 @@
 import { logDebug } from '../../logger';
 import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../productionRules';
 import { HIREABLE_UNIT_TYPES } from '../../../shared/mercenaryRules';
+import { AIR_STRIKE_TARGET_TYPES } from '../../../shared/airStrikeTarget';
 import { STANDING_ORDER_TYPES } from '../../tools/standingOrdersShared';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
 import { envelopeFieldsForGates, legalOrderActionsForMode, type EnvelopeGates } from './envelopeContract';
@@ -24,16 +25,6 @@ import { envelopeFieldsForGates, legalOrderActionsForMode, type EnvelopeGates } 
  * Exceptions: None.
  */
 export const ORDERS_ENVELOPE_SCHEMA_NAME = 'orders_envelope';
-
-/**
- * Air strike target categories accepted by `normalizeAirStrikeOrders`.
- *
- * Purpose: Enum for `airStrikes[].targetType`.
- * When to use: Building the air strike row schema.
- * Expected outcome: Same values the parser accepts.
- * Exceptions: None.
- */
-const AIR_STRIKE_TARGET_TYPES: readonly string[] = ['units', 'urban', 'airport', 'seaport'];
 
 /**
  * Infrastructure categories the `infrastructure_destroyed` callback filters on.

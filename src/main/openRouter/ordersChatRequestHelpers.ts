@@ -1,5 +1,5 @@
 import { logDebug, logInfo } from '../logger';
-import type { ConsultTelemetry } from './consultTelemetry';
+import type { ConsultFallbackKind, ConsultTelemetry } from './consultTelemetry';
 import type { OpenRouterChatTransport, OpenRouterChatTransportResult } from './openRouterChatTransport';
 import {
   isCacheBreakpointDroppedForModel,
@@ -93,6 +93,106 @@ function isRequiredToolChoiceRejection(result: OpenRouterChatTransportResult): b
   if (result.ok || result.status === undefined) return false;
   return STRUCTURED_OUTPUT_REJECTION_STATUSES.has(result.status) && /tool_choice/i.test(result.error);
 }
+
+/**
+ * One retry inside the prepared send.
+ *
+ * Purpose: The cache-mark refusal and the consecutive-user refusal share one sequence of log, cancel, telemetry, mark, and resend.
+ * When to use: The ordered rules for a prepared chat body.
+ * Expected outcome: A rule that does not match leaves the result alone.
+ * Exceptions: None.
+ */
+interface PreparedRetryRule {
+  /**
+   * Whether this failed result is the refusal this rule handles.
+   *
+   * Contract: True only for that provider error.
+   * When to use: After a failed send, before the model is marked.
+   * Expected outcome: False for a success or a different error.
+   * Exceptions: None.
+   */
+  readonly rejects: (result: { readonly error?: string }) => boolean;
+  /**
+   * Whether this model already took this retry.
+   *
+   * Contract: True after `mark` for this model.
+   * When to use: Before applying the rule again.
+   * Expected outcome: A marked model is not retried for this rule.
+   * Exceptions: None.
+   */
+  readonly isMarked: (modelId: string) => boolean;
+  /**
+   * Records that this model took this retry.
+   *
+   * Contract: Later requests for the model skip this rule.
+   * When to use: After the cancellation check and before the resend.
+   * Expected outcome: `isMarked` becomes true for this model.
+   * Exceptions: None.
+   */
+  readonly mark: (modelId: string) => void;
+  /**
+   * Telemetry name for this retry.
+   *
+   * Contract: One consult fallback kind.
+   * When to use: When the rule resends.
+   * Expected outcome: The kind recorded for this refusal.
+   * Exceptions: None.
+   */
+  readonly fallback: ConsultFallbackKind;
+  /**
+   * Info-log label for this retry.
+   *
+   * Contract: The label the previous inline log used.
+   * When to use: When the rule resends.
+   * Expected outcome: The same label as the inline retry it replaced.
+   * Exceptions: None.
+   */
+  readonly logLabel: string;
+  /**
+   * Line shown to the commander for this retry.
+   *
+   * Contract: The sentence the previous `onLog` call used.
+   * When to use: When the rule resends.
+   * Expected outcome: The same sentence as the inline retry it replaced.
+   * Exceptions: None.
+   */
+  readonly logLine: string;
+}
+
+/**
+ * Prepared-send retries, in the order a provider can raise them.
+ *
+ * Purpose: A provider can reject the joined messages' cache mark only after the join, so the cache rule runs again last.
+ * When to use: The prepared send, once per failed result.
+ * Expected outcome: The cache drop, then the message join, then the cache drop again.
+ * Exceptions: None.
+ */
+const PREPARED_RETRY_RULES: readonly PreparedRetryRule[] = [
+  {
+    rejects: isCacheBreakpointRejection,
+    isMarked: isCacheBreakpointDroppedForModel,
+    mark: markCacheBreakpointDroppedForModel,
+    fallback: 'cacheBreakpointDropped',
+    logLabel: 'ordersChatRequestHelpers postOrdersChatRequest: cache breakpoint rejected',
+    logLine: 'Model rejected the prompt cache mark; retrying once without it.',
+  },
+  {
+    rejects: isConsecutiveUserMessageRejection,
+    isMarked: isSituationMessagesJoinedForModel,
+    mark: markSituationMessagesJoinedForModel,
+    fallback: 'situationMessagesJoined',
+    logLabel: 'ordersChatRequestHelpers postOrdersChatRequest: consecutive user messages rejected',
+    logLine: 'Model rejected two user messages; retrying once with the situation joined.',
+  },
+  {
+    rejects: isCacheBreakpointRejection,
+    isMarked: isCacheBreakpointDroppedForModel,
+    mark: markCacheBreakpointDroppedForModel,
+    fallback: 'cacheBreakpointDropped',
+    logLabel: 'ordersChatRequestHelpers postOrdersChatRequest: cache breakpoint rejected after join',
+    logLine: 'Model rejected the prompt cache mark; retrying once without it.',
+  },
+];
 
 /**
  * Posts one order-flow chat request with the consultation's reasoning and structured-output settings.
@@ -201,40 +301,13 @@ export async function postOrdersChatRequest(args: {
    */
   const sendPrepared = async (body: Record<string, unknown>): Promise<OpenRouterChatTransportResult> => {
     let result = await sendRecoveringToolChoice(prepareCachedBody(body));
-    if (!result.ok && isCacheBreakpointRejection(result) && !isCacheBreakpointDroppedForModel(modelId)) {
-      logInfo('ordersChatRequestHelpers postOrdersChatRequest: cache breakpoint rejected', {
-        requestLabel,
-        modelId,
-        error: result.error,
-      });
+    for (const rule of PREPARED_RETRY_RULES) {
+      if (result.ok || !rule.rejects(result) || rule.isMarked(modelId)) continue;
+      logInfo(rule.logLabel, { requestLabel, modelId, error: result.error });
       if (signal?.aborted) return { ok: false, error: 'Cancelled' };
-      onLog?.('Model rejected the prompt cache mark; retrying once without it.', false);
-      settings.telemetry?.recordFallback('cacheBreakpointDropped');
-      markCacheBreakpointDroppedForModel(modelId);
-      result = await sendRecoveringToolChoice(prepareCachedBody(body));
-    }
-    if (!result.ok && isConsecutiveUserMessageRejection(result) && !isSituationMessagesJoinedForModel(modelId)) {
-      logInfo('ordersChatRequestHelpers postOrdersChatRequest: consecutive user messages rejected', {
-        requestLabel,
-        modelId,
-        error: result.error,
-      });
-      if (signal?.aborted) return { ok: false, error: 'Cancelled' };
-      onLog?.('Model rejected two user messages; retrying once with the situation joined.', false);
-      settings.telemetry?.recordFallback('situationMessagesJoined');
-      markSituationMessagesJoinedForModel(modelId);
-      result = await sendRecoveringToolChoice(prepareCachedBody(body));
-    }
-    if (!result.ok && isCacheBreakpointRejection(result) && !isCacheBreakpointDroppedForModel(modelId)) {
-      logInfo('ordersChatRequestHelpers postOrdersChatRequest: cache breakpoint rejected after join', {
-        requestLabel,
-        modelId,
-        error: result.error,
-      });
-      if (signal?.aborted) return { ok: false, error: 'Cancelled' };
-      onLog?.('Model rejected the prompt cache mark; retrying once without it.', false);
-      settings.telemetry?.recordFallback('cacheBreakpointDropped');
-      markCacheBreakpointDroppedForModel(modelId);
+      onLog?.(rule.logLine, false);
+      settings.telemetry?.recordFallback(rule.fallback);
+      rule.mark(modelId);
       result = await sendRecoveringToolChoice(prepareCachedBody(body));
     }
     return result;

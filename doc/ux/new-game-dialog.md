@@ -98,6 +98,7 @@ None.
 
 - `static/index.html` (`#game-over-overlay`, `#new-game-dialog-collapse`, `#game-over-dialog`, `#game-over-message`, `#new-game-tab-global`, `#new-game-tab-regional`, `#new-game-region-select`, `#new-game-region-randomize`, `#new-game-sides-caption`, `#new-game-observe-only`, `#new-game-side-rows`, `#new-game-add-side-btn`, `#new-game-options-btn`, `#new-game-options-popover`, `#new-game-human-nickname`, `#new-game-victory-select`, `#new-game-turn-limit-select`, `#new-game-ai-only-battles-select`, `#new-game-beat-limit-select`, `#new-game-section-other`, `#new-game-sight-cues-checkbox`, `#new-game-advanced-tech`, `#new-game-cost-infantry`, `#new-game-cost-armor`, `#new-game-cost-naval`, `#new-game-cost-air`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-auto-start-checkbox`, `#new-game-origin-bonus-select`, `#new-game-terrain-bonus-select`, `#new-game-weather-bonus-select`, `#new-game-tech-bonus-select`, `#new-game-start-month`, `#new-game-start-month-randomize`, `#new-game-panel-footer`, `#new-game-btn`)
 - `src/renderer/gameplay/newGameOptionsPopover.ts` (`wireNewGameOptionsPopover`, `toggleNewGameOptionsPopover`, `closeNewGameOptionsPopover`)
+- `src/renderer/chrome/anchoredPopoverLifecycle.ts` (`attachAnchoredPopoverListeners`, `placePopoverBelowAnchor`)
 - `src/shared/newGameSides.ts`
 - `src/shared/sideNicknames.ts` (`sideDisplayName`, `normalizeSideNickname`, `storedAiNickname`, `SIDE_NICKNAME_MAX_LENGTH`)
 - `src/renderer/gameplay/humanNicknameField.ts` (`wireHumanNicknameField`, `readHumanNicknameForStart`)
@@ -113,6 +114,7 @@ None.
 - `src/shared/commanderSetupCopy.ts` (`prefillFirstAiApiKey`, `copyButtonState`)
 - `src/shared/commanderSummary.ts`
 - `src/renderer/openRouter/commanderPopover.ts`
+- `src/renderer/chrome/anchoredPopoverLifecycle.ts` (`attachAnchoredPopoverListeners`, `placePopoverBelowAnchor`)
 - `src/renderer/openRouter/commanderPopoverLabels.ts`
 - `static/newGameChrome.css`
 - `src/renderer/gameplay/newGameDialogCollapse.ts` (`expandNewGameDialog`, `toggleNewGameDialogCollapsed`, `scrollNewGameDialogToTop`)

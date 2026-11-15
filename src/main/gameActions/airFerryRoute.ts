@@ -11,6 +11,7 @@ import { findAirportFerryRoute, type AirportFerryRouteResult } from '../../share
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { dbGetAll, dbGetOne, getHexController } from '../gameDb';
+import { readTurnNumberOrFirst } from '../gameDb/turnStateReads';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { logDebug } from '../logger';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
@@ -41,7 +42,7 @@ export type StrategicAirportFerryArgs = {
  */
 export function resolveStrategicAirportFerry(args: StrategicAirportFerryArgs): AirportFerryRouteResult {
   const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
-  const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
+  const turnNumber = readTurnNumberOrFirst(dbGetOne);
   const birth = dbGetOne<{ birth_h3_index: string | null }>(
     'SELECT birth_h3_index FROM units WHERE id = ?',
     [args.unitId]

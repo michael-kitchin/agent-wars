@@ -16,6 +16,7 @@ import {
   shouldRenderTacticalHexes,
   spanForProjectedHex,
 } from '../map/terrainView';
+import { getMapZoomStrokeScale } from './renderGeometry';
 import { getLeafletGlobal } from '../map/mapHelpers';
 import { getMainLeafletMapForProjection } from '../map/leafletMainMapProjection';
 import { rendererSharedState as S } from '../core/state';
@@ -225,7 +226,7 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
     const viewportWidth = Math.max(1, container.clientWidth);
     const viewportHeight = Math.max(1, container.clientHeight);
     const zoom = typeof map.getZoom === 'function' ? map.getZoom() ?? 4 : 4;
-    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
     const exploredHexes = deps.getExploredHexSet(S.gameState);
     const tactical = S.tacticalBattleSnapshot;
     const inspection = isMapInspectionModeHeld();
@@ -339,7 +340,7 @@ export function drawStrategicInspectionHexCodes(
     const viewportWidth = Math.max(1, container.clientWidth);
     const viewportHeight = Math.max(1, container.clientHeight);
     const zoom = typeof map.getZoom === 'function' ? map.getZoom() ?? 4 : 4;
-    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
     const labelJobs: LabelJob[] = [];
 
     for (const parent of S.gameState.hexes) {

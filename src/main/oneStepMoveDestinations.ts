@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../shared/landUnitType';
 /**
  * One-step legal move destinations for AI order validation and prompt precomputation.
  * Land units use res-1 land-mass edge reachability; naval units use berth/egress strategic edges.
@@ -89,7 +90,7 @@ function validDestinationsCacheKey(
     originH3: unit.h3Index,
     unitType: unit.unitType,
   });
-  const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
+  const wantLand = isLandUnitType(unit.unitType);
   const embarked = Boolean(wantLand && unit.id && isDbReady() && isEmbarkedLandUnit(unit.id));
   const debark = options?.assumeDebarkedForReachability ? '1' : '0';
   const row = unit.id ? state.units.find((candidate) => candidate.id === unit.id) : undefined;
@@ -203,7 +204,7 @@ function computeValidDestinations(
     { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: row?.weatherTags },
     state
   );
-  const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
+  const wantLand = isLandUnitType(unit.unitType);
   const hexSet = new Set(state.hexes.map((h) => h.h3Index));
 
   if (wantLand) {

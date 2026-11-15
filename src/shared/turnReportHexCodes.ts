@@ -7,6 +7,7 @@
  * Exceptions: None. This module has no logger.
  */
 
+import { compareCodeUnits } from './codeUnitOrder';
 import { joinWithSerialComma } from './consolidatedTurnUpdateToast';
 
 /**
@@ -36,7 +37,7 @@ export function formatTurnReportHexList(codes: readonly (string | null)[]): stri
     if (trimmed.length === 0) unknown = true;
     else known.add(trimmed);
   }
-  const sorted = [...known].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  const sorted = [...known].sort(compareCodeUnits);
   if (unknown) sorted.push(TURN_REPORT_UNKNOWN_HEX);
   return joinWithSerialComma(sorted);
 }

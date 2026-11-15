@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * After-resolution callback evaluation and conditional consultation.
  * Runs when event-driven mode is on: evaluates mandatory overrides and subscription events,
@@ -218,7 +219,7 @@ export function campaignReadyOverride(
     .filter(
       (unit) =>
         unit.player === seatId &&
-        (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
+        (isLandUnitType(unit.unitType)) &&
         !unit.embarkedOnCarrierUnitId &&
         !inOperation.has(unit.id)
     )

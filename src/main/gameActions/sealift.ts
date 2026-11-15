@@ -9,6 +9,7 @@ import { logDebug, logTrace } from '../logger';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { airliftEmbarkAllowed } from './airlift';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import {
@@ -18,6 +19,7 @@ import {
   normalizeSealiftSlots,
   type SealiftSlotPair,
 } from './sealiftSlotAssignment';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
@@ -208,7 +210,7 @@ function airliftRowIds(unitsAtHex: UnitRow[], assignments: readonly { navalUnitI
     .filter((unit) => unit.player === HUMAN_SEAT_ID && unit.unitType === 'air')
     .filter((unit) => infantryPresent || assignments.some((row) => row.navalUnitId === unit.id))
     .map((unit) => unit.id)
-    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+    .sort(compareCodeUnits);
 }
 
 /**
@@ -220,7 +222,7 @@ function airliftRowIds(unitsAtHex: UnitRow[], assignments: readonly { navalUnitI
  * Exceptions: None.
  */
 function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[] {
-  const land = unitsAtHex.filter((unit) => unit.player === HUMAN_SEAT_ID && (unit.unitType === 'infantry' || unit.unitType === 'armor'));
+  const land = unitsAtHex.filter((unit) => unit.player === HUMAN_SEAT_ID && (isLandUnitType(unit.unitType)));
   return land
     .map((unit) => ({ unitId: unit.id, unitType: unit.unitType as 'infantry' | 'armor' }))
     .sort((a, b) => {
@@ -718,7 +720,7 @@ export function applyTacticalEmbarkCommittedOrdersToStrategicDb(
         logDebug('applyTacticalEmbarkCommittedOrdersToStrategicDb skip extra infantry on air', { navalParent, landParent });
         continue;
       }
-    } else if (!((land.unitType === 'infantry' || land.unitType === 'armor') && naval.unitType === 'naval')) {
+    } else if (!((isLandUnitType(land.unitType)) && naval.unitType === 'naval')) {
       continue;
     }
     dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [landParent]);
@@ -750,7 +752,7 @@ export function syncStrategicSealiftFromTacticalHexEmbarkPairs(args: {
   const landParents: string[] = [];
   for (const u of args.battle.subUnits) {
     if (u.h3Index !== args.h3Index || u.player !== HUMAN_SEAT_ID) continue;
-    if (u.unitType !== 'infantry' && u.unitType !== 'armor') continue;
+    if (!isLandUnitType(u.unitType)) continue;
     landParents.push(u.parentUnitId);
   }
   const unique = [...new Set(landParents)];
@@ -806,7 +808,7 @@ export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: stri
         embarkedLandUnitTypes: existingCargo.map((cargo) => cargo.unitType),
       })) continue;
     } else {
-      if (!(land.unitType === 'infantry' || land.unitType === 'armor') || naval.unitType !== 'naval') continue;
+      if (!(isLandUnitType(land.unitType)) || naval.unitType !== 'naval') continue;
       if (!canPlayerEmbarkFromHex(land.h3Index, playerId)) continue;
       const existingArmor = existingCargo.some((cargo) => cargo.unitType === 'armor');
       const existingInfantryCount = existingCargo.filter((cargo) => cargo.unitType === 'infantry').length;

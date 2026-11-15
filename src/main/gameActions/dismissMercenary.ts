@@ -20,6 +20,7 @@ import {
 import { isHumanSeatId, type SeatId } from '../../shared/seatIds';
 import { getSeatRoster } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
+import { readTurnPhase } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
@@ -60,7 +61,7 @@ export function executeDismissMercenary(seatId: SeatId, unitId: string): Dismiss
  * Exceptions: Propagates a database error from the reads.
  */
 function refusalFor(seatId: SeatId, unitId: string): DismissMercenaryResult | null {
-  const phase = gameDbOps.getOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+  const phase = readTurnPhase(gameDbOps.getOne) ?? 'planning';
   if (phase !== 'planning') return refuse(seatId, unitId, DISMISS_REASON_NOT_PLANNING);
   if (isHumanSeatId(seatId) && isTacticalBattleActive()) return refuse(seatId, unitId, DISMISS_REASON_TACTICAL);
   const seat = getSeatRoster().find((row) => row.seatId === seatId);

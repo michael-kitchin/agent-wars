@@ -108,6 +108,7 @@ import {
 } from './ipc/deferredResolutionPlaybackConsult';
 import { stopModelWork } from './ipc/modelWorkCancellation';
 import { parseModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
+import type { AirStrikeTargetType } from '../shared/ipc/ordersTypes';
 import type {
   SubmitOrdersPayload,
   ReadyResult,
@@ -504,7 +505,7 @@ function registerIpcHandlers(): void {
   );
   ipcMain.handle(
     IPC_GAME.validateGroupAirStrikeTarget,
-    (_event, payload: { unitIds?: string[]; targetH3Index?: string; targetType?: 'units' | 'urban' | 'airport' | 'seaport' }) => {
+    (_event, payload: { unitIds?: string[]; targetH3Index?: string; targetType?: AirStrikeTargetType }) => {
       const parsed = parseGroupedStrikePayload(payload);
       if (!parsed) {
         return { success: false, reason: 'Invalid grouped strike payload' };

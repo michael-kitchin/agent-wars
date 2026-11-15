@@ -5,19 +5,8 @@
 import * as fs from 'fs';
 import type { TacticalTransportVectorOverlayRow } from '../shared/ipc/terrainHexTypes';
 import { logDebug, logError } from './logger';
+import { isNonNullObject } from '../shared/objectGuards';
 import { resolveTerrainTacticalRoadRailVectorsPathOptional } from './terrainMetadataPaths';
-
-/**
- * Defines the `isRecord` function shape (function isRecord(x: unknown): x is Record<string, unknown>).
-
- * Purpose: Narrows unknown JSON nodes to object records for schema checks.
- * When to use: During vector JSON envelope/row parsing.
- * Expected outcome: True only for non-null objects.
- * Exceptions: None.
- */
-function isRecord(x: unknown): x is Record<string, unknown> {
-  return typeof x === 'object' && x !== null;
-}
 
 /**
  * Defines the `parsePointTuple` function shape (function parsePointTuple(x: unknown, rowIndex: number, pointIndex: number): [number, number] | null).
@@ -57,7 +46,7 @@ const SUPPORTED_VECTOR_SCHEMA_VERSIONS = new Set(['0.1.0']);
  */
 export function parseTerrainTacticalRoadRailVectorsJson(text: string): TacticalTransportVectorOverlayRow[] {
   const root = JSON.parse(text) as unknown;
-  if (!isRecord(root)) throw new Error('terrain road/rail vectors: root must be an object');
+  if (!isNonNullObject(root)) throw new Error('terrain road/rail vectors: root must be an object');
   const schema = root.schema_version;
   if (schema !== undefined && (typeof schema !== 'string' || !SUPPORTED_VECTOR_SCHEMA_VERSIONS.has(schema))) {
     throw new Error(`terrain road/rail vectors: unsupported schema_version ${String(schema)}`);
@@ -67,7 +56,7 @@ export function parseTerrainTacticalRoadRailVectorsJson(text: string): TacticalT
   const out: TacticalTransportVectorOverlayRow[] = [];
   for (let i = 0; i < rowsRaw.length; i++) {
     const row = rowsRaw[i];
-    if (!isRecord(row)) continue;
+    if (!isNonNullObject(row)) continue;
     const kind = row.kind;
     if (kind !== 'road' && kind !== 'rail') continue;
     const ptsRaw = row.points;

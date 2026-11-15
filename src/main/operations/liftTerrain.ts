@@ -16,6 +16,7 @@ import {
   navalLookupForHexState,
   navalStrategicHexIsOccupiable,
 } from '../navalStrategicPath';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { canLandUnitTraverseEdge, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
@@ -168,7 +169,7 @@ export function buildLiftTerrain(args: {
       if (h3 !== cityH3 && !canLandUnitTraverseEdge(h3, cityH3, args.landMass)) continue;
       found.push(h3);
     }
-    found.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+    found.sort(compareCodeUnits);
     return found;
   };
   const enemyUnitsWithin = (h3Index: string, radius: number): number => {

@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Theater rules for `estimate_combat`: which units take part, where they stand, and who can fire at whom.
  *
@@ -256,7 +257,7 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain] as const));
   const isEmbarkedAtSea = (u: GameStateSnapshot['units'][number]): boolean =>
     !!u.embarkedOnCarrierUnitId &&
-    (u.unitType === 'infantry' || u.unitType === 'armor') &&
+    (isLandUnitType(u.unitType)) &&
     terrainByH3.get(u.h3Index) === 'water';
   const toCombatUnit = (u: GameStateSnapshot['units'][number]): CombatUnit => ({
     id: u.id,

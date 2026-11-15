@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Snapshot-based validation for opponent tactical orders (air, ferry, embark) using tactical geometry and strategic infrastructure DB rows.
  */
@@ -159,7 +160,7 @@ function validateTacticalEmbarkOrderForPlayer(args: {
     tacticalLogQuery(`${logLabel} ok`, { unitId: order.unitId, carrier: 'air' });
     return tacticalValidResult();
   }
-  if (!(land.unitType === 'infantry' || land.unitType === 'armor') || naval.unitType !== 'naval') {
+  if (!(isLandUnitType(land.unitType)) || naval.unitType !== 'naval') {
     return tacticalInvalidResult('Embark requires infantry or armor and a naval carrier');
   }
   if (land.h3Index !== naval.h3Index) return tacticalInvalidResult('Embark requires co-located land and naval units');

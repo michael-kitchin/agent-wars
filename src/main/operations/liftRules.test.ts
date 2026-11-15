@@ -9,8 +9,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { gridDisk, latLngToCell } from 'h3-js';
 import { carrierAcceptsLandUnit } from '../../shared/carrierCargoRules';
-import { fillShip, liftGroundCap, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
+import type { GameStateSnapshot } from '../gameDb';
+import { countObjectiveReinforcers, fillShip, liftGroundCap, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
 
 /**
  * Checks that boarding the returned ids one at a time is legal for a ship.
@@ -90,4 +92,35 @@ test('shipsNeeded counts armor and pairs of infantry', () => {
   assert.equal(shipsNeeded(['infantry', 'infantry', 'infantry', 'armor']), 3);
   assert.equal(shipsNeeded([]), 0);
   assert.equal(shipsNeeded(['naval']), 0);
+});
+
+/**
+ * Picks an unused hex at an exact grid distance from `origin`.
+ *
+ * Purpose: The reinforcer count depends on distance, not on a particular hex id.
+ * When to use: Once per fixture unit.
+ * Expected outcome: A hex in the disk of `distance` that is outside the next-smaller disk.
+ * Exceptions: Throws when the disk has no unused hex.
+ */
+function hexAtDistance(origin: string, distance: number, used: Set<string>): string {
+  const closer = new Set(distance === 0 ? [] : gridDisk(origin, distance - 1));
+  const hex = gridDisk(origin, distance).find((cell) => !closer.has(cell) && !used.has(cell));
+  if (!hex) throw new Error(`no hex at distance ${distance}`);
+  used.add(hex);
+  return hex;
+}
+
+test('countObjectiveReinforcers counts one enemy land unit inside eta and outside the clear radius', () => {
+  const city = latLngToCell(0, 0, 1);
+  const used = new Set<string>([city]);
+  const state = {
+    units: [
+      { id: 'inf-eta', player: 'ai2', unitType: 'infantry', h3Index: hexAtDistance(city, 3, used) },
+      { id: 'naval-eta', player: 'ai2', unitType: 'naval', h3Index: hexAtDistance(city, 3, used) },
+      { id: 'arm-own', player: 'ai1', unitType: 'armor', h3Index: hexAtDistance(city, 3, used) },
+      { id: 'arm-near', player: 'ai2', unitType: 'armor', h3Index: hexAtDistance(city, 1, used) },
+      { id: 'inf-far', player: 'ai2', unitType: 'infantry', h3Index: hexAtDistance(city, 5, used) },
+    ],
+  } as unknown as GameStateSnapshot;
+  assert.equal(countObjectiveReinforcers({ state, seatId: 'ai1', cityH3: city, etaTurns: 3 }), 1);
 });

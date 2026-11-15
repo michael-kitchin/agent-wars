@@ -19,7 +19,7 @@ import {
   resolutionAnimationElapsedMs,
   type ResolutionPlaybackState,
 } from '../rendering/resolutionPlayback';
-import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './mapHelpers';
+import { hexCenterPx, hitTestMapHexAtContainerPoint } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { shouldHideStrategicMapUnitsForZoom } from './terrainView';
@@ -322,9 +322,7 @@ export function updateMapInteractionCursor(clientX: number, clientY: number, dep
   if (want === '' && S.gameState) {
     const px = clientX - rect.left;
     const py = clientY - rect.top;
-    const hexSet = new Set(S.gameState.hexes.map((h) => h.h3Index));
-    const tb = S.tacticalBattleSnapshot;
-    const hit = tb ? hitTestTacticalHexAtContainerPixel(px, py, tb) : hitTestHexAtContainerPixel(px, py, hexSet);
+    const hit = hitTestMapHexAtContainerPoint(px, py, S.gameState);
     if (hit) {
       const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(S.gameState, deps);
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));

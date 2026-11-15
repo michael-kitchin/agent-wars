@@ -1,7 +1,7 @@
 import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
 import { commanderApiKey } from '../../shared/commanderSetupCopy';
 import { listSelectableReasoningEfforts } from '../../shared/openRouterReasoningEffort';
-import { placeBelowAnchor } from '../../shared/popoverPlacement';
+import { attachAnchoredPopoverListeners, placePopoverBelowAnchor } from '../chrome/anchoredPopoverLifecycle';
 import { nicknameFieldValue, SIDE_NICKNAME_MAX_LENGTH } from '../../shared/sideNicknames';
 import { apiKeyTooltipText, commanderNicknameTooltipText, refreshModelsTooltipText } from '../chrome/controlTooltipText';
 import {
@@ -216,26 +216,11 @@ export function openCommanderPopover(request: CommanderPopoverRequest): void {
   document.body.appendChild(root);
   popover = root;
   placeCommanderPopover();
-  const onKey = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') closeCommanderPopover();
-  };
-  const onPointer = (event: Event): void => {
-    const target = event.target;
-    if (!(target instanceof Node)) return;
-    if (popover?.contains(target) || anchor?.contains(target)) return;
-    closeCommanderPopover();
-  };
-  const onScroll = (): void => placeCommanderPopover();
-  document.addEventListener('keydown', onKey);
-  document.addEventListener('pointerdown', onPointer);
-  document.addEventListener('scroll', onScroll, true);
-  window.addEventListener('resize', onScroll);
-  detachListeners = () => {
-    document.removeEventListener('keydown', onKey);
-    document.removeEventListener('pointerdown', onPointer);
-    document.removeEventListener('scroll', onScroll, true);
-    window.removeEventListener('resize', onScroll);
-  };
+  detachListeners = attachAnchoredPopoverListeners({
+    containsTarget: (target) => !!(popover?.contains(target) || anchor?.contains(target)),
+    close: closeCommanderPopover,
+    reposition: placeCommanderPopover,
+  });
 }
 
 /**
@@ -547,13 +532,5 @@ function saveAppWideModel(modelId: string | null): void {
  */
 function placeCommanderPopover(): void {
   if (!popover || !anchor) return;
-  const rect = anchor.getBoundingClientRect();
-  const box = popover.getBoundingClientRect();
-  const placed = placeBelowAnchor(
-    { top: rect.top, bottom: rect.bottom, left: rect.left },
-    { width: box.width, height: box.height },
-    { width: window.innerWidth, height: window.innerHeight }
-  );
-  popover.style.top = `${placed.top}px`;
-  popover.style.left = `${placed.left}px`;
+  placePopoverBelowAnchor(popover, anchor);
 }

@@ -7,6 +7,7 @@
  * Exceptions: This module does not read files and does not log. Callers log a full cell list.
  */
 
+import { isNonArrayObject } from './objectGuards';
 import { WEB_MERCATOR_MAX_ABS_LAT } from './webMercator';
 import {
   ADMIN_BORDER_GROUP_IDS,
@@ -189,10 +190,10 @@ export function parseCoastEdgeMaskPack(value: unknown): CoastEdgeMaskPack {
   const record = requireRecord(value, 'coast_edge_mask');
   requireIdentity(record, 'coast_edge_mask');
   const cellsValue = record.cells;
-  if (!isRecord(cellsValue)) throw new Error('cells is not an object');
+  if (!isNonArrayObject(cellsValue)) throw new Error('cells is not an object');
   const cells: Record<string, CoastEdgeMaskCell> = {};
   for (const [key, cell] of Object.entries(cellsValue)) {
-    if (!isRecord(cell)) throw new Error(`cells ${key} is not an object`);
+    if (!isNonArrayObject(cell)) throw new Error(`cells ${key} is not an object`);
     cells[key] = {
       water: requirePolygons(cell.water, 'water'),
       land: requirePolygons(cell.land, 'land'),
@@ -222,7 +223,7 @@ export function parseAdminBorderPack(value: unknown): AdminBorderPack {
   if (!Array.isArray(groupsValue)) throw new Error('groups is not an array');
   const byId = new Map<AdminBorderGroupId, readonly VectorLod[]>();
   for (const group of groupsValue) {
-    if (!isRecord(group)) throw new Error('group is not an object');
+    if (!isNonArrayObject(group)) throw new Error('group is not an object');
     const id = group.id;
     if (!isBorderGroupId(id)) throw new Error(`id ${String(id)} is not a border group`);
     byId.set(id, parseLodList(group.lods));
@@ -290,18 +291,6 @@ function rowOf(lat: number, cellDeg: number): number {
 }
 
 /**
- * True for a plain object.
- *
- * Purpose: JSON values arrive as `unknown`.
- * When to use: Before reading a field.
- * Expected outcome: True for objects, false for arrays and null.
- * Exceptions: None.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
  * Requires a JSON object.
  *
  * Purpose: Every document is one object.
@@ -310,7 +299,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Exceptions: Throws `Error` naming `document` when the value is not an object.
  */
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (!isRecord(value)) throw new Error(`${label} document is not an object`);
+  if (!isNonArrayObject(value)) throw new Error(`${label} document is not an object`);
   return value;
 }
 
@@ -378,7 +367,7 @@ function requireLods(record: Record<string, unknown>): readonly VectorLod[] {
 function parseLodList(value: unknown): readonly VectorLod[] {
   if (!Array.isArray(value)) throw new Error('lods is not an array');
   return value.map((lod) => {
-    if (!isRecord(lod)) throw new Error('lod is not an object');
+    if (!isNonArrayObject(lod)) throw new Error('lod is not an object');
     const minZoom = lod.min_zoom;
     const maxZoom = lod.max_zoom;
     const cellDeg = lod.cell_deg;
@@ -398,7 +387,7 @@ function parseLodList(value: unknown): readonly VectorLod[] {
  * Exceptions: Throws `Error` naming `cells` or `part`.
  */
 function parseCells(value: unknown): Readonly<Record<string, readonly EncodedPart[]>> {
-  if (!isRecord(value)) throw new Error('cells is not an object');
+  if (!isNonArrayObject(value)) throw new Error('cells is not an object');
   const cells: Record<string, EncodedPart[]> = {};
   for (const [key, parts] of Object.entries(value)) {
     if (!Array.isArray(parts)) throw new Error(`cells ${key} is not an array`);

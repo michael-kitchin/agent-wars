@@ -2,7 +2,7 @@ import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTyp
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { HEX_DETAILS_TOOLTIP_DELAY_MS, HEX_DETAILS_TOOLTIP_REST_PX } from '../core/constants';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
-import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './mapHelpers';
+import { hitTestMapHexAtClientPoint } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
@@ -405,24 +405,6 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   // double-click cannot retarget the selection the order will be planned for.
   let suppressIconRetargetOnNextClick = false;
 
-  function clientXYToHit(clientX: number, clientY: number): string | null {
-    if (!S.gameState) return null;
-    const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
-    if (!map) return null;
-    const rect = map.getContainer().getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    const tb = S.tacticalBattleSnapshot;
-    if (tb) {
-      // Do not fall back to strategic hit-testing while tactical is active: `gameState.hexes`
-      // still covers the globe at strategic, so coordinates outside the battle footprint would keep a
-      // stale strategic `hit` and the hex tooltip would never clear when the pointer leaves the tactical grid.
-      return hitTestTacticalHexAtContainerPixel(x, y, tb);
-    }
-    const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
-    return hitTestHexAtContainerPixel(x, y, set);
-  }
-
   /**
    * Returns whether a client pixel lands on a drawn unit or stack icon in `h3Index`.
    *
@@ -614,7 +596,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       deps.hideTerrainTooltipVisual();
     }
     const mapHexSet = new Set((S.gameState?.hexes ?? []).map((h) => h.h3Index));
-    const hit = clientXYToHit(e.clientX, e.clientY);
+    const hit = hitTestMapHexAtClientPoint(e.clientX, e.clientY);
     const detailHit = deps.detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
 
     const prevHit = S.hoveredHexH3;
@@ -789,7 +771,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return;
     }
 
-    const hit = clientXYToHit(e.clientX, e.clientY);
+    const hit = hitTestMapHexAtClientPoint(e.clientX, e.clientY);
     deps.clearSidebarError();
 
     if (S.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, S.tacticalBattleSnapshot)) {
@@ -944,7 +926,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   mainMapEl.addEventListener('dblclick', (e) => {
     if (newGameOverlayIsOpen()) return;
     void handleMainMapDoubleClick(e, {
-      clientXYToHit,
+      clientXYToHit: hitTestMapHexAtClientPoint,
       pointerHitsDrawnUnitIcon,
       getSelectedHumanUnitsAtMouseDown,
       commitGroupedMarchOrders,

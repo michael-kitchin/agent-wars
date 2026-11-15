@@ -9,6 +9,7 @@ import {
   isDbReady,
   getStrategicInfrastructureForHex,
 } from '../gameDb';
+import { readTurnPhase } from '../gameDb/turnStateReads';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
 import type {
@@ -310,8 +311,7 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     if (isTacticalBattleActive()) return validateHumanMarchOrdersWhenTacticalActive([unitId], destinationH3Index);
     const state = humanPerspectiveStateSnapshot();
-    const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
-    if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
+    if (readTurnPhase(dbGetOne) !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
     const unitRow = state.units.find((unit) => unit.id === unitId && unit.player === HUMAN_PLAYER_ID);
     if (!unitRow) return { success: false, reason: 'Unit not found or not human-controlled' };
     if (unitRow.unitType === 'air') return { success: false, reason: AIR_UNITS_CANNOT_MARCH_REASON };
@@ -394,7 +394,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
       destinationTerrainRaw: destinationHex.terrain,
       destinationTerrainKind: destinationHex.terrainKind,
       destinationSeaportCount,
-      hasLand: selectedUnits.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor'),
+      hasLand: selectedUnits.some((unit) => isLandUnitType(unit.unitType)),
       hasNaval: selectedUnits.some((unit) => unit.unitType === 'naval'),
       sharedMixedTerrain,
       selectedUnitTypes: selectedUnits.map((u) => u.unitType),

@@ -12,57 +12,19 @@ import { logDebug } from '../logger';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { AIRLIFT_INFANTRY_CAPACITY } from '../../shared/carrierCargoRules';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { findReachableAirportFerryDestinations } from '../../shared/airportFerryRoute';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { getLandStepDistances, landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import type { Operation, OperationCandidate } from '../../shared/operationTypes';
-import { LIFT_OBJECTIVE_CLEAR_RADIUS, rankLiftCities } from './liftRules';
+import { countObjectiveReinforcers, LIFT_OBJECTIVE_CLEAR_RADIUS, rankLiftCities } from './liftRules';
 import type { LiftTerrain } from './liftTerrain';
 import { OPERATION_MENU_AIR_ROWS, OPERATION_MUSTER_MAX_LAND_STEPS } from './operationRules';
 import { listKnownEnemyCities } from './seaOperationCandidates';
 
 type UnitRow = GameStateSnapshot['units'][number];
-
-/**
- * Orders two ids by their raw string order.
- *
- * Purpose: `localeCompare` follows the machine locale and can reorder ids between runs.
- * When to use: Unit ids and hex ids in this file.
- * Expected outcome: Negative when `left` is first, positive when `right` is first, zero when equal.
- * Exceptions: None.
- */
-function compareIds(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
-
-/**
- * Enemy ground units that could arrive after the drop and are not already within the clear radius.
- *
- * Purpose: The menu's risk column uses the same count a sea row uses.
- * When to use: Once per kept city.
- * Expected outcome: Infantry and armor of other sides inside `etaTurns` and outside the clear radius.
- * Exceptions: None.
- */
-function countReinforcers(args: {
-  readonly state: GameStateSnapshot;
-  readonly seatId: string;
-  readonly cityH3: string;
-  readonly etaTurns: number;
-}): number {
-  let count = 0;
-  for (const unit of args.state.units) {
-    if (unit.player === args.seatId) continue;
-    if (unit.unitType !== 'infantry' && unit.unitType !== 'armor') continue;
-    if (!isWithinGridRangePure(args.cityH3, unit.h3Index, args.etaTurns)) continue;
-    if (isWithinGridRangePure(args.cityH3, unit.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS)) continue;
-    count += 1;
-  }
-  return count;
-}
 
 /**
  * Airports the seat controls that this air unit can use as a drop base.
@@ -120,7 +82,7 @@ function launchAirportForCity(airH3: string, airports: readonly string[], cityH3
   if (airports.includes(airH3) && isWithinGridRangePure(airH3, cityH3, AIR_STRIKE_RANGE_HEXES)) return airH3;
   const inRange = airports
     .filter((airport) => isWithinGridRangePure(airport, cityH3, AIR_STRIKE_RANGE_HEXES))
-    .sort(compareIds);
+    .sort(compareCodeUnits);
   return inRange[0] ?? null;
 }
 
@@ -165,7 +127,7 @@ export function listAirOperationCandidates(args: {
         control.get(unit.h3Index) === args.seatId &&
         (airportCount.get(unit.h3Index) ?? 0) > 0
     )
-    .sort((left, right) => compareIds(left.id, right.id));
+    .sort((left, right) => compareCodeUnits(left.id, right.id));
   if (freeAir.length === 0 || AIRLIFT_INFANTRY_CAPACITY < 1) return finish([]);
   const ranked = rankLiftCities(listKnownEnemyCities(args.state, args.seatId));
   const cities = args.onlyObjectiveH3 === undefined
@@ -191,7 +153,7 @@ export function listAirOperationCandidates(args: {
       .sort((left, right) => {
         const stepDelta = (steps.get(left.h3Index) ?? 0) - (steps.get(right.h3Index) ?? 0);
         if (stepDelta !== 0) return stepDelta;
-        return compareIds(left.id, right.id);
+        return compareCodeUnits(left.id, right.id);
       })
       .slice(0, AIRLIFT_INFANTRY_CAPACITY);
     const chosen = infantry[0];
@@ -221,7 +183,7 @@ export function listAirOperationCandidates(args: {
         inEnemyHome: city.inEnemyHome,
         knownFortifiedCount: city.knownFortifiedCount,
         defenders,
-        reinforcers: countReinforcers({ state: args.state, seatId: args.seatId, cityH3: city.h3Index, etaTurns }),
+        reinforcers: countObjectiveReinforcers({ state: args.state, seatId: args.seatId, cityH3: city.h3Index, etaTurns }),
         clear: true,
       });
     }

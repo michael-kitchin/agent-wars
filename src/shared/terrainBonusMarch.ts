@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Pure rules for battle movement under the terrain bonus: which birth terrain a moving unit may stop on.
  *
@@ -38,7 +39,7 @@ export function terrainBonusMarchCategoryFor(input: {
   const category = normalizeDbTerrainKindToTacticalCategory(birthKind, 'land');
   if (category === 'water') return null;
   if (input.unitType === 'naval') return category === 'wetlands' ? category : null;
-  if (input.unitType !== 'infantry' && input.unitType !== 'armor') return null;
+  if (!isLandUnitType(input.unitType)) return null;
   return Number.isFinite(tacticalEnterHexMovementCost(input.unitType, category)) ? null : category;
 }
 

@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Tactical air strikes against units, and the per-sub-unit casualty marking they share with infrastructure strikes.
  *
@@ -212,7 +213,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
   const defenders = sub.filter((u) => u.h3Index === targetH3Index && u.player !== attacker.player);
   const eligibleForAa = defenders.filter(
     (d) =>
-      (d.unitType !== 'infantry' && d.unitType !== 'armor') ||
+      (!isLandUnitType(d.unitType)) ||
       !tacticalEmbarkedLandExcludedFromRangedInput(battle, sub, d)
   );
   const strikeThreshold = attackHitThreshold({

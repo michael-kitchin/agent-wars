@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * OpenRouter integration: API key storage, list models, and request AI movement orders.
  * All key handling is in the main process. The local renderer receives a key only to fill a password field, and the key is never logged.
@@ -455,7 +456,7 @@ function validateAiOrder(
       return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
     }
   }
-  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !landUnitCanOccupyHex(order.toH3Index, getStrategicLandMassByH3())) {
+  if ((isLandUnitType(unit.unitType)) && !landUnitCanOccupyHex(order.toH3Index, getStrategicLandMassByH3())) {
     return { valid: false, reason: 'Land units must move to a hex that overlaps a continent or large island.' };
   }
   if (unit.unitType === 'armor') {

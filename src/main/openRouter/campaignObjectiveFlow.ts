@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Turns a side's briefing snapshot into campaign inputs, refreshes the stored objective once per consult, and builds the plan the briefing builders receive.
  *
@@ -131,7 +132,7 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
     .filter(
       (unit) =>
         unit.player === seatId &&
-        (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
+        (isLandUnitType(unit.unitType)) &&
         !unit.embarkedOnCarrierUnitId &&
         !inOperation.has(unit.id)
     )
@@ -139,7 +140,7 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
   const enemyUnits = state.units.filter((unit) => activeEnemySeatIds.has(unit.player));
   const enemyUnitHexes = enemyUnits.map((unit) => unit.h3Index);
   const enemyGroundUnitHexes = enemyUnits
-    .filter((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor')
+    .filter((unit) => isLandUnitType(unit.unitType))
     .map((unit) => unit.h3Index);
   const homeSeatByH3 = new Map<string, string>();
   const inSeveralHomes = new Set<string>();

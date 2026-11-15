@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Pure tactical terrain-effect strings for the map hex tooltip "Effects:" line.
  *
@@ -375,11 +376,11 @@ function movementSymbolForUnit(
   input: TerrainEffectsInput,
   hasTransport: boolean
 ): EffectSymbol | null {
-  if (hasTransport && (unitType === 'infantry' || unitType === 'armor')) {
+  if (hasTransport && (isLandUnitType(unitType))) {
     return '+';
   }
 
-  if (input.isRubble && (unitType === 'infantry' || unitType === 'armor')) {
+  if (input.isRubble && (isLandUnitType(unitType))) {
     const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
     if (rubbleCost === Infinity) {
       if (shouldSuppressMovementBlock(unitType, cat)) return null;
@@ -390,7 +391,7 @@ function movementSymbolForUnit(
   }
 
   if (input.isUrban) {
-    if (unitType === 'infantry' || unitType === 'armor') return '-';
+    if (isLandUnitType(unitType)) return '-';
     return null;
   }
 
@@ -418,7 +419,7 @@ function shouldSuppressMovementBlock(
   if (unitType === 'naval') {
     return cat !== 'water' && cat !== 'coastal';
   }
-  if (unitType === 'infantry' || unitType === 'armor') {
+  if (isLandUnitType(unitType)) {
     return cat === 'water';
   }
   return false;

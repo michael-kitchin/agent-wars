@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Beat-counting march search for terrain-bonus movement, and the rule that decides when its route replaces today's.
  *
@@ -154,7 +155,7 @@ export function searchTacticalMarchBeats(
 ): TacticalMarchBeatRoute | null {
   const { fromH3, toH3, tacticalSet, movementPointBudget: budget } = args;
   if (!(budget >= 1) || fromH3 === toH3 || !tacticalSet.has(fromH3) || !tacticalSet.has(toH3)) return null;
-  const isLand = args.unitTypeForMovement === 'infantry' || args.unitTypeForMovement === 'armor';
+  const isLand = isLandUnitType(args.unitTypeForMovement);
   const ctx: TacticalMarchStepContext = {
     terrain: args.terrain,
     moveType: args.unitTypeForMovement,

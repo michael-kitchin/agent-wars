@@ -11,11 +11,12 @@ import { getRange } from '../combatConstants';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { knownCampaignCities } from '../openRouter/campaignTargetSelection';
-import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
+import { isLandUnitType } from '../../shared/landUnitType';
 import { getLandStepDistances, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import type { Operation, OperationCandidate } from '../../shared/operationTypes';
 import type { PostureSettings } from '../../shared/postureTypes';
-import { LIFT_OBJECTIVE_CLEAR_RADIUS, liftGroundCap, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
+import { countObjectiveReinforcers, LIFT_OBJECTIVE_CLEAR_RADIUS, liftGroundCap, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
 import type { LiftTerrain } from './liftTerrain';
 import {
   OPERATION_MENU_SIZE,
@@ -28,20 +29,6 @@ import {
 type UnitRow = GameStateSnapshot['units'][number];
 
 /**
- * Orders two ids by their raw string order.
- *
- * Purpose: `localeCompare` follows the machine locale and can reorder ids between runs.
- * When to use: Unit ids, ship ids, and hex ids in this file.
- * Expected outcome: Negative when `left` is first, positive when `right` is first, zero when equal.
- * Exceptions: None.
- */
-function compareIds(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
-
-/**
  * True when the unit is infantry or armor.
  *
  * Purpose: Only those types board a landing.
@@ -50,7 +37,7 @@ function compareIds(left: string, right: string): number {
  * Exceptions: None.
  */
 function isGroundUnit(unit: UnitRow): boolean {
-  return unit.unitType === 'infantry' || unit.unitType === 'armor';
+  return isLandUnitType(unit.unitType);
 }
 
 /**
@@ -184,7 +171,7 @@ function forceAtPort(args: {
       if (stepDelta !== 0) return stepDelta;
       const typeDelta = (left.unitType === 'infantry' ? 0 : 1) - (right.unitType === 'infantry' ? 0 : 1);
       if (typeDelta !== 0) return typeDelta;
-      return compareIds(left.id, right.id);
+      return compareCodeUnits(left.id, right.id);
     });
   let chosen = ordered.slice(0, args.cap);
   const shipsHere = args.freeShips.filter((ship) => sailByShip.has(ship.id));
@@ -197,37 +184,13 @@ function forceAtPort(args: {
     .sort((left, right) => {
       const turnDelta = (sailByShip.get(left.id) ?? 0) - (sailByShip.get(right.id) ?? 0);
       if (turnDelta !== 0) return turnDelta;
-      return compareIds(left.id, right.id);
+      return compareCodeUnits(left.id, right.id);
     })
     .slice(0, needed);
   const totalSteps = chosen.reduce((sum, unit) => sum + (steps.get(unit.h3Index) ?? 0), 0);
   const farthestUnit = chosen.reduce((max, unit) => Math.max(max, steps.get(unit.h3Index) ?? 0), 0);
   const slowestShip = ships.reduce((max, ship) => Math.max(max, sailByShip.get(ship.id) ?? 0), 0);
   return { port: args.port, units: chosen, ships, totalSteps, musterTurns: Math.max(farthestUnit, slowestShip) };
-}
-
-/**
- * Enemy ground units that could arrive after the landing starts and are not already defenders.
- *
- * Purpose: A later menu can show the reinforcements without a path search per unit.
- * When to use: Once per candidate city.
- * Expected outcome: Infantry and armor of other sides inside `etaTurns` and outside the clear radius.
- * Exceptions: None.
- */
-function countReinforcers(args: {
-  readonly state: GameStateSnapshot;
-  readonly seatId: string;
-  readonly cityH3: string;
-  readonly etaTurns: number;
-}): number {
-  let count = 0;
-  for (const unit of args.state.units) {
-    if (unit.player === args.seatId || !isGroundUnit(unit)) continue;
-    if (!isWithinGridRangePure(args.cityH3, unit.h3Index, args.etaTurns)) continue;
-    if (isWithinGridRangePure(args.cityH3, unit.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS)) continue;
-    count += 1;
-  }
-  return count;
 }
 
 /**
@@ -280,7 +243,7 @@ export function listSeaOperationCandidates(args: {
         !args.state.units.some((cargo) => cargo.embarkedOnCarrierUnitId === unit.id) &&
         args.terrain.enemyUnitsWithin(unit.h3Index, getRange('naval')) === 0
     )
-    .sort((left, right) => compareIds(left.id, right.id));
+    .sort((left, right) => compareCodeUnits(left.id, right.id));
   if (freeShips.length === 0) return finish([]);
   const available = own.filter(
     (unit) => isGroundUnit(unit) && !unit.embarkedOnCarrierUnitId && !busy.has(unit.id) && !args.protectedUnitIds.has(unit.id)
@@ -317,7 +280,7 @@ export function listSeaOperationCandidates(args: {
     .sort((left, right) => {
       const stepDelta = (fromTroops.get(left) ?? 0) - (fromTroops.get(right) ?? 0);
       if (stepDelta !== 0) return stepDelta;
-      return compareIds(left, right);
+      return compareCodeUnits(left, right);
     })
     .slice(0, OPERATION_MUSTER_CANDIDATE_LIMIT);
   const forces = ports
@@ -336,7 +299,7 @@ export function listSeaOperationCandidates(args: {
     .sort((left, right) => {
       if (left.units.length !== right.units.length) return right.units.length - left.units.length;
       if (left.totalSteps !== right.totalSteps) return left.totalSteps - right.totalSteps;
-      return compareIds(left.port, right.port);
+      return compareCodeUnits(left.port, right.port);
     });
   const force = forces[0];
   if (!force) return finish([]);
@@ -377,7 +340,7 @@ export function listSeaOperationCandidates(args: {
       inEnemyHome: city.inEnemyHome,
       knownFortifiedCount: city.knownFortifiedCount,
       defenders,
-      reinforcers: countReinforcers({ state: args.state, seatId: args.seatId, cityH3: city.h3Index, etaTurns }),
+      reinforcers: countObjectiveReinforcers({ state: args.state, seatId: args.seatId, cityH3: city.h3Index, etaTurns }),
       clear: defenders === 0,
     });
   }

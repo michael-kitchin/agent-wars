@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Lists tactical cells a tactical sub-unit can fully reach this beat under terrain-weighted MP budgets.
  *
@@ -66,7 +67,7 @@ export function collectTacticalLegalMoveDestinationHexes(
     buildTacticalFootprintAdjacencyMap(footprint)
   );
   const terrainBonusCategory = terrainBonusMarchCategoryForMover(battle, u, u.unitType);
-  if (u.unitType === 'infantry' || u.unitType === 'armor') {
+  if (isLandUnitType(u.unitType)) {
     return collectInfantryArmorReachableWithinBudget({
       fromH3: u.h3Index,
       tacticalSet: marchSet,

@@ -1,3 +1,5 @@
+import { compareCodeUnits } from './codeUnitOrder';
+
 /**
  * Head-on contact: opposing units that would trade cells meet in one of them.
  *
@@ -158,20 +160,6 @@ export function headOnCellPair(cellA: string, cellB: string): readonly [string, 
 }
 
 /**
- * Sorts ids and cells with `<`, so the order does not depend on locale.
- *
- * Purpose: Contact lists and id lists must be stable for logs and tests.
- * When to use: Sorting holding ids, entering ids, and the contact list.
- * Expected outcome: Negative when `left` is lesser, positive when it is greater, and 0 when they are equal.
- * Exceptions: None.
- */
-function compareAscending(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
-
-/**
  * Groups movers that travel between the same two cells.
  *
  * Purpose: A contact is a property of a cell pair, not of one unit.
@@ -210,8 +198,8 @@ function contactForPair(group: readonly HeadOnMover[], pickHeldCell: HeadOnHeldC
   if (heldCell !== lowCell && heldCell !== highCell) {
     throw new Error(`resolveHeadOnContacts: picker returned ${heldCell}, expected ${lowCell} or ${highCell}`);
   }
-  const holdingUnitIds = group.filter((mover) => mover.fromCell === heldCell).map((mover) => mover.unitId).sort(compareAscending);
-  const enteringUnitIds = group.filter((mover) => mover.fromCell !== heldCell).map((mover) => mover.unitId).sort(compareAscending);
+  const holdingUnitIds = group.filter((mover) => mover.fromCell === heldCell).map((mover) => mover.unitId).sort(compareCodeUnits);
+  const enteringUnitIds = group.filter((mover) => mover.fromCell !== heldCell).map((mover) => mover.unitId).sort(compareCodeUnits);
   return { lowCell, highCell, heldCell, holdingUnitIds, enteringUnitIds };
 }
 
@@ -232,7 +220,7 @@ export function resolveHeadOnContacts(
       const contact = contactForPair(group, pickHeldCell);
       return contact ? [contact] : [];
     })
-    .sort((left, right) => compareAscending(left.lowCell, right.lowCell) || compareAscending(left.highCell, right.highCell));
+    .sort((left, right) => compareCodeUnits(left.lowCell, right.lowCell) || compareCodeUnits(left.highCell, right.highCell));
   const cancelledUnitIds = new Set(contacts.flatMap((contact) => contact.holdingUnitIds));
   return { contacts, cancelledUnitIds };
 }

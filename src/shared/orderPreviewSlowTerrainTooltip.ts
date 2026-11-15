@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Copy and light terrain classification for transient “Slower: …” hover hints during valid tactical marches.
  *
@@ -426,7 +427,7 @@ export function collectTacticalMarchTerrainImpact(args: {
     if (Number.isFinite(cost) && openGround > cost && (battle.weather === 'snow' || battle.weather === 'rain')) {
       push(formatWeatherLabel(battle.weather));
     }
-    if (tacticalCellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
+    if (tacticalCellIsForestClass(battle, h) && (isLandUnitType(subUnit.unitType))) {
       push('Forest');
       continue;
     }
@@ -476,7 +477,7 @@ export function pickTacticalRangedSlowTerrainDisplayTitle(
   unitType: string,
   attackerSubUnitId: string
 ): string | null {
-  if (unitType !== 'infantry' && unitType !== 'armor') return null;
+  if (!isLandUnitType(unitType)) return null;
   const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
   if (!u) return null;
   const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);

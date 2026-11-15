@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * One battle march step, classified as a normal priced step, a terrain-bonus stop, or blocked.
  *
@@ -125,7 +126,7 @@ function tacticalMarchStepCostWithoutBonus(
 ): number {
   const { terrain, moveType } = ctx;
   if (moveType === 'naval') return tacticalNavalEnterNeighborCost(step.fromH3, step.toH3, terrain);
-  if (moveType !== 'infantry' && moveType !== 'armor') return Infinity;
+  if (!isLandUnitType(moveType)) return Infinity;
   if (
     !blockedHexLandTransitAllowsRelaxation({
       unitTypeForMovement: moveType,

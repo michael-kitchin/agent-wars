@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Strategic WEGO `ready` resolution from phase flip through air/ranged/movement/ferry and melee branch or finalize.
  *
@@ -8,6 +9,7 @@
  */
 
 import { dbGetAll, dbGetOne, dbRun, getGameSeed, getGameStateForPlayer, getSeatRoster, listUnitsForSnapshot } from '../gameDb';
+import { readTurnNumberOrFirst, readTurnPhase } from '../gameDb/turnStateReads';
 import { readAiOnlyBattles } from '../gameDb/gameConfigKv';
 import { buildSightCuesForReady } from '../sightCues/sightCueReadyStage';
 import { buildAiOnlyBattleOffer } from './aiOnlyBattleOffer';
@@ -112,8 +114,8 @@ function dbBackedStateSnapshot(): {
     units: dbGetAll<{ id: string; player: string; unitType: string; h3Index: string }>(
       'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units'
     ),
-    phase: dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning',
-    turnNumber: dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1,
+    phase: readTurnPhase(dbGetOne) ?? 'planning',
+    turnNumber: readTurnNumberOrFirst(dbGetOne),
     pendingOrders: dbGetAll<{ unitId: string; toH3Index: string }>(
       'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
     ),
@@ -156,7 +158,7 @@ function withoutEmbarkedLandOnWater<T extends { readonly id: string; readonly un
   units: readonly T[]
 ): T[] {
   return units.filter((u) => {
-    if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
+    if (!isLandUnitType(u.unitType)) return true;
     return !landUnitSitsOutCombat(u.id);
   });
 }

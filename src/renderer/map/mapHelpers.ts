@@ -22,6 +22,7 @@ import {
   type PanAxisKey,
 } from '../../shared/mapKeyboardPanLogic';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Defines the `shouldIgnoreGlobalKeydown` function shape (export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean).
@@ -170,7 +171,7 @@ export function applyInitialCameraForState(state: GameStateSnapshot): void {
   if (!map || !leafletRef) return;
 
   const humanGround = state.units.filter(
-    (u) => u.player === HUMAN_SEAT_ID && (u.unitType === 'infantry' || u.unitType === 'armor')
+    (u) => u.player === HUMAN_SEAT_ID && (isLandUnitType(u.unitType))
   );
   const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === HUMAN_SEAT_ID);
   if (anchors.length === 0) return;
@@ -299,4 +300,37 @@ export function hitTestTacticalHexAtContainerPixel(
     return null;
   }
   return null;
+}
+
+/**
+ * Hit-tests the hex under a container pixel, using the tactical footprint when a battle is open.
+ *
+ * Purpose: Map gestures and the cursor share one choice between the tactical grid and the strategic hex set.
+ * When to use: When the pointer position is already in container pixels and a snapshot is in hand.
+ * Expected outcome: The tactical cell, the strategic hex, or null when the pointer is outside both.
+ * Exceptions: None. The tactical hit-test does not fall back to the strategic set.
+ */
+export function hitTestMapHexAtContainerPoint(x: number, y: number, gameState: GameStateSnapshot): string | null {
+  const tb = S.tacticalBattleSnapshot;
+  // Do not fall back to strategic hit-testing while tactical is active: `gameState.hexes`
+  // still covers the globe at strategic, so coordinates outside the battle footprint would keep a
+  // stale strategic `hit` and the hex tooltip would never clear when the pointer leaves the tactical grid.
+  if (tb) return hitTestTacticalHexAtContainerPixel(x, y, tb);
+  return hitTestHexAtContainerPixel(x, y, new Set(gameState.hexes.map((h) => h.h3Index)));
+}
+
+/**
+ * Hit-tests the hex under a client pixel on the main map.
+ *
+ * Purpose: Callers that have a pointer event share the container conversion and the tactical-or-strategic choice.
+ * When to use: Hover, click, and tooltip restore.
+ * Expected outcome: The hex under the pointer, or null when there is no snapshot, no map, or no hex.
+ * Exceptions: None.
+ */
+export function hitTestMapHexAtClientPoint(clientX: number, clientY: number): string | null {
+  if (!S.gameState) return null;
+  const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+  if (!map) return null;
+  const rect = map.getContainer().getBoundingClientRect();
+  return hitTestMapHexAtContainerPoint(clientX - rect.left, clientY - rect.top, S.gameState);
 }

@@ -4,6 +4,7 @@ import { getResolution } from 'h3-js';
 import { readJsonFileOrThrow } from './jsonFileHelpers';
 import { logDebug, logTrace } from './logger';
 import { strategicH3Resolution, tacticalH3Resolution } from '../shared/h3Resolutions';
+import { isNonNullObject } from '../shared/objectGuards';
 import { resolveTerrainStrategicNamingPath, resolveTerrainTacticalNamingPath } from './terrainMetadataPaths';
 
 /**
@@ -365,18 +366,6 @@ records: TerrainNamingRecordStrategic[] | TerrainNamingRecordTactical[];
 }
 
 /**
- * Defines the `isRecord` function shape (function isRecord(x: unknown): x is Record<string, unknown>).
-
- * Purpose: Supports maintainability by documenting why `isRecord` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isRecord(x: unknown): x is Record<string, unknown> {
-  return typeof x === 'object' && x !== null;
-}
-
-/**
  * Defines the `readStr` function shape (function readStr(r: Record<string, unknown>, key: string): string).
 
  * Purpose: Supports maintainability by documenting why `readStr` exists.
@@ -486,7 +475,7 @@ function readStateArray(r: Record<string, unknown>, key: string): TerrainNamingS
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
   return v.map((el, i) => {
-    if (!isRecord(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
+    if (!isNonNullObject(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
     return {
       name: readStr(el, 'name'),
       country: readStr(el, 'country'),
@@ -508,7 +497,7 @@ function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamin
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
   return v.map((el, i) => {
-    if (!isRecord(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
+    if (!isNonNullObject(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
     return {
       name: readStr(el, 'name'),
       continent: readOptionalStrOrNull(el, 'continent'),
@@ -532,7 +521,7 @@ function readWaterArray(r: Record<string, unknown>, key: string): TerrainNamingW
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
   return v.map((el, i) => {
-    if (!isRecord(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
+    if (!isNonNullObject(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
     const typeRaw = readStr(el, 'type');
     if (typeRaw !== 'ocean' && typeRaw !== 'lake') {
       throw new Error(`terrain naming: ${key}[${i}].type must be "ocean" or "lake"`);
@@ -557,7 +546,7 @@ function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCi
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
   return v.map((el, i) => {
-    if (!isRecord(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
+    if (!isNonNullObject(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
     return {
       name: readStr(el, 'name'),
       state: readOptionalStrOrNull(el, 'state'),
@@ -578,7 +567,7 @@ function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCi
  * Exceptions: None.
  */
 function parseStrategicRow(raw: unknown, resolution: number): TerrainNamingRecordStrategic {
-  if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
+  if (!isNonNullObject(raw)) throw new Error('terrain naming: record must be an object');
   const h3Index = readStr(raw, 'h3_index');
   if (getResolution(h3Index) !== resolution) {
     throw new Error(`terrain naming: h3_index ${h3Index} resolution != envelope ${resolution}`);
@@ -600,7 +589,7 @@ function parseStrategicRow(raw: unknown, resolution: number): TerrainNamingRecor
  * Exceptions: None.
  */
 function parseTacticalRow(raw: unknown, resolution: number): TerrainNamingRecordTactical {
-  if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
+  if (!isNonNullObject(raw)) throw new Error('terrain naming: record must be an object');
   const base = parseStrategicRow(raw, resolution);
   return {
     ...base,
@@ -617,7 +606,7 @@ function parseTacticalRow(raw: unknown, resolution: number): TerrainNamingRecord
  * Exceptions: None.
  */
 function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainNamingEnvelope {
-  if (!isRecord(raw)) throw new Error('terrain naming: root must be an object');
+  if (!isNonNullObject(raw)) throw new Error('terrain naming: root must be an object');
   if (raw.schema_version !== EXPECTED_HEX_NAMING_SCHEMA_VERSION) {
     throw new Error(
       `terrain naming: schema_version ${String(raw.schema_version)} != ${EXPECTED_HEX_NAMING_SCHEMA_VERSION}`

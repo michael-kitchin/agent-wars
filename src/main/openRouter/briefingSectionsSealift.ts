@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Naval Transport Status briefing block for both consultation modes.
  *
@@ -74,7 +75,7 @@ export function buildSealiftBriefingBlock(
   const ownSeat = briefingOwnSeatId(state);
   const opponentNaval = state.units.filter((unit) => unit.player === ownSeat && unit.unitType === 'naval');
   const opponentLand = state.units.filter(
-    (unit) => unit.player === ownSeat && (unit.unitType === 'infantry' || unit.unitType === 'armor')
+    (unit) => unit.player === ownSeat && (isLandUnitType(unit.unitType))
   );
   logDebug('briefingSections buildSealiftBriefingBlock', {
     turnNumber: state.turnNumber,

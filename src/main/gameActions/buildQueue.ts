@@ -9,6 +9,7 @@ import {
   getStrategicInfrastructureForHex,
   setKeepBuildingForHex,
 } from '../gameDb';
+import { readTurnPhase } from '../gameDb/turnStateReads';
 import { logDebug, logError, logTrace } from '../logger';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { isSeatId } from '../../shared/seatIds';
@@ -407,7 +408,7 @@ function validateBuildQueueMutationContext(args: {
   requestingPlayerId: string;
   requireBuildSectionVisible: boolean;
 }): { valid: true; queueView: HexBuildQueueView } | { valid: false; reason: string } {
-  const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+  const phase = readTurnPhase(dbGetOne) ?? 'planning';
   if (phase !== 'planning') {
     return { valid: false, reason: 'Build queue can only be edited during planning phase.' };
   }

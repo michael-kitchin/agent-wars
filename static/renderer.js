@@ -16439,6 +16439,13 @@
     return observing && typeof battleHex === "string" && battleHex.length > 0 && needsAnimation;
   }
 
+  // src/shared/codeUnitOrder.ts
+  function compareCodeUnits(left, right) {
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  }
+
   // src/shared/unitIds.ts
   var UNIT_TYPE_ID_CODES = {
     infantry: "i",
@@ -16751,6 +16758,11 @@
     return id === "state" || id === "state_disputed" ? STATE_BORDER_OPACITY : NATIONAL_BORDER_OPACITY;
   }
 
+  // src/shared/objectGuards.ts
+  function isNonArrayObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
   // src/shared/vectorPackTypes.ts
   var ADMIN_BORDER_GROUP_IDS = ["country", "country_disputed", "state", "state_disputed"];
 
@@ -16811,10 +16823,10 @@
     const record = requireRecord(value, "coast_edge_mask");
     requireIdentity(record, "coast_edge_mask");
     const cellsValue = record.cells;
-    if (!isRecord(cellsValue)) throw new Error("cells is not an object");
+    if (!isNonArrayObject(cellsValue)) throw new Error("cells is not an object");
     const cells = {};
     for (const [key, cell] of Object.entries(cellsValue)) {
-      if (!isRecord(cell)) throw new Error(`cells ${key} is not an object`);
+      if (!isNonArrayObject(cell)) throw new Error(`cells ${key} is not an object`);
       cells[key] = {
         water: requirePolygons(cell.water, "water"),
         land: requirePolygons(cell.land, "land")
@@ -16835,7 +16847,7 @@
     if (!Array.isArray(groupsValue)) throw new Error("groups is not an array");
     const byId = /* @__PURE__ */ new Map();
     for (const group of groupsValue) {
-      if (!isRecord(group)) throw new Error("group is not an object");
+      if (!isNonArrayObject(group)) throw new Error("group is not an object");
       const id = group.id;
       if (!isBorderGroupId(id)) throw new Error(`id ${String(id)} is not a border group`);
       byId.set(id, parseLodList(group.lods));
@@ -16873,11 +16885,8 @@
     if (row > lastRow) return lastRow;
     return row;
   }
-  function isRecord(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
   function requireRecord(value, label) {
-    if (!isRecord(value)) throw new Error(`${label} document is not an object`);
+    if (!isNonArrayObject(value)) throw new Error(`${label} document is not an object`);
     return value;
   }
   function requireIdentity(record, kind) {
@@ -16900,7 +16909,7 @@
   function parseLodList(value) {
     if (!Array.isArray(value)) throw new Error("lods is not an array");
     return value.map((lod) => {
-      if (!isRecord(lod)) throw new Error("lod is not an object");
+      if (!isNonArrayObject(lod)) throw new Error("lod is not an object");
       const minZoom = lod.min_zoom;
       const maxZoom = lod.max_zoom;
       const cellDeg = lod.cell_deg;
@@ -16911,7 +16920,7 @@
     });
   }
   function parseCells(value) {
-    if (!isRecord(value)) throw new Error("cells is not an object");
+    if (!isNonArrayObject(value)) throw new Error("cells is not an object");
     const cells = {};
     for (const [key, parts] of Object.entries(value)) {
       if (!Array.isArray(parts)) throw new Error(`cells ${key} is not an array`);
@@ -17978,6 +17987,11 @@
     };
   }
 
+  // src/shared/landUnitType.ts
+  function isLandUnitType(unitType) {
+    return unitType === "infantry" || unitType === "armor";
+  }
+
   // src/renderer/map/mapHelpers.ts
   function shouldIgnoreGlobalKeydown(e) {
     const target = e.target;
@@ -18040,7 +18054,7 @@
     const leafletRef2 = globalThis.L;
     if (!map || !leafletRef2) return;
     const humanGround = state.units.filter(
-      (u) => u.player === HUMAN_SEAT_ID && (u.unitType === "infantry" || u.unitType === "armor")
+      (u) => u.player === HUMAN_SEAT_ID && isLandUnitType(u.unitType)
     );
     const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === HUMAN_SEAT_ID);
     if (anchors.length === 0) return;
@@ -18114,6 +18128,18 @@
     }
     return null;
   }
+  function hitTestMapHexAtContainerPoint(x, y, gameState) {
+    const tb = rendererSharedState.tacticalBattleSnapshot;
+    if (tb) return hitTestTacticalHexAtContainerPixel(x, y, tb);
+    return hitTestHexAtContainerPixel(x, y, new Set(gameState.hexes.map((h) => h.h3Index)));
+  }
+  function hitTestMapHexAtClientPoint(clientX, clientY) {
+    if (!rendererSharedState.gameState) return null;
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const rect = map.getContainer().getBoundingClientRect();
+    return hitTestMapHexAtContainerPoint(clientX - rect.left, clientY - rect.top, rendererSharedState.gameState);
+  }
 
   // src/renderer/rendering/renderGeometry.ts
   function projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight) {
@@ -18129,6 +18155,23 @@
       if (p.y > maxY) maxY = p.y;
     }
     return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
+  }
+  function spanForProjectedHex(pts) {
+    if (pts.length === 0) return 1;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.max(1, Math.min(maxX - minX, maxY - minY));
+  }
+  function getMapZoomStrokeScale(zoom) {
+    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
   }
 
   // src/renderer/map/terrainView.ts
@@ -18215,20 +18258,6 @@
   }
   function shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight) {
     return projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight);
-  }
-  function spanForProjectedHex(pts) {
-    if (pts.length === 0) return 1;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    return Math.max(1, Math.min(maxX - minX, maxY - minY));
   }
 
   // src/renderer/rendering/unitDrawing.ts
@@ -21274,7 +21303,7 @@
     return cat !== "water" && cat !== "arctic";
   }
   function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
-    if (unitType !== "infantry" && unitType !== "armor") return false;
+    if (!isLandUnitType(unitType)) return false;
     if (terrain.isUrbanTactical?.(cellH3) || terrain.isRubbleTactical?.(cellH3)) return true;
     const raw = terrain.effectiveKindForTacticalHex(cellH3);
     const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
@@ -21401,7 +21430,7 @@
   function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
     void _toH3Index;
     if (unit.unitType === "air") return "air";
-    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
+    const embarked = isLandUnitType(unit.unitType) && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
     if (embarked) {
       return "naval";
     }
@@ -21461,7 +21490,7 @@
   }
   function tacticalMovementTerrainAnchorH3(u, subUnits) {
     const emb = u.embarkedOnSubUnitId;
-    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
+    if (emb && isLandUnitType(u.unitType)) {
       const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
       if (naval) return naval.h3Index;
     }
@@ -21473,7 +21502,7 @@
   }
   function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
     const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
+    if (isLandUnitType(unitType) && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
       return Math.min(baseline, 1);
     }
     return baseline;
@@ -21482,7 +21511,7 @@
     const anchor3 = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
     const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
     let budget;
-    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
+    if (isLandUnitType(subUnit.unitType)) {
       if (tacticalCellIsUrbanOrRubble(battle, anchor3)) {
         budget = Math.max(0, 1);
       } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor3)) {
@@ -22749,6 +22778,41 @@ ${bonuses}`;
     return { top, left };
   }
 
+  // src/renderer/chrome/anchoredPopoverLifecycle.ts
+  function attachAnchoredPopoverListeners(hooks) {
+    const onKey = (event) => {
+      if (event.key === "Escape") hooks.close();
+    };
+    const onPointer = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (hooks.containsTarget(target)) return;
+      hooks.close();
+    };
+    const onMove = () => hooks.reposition();
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }
+  function placePopoverBelowAnchor(popover3, anchor3) {
+    const rect = anchor3.getBoundingClientRect();
+    const box = popover3.getBoundingClientRect();
+    const placed = placeBelowAnchor(
+      { top: rect.top, bottom: rect.bottom, left: rect.left },
+      { width: box.width, height: box.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    popover3.style.top = `${placed.top}px`;
+    popover3.style.left = `${placed.left}px`;
+  }
+
   // src/shared/openRouterProviderSort.ts
   var PROVIDER_SORT_CHOICES = Object.freeze([
     "throughput",
@@ -23257,26 +23321,11 @@ ${bonuses}`;
     document.body.appendChild(root);
     popover = root;
     placeCommanderPopover();
-    const onKey = (event) => {
-      if (event.key === "Escape") closeCommanderPopover();
-    };
-    const onPointer = (event) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (popover?.contains(target) || anchor?.contains(target)) return;
-      closeCommanderPopover();
-    };
-    const onScroll = () => placeCommanderPopover();
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
-    detachListeners = () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
+    detachListeners = attachAnchoredPopoverListeners({
+      containsTarget: (target) => !!(popover?.contains(target) || anchor?.contains(target)),
+      close: closeCommanderPopover,
+      reposition: placeCommanderPopover
+    });
   }
   function closeCommanderPopover() {
     detachListeners?.();
@@ -23498,15 +23547,7 @@ ${bonuses}`;
   }
   function placeCommanderPopover() {
     if (!popover || !anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const box = popover.getBoundingClientRect();
-    const placed = placeBelowAnchor(
-      { top: rect.top, bottom: rect.bottom, left: rect.left },
-      { width: box.width, height: box.height },
-      { width: window.innerWidth, height: window.innerHeight }
-    );
-    popover.style.top = `${placed.top}px`;
-    popover.style.left = `${placed.left}px`;
+    placePopoverBelowAnchor(popover, anchor);
   }
 
   // src/renderer/gameplay/newGameOptionsPopover.ts
@@ -23535,26 +23576,11 @@ ${bonuses}`;
     anchor2 = button;
     root.hidden = false;
     placeNewGameOptionsPopover();
-    const onKey = (event) => {
-      if (event.key === "Escape") closeNewGameOptionsPopover();
-    };
-    const onPointer = (event) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (popover2?.contains(target) || anchor2?.contains(target)) return;
-      closeNewGameOptionsPopover();
-    };
-    const onMove = () => placeNewGameOptionsPopover();
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("scroll", onMove, true);
-    window.addEventListener("resize", onMove);
-    detachListeners2 = () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("scroll", onMove, true);
-      window.removeEventListener("resize", onMove);
-    };
+    detachListeners2 = attachAnchoredPopoverListeners({
+      containsTarget: (target) => !!(popover2?.contains(target) || anchor2?.contains(target)),
+      close: closeNewGameOptionsPopover,
+      reposition: placeNewGameOptionsPopover
+    });
   }
   function wireNewGameOptionsPopover() {
     const button = document.getElementById("new-game-options-btn");
@@ -23570,15 +23596,7 @@ ${bonuses}`;
   }
   function placeNewGameOptionsPopover() {
     if (!popover2 || popover2.hidden || !anchor2) return;
-    const rect = anchor2.getBoundingClientRect();
-    const box = popover2.getBoundingClientRect();
-    const placed = placeBelowAnchor(
-      { top: rect.top, bottom: rect.bottom, left: rect.left },
-      { width: box.width, height: box.height },
-      { width: window.innerWidth, height: window.innerHeight }
-    );
-    popover2.style.top = `${placed.top}px`;
-    popover2.style.left = `${placed.left}px`;
+    placePopoverBelowAnchor(popover2, anchor2);
   }
 
   // src/renderer/gameplay/newGameDialogCollapse.ts
@@ -24577,11 +24595,11 @@ ${bonuses}`;
   function isEmbarkedLandUnitBlockedForSelection(unitId) {
     if (rendererSharedState.tacticalBattleSnapshot) {
       const sub = rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.id === unitId);
-      if (!sub || sub.unitType !== "infantry" && sub.unitType !== "armor") return false;
+      if (!sub || !isLandUnitType(sub.unitType)) return false;
       return !!sub.embarkedOnSubUnitId;
     }
     const unit = rendererSharedState.gameState?.units.find((u) => u.id === unitId);
-    if (!unit || unit.unitType !== "infantry" && unit.unitType !== "armor") return false;
+    if (!unit || !isLandUnitType(unit.unitType)) return false;
     return !!(unit.embarkedOnCarrierUnitId && unit.embarkedOnCarrierUnitId.length > 0);
   }
   function shouldBlockEmbarkedLandUnitSelect(unitId) {
@@ -24943,10 +24961,10 @@ ${bonuses}`;
     return movementSymbolForUnit(unitType, cat, input, hasTransport);
   }
   function movementSymbolForUnit(unitType, cat, input, hasTransport) {
-    if (hasTransport && (unitType === "infantry" || unitType === "armor")) {
+    if (hasTransport && isLandUnitType(unitType)) {
       return "+";
     }
-    if (input.isRubble && (unitType === "infantry" || unitType === "armor")) {
+    if (input.isRubble && isLandUnitType(unitType)) {
       const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
       if (rubbleCost === Infinity) {
         if (shouldSuppressMovementBlock(unitType, cat)) return null;
@@ -24956,7 +24974,7 @@ ${bonuses}`;
       return "-";
     }
     if (input.isUrban) {
-      if (unitType === "infantry" || unitType === "armor") return "-";
+      if (isLandUnitType(unitType)) return "-";
       return null;
     }
     const cost = tacticalEnterHexMovementCost(unitType, cat);
@@ -24971,7 +24989,7 @@ ${bonuses}`;
     if (unitType === "naval") {
       return cat !== "water" && cat !== "coastal";
     }
-    if (unitType === "infantry" || unitType === "armor") {
+    if (isLandUnitType(unitType)) {
       return cat === "water";
     }
     return false;
@@ -26919,7 +26937,7 @@ ${bonuses}`;
     return { h, prev: rest.length > 0 ? rest : null };
   }
   function landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h) {
-    if (unitTypeForMovement !== "infantry" && unitTypeForMovement !== "armor") return false;
+    if (!isLandUnitType(unitTypeForMovement)) return false;
     return !tacticalLandUnitMayOccupyCellWithoutTransport(unitTypeForMovement, h, terrain);
   }
   function legacyLandTransportPlainsEnterAllowed(args) {
@@ -26938,7 +26956,7 @@ ${bonuses}`;
   }
   function blockedHexLandTransitAllowsRelaxation(args) {
     const { unitTypeForMovement, terrain, h, prev, nb, marchStartH3, marchGoalH3 } = args;
-    if (unitTypeForMovement !== "infantry" && unitTypeForMovement !== "armor") return true;
+    if (!isLandUnitType(unitTypeForMovement)) return true;
     if (prev == null) return true;
     if (h === marchStartH3 || h === marchGoalH3) return true;
     if (!landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h)) return true;
@@ -27178,7 +27196,7 @@ ${bonuses}`;
   function tacticalMarchStepCostWithoutBonus(ctx, step) {
     const { terrain, moveType } = ctx;
     if (moveType === "naval") return tacticalNavalEnterNeighborCost(step.fromH3, step.toH3, terrain);
-    if (moveType !== "infantry" && moveType !== "armor") return Infinity;
+    if (!isLandUnitType(moveType)) return Infinity;
     if (!blockedHexLandTransitAllowsRelaxation({
       unitTypeForMovement: moveType,
       terrain,
@@ -27226,7 +27244,7 @@ ${bonuses}`;
     const category = normalizeDbTerrainKindToTacticalCategory(birthKind, "land");
     if (category === "water") return null;
     if (input.unitType === "naval") return category === "wetlands" ? category : null;
-    if (input.unitType !== "infantry" && input.unitType !== "armor") return null;
+    if (!isLandUnitType(input.unitType)) return null;
     return Number.isFinite(tacticalEnterHexMovementCost(input.unitType, category)) ? null : category;
   }
   function terrainBonusMarchCategoryForMover(battle, mover, moveType) {
@@ -27413,7 +27431,7 @@ ${bonuses}`;
       if (Number.isFinite(cost) && openGround > cost && (battle.weather === "snow" || battle.weather === "rain")) {
         push(formatWeatherLabel(battle.weather));
       }
-      if (tacticalCellIsForestClass(battle, h) && (subUnit.unitType === "armor" || subUnit.unitType === "infantry")) {
+      if (tacticalCellIsForestClass(battle, h) && isLandUnitType(subUnit.unitType)) {
         push("Forest");
         continue;
       }
@@ -27430,7 +27448,7 @@ ${bonuses}`;
     };
   }
   function pickTacticalRangedSlowTerrainDisplayTitle(battle, unitType, attackerSubUnitId) {
-    if (unitType !== "infantry" && unitType !== "armor") return null;
+    if (!isLandUnitType(unitType)) return null;
     const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
     if (!u) return null;
     const anchor3 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
@@ -29178,9 +29196,6 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/terrainRendering.ts
-  function getMapZoomStrokeScale(zoom) {
-    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-  }
   function getHomeRegionOwnershipLineWidth(zoom) {
     const stroke = getActiveHexStrokeStyle();
     const zoomStrokeScale = getMapZoomStrokeScale(zoom);
@@ -33188,7 +33203,7 @@ ${bonuses}`;
   var LABEL_KINDS = ["continent", "country", "state", "ocean", "major_water", "minor_water"];
   function parseMapLabelPack(text) {
     const value = JSON.parse(text);
-    if (!isRecord2(value)) throw new Error("map_labels is not an object");
+    if (!isNonArrayObject(value)) throw new Error("map_labels is not an object");
     if (value.schema_version !== SCHEMA_VERSION2) throw new Error("schema_version is not 1.0.0");
     if (value.kind !== "map_labels") throw new Error("kind is not map_labels");
     if (!Array.isArray(value.features)) throw new Error("features is not an array");
@@ -33199,7 +33214,7 @@ ${bonuses}`;
     };
   }
   function parseFeature(value, index) {
-    if (!isRecord2(value)) throw new Error(`features ${index} is not an object`);
+    if (!isNonArrayObject(value)) throw new Error(`features ${index} is not an object`);
     const kind = value.kind;
     if (!isLabelKind(kind)) throw new Error(`features ${index} kind is not a place-name kind`);
     const anchors = parseAnchors(value.anchors, index);
@@ -33242,9 +33257,6 @@ ${bonuses}`;
   }
   function isLabelKind(value) {
     return typeof value === "string" && LABEL_KINDS.some((kind) => kind === value);
-  }
-  function isRecord2(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
   function requireString(value, label) {
     if (typeof value !== "string" || value === "") throw new Error(`${label} is not a string`);
@@ -34237,7 +34249,7 @@ ${bonuses}`;
   }
   function selectionHasMixedLandAndNaval(units) {
     const hasNaval = units.some((unit) => unit.unitType === "naval");
-    const hasLand = units.some((unit) => unit.unitType === "infantry" || unit.unitType === "armor");
+    const hasLand = units.some((unit) => isLandUnitType(unit.unitType));
     return hasNaval && hasLand;
   }
   var TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY = {
@@ -34357,7 +34369,7 @@ ${bonuses}`;
   function searchTacticalMarchBeats(args) {
     const { fromH3, toH3, tacticalSet, movementPointBudget: budget } = args;
     if (!(budget >= 1) || fromH3 === toH3 || !tacticalSet.has(fromH3) || !tacticalSet.has(toH3)) return null;
-    const isLand = args.unitTypeForMovement === "infantry" || args.unitTypeForMovement === "armor";
+    const isLand = isLandUnitType(args.unitTypeForMovement);
     const ctx = {
       terrain: args.terrain,
       moveType: args.unitTypeForMovement,
@@ -34447,7 +34459,7 @@ ${bonuses}`;
     if (unitTypeForMovement === "naval") {
       return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
     }
-    if ((unitTypeForMovement === "infantry" || unitTypeForMovement === "armor") && fromH3 != null) {
+    if (isLandUnitType(unitTypeForMovement) && fromH3 != null) {
       return landInfantryArmorEnterCost({
         toH3: h,
         unitTypeForMovement,
@@ -34464,7 +34476,7 @@ ${bonuses}`;
     const raw = terrain.effectiveKindForTacticalHex(h);
     const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
     const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
-    const urbanDest = !!(unitTypeForMovement === "infantry" || unitTypeForMovement === "armor") && !!terrain.isUrbanTactical?.(h);
+    const urbanDest = !!isLandUnitType(unitTypeForMovement) && !!terrain.isUrbanTactical?.(h);
     if (urbanDest) return 1;
     return tacticalWeatherOpenGroundCost({
       unitType: unitTypeForMovement,
@@ -34547,7 +34559,7 @@ ${bonuses}`;
         failureReason: "outside_footprint"
       };
     }
-    const isLandInfantryOrArmor = unitTypeForMovement === "infantry" || unitTypeForMovement === "armor";
+    const isLandInfantryOrArmor = isLandUnitType(unitTypeForMovement);
     if (isLandInfantryOrArmor) {
       const landResult = planInfantryArmorLandContinuityMarch({
         fromH3,
@@ -34714,7 +34726,7 @@ ${bonuses}`;
   }
   function tacticalMarchUnreachableReason(args) {
     if (args.hoveredH3Index === args.originH3Index) return "No valid tactical route";
-    if (args.moveType !== "infantry" && args.moveType !== "armor" && args.moveType !== "naval") {
+    if (!isLandUnitType(args.moveType) && args.moveType !== "naval") {
       return "No valid tactical route";
     }
     const blocks = tacticalDestinationBlocksMarch({
@@ -34771,7 +34783,7 @@ ${bonuses}`;
     if (origin === args.hoveredH3Index) {
       return { preview: { valid: true, showInvalidMarker: false, segments: [] }, pathH3Indexes: [origin] };
     }
-    if ((sub.unitType === "infantry" || sub.unitType === "armor") && sub.embarkedOnSubUnitId && args.hoveredH3Index !== origin) {
+    if (isLandUnitType(sub.unitType) && sub.embarkedOnSubUnitId && args.hoveredH3Index !== origin) {
       return invalid({
         valid: false,
         showInvalidMarker: true,
@@ -37153,7 +37165,7 @@ ${bonuses}`;
       const viewportWidth = Math.max(1, container.clientWidth);
       const viewportHeight = Math.max(1, container.clientHeight);
       const zoom = typeof map.getZoom === "function" ? map.getZoom() ?? 4 : 4;
-      const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+      const zoomStrokeScale = getMapZoomStrokeScale(zoom);
       const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
       const tactical = rendererSharedState.tacticalBattleSnapshot;
       const inspection = isMapInspectionModeHeld();
@@ -37247,7 +37259,7 @@ ${bonuses}`;
       const viewportWidth = Math.max(1, container.clientWidth);
       const viewportHeight = Math.max(1, container.clientHeight);
       const zoom = typeof map.getZoom === "function" ? map.getZoom() ?? 4 : 4;
-      const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+      const zoomStrokeScale = getMapZoomStrokeScale(zoom);
       const labelJobs = [];
       for (const parent of rendererSharedState.gameState.hexes) {
         if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
@@ -38348,7 +38360,7 @@ ${bonuses}`;
       if (trimmed.length === 0) unknown = true;
       else known.add(trimmed);
     }
-    const sorted = [...known].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+    const sorted = [...known].sort(compareCodeUnits);
     if (unknown) sorted.push(TURN_REPORT_UNKNOWN_HEX);
     return joinWithSerialComma(sorted);
   }
@@ -38664,7 +38676,7 @@ ${bonuses}`;
       group.codes.push(entry.hexCode);
       groups.set(key, group);
     }
-    return [...groups.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([, group]) => {
+    return [...groups.entries()].sort(([left], [right]) => compareCodeUnits(left, right)).map(([, group]) => {
       const noun = group.codes.length === 1 ? "Queue" : "Queues";
       const reasons = joinWithSerialComma(group.reasons.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]));
       return `${noun} paused at ${formatTurnReportHexList(group.codes)}: ${reasons}.`;
@@ -41706,18 +41718,7 @@ ${bonuses}`;
     if (shouldSuppressTerrainTooltip()) return;
     let hoverH3 = rendererSharedState.hoveredHexH3;
     if (!hoverH3) {
-      const map = getMainLeafletMap();
-      if (!map) return;
-      const rect = map.getContainer().getBoundingClientRect();
-      const x = rendererSharedState.lastPointerClientX - rect.left;
-      const y = rendererSharedState.lastPointerClientY - rect.top;
-      const tb = rendererSharedState.tacticalBattleSnapshot;
-      if (tb) {
-        hoverH3 = hitTestTacticalHexAtContainerPixel(x, y, tb);
-      } else {
-        const set = new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-        hoverH3 = hitTestHexAtContainerPixel(x, y, set);
-      }
+      hoverH3 = hitTestMapHexAtClientPoint(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
       if (!hoverH3) return;
       rendererSharedState.hoveredHexH3 = hoverH3;
     }
@@ -42766,9 +42767,7 @@ ${bonuses}`;
     if (want === "" && rendererSharedState.gameState) {
       const px = clientX - rect.left;
       const py = clientY - rect.top;
-      const hexSet = new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-      const tb = rendererSharedState.tacticalBattleSnapshot;
-      const hit = tb ? hitTestTacticalHexAtContainerPixel(px, py, tb) : hitTestHexAtContainerPixel(px, py, hexSet);
+      const hit = hitTestMapHexAtContainerPoint(px, py, rendererSharedState.gameState);
       if (hit) {
         const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds2(rendererSharedState.gameState, deps);
         const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
@@ -43966,20 +43965,6 @@ ${bonuses}`;
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
     let suppressIconRetargetOnNextClick = false;
-    function clientXYToHit(clientX, clientY) {
-      if (!rendererSharedState.gameState) return null;
-      const map = getMainLeafletMap();
-      if (!map) return null;
-      const rect = map.getContainer().getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
-      const tb = rendererSharedState.tacticalBattleSnapshot;
-      if (tb) {
-        return hitTestTacticalHexAtContainerPixel(x, y, tb);
-      }
-      const set = new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-      return hitTestHexAtContainerPixel(x, y, set);
-    }
     function pointerHitsDrawnUnitIcon(clientX, clientY, h3Index) {
       if (shouldHideStrategicMapUnitsForZoom()) return false;
       if (!rendererSharedState.gameState) return false;
@@ -44109,7 +44094,7 @@ ${bonuses}`;
         deps.hideTerrainTooltipVisual();
       }
       const mapHexSet = new Set((rendererSharedState.gameState?.hexes ?? []).map((h) => h.h3Index));
-      const hit = clientXYToHit(e.clientX, e.clientY);
+      const hit = hitTestMapHexAtClientPoint(e.clientX, e.clientY);
       const detailHit = deps.detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
       const prevHit = rendererSharedState.hoveredHexH3;
       const prevDetail = rendererSharedState.hoveredDetailHexH3;
@@ -44248,7 +44233,7 @@ ${bonuses}`;
         }
         return;
       }
-      const hit = clientXYToHit(e.clientX, e.clientY);
+      const hit = hitTestMapHexAtClientPoint(e.clientX, e.clientY);
       deps.clearSidebarError();
       if (rendererSharedState.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, rendererSharedState.tacticalBattleSnapshot)) {
         deps.showMapToast("That hex is outside the active tactical battle.", { isError: true });
@@ -44382,7 +44367,7 @@ ${bonuses}`;
     mainMapEl.addEventListener("dblclick", (e) => {
       if (newGameOverlayIsOpen()) return;
       void handleMainMapDoubleClick(e, {
-        clientXYToHit,
+        clientXYToHit: hitTestMapHexAtClientPoint,
         pointerHitsDrawnUnitIcon,
         getSelectedHumanUnitsAtMouseDown,
         commitGroupedMarchOrders,
@@ -44407,6 +44392,12 @@ ${bonuses}`;
       clearSelectionLikeRightClick(deps);
     });
     document.getElementById("selection-panel-close")?.addEventListener("click", () => clearSelectionLikeRightClick(deps));
+  }
+
+  // src/shared/airStrikeTarget.ts
+  var AIR_STRIKE_TARGET_TYPES = ["units", "urban", "airport", "seaport"];
+  function isAirStrikeTargetType(value) {
+    return AIR_STRIKE_TARGET_TYPES.includes(value);
   }
 
   // src/renderer/map/mapKeyboardPan.ts
@@ -44607,7 +44598,7 @@ ${bonuses}`;
       const target = event.target;
       if (!target) return;
       const value = target.value;
-      if (value === "units" || value === "urban" || value === "airport" || value === "seaport") {
+      if (isAirStrikeTargetType(value)) {
         rendererSharedState.airStrikeTargetType = value;
       }
     });

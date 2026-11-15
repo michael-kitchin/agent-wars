@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Immediate tactical sealift slot edits (embark/debark/reassign) mirroring strategic `executeSealiftSlotUpdate` on the active snapshot.
  */
@@ -33,7 +34,7 @@ type SealiftSlots = SealiftSlotPair;
 function clearHumanLandEmbarksAtHex(snap: TacticalBattleSnapshot, h3Index: string): TacticalBattleSnapshot {
   const subUnits = snap.subUnits.map((u) => {
     if (u.h3Index !== h3Index || u.player !== HUMAN_SEAT_ID) return u;
-    if (u.unitType !== 'infantry' && u.unitType !== 'armor') return u;
+    if (!isLandUnitType(u.unitType)) return u;
     return { ...u, embarkedOnSubUnitId: undefined };
   });
   return { ...snap, subUnits };

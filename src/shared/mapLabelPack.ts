@@ -8,6 +8,7 @@
  */
 
 import type { MapLabelKind } from './mapLabelRules';
+import { isNonArrayObject } from './objectGuards';
 
 const SCHEMA_VERSION = '1.0.0';
 const LABEL_KINDS: readonly MapLabelKind[] = ['continent', 'country', 'state', 'ocean', 'major_water', 'minor_water'];
@@ -229,7 +230,7 @@ export interface MapLabelPack {
  */
 export function parseMapLabelPack(text: string): MapLabelPack {
   const value: unknown = JSON.parse(text);
-  if (!isRecord(value)) throw new Error('map_labels is not an object');
+  if (!isNonArrayObject(value)) throw new Error('map_labels is not an object');
   if (value.schema_version !== SCHEMA_VERSION) throw new Error('schema_version is not 1.0.0');
   if (value.kind !== 'map_labels') throw new Error('kind is not map_labels');
   if (!Array.isArray(value.features)) throw new Error('features is not an array');
@@ -249,7 +250,7 @@ export function parseMapLabelPack(text: string): MapLabelPack {
  * Exceptions: Throws `Error` naming the feature index and the bad field.
  */
 function parseFeature(value: unknown, index: number): MapLabelFeature {
-  if (!isRecord(value)) throw new Error(`features ${index} is not an object`);
+  if (!isNonArrayObject(value)) throw new Error(`features ${index} is not an object`);
   const kind = value.kind;
   if (!isLabelKind(kind)) throw new Error(`features ${index} kind is not a place-name kind`);
   const anchors = parseAnchors(value.anchors, index);
@@ -319,18 +320,6 @@ function boundsOf(anchors: readonly MapLabelAnchor[]): MapLabelBounds {
  */
 function isLabelKind(value: unknown): value is MapLabelKind {
   return typeof value === 'string' && LABEL_KINDS.some((kind) => kind === value);
-}
-
-/**
- * Whether a value is a plain object.
- *
- * Purpose: JSON objects arrive as `unknown`.
- * When to use: Before reading fields.
- * Expected outcome: True for objects that are not arrays.
- * Exceptions: None.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**

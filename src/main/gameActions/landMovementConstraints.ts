@@ -1,3 +1,7 @@
+import { isLandUnitType } from '../../shared/landUnitType';
+
+export { isLandUnitType };
+
 /**
  * Documents the module-scope binding `EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON` (EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON).
 
@@ -47,18 +51,6 @@ terrainByH3: Map<string, string>;
    * Exceptions: None.
    */
 terrainKindByH3: Map<string, string>;
-}
-
-/**
- * Defines the `isLandUnitType` function shape (export function isLandUnitType(unitType: string): unitType is 'infantry' | 'armor').
-
- * Purpose: Supports maintainability by documenting why `isLandUnitType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function isLandUnitType(unitType: string): unitType is 'infantry' | 'armor' {
-  return unitType === 'infantry' || unitType === 'armor';
 }
 
 /**

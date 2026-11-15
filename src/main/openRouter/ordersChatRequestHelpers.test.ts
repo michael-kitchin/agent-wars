@@ -156,6 +156,49 @@ function telemetryRecorder(): ReturnType<typeof createConsultTelemetry> {
 }
 
 /**
+ * Posts a cache-capable request whose opening messages are a system rule and two user turns.
+ *
+ * Purpose: The cache and role retries need a body the mark and the join can both change.
+ * When to use: The three retry cases.
+ * Expected outcome: The helper's transport result. `attachResponseFormat` is false, so the request goes straight to the prepared send.
+ * Exceptions: None.
+ */
+function postCacheModelRequest(
+  post: OpenRouterChatTransport,
+  telemetry: OrdersChatRequestSettings['telemetry']
+): Promise<OpenRouterChatTransportResult> {
+  return postOrdersChatRequest({
+    post,
+    key: 'k',
+    modelId: 'anthropic/test-model',
+    baseBody: {
+      model: 'anthropic/test-model',
+      messages: [
+        { role: 'system', content: 'rules' },
+        { role: 'user', content: 'lead-in' },
+        { role: 'user', content: 'situation' },
+      ],
+      max_tokens: 100,
+    },
+    settings: { ...structuredSettings(), telemetry },
+    attachResponseFormat: false,
+    requestLabel: 'test',
+  });
+}
+
+/**
+ * Reads the posted messages.
+ *
+ * Purpose: The retry cases assert the mark and the join on the HTTP body.
+ * When to use: After `postCacheModelRequest`.
+ * Expected outcome: The body's `messages` array.
+ * Exceptions: None.
+ */
+function postedMessages(body: Record<string, unknown>): { readonly content?: unknown }[] {
+  return body.messages as { readonly content?: unknown }[];
+}
+
+/**
  * Verifies a capable model gets the schema, the healing plugin, and the reasoning override in one post.
  *
  * Purpose: Happy path for every optional parameter.
@@ -289,6 +332,78 @@ async function testFailedRetryDoesNotMarkModel(): Promise<void> {
 }
 
 /**
+ * Verifies a cache-mark rejection is retried once without the mark.
+ *
+ * Purpose: The first prepared retry drops the mark and records that fallback.
+ * When to use: After changing the prepared-send retries.
+ * Expected outcome: The second body has a string system message, and the fallback list is the cache drop.
+ * Exceptions: None.
+ */
+async function testCacheMarkRejectionRetriesWithoutMark(): Promise<void> {
+  resetOpenRouterModelCapabilitiesForTests();
+  const transport = fakeTransport([
+    { ok: false, status: 400, error: 'cache_control is not supported' },
+    OK_RESULT,
+  ]);
+  const telemetry = telemetryRecorder();
+  const result = await postCacheModelRequest(transport.post, telemetry);
+  assert.equal(result.ok, true);
+  assert.equal(transport.bodies.length, 2);
+  assert.ok(Array.isArray(postedMessages(transport.bodies[0])[0]?.content));
+  assert.equal(postedMessages(transport.bodies[1])[0]?.content, 'rules');
+  assert.deepEqual(telemetry.summary().fallbacks, ['cacheBreakpointDropped']);
+}
+
+/**
+ * Verifies a consecutive-user rejection joins the lead-in onto the situation.
+ *
+ * Purpose: The second prepared retry keeps the cache mark.
+ * When to use: After changing the prepared-send retries.
+ * Expected outcome: The second body has two messages, joined user text, and a marked system message.
+ * Exceptions: None.
+ */
+async function testRoleRejectionJoinsSituation(): Promise<void> {
+  resetOpenRouterModelCapabilitiesForTests();
+  const transport = fakeTransport([
+    { ok: false, status: 400, error: 'Roles must alternate' },
+    OK_RESULT,
+  ]);
+  const telemetry = telemetryRecorder();
+  const result = await postCacheModelRequest(transport.post, telemetry);
+  assert.equal(result.ok, true);
+  assert.equal(transport.bodies.length, 2);
+  assert.equal(postedMessages(transport.bodies[0]).length, 3);
+  assert.equal(postedMessages(transport.bodies[1]).length, 2);
+  assert.equal(postedMessages(transport.bodies[1])[1]?.content, 'lead-in\nsituation');
+  assert.ok(Array.isArray(postedMessages(transport.bodies[1])[0]?.content));
+  assert.deepEqual(telemetry.summary().fallbacks, ['situationMessagesJoined']);
+}
+
+/**
+ * Verifies a cache rejection after the join retries once more without the mark.
+ *
+ * Purpose: The cache rule runs again after the messages are joined.
+ * When to use: After changing the prepared-send retries.
+ * Expected outcome: The third body has two messages and an unmarked system message. Both fallbacks are recorded.
+ * Exceptions: None.
+ */
+async function testCacheRejectionAfterJoinRetriesAgain(): Promise<void> {
+  resetOpenRouterModelCapabilitiesForTests();
+  const transport = fakeTransport([
+    { ok: false, status: 400, error: 'Roles must alternate' },
+    { ok: false, status: 400, error: 'cache_control is not supported' },
+    OK_RESULT,
+  ]);
+  const telemetry = telemetryRecorder();
+  const result = await postCacheModelRequest(transport.post, telemetry);
+  assert.equal(result.ok, true);
+  assert.equal(transport.bodies.length, 3);
+  assert.equal(postedMessages(transport.bodies[2]).length, 2);
+  assert.equal(postedMessages(transport.bodies[2])[0]?.content, 'rules');
+  assert.deepEqual(telemetry.summary().fallbacks, ['situationMessagesJoined', 'cacheBreakpointDropped']);
+}
+
+/**
  * Runs request helper tests.
  *
  * Purpose: Node entrypoint for test discovery.
@@ -303,6 +418,9 @@ async function run(): Promise<void> {
   await testRequiredToolChoiceRetriesWithAuto();
   await testFailedToolChoiceRetryDoesNotMarkModel();
   await testFailedRetryDoesNotMarkModel();
+  await testCacheMarkRejectionRetriesWithoutMark();
+  await testRoleRejectionJoinsSituation();
+  await testCacheRejectionAfterJoinRetriesAgain();
   console.log('ordersChatRequestHelpers.test.ts passed');
 }
 

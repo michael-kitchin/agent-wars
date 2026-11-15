@@ -1,21 +1,19 @@
 # Example strategic response
 
-One OpenRouter completion from a single strategic consultation, laid out for reading. The assistant message is the order envelope. The same consultation's prompt is [example-strategic-prompt.md](example-strategic-prompt.md). The field contract is [strategic-prompt.md](strategic-prompt.md) section 3, and [assembly-contract.md](assembly-contract.md) section 5. The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one reply.
+One OpenRouter completion from opponent 1's latest strategic consultation, laid out for reading. The assistant message is the order envelope. The same consultation's prompt is [example-strategic-prompt.md](example-strategic-prompt.md). The field contract is [strategic-prompt.md](strategic-prompt.md) section 3, and [assembly-contract.md](assembly-contract.md) section 5. The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one reply.
 
-The capture stores the envelope as a string on `choices[0].message.content`. It is parsed and indented below. That body also carried an encrypted reasoning blob, which is left out. The reading copy adds one `operations` launch the captured body did not carry, so the field is visible.
-
-The host applies `memoryUpdates` through `executeMemory`. This sample's write has no `content`. `write` in `src/main/tools/memory.ts` rejects empty content, so that row is a drop reason, and the rest of the envelope still applies.
+The capture stores the envelope as a string on `choices[0].message.content`. It is parsed and indented below. That body also carried an encrypted reasoning blob, which is left out.
 
 ## Completion
 
-`google/gemini-3.5-flash-lite` from Google finished with `stop`. Token counts and cost:
+`google/gemini-3.5-flash-lite` from Google AI Studio finished with `stop`. Token counts and cost:
 
 ```json
 {
-  "prompt_tokens": 21405,
-  "completion_tokens": 850,
-  "total_tokens": 22255,
-  "cost": 0.0085465
+  "prompt_tokens": 13722,
+  "completion_tokens": 651,
+  "total_tokens": 14373,
+  "cost": 0.0037379933333333334
 }
 ```
 
@@ -23,139 +21,92 @@ The host applies `memoryUpdates` through `executeMemory`. This sample's write ha
 
 ```json
 {
-  "message": "Your southern line will shatter into dust before our advancing might.",
-  "strategy": "Execute coordinated air and naval strikes against enemy positions while advancing ground forces to crush enemy pockets.",
+  "message": "Your Eastern territory will crumble before our advance.",
+  "strategy": "Engage enemy forces at RE, establish air superiority, and set up production queues across all controlled urban hexes.",
   "orders": [
     {
       "action": "explicit_move",
-      "destination": "G5",
       "unitIds": [
         "a1-i1",
+        "a1-t1",
         "a1-t2"
-      ]
+      ],
+      "destination": "RE"
     },
     {
       "action": "explicit_move",
-      "destination": "GZ",
-      "unitIds": [
-        "a1-i2",
-        "a1-i3",
-        "a1-i17",
-        "a1-t3",
-        "a1-t4",
-        "a1-t5"
-      ]
+      "unitId": "a1-n1",
+      "destination": "RF"
     },
     {
-      "action": "explicit_move",
-      "destination": "J0",
-      "unitIds": [
-        "a1-i6",
-        "a1-n7",
-        "a1-n8",
-        "a1-n9",
-        "a1-n10"
-      ]
-    },
-    {
-      "action": "explicit_move",
-      "destination": "FH",
-      "unitId": "a1-i9"
-    },
-    {
-      "action": "explicit_move",
-      "destination": "LP",
-      "unitId": "a1-i12"
-    },
-    {
-      "action": "explicit_move",
-      "destination": "FO",
-      "unitIds": [
-        "a1-i13",
-        "a1-i14"
-      ]
-    },
-    {
-      "action": "explicit_move",
-      "destination": "KQ",
-      "unitIds": [
-        "a1-n4",
-        "a1-n5",
-        "a1-n6"
-      ]
-    },
-    {
-      "action": "ranged_attack",
-      "targetUnitId": "h1-i34",
-      "unitIds": [
-        "a1-n4",
-        "a1-n5",
-        "a1-n6",
-        "a1-n10"
-      ]
-    },
-    {
-      "action": "ranged_attack",
-      "targetUnitId": "h1-i32",
-      "unitIds": [
-        "a1-n7",
-        "a1-n8",
-        "a1-n9",
-        "a1-n10"
-      ]
+      "action": "assign_order",
+      "unitId": "a1-a1",
+      "order": {
+        "type": "defend",
+        "defendHex": "SK"
+      }
     }
   ],
   "airStrikes": [
     {
+      "unitId": "a1-a1",
       "targetType": "units",
-      "targetHexCode": "LP",
-      "unitIds": [
-        "a1-a4",
-        "a1-a5",
-        "a1-a6",
-        "a1-a7",
-        "a1-a8"
-      ]
+      "targetUnitId": "h1-a1"
     }
   ],
   "ferryOrders": [],
+  "airDrops": [],
+  "callbacks": [],
   "memoryUpdates": [
     {
       "action": "write",
       "key": "turn_objectives",
+      "content": "Assault enemy air unit at RE with ground and air forces; secure production queues.",
       "tier": "persistent"
     }
   ],
   "productionOrders": [
     {
       "action": "set_build_queue",
-      "hex": "EJ",
+      "hex": "SG",
       "unitType": "armor",
       "count": 1
     },
     {
       "action": "set_build_queue",
-      "hex": "FO",
+      "hex": "PZ",
       "unitType": "armor",
       "count": 1
     },
     {
       "action": "set_build_queue",
-      "hex": "ER",
-      "unitType": "armor",
+      "hex": "SK",
+      "unitType": "air",
       "count": 1
     },
     {
       "action": "set_build_queue",
-      "hex": "EJ",
-      "unitType": "armor",
+      "hex": "PU",
+      "unitType": "infantry",
       "count": 1
-    }
-  ],
-  "operations": [
+    },
     {
-      "action": "launch",
-      "option": "A"
+      "action": "set_build_queue",
+      "hex": "R7",
+      "unitType": "naval",
+      "count": 1
+    },
+    {
+      "action": "set_build_queue",
+      "hex": "QY",
+      "unitType": "infantry",
+      "count": 1
+    },
+    {
+      "action": "set_build_queue",
+      "hex": "Q6",
+      "unitType": "credits",
+      "count": 1
     }
   ]
 }

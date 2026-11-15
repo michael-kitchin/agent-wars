@@ -1,3 +1,4 @@
+import { isLandUnitType } from './landUnitType';
 /**
  * Tactical movement terrain categories and per-hex costs (combat rules §12.4).
  * Shared by renderer hover preview and main-process march validation.
@@ -185,7 +186,7 @@ export function tacticalLandUnitMayOccupyCellWithoutTransport(
   cellH3: string,
   terrain: TacticalTerrainKindResolver
 ): boolean {
-  if (unitType !== 'infantry' && unitType !== 'armor') return false;
+  if (!isLandUnitType(unitType)) return false;
   if (terrain.isUrbanTactical?.(cellH3) || terrain.isRubbleTactical?.(cellH3)) return true;
   const raw = terrain.effectiveKindForTacticalHex(cellH3);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
@@ -400,7 +401,7 @@ export function tacticalMovementUnitTypeForPathfinding(
   void _toH3Index;
   if (unit.unitType === 'air') return 'air';
   const embarked =
-    (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
+    (isLandUnitType(unit.unitType)) &&
     !!unit.embarkedOnSubUnitId &&
     unit.embarkedOnSubUnitId.length > 0;
   if (embarked) {

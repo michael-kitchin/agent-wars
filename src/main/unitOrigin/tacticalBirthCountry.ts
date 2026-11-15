@@ -6,6 +6,7 @@
  * Expected outcome: Deterministic results from the naming data alone.
  * Exceptions: None.
  */
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import type { BirthCountry } from '../../shared/unitOriginTypes';
 import { logDebug } from '../logger';
 import type {
@@ -15,19 +16,6 @@ import type {
   TerrainNamingRecordTactical,
   TerrainNamingStateRow,
 } from '../terrainNamingLoad';
-
-/**
- * Orders strings by UTF-16 code units.
- *
- * Purpose: Locale-independent tie-breaks so every machine picks the same country.
- * When to use: As the final tie-break in this module's sorts and in other country picks that must agree with them.
- * Expected outcome: Negative, zero, or positive like any comparator.
- * Exceptions: None.
- */
-export function compareOrdinal(a: string, b: string): number {
-  if (a < b) return -1;
-  return a > b ? 1 : 0;
-}
 
 /**
  * Orders scaleranks ascending with `null` last.
@@ -56,7 +44,7 @@ function pickDominantCity(cities: ReadonlyArray<TerrainNamingCityRow>): TerrainN
       (a, b) =>
         (b.population ?? 0) - (a.population ?? 0) ||
         compareScalerank(a.scalerank, b.scalerank) ||
-        compareOrdinal(a.name, b.name)
+        compareCodeUnits(a.name, b.name)
     )[0];
 }
 
@@ -80,7 +68,7 @@ function pickDominantCountry(
   const stateCount = (row: TerrainNamingCountryRow): number =>
     row.countryCode ? (stateCountByCode.get(row.countryCode) ?? 0) : 0;
   return [...countries].sort(
-    (a, b) => stateCount(b) - stateCount(a) || compareScalerank(a.scalerank, b.scalerank) || compareOrdinal(a.name, b.name)
+    (a, b) => stateCount(b) - stateCount(a) || compareScalerank(a.scalerank, b.scalerank) || compareCodeUnits(a.name, b.name)
   )[0];
 }
 
@@ -93,7 +81,7 @@ function pickDominantCountry(
  * Exceptions: None.
  */
 function pickDominantState(states: ReadonlyArray<TerrainNamingStateRow>): TerrainNamingStateRow | undefined {
-  return [...states].sort((a, b) => compareScalerank(a.scalerank, b.scalerank) || compareOrdinal(a.name, b.name))[0];
+  return [...states].sort((a, b) => compareScalerank(a.scalerank, b.scalerank) || compareCodeUnits(a.name, b.name))[0];
 }
 
 /**
@@ -155,7 +143,7 @@ export function buildCanonicalCountryNameByCode(strategicRecords: ReadonlyArray<
     let winningName: string | null = null;
     let winningCount = -1;
     for (const [name, count] of countsForCode) {
-      const nameWins = winningName === null || count > winningCount || (count === winningCount && compareOrdinal(name, winningName) < 0);
+      const nameWins = winningName === null || count > winningCount || (count === winningCount && compareCodeUnits(name, winningName) < 0);
       if (!nameWins) continue;
       winningName = name;
       winningCount = count;

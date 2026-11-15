@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { isAirStrikeTargetType } from '../../shared/airStrikeTarget';
 import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
@@ -452,7 +453,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     const target = event.target as HTMLSelectElement | null;
     if (!target) return;
     const value = target.value;
-    if (value === 'units' || value === 'urban' || value === 'airport' || value === 'seaport') {
+    if (isAirStrikeTargetType(value)) {
       S.airStrikeTargetType = value;
     }
   });

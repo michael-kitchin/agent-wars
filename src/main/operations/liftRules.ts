@@ -1,12 +1,16 @@
 /**
- * Pure limits for how many ground units a lift may take and how a ship is filled.
+ * Pure limits for a lift: how many ground units it may take, which cities come first, how a ship is filled, and how many enemy land units can reach a city first.
  *
- * Purpose: Later callers share one cap, one city order, and one load, without reading the database or the map.
- * When to use: When choosing how many units to commit, which cities to try first, and which units board one ship.
- * Expected outcome: Deterministic numbers and id lists. The input arrays are not changed.
+ * Purpose: Later callers share one cap, one city order, one load, and one reinforcer count, without reading the database or the map.
+ * When to use: When choosing how many units to commit, which cities to try first, which units board one ship, and whether a city is contested.
+ * Expected outcome: Deterministic numbers and id lists. The input arrays and the snapshot are not changed.
  * Exceptions: None. Callers pass already counted units.
  */
 
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
+import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import { isLandUnitType } from '../../shared/landUnitType';
+import type { GameStateSnapshot } from '../gameDb';
 import { logTrace } from '../logger';
 
 /**
@@ -87,20 +91,6 @@ export interface LiftCity {
 }
 
 /**
- * Orders two hex or unit ids by their raw string order.
- *
- * Purpose: `localeCompare` follows the machine locale and can reorder ids between runs.
- * When to use: City hexes and unit ids in this file.
- * Expected outcome: Negative when `left` is first, positive when `right` is first, zero when equal.
- * Exceptions: None.
- */
-function compareIds(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
-
-/**
  * How many more ground units may be committed.
  *
  * Purpose: The share is of the whole ground force. Units already committed are subtracted by the caller.
@@ -146,7 +136,7 @@ export function liftGroundCap(args: {
 export function rankLiftCities(cities: readonly LiftCity[]): LiftCity[] {
   const ranked = [...cities].sort((left, right) => {
     if (left.urbanHexCount !== right.urbanHexCount) return right.urbanHexCount - left.urbanHexCount;
-    return compareIds(left.h3Index, right.h3Index);
+    return compareCodeUnits(left.h3Index, right.h3Index);
   });
   logTrace('liftRules rankLiftCities', { cityCount: cities.length });
   return ranked;
@@ -164,11 +154,11 @@ export function fillShip(candidates: readonly { readonly id: string; readonly un
   const infantry = candidates
     .filter((unit) => unit.unitType === 'infantry')
     .map((unit) => unit.id)
-    .sort(compareIds);
+    .sort(compareCodeUnits);
   const armor = candidates
     .filter((unit) => unit.unitType === 'armor')
     .map((unit) => unit.id)
-    .sort(compareIds);
+    .sort(compareCodeUnits);
   const chosen = infantry.length >= 2 ? [infantry[0]!, infantry[1]!] : infantry.length === 1 ? [infantry[0]!] : armor.length > 0 ? [armor[0]!] : [];
   logTrace('liftRules fillShip', { candidateCount: candidates.length, chosen });
   return chosen;
@@ -192,4 +182,35 @@ export function shipsNeeded(unitTypes: readonly string[]): number {
   const needed = armorCount + Math.ceil(infantryCount / 2);
   logTrace('liftRules shipsNeeded', { typeCount: unitTypes.length, needed });
   return needed;
+}
+
+/**
+ * Counts enemy land units that can reach a lift city before the lift does.
+ *
+ * Purpose: An objective counts as contested when enemy land units can arrive before the lift does.
+ * When to use: Once per candidate city. Pass the lift's arrival time as `etaTurns`.
+ * Expected outcome: The number of other seats' infantry and armor inside `etaTurns` and outside `LIFT_OBJECTIVE_CLEAR_RADIUS`.
+ * Exceptions: None.
+ */
+export function countObjectiveReinforcers(args: {
+  readonly state: GameStateSnapshot;
+  readonly seatId: string;
+  readonly cityH3: string;
+  readonly etaTurns: number;
+}): number {
+  let count = 0;
+  for (const unit of args.state.units) {
+    if (unit.player === args.seatId) continue;
+    if (!isLandUnitType(unit.unitType)) continue;
+    if (!isWithinGridRangePure(args.cityH3, unit.h3Index, args.etaTurns)) continue;
+    if (isWithinGridRangePure(args.cityH3, unit.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS)) continue;
+    count += 1;
+  }
+  logTrace('liftRules countObjectiveReinforcers', {
+    seatId: args.seatId,
+    cityH3: args.cityH3,
+    etaTurns: args.etaTurns,
+    count,
+  });
+  return count;
 }

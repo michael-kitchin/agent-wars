@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Lands embarked infantry from an air unit, or loses both when the target shoots the air unit down.
  *
@@ -12,6 +13,7 @@ import type { AirStrikeOrder, FerryOrder } from '../../shared/ipc/ordersTypes';
 import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import { createCombatDiceLog, type CombatDiceLog } from '../combatDiceRecording';
 import { dbGetAll, dbGetOne, dbRun } from '../gameDb';
+import { readTurnNumberOrFirst } from '../gameDb/turnStateReads';
 import { logDebug } from '../logger';
 import { noOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
@@ -121,7 +123,7 @@ export function resolveAirDropPhase(
       'SELECT id, player, unit_type, h3_index FROM units WHERE h3_index = ? AND player != ?',
       [order.targetH3Index, carrier.player]
     ).filter((defender) => {
-      if (defender.unit_type !== 'infantry' && defender.unit_type !== 'armor') return true;
+      if (!isLandUnitType(defender.unit_type)) return true;
       return !landUnitSitsOutCombat(defender.id);
     });
     const shotDown = defenders.length > 0 && rollAntiAirCounterFire({
@@ -195,7 +197,7 @@ export function resolveAirDropPhase(
  */
 function dropWeatherPenalty(unitId: string, unitType: string, h3Index: string): WeatherAttackPenalty {
   const settings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
-  const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
+  const turnNumber = readTurnNumberOrFirst(dbGetOne);
   const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [unitId])?.birth_h3_index;
   return weatherPenaltyForRoll({
     unitType,

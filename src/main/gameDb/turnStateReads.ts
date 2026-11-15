@@ -23,3 +23,27 @@ export function readTurnStateRow(getOne: DbReadOps['getOne']): TurnStateRow | un
   logTrace('readTurnStateRow');
   return getOne<TurnStateRow>('SELECT phase, turn_number FROM turn_state WHERE id = 1');
 }
+
+/**
+ * Reads the stored turn number, or 1 when the row is missing.
+ *
+ * Purpose: Every turn-number reader uses 1 for a missing row. `readTurnStateRow` already traces, so this adds no log line.
+ * When to use: When the caller needs the turn and not the phase.
+ * Expected outcome: The stored `turn_number`, or 1 when no row exists.
+ * Exceptions: None. SQL errors propagate from `getOne`.
+ */
+export function readTurnNumberOrFirst(getOne: DbReadOps['getOne']): number {
+  return readTurnStateRow(getOne)?.turn_number ?? 1;
+}
+
+/**
+ * Reads the stored phase without choosing a default.
+ *
+ * Purpose: Callers choose their own default. `readTurnStateRow` already traces, so this adds no log line.
+ * When to use: Action guards that allow the action use `?? 'planning'`. Guards that reject it compare with `!==`.
+ * Expected outcome: The stored phase, or `undefined` when no row exists.
+ * Exceptions: None. SQL errors propagate from `getOne`.
+ */
+export function readTurnPhase(getOne: DbReadOps['getOne']): string | undefined {
+  return readTurnStateRow(getOne)?.phase;
+}

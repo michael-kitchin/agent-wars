@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * The Active Operations section of a strategic briefing.
  *
@@ -229,7 +230,7 @@ export function buildOperationOptionsSection(args: {
   logTrace('briefingSectionsOperations buildOperationOptionsSection', { seatId: args.seatId, candidateCount: listed.length });
   if (listed.length === 0) return '';
   const own = args.state.units.filter((unit) => unit.player === args.seatId);
-  const groundTotal = own.filter((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor').length;
+  const groundTotal = own.filter((unit) => isLandUnitType(unit.unitType)).length;
   const navalTotal = own.filter((unit) => unit.unitType === 'naval').length;
   const airTotal = own.filter((unit) => unit.unitType === 'air').length;
   const rows = listed.map((candidate, index) => optionRow({

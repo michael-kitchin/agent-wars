@@ -4,7 +4,6 @@
 
 import { dismissMapDetailPopoversIfHoverPlanningActive, hideStackCallout, isClientPointInsideMainMapLeafletContainer, refreshStackCalloutIfOpen, shouldSuppressTerrainTooltip } from './map/stackCallout';
 import { redraw, requestRedraw, resizeAndRedraw } from './rendering/gameScene';
-import { getMainLeafletMap } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
 import type { GameStateSnapshot, TacticalCityOverlayRow, TacticalRoadRailOverlayRow, TacticalTransportVectorOverlayRow } from '../shared/ipcTypes';
 import { formatUnitNameForViewer, viewerSeatIdForRoster } from '../shared/sideLabels';
@@ -14,7 +13,7 @@ import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../sh
 import { placeAnchoredPopupElement } from './chrome/placeAnchoredPopup';
 import { runButtonTooltipText } from './chrome/controlTooltipText';
 import { appendOpenRouterLog, showMapToast, updateOpenRouterCostLabel, updateOpenRouterToolCountLabels, updateReadyButtonState } from './openRouter/openRouterUiHelpers';
-import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './map/mapHelpers';
+import { hitTestMapHexAtClientPoint } from './map/mapHelpers';
 import { shouldRenderTacticalHexes } from './map/terrainView';
 
 import { clearSelection, isHexExploredByPlayer, reconcileSelectionToCurrentState, replaceSelection, toggleUnitSelection } from './core/selection';
@@ -423,18 +422,7 @@ export async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
   if (shouldSuppressTerrainTooltip()) return;
   let hoverH3 = S.hoveredHexH3;
   if (!hoverH3) {
-    const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
-    if (!map) return;
-    const rect = map.getContainer().getBoundingClientRect();
-    const x = S.lastPointerClientX - rect.left;
-    const y = S.lastPointerClientY - rect.top;
-    const tb = S.tacticalBattleSnapshot;
-    if (tb) {
-      hoverH3 = hitTestTacticalHexAtContainerPixel(x, y, tb);
-    } else {
-      const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
-      hoverH3 = hitTestHexAtContainerPixel(x, y, set);
-    }
+    hoverH3 = hitTestMapHexAtClientPoint(S.lastPointerClientX, S.lastPointerClientY);
     if (!hoverH3) return;
     S.hoveredHexH3 = hoverH3;
   }

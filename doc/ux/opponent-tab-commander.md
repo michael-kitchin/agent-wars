@@ -104,6 +104,7 @@ None.
 - `src/renderer/openRouter/modelDescriptionTooltip.ts`
 - `src/renderer/openRouter/aiPlanningState.ts`
 - `src/renderer/openRouter/commanderPopover.ts`
+- `src/renderer/chrome/anchoredPopoverLifecycle.ts` (`attachAnchoredPopoverListeners`, `placePopoverBelowAnchor`)
 - `src/renderer/openRouter/commanderPopoverChoices.ts`
 - `src/shared/openRouterProviderSort.ts`
 - `src/renderer/openRouter/commanderPopoverLabels.ts`

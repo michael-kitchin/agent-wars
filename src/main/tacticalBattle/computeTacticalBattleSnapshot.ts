@@ -50,6 +50,7 @@ import {
   placementPassableForSide,
   takeFortifiedCellForDefender,
 } from './tacticalFortificationPlacement';
+import { isLandUnitType } from '../../shared/landUnitType';
 
 /**
  * Maps one strategic parent type to the number of tactical sub-units placed for it.
@@ -271,7 +272,7 @@ function isTacticalCellPassableForUnitType(args: {
   if (unitType === 'air') {
     return isAirportCell;
   }
-  if (unitType === 'infantry' || unitType === 'armor') {
+  if (isLandUnitType(unitType)) {
     if (tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, placementTerrain)) {
       return true;
     }

@@ -18,7 +18,7 @@ It records two things:
 1. **Live engine behaviour is first authority.** If a fact, stat, range, cap, phase order, or legality rule can be read from a symbol under `src/`, that symbol wins. Game-rule pages in `doc/` answer to the same symbols.
 2. **Prompt-generating code is first authority for wording.** `buildConsultPromptParts` (`consultPromptParts.ts`) builds the system message and the situation message. `buildSystemPromptForTools` (`openRouterBuildSystemPrompt.ts`) joins them. Which rules sentences apply is `combatRuleGatesForPrompt` in `promptSpec/gameRuleSituationGates.ts`. Weather and terrain cover live in `promptSpec/gameRuleEnvironmentText.ts` and are re-exported from `gameRuleText.ts`. The production submit clause lives in `promptSpec/productionSubmitText.ts` and is re-exported from `promptText.ts`. Coaching lives in `promptSpec/coachingText.ts`, `coachingTextStrategic.ts`, and `coachingTextTactical.ts`, and is printed as `# Orders Guidance`. Turn-invariant briefing rules live in `promptSpec/briefingGuideText.ts`. Distance caveat lines live in `src/main/briefing/briefingDistanceCaveat.ts`. Rules subsections are `buildRulesSections` in `promptSpec/gameRuleText.ts`. Envelope shape lives in `promptSpec/envelopeContract.ts`; the structured-output schema built from the same gates lives in `promptSpec/envelopeJsonSchema.ts`. Opening, repair, and final orders user messages live in `promptSpec/consultationText.ts`. Briefing tables live in `briefingFormatter.ts`, `formatTacticalBriefing.ts`, and the section builders they call. The armed-units sentence is `armedUnitsBulletText` in `src/main/briefing/briefingArmedUnits.ts`. The orderless-mission count is `orderlessMissionCount` in `src/main/briefing/briefingOrderlessMission.ts`.
 3. **This package describes that emission.** A sentence here is evidence of what we tell the model only insofar as it matches those builders.
-4. [`example-strategic-prompt.md`](example-strategic-prompt.md) and [`example-tactical-prompt.md`](example-tactical-prompt.md) are reading copies of one consultation each. `debug-last-strategic-prompt-N.txt` and `debug-last-tactical-prompt-N.txt` are the system message only. `debug-last-user-prompt-N.txt` is the situation message, briefing plus opening. The fixed lead-in is not written to its own file. N is `aiIndexForSeatId` of the seat being consulted. Opponent 1 writes `debug-last-strategic-prompt-1.txt`. None of these is a contract. Tactical catalogs in [`source-inventory.md`](source-inventory.md) are derived from code.
+4. [`example-strategic-prompt.md`](example-strategic-prompt.md) is a reading copy of one strategic consultation. [`example-tactical-prompt.md`](example-tactical-prompt.md) is a reading copy of one tactical system message; its situation message is not in the logs. `debug-last-strategic-prompt-N.txt` and `debug-last-tactical-prompt-N.txt` are the system message only. `debug-last-user-prompt-N.txt` is the situation message, briefing plus opening. The fixed lead-in is not written to its own file. N is `aiIndexForSeatId` of the seat being consulted. Opponent 1 writes `debug-last-strategic-prompt-1.txt`. None of these is a contract. Tactical catalogs in [`source-inventory.md`](source-inventory.md) are derived from code.
 5. [`example-strategic-response.md`](example-strategic-response.md) is a reading copy of one strategic completion. `debug-last-openrouter-response-body-N.txt` is the runtime capture for opponent N. Neither is a contract.
 6. [`devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) is historical architecture and is not prompt authority.
 
@@ -31,14 +31,14 @@ It records two things:
 | See section order, headings, or the response shape | [`assembly-contract.md`](assembly-contract.md), then the mode file |
 | See a strategic section, column, or coaching bullet | [`strategic-prompt.md`](strategic-prompt.md) |
 | See a tactical section, column, or coaching bullet | [`tactical-prompt.md`](tactical-prompt.md) |
-| Read one full strategic or tactical emission | [`example-strategic-prompt.md`](example-strategic-prompt.md), [`example-tactical-prompt.md`](example-tactical-prompt.md) |
+| Read one full strategic emission, or one tactical system message | [`example-strategic-prompt.md`](example-strategic-prompt.md), [`example-tactical-prompt.md`](example-tactical-prompt.md) |
 | Read one captured strategic reply | [`example-strategic-response.md`](example-strategic-response.md) |
 | See anything after the system prompt | [`consultation-flow.md`](consultation-flow.md) |
 | See a configuration, roster, or scenario case | [`variants.md`](variants.md) |
 | Find where an existing prompt section is specified | [`crosswalk.md`](crosswalk.md) |
 | Know what the builders emit today, and remaining engine-versus-copy gaps | [`source-inventory.md`](source-inventory.md) |
 
-Reading order for a first pass: this file, then [`information-decision-model.md`](information-decision-model.md), [`assembly-contract.md`](assembly-contract.md), the mode file you need, [`consultation-flow.md`](consultation-flow.md), [`variants.md`](variants.md). After the mode file, the matching example shows one full emission. [`source-inventory.md`](source-inventory.md) and [`crosswalk.md`](crosswalk.md) are reference.
+Reading order for a first pass: this file, then [`information-decision-model.md`](information-decision-model.md), [`assembly-contract.md`](assembly-contract.md), the mode file you need, [`consultation-flow.md`](consultation-flow.md), [`variants.md`](variants.md). After the mode file, the strategic example shows one full emission and the tactical example shows one system message. [`source-inventory.md`](source-inventory.md) and [`crosswalk.md`](crosswalk.md) are reference.
 
 Two rules the builders actually enforce:
 
@@ -56,7 +56,7 @@ Two rules the builders actually enforce:
 - [`variants.md`](variants.md) — fog, tool groups, roster composition, scenarios, game size, consultation policy.
 - [`crosswalk.md`](crosswalk.md) — item to carrier, existing section to disposition, and closed or remaining defects.
 - [`example-strategic-prompt.md`](example-strategic-prompt.md) — one strategic consultation, formatted for reading.
-- [`example-tactical-prompt.md`](example-tactical-prompt.md) — one tactical consultation, formatted for reading.
+- [`example-tactical-prompt.md`](example-tactical-prompt.md) — one tactical system message, formatted for reading.
 - [`example-strategic-response.md`](example-strategic-response.md) — one strategic order envelope, taken from an OpenRouter completion and formatted for reading.
 
 ## 5. Related documents

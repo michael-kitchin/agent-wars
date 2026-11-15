@@ -16,6 +16,22 @@ test('terrainView imports projectedPolygonOverlapsViewport from renderGeometry',
   assert.ok(source.includes("from '../rendering/renderGeometry'"));
 });
 
+test('terrainView does not define spanForProjectedHex', () => {
+  const terrainView = readRendererSource('map', 'terrainView.ts');
+  const geometry = readRendererSource('rendering', 'renderGeometry.ts');
+  assert.ok(!terrainView.includes('export function spanForProjectedHex('));
+  assert.ok(geometry.includes('export function spanForProjectedHex('));
+});
+
+test('getMapZoomStrokeScale is defined in renderGeometry', () => {
+  const overlays = readRendererSource('rendering', 'tacticalCityOverlays.ts');
+  const terrain = readRendererSource('rendering', 'terrainRendering.ts');
+  const geometry = readRendererSource('rendering', 'renderGeometry.ts');
+  assert.ok(!overlays.includes('Math.max(0.88, Math.min(1.22'));
+  assert.ok(!terrain.includes('export function getMapZoomStrokeScale('));
+  assert.ok(geometry.includes('export function getMapZoomStrokeScale('));
+});
+
 test('buildQueuePopupFormatting delegates HTML helpers to shared module', () => {
   const source = readRendererSource('gameplay', 'buildQueuePopupFormatting.ts');
   assert.ok(source.includes('escapeHtmlText'));

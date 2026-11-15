@@ -37,6 +37,7 @@ import { NEUTRAL_OWNER_ID, isHumanSeatId, type SeatId } from '../../shared/seatI
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { getGameStateForPlayer, getSeatRoster } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
+import { readTurnNumberOrFirst, readTurnPhase } from '../gameDb/turnStateReads';
 import { hireOrderFee, readMercenaryFunds } from '../gameDb/mercenaryEconomyRead';
 import {
   addTreasuryCredits,
@@ -235,7 +236,7 @@ function evaluateHexForSeat(h3Index: string, seatId: SeatId): SeatHexHire | null
  * Exceptions: None.
  */
 function planningGate(seatId: SeatId): HireMutationResult | null {
-  const phase = gameDbOps.getOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+  const phase = readTurnPhase(gameDbOps.getOne) ?? 'planning';
   if (phase !== 'planning') return failure(HIRE_REASON_NOT_PLANNING);
   if (isHumanSeatId(seatId) && isTacticalBattleActive()) return failure(HIRE_REASON_TACTICAL);
   return null;
@@ -357,7 +358,7 @@ function insertReservedOrder(
  * Exceptions: None.
  */
 function currentTurn(): number {
-  return gameDbOps.getOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
+  return readTurnNumberOrFirst(gameDbOps.getOne);
 }
 
 /**

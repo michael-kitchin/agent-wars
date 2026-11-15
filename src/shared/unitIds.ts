@@ -11,6 +11,7 @@
  * their boundary.
  */
 
+import { compareCodeUnits } from './codeUnitOrder';
 import { type BuildUnitType } from './ipc/productionTypes';
 import { type SeatId, aiIndexForSeatId, aiSeatIdForIndex, isHumanSeatId, AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
 
@@ -283,5 +284,5 @@ export function unitIdOwnerFromId(unitId: string): SeatId | null {
 export function compareUnitIdsNaturally(a: string, b: string): number {
   const collated = NATURAL_UNIT_ID_COLLATOR.compare(a, b);
   if (collated !== 0) return collated;
-  return a < b ? -1 : a > b ? 1 : 0;
+  return compareCodeUnits(a, b);
 }

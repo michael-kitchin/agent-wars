@@ -1,3 +1,5 @@
+import { compareCodeUnits } from './codeUnitOrder';
+
 /**
  * Airport-to-airport ferry search.
  *
@@ -222,7 +224,7 @@ export function findAirportFerryRoute(request: AirportFerryRouteRequest): Airpor
     if (current === undefined) break;
     const neighbors = usable
       .filter((hex) => hex !== current && !seen.has(hex) && hopAllowed(request, current, hex))
-      .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+      .sort(compareCodeUnits);
     for (const next of neighbors) {
       seen.add(next);
       previous.set(next, current);

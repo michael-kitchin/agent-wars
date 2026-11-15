@@ -17,7 +17,7 @@ import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelType
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetOne, getSeatRoster } from '../gameDb';
 import { hasDbHandle } from '../gameDb/dbConnection';
-import { readTurnStateRow } from '../gameDb/turnStateReads';
+import { readTurnNumberOrFirst } from '../gameDb/turnStateReads';
 import { gameMapLoadError } from '../gameMap/loadGameMap';
 import { logDebug, logError, logTrace } from '../logger';
 import {
@@ -493,7 +493,7 @@ function readTurnNumber(): number | null {
   try {
     if (!hasDbHandle()) return 1;
     if (gameMapLoadError() !== null) return 1;
-    return readTurnStateRow(dbGetOne)?.turn_number ?? 1;
+    return readTurnNumberOrFirst(dbGetOne);
   } catch (err) {
     logError('commanderPool could not read the match turn', err);
     return null;

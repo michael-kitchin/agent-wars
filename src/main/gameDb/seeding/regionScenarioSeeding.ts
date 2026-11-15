@@ -19,6 +19,7 @@ import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './init
 import { insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitPlan } from './plannedUnits';
 import type { UnitOrigin } from '../../../shared/unitOriginTypes';
 import type { SpawnCandidate } from './spawnSelection';
+import { isLandUnitType } from '../../../shared/landUnitType';
 
 /**
  * Documents the `RegionScenarioSeedDeps` interface as a named contract surface (export interface RegionScenarioSeedDeps extends GuardedDbRunAndGetAllOps).
@@ -181,7 +182,7 @@ function applyScenarioSubstitutions(
   }
   if (!hasLandCandidates) {
     entries = entries.map((entry) =>
-      entry.unitType === 'infantry' || entry.unitType === 'armor'
+      isLandUnitType(entry.unitType)
         ? { key: `${entry.key}::sub-naval`, unitType: 'naval' }
         : entry
     );
@@ -241,7 +242,7 @@ function dropUnitsWithoutTerrainCandidates(
 ): ScenarioSpawnPlan {
   const droppedReasons: string[] = [];
   const filtered = entries.filter((entry) => {
-    if ((entry.unitType === 'infantry' || entry.unitType === 'armor') && !hasLandCandidates) {
+    if ((isLandUnitType(entry.unitType)) && !hasLandCandidates) {
       droppedReasons.push(`Dropped ${entry.key} (${entry.unitType}) because selected region has no passable land hexes`);
       return false;
     }

@@ -1,16 +1,14 @@
 # Example strategic prompt
 
-One strategic consultation, laid out for reading. The operational map is in a code block so its columns stay aligned. The closing JSON example is indented here; the builders print that object on one line.
+One strategic consultation, laid out for reading. The operational map is in a code block so its columns stay aligned. The closing JSON example is indented here; the builders print that object on one line. Placeholders written in angle brackets are wrapped so this page shows them.
 
-This reading copy was edited to match the builders rather than captured. The system message comes first, then the fixed lead-in, then the situation message. The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this copy disagrees with them. The reply is [example-strategic-response.md](example-strategic-response.md).
-
-The operational map below is one connected area. The builders print one fenced block per area. When the window is smaller than the loaded set they add `Shown: N of M cells in K areas around your units, visible enemies, your cities, and the listed targets.` and, when `get_map` is enabled, `Call get_map(center, radius) for cells outside this window.`
+This copy is opponent 1's latest strategic consultation: Southern Africa against Eastern Africa, turn 1, May, Year 1. The system message is `debug-last-strategic-prompt-1.txt` and the situation message is `debug-last-user-prompt-1.txt`. The fixed lead-in sits between them. The builders send that lead-in as its own user message and do not write it to a log. The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this copy disagrees with them. The reply is [example-strategic-response.md](example-strategic-response.md).
 
 ---
 
 # Your Command
 
-You command Northern America in a WEGO (simultaneous movement) hex wargame with 2 sides. Every other side is your enemy, and so are neutral garrisons.
+You command Southern Africa in a WEGO (simultaneous movement) hex wargame with 2 sides. Every other side is your enemy, and so are neutral garrisons.
 
 Your goal is to be the last side standing. A side is knocked out when one other side controls its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side's units become neutral garrisons and its land becomes neutral.
 
@@ -19,22 +17,20 @@ If every side would be knocked out on the same turn, none is knocked out and the
 # Scenario Objective (Required)
 
 - Scenario: region_vs_region
-- Your home region: Northern America
-- Enemy home regions: South America
-- Win at end of turn by either:
-    (1) Controlling all hexes intersecting the enemy home region, OR
-    (2) Eliminating all urban production (tactical urban hexes) in the enemy home region.
+- Your home region: Southern Africa
+- Enemy home regions: Eastern Africa
+- Win at end of turn by either: (1) Controlling all hexes intersecting the enemy home region, OR (2) Eliminating all urban production (tactical urban hexes) in the enemy home region.
 - Every home-region outline is always visible on the map.
-
-- Your home region hexes are: AC, AH, AO, AP, AV, AE, AZ, BL, AQ, BA, AW, AJ, BH, BU, BT, B6, AT, A5, A2, BQ, CM, B0, CO, A3, BV, A7, BY, B8, CJ, CU, A8, BI, BO, CC, DQ, B3, CR, B9, DC, CN, DY, ER, EE, E3, CW, DN, DB, EG, DW, DD, FS, E0, EH, FE, EJ, FH, DK, DJ, GZ, FZ, GL, FO, G2, G9, GQ, F9, GF, FQ, HL
-- South America home region hexes are: IW, K5, KG, J9, J0, K2, KQ, LP, JN, I8, LA, K7, MT, L4, L7, OL, NQ, NS, NL, MM, MQ, LY, O5, N9, OG, N1, OZ, MB, NC, M0, P2, PE, QR, PW, P7, PB, RZ, RB, QW, RA, RU, RV, SL, PT, QJ, QI, S8, SF, TY, SX, T5, TN, S2, VC, UO, UT, VH
+- Your home region hexes are: QY, PU, PL, R7, Q6, SK, SG, T8
+- Eastern Africa home region hexes are: JC, JG, HZ, JP, KI, KK, LS, I5, LZ, LU, KR, KO, NE, ND, M9, OQ, OK, NA, M7, OS, P1, PV, RD, OT, OP, P5, PM
+- These hexes are in more than one home region: P4, PZ, RF, RE
 
 ## Sides
 
 | Side | Unit id prefix | Home region | Status |
 | --- | --- | --- | --- |
-| Northern America (you) | a1 | Northern America | Active |
-| South America | h1 | South America | Active |
+| Southern Africa (you) | a1 | Southern Africa | Active |
+| Eastern Africa | h1 | Eastern Africa | Active |
 
 # Coordinates
 
@@ -48,7 +44,7 @@ Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy u
 
 Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17. infantry: 3 attack / 7 defense, melee only; armor: 10 attack / 7 defense, range 1; naval: 7 attack / 7 defense, range 2; air: 10 attack / 3 defense, range 3.
 
-Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
+Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
 
 ## Bonuses
 
@@ -102,12 +98,6 @@ airDrops lands that infantry on a land hex within 3 of the current airport, incl
 
 When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.
 
-## Missiles
-
-A missile is built in a city with at least 21 urban cells. It never moves and is spent when it launches. It reaches any explored hex within 12 hexes of the hex where it was built.
-
-A launch always hits: each city, airport, and seaport cell in the target hex is destroyed when its own d20 roll is at or below the air unit's attack of 10, and every air unit based there is destroyed when an airport cell is destroyed. Other units in the hex are unharmed.
-
 ## Fortifications
 
 Fortifications: a hex's controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller's units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains.
@@ -142,30 +132,17 @@ Hired units arrive at the end of the turn and take orders the next turn. A raise
 
 After that each mercenary costs its upkeep every turn: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.
 
+## Rule Lookup
+
+Call rules(topic) for a rule that is not printed above. Topics: weather, movement, line-of-sight, casualties, stacking, naval, air, fortifications, missiles, mercenaries, resolution, combat-stats.
+
 # Strategic Context
 
-- Your goals are, in priority order:
-    (1) Take and hold enemy cities. Taking cities is how you knock sides out.
-    (2) Bring more force to each fight than the enemy can. Mass your ground units before an attack, and use ships, aircraft, and mercenaries to put units where the enemy is weak.
-    (3) Stop the enemy doing the same. Destroy the city cells, airports, and seaports that build and move its units.
-    (4) Keep enough units at home to stop a raid on your cities.
-    (5) Keep every city building, and keep credits coming in for mercenaries.
-    (6) Scout with a few units, not your main force.
-- Your strategy is:
-    (1) Attack where you outnumber the defenders, and avoid fights where you do not.
-    (2) Strike gaps the enemy cannot reinforce quickly.
-    (3) Keep the initiative: move toward your objective every turn.
-- Your tools are:
-    (1) Missiles destroy city cells, airports, and seaports up to 12 hexes away, beyond the reach of aircraft. Build one in a city that reaches a large enemy city, then launch it.
-    (2) Naval units shell any hex within 2 of them, and carry ground units to a coast the enemy has left open.
-    (3) Air units strike within 3 hexes of their airport, carry one infantry unit between airports, and drop it within 3 hexes.
-    (4) Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside the campaign target, or behind the enemy to split its force.
-- Your doctrine is balanced:
-    (1) Advance on the campaign target while your home cities are safe.
-    (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not.
-    (3) Strike the cities, airports, and seaports your ground units cannot reach. Production the enemy loses is force it cannot bring.
-- Your message is:
-    Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
+- Your goals are, in priority order: (1) Take and hold enemy cities. Taking cities is how you knock sides out. (2) Bring more force to each fight than the enemy can. Mass your ground units before an attack, and use ships, aircraft, and mercenaries to put units where the enemy is weak. (3) Stop the enemy doing the same. Destroy the city cells, airports, and seaports that build and move its units. (4) Keep enough units at home to stop a raid on your cities. (5) Keep every city building, and keep credits coming in for mercenaries. (6) Scout with a few units, not your main force.
+- Your strategy is: (1) Attack where you outnumber the defenders, and avoid fights where you do not. (2) Strike gaps the enemy cannot reinforce quickly. (3) Keep the initiative: move toward your objective every turn.
+- Your tools are: (1) Naval units shell any hex within 2 of them, and carry ground units to a coast the enemy has left open. (2) Air units strike within 3 hexes of their airport, carry one infantry unit between airports, and drop it within 3 hexes. (3) Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside the campaign target, or behind the enemy to split its force.
+- Your doctrine is balanced: (1) Advance on the campaign target while your home cities are safe. (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not. (3) Strike the cities, airports, and seaports your ground units cannot reach. Production the enemy loses is force it cannot bring.
+- Your message is: Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
 
 ## Campaign
 
@@ -195,11 +172,11 @@ Your land campaign is listed there too, as "campaign". It is described under Cam
 
 Operation Options lists up to 5 operations you could launch, with what each would gain, what it would tie up, and what stands in its way. A sea or air row is listed only while you have room for another operation by that method.
 
-Launch one with "operations": [{"action":"launch","option":"<letter>"}]. You may also name a city that is not listed, with "objective" and "method" in place of "option".
+Launch one with "operations": [{"action":"launch","option":"`<letter>`"}]. You may also name a city that is not listed, with "objective" and "method" in place of "option".
 
 On the turn after a sea or air row was offered, the engine launches the first one it counts as clear: an undefended row, or a lightly held one when your posture allows it. It never launches a land row.
 
-Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
+Call an operation off with {"action":"cancel","id":"`<operation id>`"}: one that is still mustering frees its units, and one at sea turns back.
 
 Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take out a unit that is not aboard, or a ship, give it any standing order of your own; it keeps that order and the operation goes on without it. A unit aboard one of an operation's ships or air units takes no order of its own: the engine refuses it and says so next turn. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.
 
@@ -267,12 +244,13 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 1. plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination. For naval units, you may pass a land unit's briefing hex code as destination; the route will be to the nearest water/coastal hex to that position so the naval can get in range. For an air unit, the result is the airport chain to that airport and its hop count; copy its orderToHexCode into ferryOrders.destination, not explicit_move.
 2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.
 3. get_map(center, radius?) - The map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.
-4. memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.
-5. query_orders(unitId?, all?) - Check standing order statuses.
-6. query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.
-7. set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.
-8. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
-9. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.
+4. rules(topic) - Full rules for one topic. Topics: weather, movement, line-of-sight, casualties, stacking, naval, air, fortifications, missiles, mercenaries, resolution, combat-stats.
+5. memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.
+6. query_orders(unitId?, all?) - Check standing order statuses.
+7. query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.
+8. set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.
+9. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
+10. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.
 
 ## How to Use These Tools Effectively
 
@@ -285,7 +263,8 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 ## Winning
 
-- Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter. If the turn limit arrives first, the most city hexes wins.
+- Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter.
+- When more than one home region lists the same cells, the listed shared cells count toward each of those sides, so holding them serves defence and attack at once.
 
 ## Using the Briefing
 
@@ -353,27 +332,6 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 # Response Format
 
-Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments).
-
-```text
-{
-  "message": "<one-line taunt or threat>",
-  "strategy": "<one-line>",
-  "orders": [ ... ],
-  "airStrikes": [ ... ],
-  "ferryOrders": [ ... ],
-  "airDrops": [ ... ],
-  "callbacks": [...],
-  "memoryUpdates": [...],
-  "productionOrders": [...],
-  "campaignTarget": "<optional hex code>",
-  "operations": [...],
-  "posture": "<optional posture>"
-}
-```
-
-Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.
-
 The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).
 
 The "strategy" field is a one-line summary of your plan for this turn.
@@ -394,8 +352,6 @@ assign_order place fields are operational-map briefing hex codes, not plan_route
 
 Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "`<hex code>`" }, airDrops[] entries use { "unitId" or "unitIds", "destination": "`<hex code>`" }.
 
-The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
-
 An entry missing a required field is dropped without comment. More than one ranged or air action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. A march or explicit_move to the unit's current cell is ignored as already arrived; the unit holds. Air units cannot be given march, patrol, or pursue orders. Infantry cannot be given a strategic ranged_attack.
 
 For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach, advance, or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there.
@@ -406,7 +362,7 @@ Legal events and their parameters: turns (n: fires after n turns have passed sin
 
 Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.
 
-Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To launch against a city that is not listed, add {"action":"launch","objective":"<hex code>","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".
+Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"`<letter>`"}. To launch against a city that is not listed, add {"action":"launch","objective":"`<hex code>`","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"`<operation id>`"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".
 
 Optional "posture": one of overland, maritime, strangle, blitz. Omit it to keep your posture. A posture holds for 6 turns before it can change; the Posture section of the briefing says when.
 
@@ -416,7 +372,7 @@ Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; 
 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. When every unit type a hex can build is at cap, queue credits and spend them on mercenaries. Queue fortification only in a city whose Exposed column says yes, and replace a fortification queue in a city that is not exposed with credits.
 
-A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.
+A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"`<code>`","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"`<id>`"} rows to productionOrders.
 
 ## Example Response
 
@@ -495,176 +451,81 @@ The current situation is in the next message.
 
 # Current Situation
 
-Current turn: 40, date: April, Year 4, phase: planning.
+Current turn: 1, date: May, Year 1, phase: planning.
 
 # Commander's Briefing
 
-Turn 40: you command 31 unit(s); currently observed enemy units: 7. 13 of your units are in or near direct combat range. 1 unit(s) face a critical threat and require immediate attention. Review the unit status table, attention flags, and operational map below, then issue movement, ranged attacks, and air strikes as permitted this turn.
+Turn 1: you command 5 unit(s); currently observed enemy units: 3. 4 of your units are in or near direct combat range. 5 unit(s) have no standing order and may need orders this turn. 5 unit(s) face a critical threat and require immediate attention. Review the unit status table, attention flags, and operational map below, then issue movement, ranged attacks, and air strikes as permitted this turn.
 
 ## Unit Status and Threats
 
 | Unit ID | Type | Hex | Bonus | Weather | Nearest enemy + distance | Threat severity | Action needed |
 |---------|------|-----|-------|---------|---------------------------|-----------------|---------------|
-| a1-a1 | air | G9 | +2 origin | Mild | — | — | no (quiet) |
-| a1-a4 | air | HV | tech +2 attack | Mild (Snow) | h1-i34 @ 7 (current, seen t40) | low | yes |
-| a1-a5 | air | HV | tech +2 attack | Mild | h1-i34 @ 7 (current, seen t40) | low | yes |
-| a1-a6 | air | HV | tech +2 attack | Mild (Heat) | h1-i34 @ 7 (current, seen t40) | low | yes |
-| a1-a7 | air | HV | tech +2 attack | Mild (Heat) | h1-i34 @ 7 (current, seen t40) | low | yes |
-| a1-a8 | air | IE | tech +2 attack | Mild (Heat) | h1-i32 @ 2 (current, seen t40) | moderate | yes |
-| a1-i1 | infantry | FQ | +2 origin | Mild (Snow) | — | — | no (quiet) |
-| a1-i2 | infantry | FZ | +2 origin; tech +2 attack | Rain (Heat) | h1-i34 @ 5 (current, seen t40) | low | no (quiet) |
-| a1-i3 | infantry | FZ | +2 origin; tech +2 attack | Rain (Heat) | h1-i34 @ 5 (current, seen t40) | low | no (quiet) |
-| a1-i6 | infantry | I8 | tech +2 attack | Mild (Heat) | h1-i32 @ 1 (current, seen t40) | moderate | yes |
-| a1-i9 | infantry | EH | +2 origin; tech +2 attack | Mild | — | — | no (quiet) |
-| a1-i12 | infantry | J0 | tech +2 attack | Rain (Heat) | h1-i32 @ 0 (current, seen t40) | critical | yes |
-| a1-i13 | infantry | ER | +2 origin; tech +2 attack | Mild (Heat) | — | — | no (quiet) |
-| a1-i14 | infantry | ER | +2 origin; tech +2 attack | Mild (Heat) | — | — | no (quiet) |
-| a1-i15 | infantry | GL | tech +2 attack | Mild | h1-i34 @ 7 (current, seen t40) | low | no (quiet) |
-| a1-i16 | infantry | GL | tech +2 attack | Mild | h1-i34 @ 7 (current, seen t40) | low | no (quiet) |
-| a1-i17 | infantry | FZ | +2 origin; tech +2 attack | Rain (Heat) | h1-i34 @ 5 (current, seen t40) | low | no (quiet) |
-| a1-i18 | infantry | GL | tech +2 attack | Mild (Heat) | h1-i34 @ 7 (current, seen t40) | low | no (quiet) |
-| a1-n4 | naval | IV | tech +2 attack | Mild (Heat) | h1-i34 @ 2 (current, seen t40) | moderate | yes |
-| a1-n5 | naval | IV | tech +2 attack | Mild (Heat) | h1-i34 @ 2 (current, seen t40) | moderate | yes |
-| a1-n6 | naval | IV | tech +2 attack | Mild (Heat) | h1-i34 @ 2 (current, seen t40) | moderate | yes |
-| a1-n7 | naval | HI | tech +2 attack | Mild | h1-i32 @ 2 (current, seen t40) | low | yes |
-| a1-n8 | naval | HI | tech +2 attack | Mild | h1-i32 @ 2 (current, seen t40) | low | yes |
-| a1-n9 | naval | HI | tech +2 attack | Mild | h1-i32 @ 2 (current, seen t40) | low | yes |
-| a1-n10 | naval | IE | tech +2 attack | Mild | h1-i32 @ 2 (current, seen t40) | moderate | yes |
-| a1-n11 | naval | ER | +2 origin; tech +2 attack | Mild (Heat) | — | — | no (quiet) |
-| a1-t2 | armor | FQ | — | Mild (Snow) | — | — | no (quiet) |
-| a1-t3 | armor | FZ | +2 origin; tech +2 attack | Rain | h1-i34 @ 5 (current, seen t40) | low | no (quiet) |
-| a1-t4 | armor | FZ | +2 origin; tech +2 attack | Rain | h1-i34 @ 5 (current, seen t40) | low | no (quiet) |
-| a1-t5 | armor | FZ | +2 origin; tech +2 attack | Rain (Heat) | h1-i34 @ 5 (current, seen t40) | low | no (quiet) |
-| a1-t9 | armor | HV | tech +2 attack | Mild (Heat) | h1-i34 @ 7 (current, seen t40) | low | no (quiet) |
+| a1-a1 | air | SK | +2 origin | Mild | h1-a1 @ 1 (current, seen t1) | critical | yes |
+| a1-i1 | infantry | PZ | +2 origin | Mild (Heat) | h1-a1 @ 1 (current, seen t1) | critical | yes |
+| a1-n1 | naval | SG | +2 origin | Mild | h1-a1 @ 1 (current, seen t1) | critical | yes |
+| a1-t1 | armor | PZ | +2 origin | Mild (Heat) | h1-a1 @ 1 (current, seen t1) | critical | yes |
+| a1-t2 | armor | Q6 | — | Mild (Heat) | h1-a1 @ 1 (current, seen t1) | critical | yes |
 
 ## Attention Flags
 
-- a1-i12 faces a critical threat (nearest enemy: h1-i32, distance 0).
-- a1-i6 faces a moderate threat (nearest enemy: h1-i32, distance 1).
-- 12 unit(s) have a legal attack this turn — copy a Best Options ranged or air-strike row for each and do not invent a target: a1-a4, a1-a5, a1-a6, a1-a7, a1-a8, a1-n4, a1-n5, a1-n6, a1-n7, a1-n8, a1-n9, a1-n10.
-- Production: 10 controlled hexes can build but are not building — empty queue, can build armor, missile, credits: EJ, FO, ER; blocked at cap, can build armor, missile, credits: FZ, DN, EH, E0, DJ, E3, GF. Add a set_build_queue row to productionOrders for each.
-- Mercenaries: your treasury of 40 credits can raise 2 infantry at E3 for 6, keeping 3 turns of their upkeep. Add a raise_mercenaries row with "count": 2 to productionOrders.
-- Campaign: 2 units need a new standing order. Copy each Campaign Orders row into an assign_order entry.
+- a1-a1 has no standing order and faces a critical threat (nearest enemy: h1-a1, distance 1).
+- a1-i1 faces a critical threat (nearest enemy: h1-a1, distance 1).
+- a1-n1 has no standing order and faces a critical threat (nearest enemy: h1-a1, distance 1).
+- 4 unit(s) have a legal attack this turn — copy a Best Options ranged or air-strike row for each and do not invent a target: a1-a1, a1-n1, a1-t1, a1-t2.
+- 5 unit(s) have no standing order and can take a mission this turn. Assign the Suggested Destination when that cell names one, and copy a Best Options move or strike when the table lists that unit.
+- Production: 7 controlled hexes can build but are not building — empty queue, can build infantry, armor, air, credits, fortification: PZ, SK, SG; empty queue, can build infantry, armor, credits, fortification: QY, PU, R7; empty queue, can build infantry, credits, fortification: Q6. Add a set_build_queue row to productionOrders for each.
 
 ## Operational Map
 
+Shown: 44 of 842 cells in 1 area around your units, visible enemies, your cities, and the listed targets. Call get_map(center, radius) for cells outside this window.
+
 ```text
-AB AA AC                                                                                                      
-.? .? .-                                                                                                      
- AD AF AH AE AG                                                                                                
- .? .? .- x- .?                                                                                                
-AK AI AN AM AJ AL                                                                                             
-.? .? .? .? x- .?                                                                                             
- AU AX AT AP AV AO AQ AW AY AR AS                                                                              
- x? x? .A .- x- x- x- .- .? .? .?                                                                              
-A0 A6 A1 A2 A5 A8 A7 A3 BA AZ A9 A4                                                                           
-x? x? .? .U xA x- x- .- x- x- x? x?                                                                           
- BB BK BG BD BJ BM BH BI BL BF BC BE                                                                           
- x? x? x? x? x? .? xB xA .- .? .? .?                                                                           
-B2 B1 B5 BZ BN BT B6 BU BO BY B0 BQ BV B3 B4 BX BW BR BP BS                                                   
-x? x? x? x? x? .U .- .B xB xU .A .- .- .- .? .? .? x? x? x?                                                   
- CG B7 CA CI CB CC CN CK B9 CJ B8 CM CE CL CF CD CH                                                            
- x? x? x? .? .? .U .- .? .- xB xA x- .- .? x? x? x?                                                            
-C2 C3 CV CS CX CT CZ C1 C4 CU CW CO CR C0 CY CQ CP                                                            
-x? x? x? x? x? x? .? .? .? xA xA x- .- .- .? .? x?                                                            
- DL DR DO C8 DG C7 C6 DC DM DE DD DB DN DJ DK DQ DI DP DH DA C5 C9 DF DS                                       
- x? x? x? x? .? .? .? .U .- .? .B xA xB xB .B .A .? .? .? x? x? x? x? x?                                       
-D6 EA DX DU D5 DT EB D7 D8 DZ ED DV D1 DW DY D2 D0 EC D4 D3 D9                                                
-x? x? x? x? x? .? .? .? .? .- .- .? .- xA xA .- .? .? .? x? .?                                                
- EV EU EP EN EO EX EL EF ES ET EG E0 EE ER EJ EH EM EW EQ EY EK EI EZ                                          
- x? x? x? x? .? .? .? .u .- .- .B xB xA x* xB .* .- .- .? .? x? x? x?                                          
-FI FN E2 FT FM FJ E6 FU FL FA E9 FD FR E1 FG E4 FS FQ E3 FO FH FE FP FB FC FK E8 E5 E7 FF FV                  
-x? x? x? x? x? x? .? .? .? .? .? .u .- .- .- .- .U x* xA xB .S .B .- .? .? x? x? .? .? x? x?                  
- F4 GB F0 F7 F1 FY F8 FX F9 GF FZ GA GE F3 F2 F6 FW GD GC F5                                                   
- x? x? x? .? .? .- .- .- .U xB x* .- .- .- .? .? .? x? x? x?                                                   
-GV GX G1 GO GH G7 G0 GS GN GI GM GQ G2 GR GG G4 G5 GZ GL GY GP GW G6 GU GJ GK GT G3                           
-x? x? x? x? x? .? .? .? .? .? .- .U .- .- .- .- .B .B .* .- .? .? x? x? x? x? x? x?                           
- HF HE HN HA HP HH HW HR HS HX G9 HL HB HY HT H0 HC HV HI G8 HK HG HD HJ HU HO HM HQ HZ                        
- x? x? x? x? .? .? .? .? .? .u .* .S .- .- .- xB .B .* .* .- .- .- .? .? x? x? x? x? x?                        
-IM H4 IQ IB IP IH H1 II IA H2 H3 IF IO H9 IK IL IE IN ID H8 H7 IC IJ H5 H6 IG                                 
-.? .? .? x? .? x? x? .? .? .? .- .- .- .- .- .- .* .b .b .- .? .? x? x? x? x?                                 
- JD JA JK I6 IT JJ I9 I1 IY I2 I7 JH JB IR JF JE JL IV I8 JN IW IS JM IU I3 JI I4 I0 IX IZ I5 JC JG            
- .? .? .? .? .? .? .? .? .? .? .u .- .- .- .? .- .- .* .* .b .s .- .? .? .? x? x? x? x? x? x? x? .?            
-JV J3 JS KD JX KC JZ JR J6 J4 J5 JW KA JU KF J1 J2 JT J0 KG JO J9 JQ JY KE J8 J7 KB JP                        
-.? .? .? .? .? .? .? .? .? .? .? .- .- .- .? .? .- .B x# xu .- .- .? .? x? x? x? x? .?                        
- KW KP KV K4 KS K1 KU KL KM K0 KX KZ KY K3 KJ KQ K2 K5 K6 KH KN KT KI KK KO KR                                 
- .? .? .? .? .? .? .? .? .u .- .- .? .? .- .- .! xU xs .? .? .? .? x? x? x? .?                                 
-LW LN K8 L1 LI LV LL K9 L6 LT LJ LC LH L3 LE L0 LD LX LM LR L2 LA LP LY L4 L7 K7 LB LF LG LK LO LQ LS LU LZ L5
-.? .? .? .? .? x? .? .? .? .? .? .? .? .? .- .- .? .? .? .? .- .- x! xa x? .? .? .? .? .? .? x? x? x? x? .? .?
- MO ME MP MA MS MK MC MN MG MU MH MI MF MX MD MJ MB MM MQ MT MW L8 MV L9 ML MR                                 
- .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .b xu x? x? .? .? .? .? .? .?                                 
-M9 M2 NJ M6 NF M5 NM NB M1 NO NG M3 NK MZ NH NP M8 NN M0 NC NL NQ NS NR NI MY M4 M7 NA ND NE                  
-.? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .- xu x? x? .? .? .? .? x? x? x? .? .?                  
- OF N4 NV OM N7 NU OH OA N3 NW OC N0 N8 NY OI NZ OE NT N2 N5 N1 N9 OG OL OJ OB NX N6 OD OK                     
- .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? x? x? x? .? .? .? .? .? x?                     
-PC O0 O6 OV PA O3 OR PD OY OX O1 OU O4 O2 OO O7 ON OZ O5 PB PE O8 OW O9 OQ OS OT OP                           
-.? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? x? x? .? .? .? .? x? x? .? .?                           
- PV PM P3 PI PY PO PJ PH P9 PR PP PF P0 PG PS P6 P8 PX PN QA PK PT PW P7 P2 PQ PL PU PZ P4 P5 P1               
- .? .? .? .? .? .? .? x? .? .? .? .? .? .? .? .? .? .? .? .? .? .? x? x? .? .? .? x? x? x? .? .?               
-QU QF QG QP QQ QO QK QE QS QC QD QX QH QV QW QL QI QJ QR QT QM QB QN QY                                       
-.? .? .? .? x? x? x? x? .? .? .? .? .? .? .? .? .? x? x? .? .? .? .? .?                                       
- Q0 RI QZ Q9 RO RK Q5 RM Q2 RJ Q4 RC Q3 RL Q1 RA RB RG RH Q7 RN Q6 RE RF RD Q8                                 
- .? .? .? .? .? x? .? .? .? .? .? .? .? .? .? .? x? .? .? .? .? x? x? .? .? .?                                 
-SC R5 RW R8 RR SA RS RT RP R3 RQ SD RY R6 SE R9 R4 RX SB RV RU SF RZ R2 R1 R0 R7 SG                           
-.? .? .? .? .? .? x? x? x? .? .? .? .? .? .? .? .? .? .? .? x? x? .? .? .? .? .? .?                           
- SS SY SP SV SW SQ SM S0 SJ SU ST S2 SL SX S1 SO SR SN SZ SK SI SH                                             
- .? .? .? .? .? x? .? .? .? .? .? .? .? x? .? .? .? .? .? .? .? .?                                             
-TB S4 TM TI TK TQ S3 TP S6 TD TJ TC S5 TO TN S8 TA TE S7 S9 TF TH TG TL                                       
-.? .? .? .? .? .? .? .? .? .? .? .? .? .? x? .? .? .? .? .? .? .? .? .?                                       
- T9 TW T3 TR TX TV TS T6 UA T2 UB UE T0 T5 TY TZ TT T1 TU T4 UD UC T7 T8                                       
- .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .?                                       
-UG UN UK UU UX UV UM US UP UH UI UQ UO UT UR UJ UL UW UF                                                      
-.? .? .? .? .? .? .? .? .? .? .? .? x? .? .? .? .? .? .?                                                      
- U9 U7 UZ U6 VB VA U0 VD VF VE U4 VC VG U3 UY U5 U8 U1 U2                                                      
- .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .?                                                      
-VX VO VI VR VQ VK VP VM VV VS VH VL VJ VT VY VU VN VW                                                         
-.? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .?                                                         
- V1 V6 WB V3 WE V0 WA V4 V7 V2 V5 V9 V8 VZ WD WC                                                               
- .? .? .? .? .? .? .? .? .? .? .? .? .? .? .? .?                                                               
-WO WH WF WG WP WL WN WR WJ WQ WK WI WM                                                                        
-.? .? .? .? .? .? .? .? .? .? .? .? .?                                                                        
- WU W0 WZ WX WW WS WT WV W1 WY                                                                                 
- .? .? .? .? .? .? .? .? .? .?                                                                                 
-W6 W3 W8 W9 W5 W7 W4 XB XA W2                                                                                 
-.? .? .? .? .? .? .? .? .? .?                                                                                 
- XG XC XD XH XI XF XE                                                                                          
- .? .? .? .? .? .? .?                                                                                          
-XL XJ XK                                                                                                      
-.? .? .?                                                                                                      
- XN XM                                                                                                         
- .? .?                                                                                                         
+KI KK KO
+x? x? x?
+ LQ LS LU LZ
+ x? x? x? x?
+M4 M7 NA ND NE
+xa xu x! x? .?
+ OD OK OQ OS OT
+ xb xu xa xa xs
+PL PU PZ P4 P5 P1
+.- xU x* xb xu xa
+ QN QY Q6 RE RF RD
+ .- .U x* x! .s x-
+R0 R7 SG SK SI SH
+.- .B x* .* .- .-
+ S7 S9 TF TH TG
+ .- .- .- .- .-
+UD UC T7 T8
+.- .- .- .-
 ```
 
-Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B), IV(B), J0(b), KQ(b), LP(a)
+Units at featured hexes: NA(u), PZ(A), Q6(U), RE(a), SG(B), SK(B)
 
 ### Best Options This Turn
 
 | Unit IDs | Action | Target Hexes | Target Units | Target Infrastructure | Odds |
 | --- | --- | --- | --- | --- | --- |
-| a1-a4, a1-a5, a1-a6, a1-a7, a1-a8 | air strike | LP | 5 infantry | 8 urban hexes, 3 airports | Kill: 2%, Hurt: 97%, Loss: 31% |
-| a1-a4, a1-a5, a1-a6, a1-a7, a1-a8 | air strike | J0 | 1 infantry | 9 urban hexes, 1 seaport, 3 airports | Kill: 97%, Hurt: 97%, Loss: 8% |
-| a1-a4, a1-a5, a1-a6, a1-a7, a1-a8 | air strike | KQ | 1 infantry | 4 urban hexes, 1 seaport, 1 airport | Kill: 97%, Hurt: 97%, Loss: 8% |
-| a1-a4, a1-a5, a1-a6, a1-a7, a1-a8 | air strike | JN | — | 18 urban hexes, 4 seaports, 2 airports | — |
-| a1-a4, a1-a5, a1-a6, a1-a7 | air strike | KG | — | 18 urban hexes | — |
-| a1-a8 | air strike | ID | — | 6 urban hexes, 2 seaports, 2 airports | — |
-| a1-i1 | advance | G5 | — | 15 urban hexes, 2 seaports, 1 airport | — |
-| a1-i1, a1-t2 | approach | G5 | h1-i32, h1-i34 | 15 urban hexes, 2 seaports, 1 airport | — |
-| a1-i1, a1-t2 | approach | GF | h1-i32, h1-i34 | 27 urban hexes, 1 seaport, 2 airports | — |
-| a1-i2, a1-i3, a1-i17, a1-t3, a1-t4, a1-t5 | approach | GZ | h1-i32, h1-i34 | 14 urban hexes, 2 seaports, 3 airports | — |
-| a1-i6, a1-n7, a1-n8, a1-n9, a1-n10 | move/melee | J0 | 1 infantry | 9 urban hexes, 1 seaport, 3 airports | Kill: 88%, Hurt: 88%, Loss: 21% |
-| a1-i6, a1-i12, a1-n4, a1-n5, a1-n6, a1-n10 | move/melee | KQ | 1 infantry | 4 urban hexes, 1 seaport, 1 airport | Kill: 91%, Hurt: 91%, Loss: 18% |
-| a1-i9 | approach | FH | h1-i32, h1-i34 | 14 urban hexes, 1 seaport | — |
-| a1-i12 | move/melee | LP | 5 infantry | 8 urban hexes, 3 airports | Kill: 0%, Hurt: 15%, Loss: 99% |
-| a1-i13, a1-i14 | approach | FO | h1-i32, h1-i34 | 65 urban hexes, 2 seaports, 2 airports | — |
-| a1-n4, a1-n5, a1-n6, a1-n10 | ranged | KQ | 1 infantry | 4 urban hexes, 1 seaport, 1 airport | Kill: 80%, Hurt: 80%, Loss: 0% |
-| a1-n7, a1-n8, a1-n9, a1-n10 | ranged | J0 | 1 infantry | 9 urban hexes, 1 seaport, 3 airports | Kill: 80%, Hurt: 80%, Loss: 0% |
-| a1-t2 | approach | H0 | h1-i32, h1-i34 | 25 urban hexes, 1 seaport, 5 airports | — |
+| a1-a1 | air strike | RE | 1 air | 51 urban hexes, 3 airports | — |
+| a1-a1 | air strike | OQ | — | 13 urban hexes, 2 airports | — |
+| a1-a1 | air strike | OS | — | 5 urban hexes, 1 airport | — |
+| a1-a1 | air strike | P1 | — | 4 urban hexes, 1 airport | — |
+| a1-a1 | air strike | P5 | — | 3 urban hexes | — |
+| a1-i1, a1-t1, a1-t2 | move/melee | RE | 1 air | 51 urban hexes, 3 airports | Kill: 80%, Hurt: 80%, Loss: 48% |
+| a1-i1, a1-t1, a1-t2 | move/melee | P4 | — | 7 urban hexes, 1 seaport, 1 airport | — |
+| a1-n1, a1-t1, a1-t2 | ranged | RE | 1 air | 51 urban hexes, 3 airports | Kill: 89%, Hurt: 89%, Loss: 70% |
+| a1-n1 | move/melee | RF | — | 2 urban hexes, 1 seaport | — |
+| a1-t1 | move/melee | NA | 1 armor, 1 infantry | 8 urban hexes | Kill: 0%, Hurt: 43%, Loss: 70% |
+| a1-t1, a1-t2 | move/melee | OD | — | 8 urban hexes, 2 seaports, 2 airports | — |
+| a1-t1 | move/melee | M4 | — | 2 urban hexes, 1 airport | — |
 
 ## Campaign Objective
 
-- Target: LP, a South America city with 8 city cells and no known fortifications. The engine chose it on turn 38.
-- Staging hex: G5.
-- Phase: assemble. 0 of 6 ground units are within 2 hexes of G5. The assault starts when 6 are.
+- Target: OQ, a Eastern Africa city with 13 city cells and no known fortifications. The engine chose it on turn 1.
+- Staging hex: Q6.
+- Phase: assemble. 3 of 3 ground units are within 2 hexes of Q6. The assault starts when 3 are.
+- Home defenders: a1-i1. 2 enemy ground units are within 3 hexes of your units at home, so these units stay home. At most half your ground units stay home.
 
 ## Posture
 
@@ -673,70 +534,37 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 
 ## Active Operations
 
-- campaign: by land to LP, an enemy city with 8 city cells. Assembling at G5: 0 of 6 ground units are within 2 hexes.
-- opponent-op38: by sea to LP, an enemy city with 8 city cells. Mustering at FH: 1 of 2 ground units and 1 of 1 ship are there. Units: a1-i20, a1-i21. Ships: a1-n11.
+- campaign: by land to OQ, an enemy city with 13 city cells. Assembling at Q6: 3 of 3 ground units are within 2 hexes.
 
-Give the units and ships named in these operations no orders unless you mean to take them out. A standing order takes out a unit that is not aboard, or a ship. A unit aboard one of their ships or air units takes no order.
-
-## Operation Options
+### Operation Options
 
 | Option | Objective | Method | Plan | Impact | Cost | Risk |
 | --- | --- | --- | --- | --- | --- | --- |
-| A | JN | land | the campaign turns to JN; ground units assemble at G5 and march on it | 18 city cells | your campaign units, about 8 turns' march | 0 enemy units within 2 hexes; 0 more can reach it in 8 turns |
-| B | KQ | sea | 2 ground units muster at FH; 1 ship sail to J0; assault KQ | 4 city cells, in an enemy home region | 2 of 12 ground units, 1 of 4 ships, about 6 turns | 0 enemy units within 2 hexes; 3 more can reach it in 6 turns |
-| C | J0 | sea | 2 ground units muster at FH; 1 ship sail to KQ; assault J0 | 9 city cells | 2 of 12 ground units, 1 of 4 ships, about 8 turns | 1 enemy unit within 2 hexes; 2 more can reach it in 8 turns |
-| D | LP | air | 1 infantry unit musters at G9; a1-a1 carries it; drops on LP | 8 city cells, in an enemy home region | 1 of 12 ground units, 1 of 6 air units, about 3 turns | 0 enemy units within 2 hexes; 1 more can reach it in 3 turns |
+| A | NA | land | the campaign turns to NA; ground units assemble at PZ and march on it | 8 city cells, in an enemy home region | your campaign units, about 2 turns' march | 2 enemy units within 2 hexes; 0 more can reach it in 2 turns |
+| B | I5 | land | the campaign turns to I5; ground units assemble at PZ and march on it | 10 city cells, in an enemy home region | your campaign units, about 5 turns' march | 0 enemy units within 2 hexes; 2 more can reach it in 5 turns |
 
 ## Supplemental Hex Intelligence
 
-- LP: terrain land; passableBy: infantry, armor; origin Colombia notes: Adjacent to water - exposed to naval bombardment (range 2)
-- J0: terrain land; passableBy: infantry, armor; origin Colombia notes: Adjacent to water - exposed to naval bombardment (range 2); Chokepoint - only 2 passable adjacent hexes
-- KQ: terrain water; passableBy: infantry, armor, naval; origin Panama notes: Adjacent to water - exposed to naval bombardment (range 2)
-
-## Recent Turn Notes
-
-Turn 37:
-- Message: Your southern line will break, and no reinforcement will reach you in time.
-- Strategy: Hit the stacked enemy infantry at J0 with air and naval fire, hold J0 with our infantry, and advance the reserves toward IE and G5.
-- Enemy Losses: Ranged attack: h1-i19; Melee attack: h1-i21; Air strike: h1-i20
-- Your Losses: Melee attack: a1-i8, a1-i10, a1-i11
-
-Turn 38:
-- Message: Your defenses are hollow husks waiting to be shattered.
-- Strategy: Bombard enemy positions with air and naval power while crushing the pocket at J0.
-- Enemy Losses: Ranged attack: h1-i22; Melee attack: h1-i29, h1-i30, h1-i23
-- Your Losses: Melee attack: a1-t6, a1-i5
-
-Turn 39:
-- Message: Your southern bastions will crumble into dust before our relentless advance.
-- Strategy: Advance armor and infantry to contact while pounding enemy positions with coordinated air and naval strikes.
-- Enemy Losses: Ranged attack: h1-i24, h1-i25; Melee attack: h1-i33
-- Your Losses: Melee attack: a1-t7, a1-t8
+- NA: terrain land; passableBy: infantry, armor; origin Tanzania notes: Adjacent to water - exposed to naval bombardment (range 2)
+- RE: terrain land; passableBy: infantry, armor; origin South Africa notes: Adjacent to water - exposed to naval bombardment (range 2)
 
 ## Production Status
 
-Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6, missile 0/2.
-
-You are currently at maximum for: infantry, naval, air.
-
-### Production Priorities
-
-- Credits: no city is producing credits. Queue credits in E3.
+Your current unit counts: infantry 1/12, armor 2/8, naval 1/8, air 1/6, missile 0/2.
 
 ### Controlled Hex Queues
 
 | Hex | Urban Hexes | Fortified | Exposed | Airports | Seaports | Available Unit Types | Current Queue | Building |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EJ | 80 | 0/80 | no | 8 | 4 | armor, missile, fortification, credits | — | yes |
-| FO | 65 | 0/65 | no | 2 | 2 | armor, missile, fortification, credits | — | yes |
-| ER | 50 | 0/50 | no | 4 | 3 | armor, missile, fortification, credits | — | yes |
-| FZ | 44 | 0/44 | no | 2 | 3 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
-| DN | 39 | 0/39 | no | 4 | 2 | armor, missile, fortification, credits | 1 naval (blocked: at cap) | yes |
-| EH | 39 | 0/39 | no | 4 | 4 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
-| E0 | 34 | 0/34 | no | 4 | 2 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
-| DJ | 33 | 0/33 | no | 4 | 4 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
-| E3 | 27 | 0/27 | no | 1 | 0 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
-| GF | 27 | 0/27 | no | 2 | 1 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
+| SG | 7 | 0/7 | yes | 1 | 1 | infantry, armor, air, fortification, credits | — | yes |
+| PZ | 5 | 0/5 | yes | 1 | 0 | infantry, armor, air, fortification, credits | — | yes |
+| SK | 5 | 0/5 | yes | 1 | 1 | infantry, armor, air, fortification, credits | — | yes |
+| PU | 3 | 0/3 | yes | 0 | 0 | infantry, armor, fortification, credits | — | yes |
+| R7 | 3 | 0/3 | yes | 1 | 1 | infantry, armor, fortification, credits | — | yes |
+| QY | 2 | 0/2 | yes | 0 | 0 | infantry, armor, fortification, credits | — | yes |
+| Q6 | 1 | 0/1 | yes | 0 | 0 | infantry, fortification, credits | — | yes |
+| PL | 0 | 0/0 | no | 0 | 0 | — | — | yes |
+| T8 | 0 | 0/0 | no | 0 | 0 | — | — | yes |
 
 ## Your Strategic Memory
 
@@ -758,50 +586,23 @@ Persistent: 0 of 5 slots used. Stored: 0 of 15 slots used.
 
 | Unit ID | Unit Type | Order Type | Destination / Target | Status | Next Move | Turns Remaining | Attention |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| a1-a1 | air | DEFEND | G9 | holding | — | — | no |
-| a1-a4 | air | DEFEND | HV | holding | — | — | no |
-| a1-a5 | air | DEFEND | EJ | holding | — | — | no |
-| a1-a6 | air | DEFEND | HV | holding | — | — | no |
-| a1-a7 | air | DEFEND | HV | holding | — | — | no |
-| a1-a8 | air | DEFEND | ER | holding | — | — | no |
-| a1-i1 | infantry | DEFEND | FQ | holding | — | — | no |
-| a1-i12 | infantry | DEFEND | J0 | holding | — | — | no |
-| a1-i13 | infantry | DEFEND | ER | holding | — | — | no |
-| a1-i14 | infantry | DEFEND | ER | holding | — | — | no |
-| a1-i15 | infantry | DEFEND | GL | holding | — | — | no |
-| a1-i16 | infantry | DEFEND | GL | holding | — | — | no |
-| a1-i17 | infantry | DEFEND | GZ | holding | — | — | no |
-| a1-i18 | infantry | DEFEND | GL | holding | — | — | no |
-| a1-i2 | infantry | DEFEND | FZ | holding | — | — | no |
-| a1-i3 | infantry | DEFEND | FZ | holding | — | — | no |
-| a1-i6 | infantry | DEFEND | I8 | holding | — | — | no |
-| a1-i9 | infantry | DEFEND | EH | holding | — | — | no |
-| a1-n10 | naval | DEFEND | IE | holding | — | — | no |
-| a1-n11 | naval | DEFEND | ER | holding | — | — | no |
-| a1-n4 | naval | DEFEND | IV | holding | — | — | no |
-| a1-n5 | naval | DEFEND | IV | holding | — | — | no |
-| a1-n6 | naval | DEFEND | IV | holding | — | — | no |
-| a1-n7 | naval | DEFEND | HI | holding | — | — | no |
-| a1-n8 | naval | DEFEND | HI | holding | — | — | no |
-| a1-n9 | naval | DEFEND | HI | holding | — | — | no |
-| a1-t2 | armor | DEFEND | FQ | holding | — | — | no |
-| a1-t3 | armor | DEFEND | FZ | holding | — | — | no |
-| a1-t4 | armor | DEFEND | FZ | holding | — | — | no |
-| a1-t5 | armor | DEFEND | FZ | holding | — | — | no |
-| a1-t9 | armor | DEFEND | HV | holding | — | — | no |
+| — | — | — | — | — | — | — | — |
 
 ### Units Without Standing Orders
 
 | Unit ID | Unit Type | Suggested Destination |
 | --- | --- | --- |
-| — | — | — |
+| a1-i1 | infantry | RE |
+| a1-t1 | armor | RE |
+| a1-t2 | armor | RE |
+| a1-n1 | naval | — |
+| a1-a1 | air | defend SK |
 
 ### Campaign Orders
 
 | Unit ID | Unit Type | Current Order | Campaign Order |
 | --- | --- | --- | --- |
-| a1-i1 | infantry | defend FQ | march G5 |
-| a1-t2 | armor | defend FQ | march G5 |
+| — | — | — | — |
 
 ## Active Callbacks
 
@@ -811,55 +612,33 @@ Persistent: 0 of 5 slots used. Stored: 0 of 15 slots used.
 
 ## Scenario Progress
 
-- Explored: 36 of 190 land hexes (19%)
-- Controlled: 29 of 190 land hexes (15%)
-- Your home region control: 69 of 69 hexes (100%)
-- Your control of South America's home region: 2 of 57 hexes (4%)
+- Explored: 11 of 190 land hexes (6%)
+- Controlled: 3 of 190 land hexes (2%)
+- Your home region control: 9 of 12 hexes (75%)
+- Your control of Eastern Africa's home region: 1 of 31 hexes (3%)
 
 ## Air Operations Status
 
-Air units: yours=6, enemy=0.
+Air units: yours=1, enemy=1.
 
 | Unit ID | Base Hex | Aboard | Base Intact | Base Controlled | Enemy Unit Targets | Strikeable Urban | Strikeable Airports | Strikeable Seaports | Ferry Destinations |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| a1-a1 | G9 | none | yes | yes | 0 | 0 | 0 | 0 | 0 |
-| a1-a4 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a5 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a6 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a7 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a8 | IE | none | yes | yes | 7 | 7 | 7 | 6 | 22 |
+| a1-a1 | SK | none | yes | yes | 1 | 5 | 3 | 1 | SG, PZ, R7 |
 
-Enemy infrastructure in your current strike envelope: airports=7, seaports=7.
+Enemy infrastructure in your current strike envelope: airports=3, seaports=1.
+
+## Mercenaries
+
+Treasury: 0 credits. No one to rehire.
 
 ## Naval Transport Status
 
 | Unit ID | Hex | Your control | Seaport Here | Aboard | Capacity Used | Nearest Embark Hex |
 | --- | --- | --- | --- | --- | --- | --- |
-| a1-n4 | IV | yes | yes | infantry 0, armor 0 | 0/2 | IV at hex distance 0 |
-| a1-n5 | IV | yes | yes | infantry 0, armor 0 | 0/2 | IV at hex distance 0 |
-| a1-n6 | IV | yes | yes | infantry 0, armor 0 | 0/2 | IV at hex distance 0 |
-| a1-n7 | HI | yes | no | infantry 0, armor 0 | 0/2 | GL at hex distance 1 |
-| a1-n8 | HI | yes | no | infantry 0, armor 0 | 0/2 | GL at hex distance 1 |
-| a1-n9 | HI | yes | no | infantry 0, armor 0 | 0/2 | GL at hex distance 1 |
-| a1-n10 | IE | yes | yes | infantry 0, armor 0 | 0/2 | IE at hex distance 0 |
-| a1-n11 | ER | yes | yes | infantry 0, armor 0 | 0/2 | ER at hex distance 0 |
-
-## Mercenaries
-
-Treasury: 40 credits. Mercenary upkeep: 0 credits per turn for 0 mercenaries. Hire orders already taken from the treasury this turn: 0 credits.
-
-### Rehire Candidates
-
-No Neutral unit you can see can be rehired.
-
-### Raise Options
-
-| Hex | To Campaign Target | Enemy Units Within 2 | Chokepoint | Capacity | Resumes building | Options |
-| --- | --- | --- | --- | --- | --- | --- |
-| E3 | 4 | 0 | no | 54 | no | infantry (fee 3, upkeep 3) |
+| a1-n1 | SG | yes | yes | infantry 0, armor 0 | 0/2 | SG at hex distance 0 |
 
 ## Unit Roster
 
-Enemy units (currently observed): South America: h1-i31 (infantry) at LP; h1-i32 (infantry) at J0; h1-i34 (infantry) at KQ; h1-i35 (infantry) at LP; h1-i36 (infantry) at LP; h1-i37 (infantry) at LP; h1-i38 (infantry) at LP
+Enemy units (currently observed): Eastern Africa: h1-i1 (infantry) at NA; h1-t1 (armor) at NA; h1-a1 (air) at RE
 
-Use the Commander's Briefing above. Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination. Give the units in the orderless table standing orders. Give each unit in Campaign Orders the order its row names. Launch an operation from Operation Options if one is worth its cost. Queue production for every hex named in the Production attention flag. Then submit JSON with "message", "strategy", "orders", "airStrikes", "ferryOrders", "airDrops", "callbacks", "memoryUpdates", "productionOrders".
+Use the Commander's Briefing above. Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination. Give the units in the orderless table standing orders. Launch an operation from Operation Options if one is worth its cost. Queue production for every hex named in the Production attention flag. Then submit JSON with "message", "strategy", "orders", "airStrikes", "ferryOrders", "airDrops", "callbacks", "memoryUpdates", "productionOrders".

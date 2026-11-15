@@ -1,5 +1,6 @@
 import { type SeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { dbGetOne, dbRun, isDbReady } from '../gameDb';
+import { readTurnPhase } from '../gameDb/turnStateReads';
 import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
@@ -178,9 +179,9 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
       return { success: false, reason: 'Cannot change strategic orders during a tactical battle.' };
     }
 
-    const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
-    if (turnRow?.phase !== deps.validPhase) {
-      logError('submitOrders: not in planning phase', turnRow?.phase);
+    const phase = readTurnPhase(dbGetOne);
+    if (phase !== deps.validPhase) {
+      logError('submitOrders: not in planning phase', phase);
       return { success: false, reason: 'Not in planning phase' };
     }
 

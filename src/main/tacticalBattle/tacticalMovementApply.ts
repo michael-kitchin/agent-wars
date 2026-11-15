@@ -1,3 +1,4 @@
+import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * Pure projection of opponent tactical march orders onto a tactical battle snapshot.
  */
@@ -22,7 +23,7 @@ import {
  */
 export function withTacticalMarchStop(unit: TacticalSubUnitSnapshot, appliedToH3Index: string): TacticalSubUnitSnapshot {
   const debarkedIndependently =
-    (unit.unitType === 'infantry' || unit.unitType === 'armor')
+    (isLandUnitType(unit.unitType))
     && !!unit.embarkedOnSubUnitId
     && appliedToH3Index !== unit.h3Index;
   tacticalLogQuery('withTacticalMarchStop', { unitId: unit.id, appliedToH3Index, debarkedIndependently });
