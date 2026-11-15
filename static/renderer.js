@@ -22023,7 +22023,7 @@ ${bonuses}`;
     return seatIds.map((seatId) => `${seatId}\0${nameOf(seatId)}`).join("");
   }
   function chatPanelShouldShow(input) {
-    return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing;
+    return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance;
   }
 
   // src/renderer/core/matchEpoch.ts
@@ -24606,7 +24606,8 @@ ${bonuses}`;
     const show = chatPanelShouldShow({
       matchLoaded: (rendererSharedState.gameState?.seats?.length ?? 0) > 0,
       playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
-      mapToastShowing: toast != null && !toast.classList.contains("hidden")
+      mapToastShowing: toast != null && !toast.classList.contains("hidden"),
+      autoAdvance: rendererSharedState.autoAdvance
     });
     const field = document.getElementById("chat-panel-input");
     if (!show && field instanceof HTMLElement && document.activeElement === field) field.blur();
@@ -31306,6 +31307,7 @@ ${bonuses}`;
   function stopObserveAutoAdvance(reason, log) {
     if (!rendererSharedState.autoAdvance) return;
     rendererSharedState.autoAdvance = false;
+    syncChatPanelVisibility();
     const box = document.getElementById("observe-auto-advance-input");
     if (box instanceof HTMLInputElement) box.checked = false;
     console.error("observe auto-advance stopped", reason);
@@ -31384,6 +31386,7 @@ ${bonuses}`;
       const input = event.target;
       if (!(input instanceof HTMLInputElement)) return;
       rendererSharedState.autoAdvance = input.checked;
+      syncChatPanelVisibility();
       if (input.checked) frameAutomaticWatchCamera();
       if (input.checked) void maybeObserveAutoAdvance();
     });
@@ -38513,12 +38516,14 @@ ${bonuses}`;
     rendererSharedState.autoAdvance = true;
     rendererSharedState.viewAs = "all";
     syncObserveChrome();
+    syncChatPanelVisibility();
     frameAutomaticWatchCamera();
   }
   function clearObserveAfterKnockout() {
     watchTheRest = false;
     rendererSharedState.autoAdvance = false;
     rendererSharedState.viewAs = "all";
+    syncChatPanelVisibility();
   }
 
   // src/shared/startMatchAiChoice.ts

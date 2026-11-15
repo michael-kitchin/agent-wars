@@ -61,11 +61,12 @@ test('canStageText rejects blank text', () => {
 });
 
 test('chatPanelShouldShow is true only when the match is loaded and nothing else is covering the corner', () => {
-  const clear = { matchLoaded: true, playbackRunning: false, mapToastShowing: false };
+  const clear = { matchLoaded: true, playbackRunning: false, mapToastShowing: false, autoAdvance: false };
   assert.equal(chatPanelShouldShow(clear), true);
   assert.equal(chatPanelShouldShow({ ...clear, matchLoaded: false }), false);
   assert.equal(chatPanelShouldShow({ ...clear, playbackRunning: true }), false);
   assert.equal(chatPanelShouldShow({ ...clear, mapToastShowing: true }), false);
+  assert.equal(chatPanelShouldShow({ ...clear, autoAdvance: true }), false);
 });
 
 test('chatNamedSeatKey changes when a name or the order changes', () => {

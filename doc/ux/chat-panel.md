@@ -8,7 +8,7 @@ Show every message sent between sides, and let a player stage a message to one c
 
 ## Availability
 
-Shown in Strategic planning and Tactical planning while a match is loaded, playback is not running, and the map toast is hidden. Hidden while resolution playback is running and while the map toast is showing, including an error toast. Hidden for the whole New game and Game over overlay (`body:has(#game-over-overlay:not(.hidden)) #chat-panel` in `static/chatChrome.css`). An observer sees the panel and cannot write. See [modes-and-transitions.md](modes-and-transitions.md) and [resolution-playback.md](resolution-playback.md).
+Shown in Strategic planning and Tactical planning while a match is loaded, playback is not running, the map toast is hidden, and the checkbox "Start the next turn when every commander is ready" is off (`S.autoAdvance`). Hidden while that checkbox is on, while resolution playback is running, and while the map toast is showing, including an error toast. Hidden for the whole New game and Game over overlay (`body:has(#game-over-overlay:not(.hidden)) #chat-panel` in `static/chatChrome.css`). Clearing the checkbox shows the panel again, unless playback or the map toast is using that corner. An observer with the checkbox off sees the panel and cannot write. See [modes-and-transitions.md](modes-and-transitions.md) and [resolution-playback.md](resolution-playback.md).
 
 ## Information Displayed
 
@@ -50,7 +50,7 @@ Shown in Strategic planning and Tactical planning while a match is loaded, playb
 ## States
 
 - Compact, expanded, and the slide between them (`expanding`, `collapsing`).
-- Hidden, while playback runs, while `#map-toast` lacks the class `hidden`, while no match is loaded, and during New game and Game over.
+- Hidden, while the auto-advance checkbox is on, while playback runs, while `#map-toast` lacks the class `hidden`, while no match is loaded, and during New game and Game over.
 - Can send, or read only.
 
 ## Invariants
@@ -64,7 +64,7 @@ Shown in Strategic planning and Tactical planning while a match is loaded, playb
 
 ## Strategic and Tactical Differences
 
-The panel is the same in both theaters. A message sent on a battle beat is marked ` (battle)`. It hides during playback in either theater and shows again for a battle's planning turn when no map toast is up.
+The panel is the same in both theaters. A message sent on a battle beat is marked ` (battle)`. It hides during playback in either theater and shows again for a battle's planning turn when no map toast is up and the auto-advance checkbox is off. While that checkbox is on, the panel stays hidden in both theaters.
 
 ## Related Documents
 
@@ -93,6 +93,8 @@ The panel is the same in both theaters. A message sent on a battle beat is marke
 - `src/renderer/chat/chatPanelClient.ts` (`refreshChatThread`, `repaintChatThread`, `stageChatMessage`, `cancelStagedChatMessage`)
 - `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot`)
 - `src/renderer/chat/chatPanelVisibility.ts` (`syncChatPanelVisibility`)
+- `src/renderer/gameplay/observeChrome.ts` (the auto-advance checkbox, `stopObserveAutoAdvance`)
+- `src/renderer/gameplay/observeIntent.ts` (`chooseWatchTheRest`, `clearObserveAfterKnockout`)
 - `src/shared/chatPanelState.ts` (`stagedMessagesInSeatOrder`, `stagedMessageFor`, `nextRecipientSeatId`, `canStageText`, `chatPanelShouldShow`)
 - `src/shared/mapChromePlacement.ts` (`chatPanelPlacement`)
 - `src/renderer/map/mapChromeLayout.ts` (`layoutMapChrome`)

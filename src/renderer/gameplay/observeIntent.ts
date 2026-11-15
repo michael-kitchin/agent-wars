@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { rendererSharedState as S } from '../core/state';
 import { frameAutomaticWatchCamera, syncObserveChrome } from './observeChrome';
 
@@ -25,7 +26,7 @@ let watchTheRest = false;
  *
  * Purpose: The dialog closes and the match keeps going.
  * When to use: The Watch the rest button.
- * Expected outcome: `observeAutoAdvanceRequested` becomes true.
+ * Expected outcome: `observeAutoAdvanceRequested` becomes true and the message panel hides.
  * Exceptions: None.
  */
 export function chooseWatchTheRest(): void {
@@ -33,6 +34,7 @@ export function chooseWatchTheRest(): void {
   S.autoAdvance = true;
   S.viewAs = 'all';
   syncObserveChrome();
+  syncChatPanelVisibility();
   frameAutomaticWatchCamera();
 }
 
@@ -53,11 +55,12 @@ export function observeAutoAdvanceRequested(): boolean {
  *
  * Purpose: A new match does not inherit the previous match's auto-advance.
  * When to use: When a match starts.
- * Expected outcome: `observeAutoAdvanceRequested` is false.
+ * Expected outcome: `observeAutoAdvanceRequested` is false and the message panel follows the cleared checkbox.
  * Exceptions: None.
  */
 export function clearObserveAfterKnockout(): void {
   watchTheRest = false;
   S.autoAdvance = false;
   S.viewAs = 'all';
+  syncChatPanelVisibility();
 }

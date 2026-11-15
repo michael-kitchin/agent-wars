@@ -20,6 +20,7 @@ import { newGameOverlayIsOpen } from './newGameDialogCollapse';
 import { isDeferredResolutionPlaybackConsultPending } from '../openRouter/aiPlanningState';
 import { anyCommanderIsPlanning, commanderStartIsSettling, subscribeCommanderPool } from '../openRouter/commanderPoolClient';
 import { onResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
+import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { frameOpenAutomaticBattle } from '../map/tacticalMapView';
 import { frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
 
@@ -128,12 +129,13 @@ export async function maybeObserveAutoAdvance(): Promise<void> {
  *
  * Purpose: A failed Ready must not keep pressing.
  * When to use: Ready, submit, and melee-resolve failures while the checkbox is on.
- * Expected outcome: The checkbox clears. The reason is logged and passed to `log`.
+ * Expected outcome: The checkbox clears and the message panel can show again. The reason is logged and passed to `log`.
  * Exceptions: None.
  */
 export function stopObserveAutoAdvance(reason: string, log: (line: string) => void): void {
   if (!S.autoAdvance) return;
   S.autoAdvance = false;
+  syncChatPanelVisibility();
   const box = document.getElementById('observe-auto-advance-input');
   if (box instanceof HTMLInputElement) box.checked = false;
   console.error('observe auto-advance stopped', reason);
@@ -230,7 +232,7 @@ export function syncObserveChrome(): void {
  *
  * Purpose: One startup for the watch.
  * When to use: After the page markup exists.
- * Expected outcome: Changing the select reloads fog. Checking the box can press Ready.
+ * Expected outcome: Changing the select reloads fog. Checking the box hides the message panel and can press Ready. Clearing the box shows the panel again.
  *   Playback finishing and a pool change can press it too. A second call does not bind twice.
  * Exceptions: None.
  */
@@ -253,6 +255,7 @@ export function wireObserveMode(deps: {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
     S.autoAdvance = input.checked;
+    syncChatPanelVisibility();
     if (input.checked) frameAutomaticWatchCamera();
     if (input.checked) void maybeObserveAutoAdvance();
   });

@@ -55,7 +55,7 @@ The result screen lists every side, and its header depends on how the match went
 Getting knocked out doesn't stop the other commanders. When the match goes on without you, a dialog says who knocked you out and where you placed, and gives you two choices:
 
 - **End game** ranks the sides still in the match and opens the result screen.
-- **Watch the rest** keeps the match going. You see every side with no fog, and the next turn starts on its own once every commander is ready. While turns start that way, the map frames the units you can see at the start of each turn, with a little room on one side.
+- **Watch the rest** keeps the match going. You see every side with no fog, and the next turn starts on its own once every commander is ready. While turns start that way, the message panel hides, and the map frames the units you can see at the start of each turn, with a little room on one side.
 
 While you watch, these controls change what you see and when turns start:
 
@@ -64,7 +64,7 @@ While you watch, these controls change what you see and when turns start:
 | Look through one side's fog | Pick that side from View as, in the top bar. |
 | See every side again, with no fog | Pick "All sides, no fog" from View as. |
 | See how many units of each type a commander has | Rest the pointer on that side's name in the top bar. |
-| Start each turn yourself | Clear "Start the next turn when every commander is ready", above Ready. |
+| Start each turn yourself, and see the message panel | Clear "Start the next turn when every commander is ready", above Ready. |
 
 A match you start with Observe only works the same way, except that the checkbox starts cleared (so the next turn waits until you check it, or click Ready yourself).
 
