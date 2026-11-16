@@ -28,13 +28,13 @@ export const RECENT_TURN_LOSS_GROUP_LINES_MAX = 12;
 /**
  * Sentence that explains the loss lines to the model.
  *
- * Purpose: A loss line is a record kept by the game, so the model must not weigh it like a message from another side.
+ * Purpose: A loss line is a record kept by the game, so the model must not weigh it like a message from another side. Naming where the side codes come from lets the model tell who attacked it before it writes to that side.
  * When to use: Printed once under the Recent Turn Notes heading when any block has a loss line.
- * Expected outcome: Names what `by`, `no side responsible`, `by unknown side`, and the closing counts mean.
+ * Expected outcome: Names what `by`, `you`, `Neutral`, the side codes, `no side responsible`, `by unknown side`, and the closing counts mean.
  * Exceptions: None.
  */
 export const RECENT_TURN_LOSS_LEGEND =
-  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
+  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "you" is your own side, "Neutral" is the Neutral side, and every other side is named by its code from the Sides table and message threads. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
 
 /**
  * Owner key for a loss with no known owner.
