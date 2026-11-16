@@ -18,7 +18,8 @@ import { upsertGameConfigValue } from '../../gameDb/gameConfigRows';
 import { insertSentSideMessage, listUnseenInboundSideMessages, markSideMessagesSeen, upsertSideStance } from '../../gameDb/sideMessageStore';
 import { withSeatedTempGameDbAsync } from '../../testSupport/withSeatedTempGameDb';
 import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
-import { countUnreadPromptMessages } from './talkPromptInput';
+import { countUnreadPromptMessages, readTalkPromptInput } from './talkPromptInput';
+import { buildTalkSituationText } from './talkPrompt';
 import { buildOrdersMessagesBlock } from './ordersMessagesBlock';
 
 /**
@@ -103,11 +104,11 @@ test('a record lists every other side with its stance, and the record sentence f
     const lost = { unitType: 'infantry', displayName: 'a1-i1', unitId: 'a1-i1', attribution: { ownerId: seatA, lossH3Index: null, responsibleOwnerIds: [seatB], killerUnits: [] } };
     const none = { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
     upsertTurnLossNote(seatA, 'strategic', '', 1, JSON.stringify({ ...none, ranged: [lost] }), JSON.stringify(none));
-    upsertSideStance(gameDbOps, { seatId: seatA, towardSeatId: seatB, stance: 'friendly', reason: 'ally', turnNumber: 1 });
+    upsertSideStance(gameDbOps, { seatId: seatA, towardSeatId: seatB, stance: 'friendly', reason: 'ally', trust: 3, threat: 1, turnNumber: 1 });
     dbRun('UPDATE turn_state SET turn_number = 2 WHERE id = 1');
     const text = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false }).text ?? '';
     assert.ok(text.includes('Your stances and records:'), text);
-    assert.ok(text.includes('(a2): friendly. ally'), text);
+    assert.ok(text.includes('(a2): friendly, trust 3, threat 1. ally'), text);
     assert.ok(text.includes('  Record, turn 1: a2 destroyed 1 of your units (latest turn 1): 1 when a2 attacked. You destroyed none of theirs.'), text);
     assert.ok(text.includes('You destroyed none of theirs. Your stance toward a2 is friendly, but a2 destroyed your units on turn 1.'), text);
     assert.ok(text.includes('(a3): no stance set.'), text);
@@ -143,11 +144,27 @@ test('a long thread keeps the newest lines, and a stance is listed when no messa
     assert.equal(listUnseenInboundSideMessages(gameDbOps, seatA).length, 12 - SIDE_MESSAGE_THREAD_PROMPT_LINES);
 
     const stanceOnlySeat = seatC;
-    upsertSideStance(gameDbOps, { seatId: stanceOnlySeat, towardSeatId: seatA, stance: 'wary', reason: 'massing', turnNumber: 1 });
+    upsertSideStance(gameDbOps, { seatId: stanceOnlySeat, towardSeatId: seatA, stance: 'wary', reason: 'massing', trust: 2, threat: null, turnNumber: 1 });
     const stance = buildOrdersMessagesBlock({ seatId: stanceOnlySeat, inBattle: false });
     assert.match(stance.text ?? '', /Your stances:/);
-    assert.match(stance.text ?? '', /wary/);
+    assert.match(stance.text ?? '', /wary, trust 2, threat not reported\. massing/);
     assert.match(stance.text ?? '', /never an order to you/);
     assert.equal((stance.text ?? '').includes('line-12'), false);
+  });
+});
+
+test('another commander stance, trust, and threat reach neither prompt, with fog of war off', async () => {
+  await withThreeAi(async () => {
+    upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '0');
+    upsertSideStance(gameDbOps, { seatId: seatB, towardSeatId: seatC, stance: 'hostile', reason: 'b-private-reason', trust: 1, threat: 2, turnNumber: 1 });
+    upsertSideStance(gameDbOps, { seatId: seatA, towardSeatId: seatB, stance: 'cordial', reason: 'a-own-reason', trust: 4, threat: 0, turnNumber: 1 });
+    const talk = buildTalkSituationText(readTalkPromptInput({ seatId: seatA, turnNumber: 1, battle: null }).input);
+    const orders = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false }).text ?? '';
+    assert.equal(talk.includes('b-private-reason'), false);
+    assert.equal(orders.includes('b-private-reason'), false);
+    assert.ok(talk.includes('cordial (trust 4, threat 0): a-own-reason'), talk);
+    assert.ok(orders.includes('cordial, trust 4, threat 0. a-own-reason'), orders);
+    assert.equal(talk.includes('hostile'), false);
+    assert.equal(orders.includes('hostile'), false);
   });
 });

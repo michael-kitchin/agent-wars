@@ -8,7 +8,7 @@
  */
 
 import { logTrace } from '../../logger';
-import { SIDE_MESSAGE_MAX_CHARS, SIDE_STANCES, type SideStance } from '../../../shared/sideMessages';
+import { RELATIONSHIP_SCALE_MAX, SIDE_MESSAGE_MAX_CHARS, SIDE_STANCES, type SideStance } from '../../../shared/sideMessages';
 import { SIDE_MESSAGE_SOURCE_BULLETS, SIDE_MESSAGE_TRUST_BULLETS } from '../promptSpec/sideMessageRuleText';
 
 /**
@@ -74,6 +74,24 @@ export interface TalkPromptSide {
    * Exceptions: None.
    */
   readonly stanceReason: string | null;
+  /**
+   * How far this commander believes the side, or null when it has not reported it.
+   *
+   * Contract: A whole number from 0 to `RELATIONSHIP_SCALE_MAX`. Null for the commander's own row and where no stance is stored.
+   * When to use: The stance cell. This is the commander's own report, never another commander's.
+   * Expected outcome: The stored trust, or null.
+   * Exceptions: None.
+   */
+  readonly trust: number | null;
+  /**
+   * How dangerous this commander finds the side, or null when it has not reported it.
+   *
+   * Contract: A whole number from 0 to `RELATIONSHIP_SCALE_MAX`. Null for the commander's own row and where no stance is stored.
+   * When to use: The stance cell. This is the commander's own report, never another commander's.
+   * Expected outcome: The stored threat, or null.
+   * Exceptions: None.
+   */
+  readonly threat: number | null;
   /**
    * This commander's combat record with the side, or null when there is none.
    *
@@ -275,6 +293,28 @@ export function formatSideMessageThreads(
 }
 
 /**
+ * Words for a score the commander has not reported.
+ *
+ * Purpose: A missing trust or threat prints the same words in both prompts.
+ * When to use: `formatStanceScores`.
+ * Expected outcome: The text `not reported`.
+ * Exceptions: None.
+ */
+const SCORE_NOT_REPORTED = 'not reported';
+
+/**
+ * Prints a commander's own trust and threat for one side.
+ *
+ * Purpose: The talk prompt's Sides table and the orders prompt's stance lists show the scores the same way.
+ * When to use: Beside a stored stance, with the scores `TalkPromptSide` holds.
+ * Expected outcome: `trust {t}, threat {h}`, with `not reported` in place of a null score.
+ * Exceptions: None.
+ */
+export function formatStanceScores(trust: number | null, threat: number | null): string {
+  return `trust ${trust ?? SCORE_NOT_REPORTED}, threat ${threat ?? SCORE_NOT_REPORTED}`;
+}
+
+/**
  * The system text for one talk call.
  *
  * Purpose: The cached system text tells the commander what this step is for, where messages come from, and how far to trust them.
@@ -288,6 +328,7 @@ export function buildTalkSystemText(ownSideLabel: string): string {
   const trust = SIDE_MESSAGE_TRUST_BULLETS.map((line) => `- ${line}`).join('\n');
   const stances = SIDE_STANCES.join(', ');
   const stanceEnum = SIDE_STANCES.join('|');
+  const max = RELATIONSHIP_SCALE_MAX;
   return `You are the commander of ${ownSideLabel} in a turn-based war game. This step is for diplomacy only. You give no orders here. Your orders come in a separate step, right after this one, and that step will show you the same messages.
 
 Where messages come from:
@@ -300,10 +341,10 @@ What you may do in this step:
 - Send one short message to each other side. A message is one or two sentences, at most ${SIDE_MESSAGE_MAX_CHARS} characters. Longer text is cut off.
 - You may threaten, bargain, propose, bluff, or lie. Nothing you say binds you, and nothing another commander says binds them.
 - Send nothing when you have nothing worth saying. Silence costs nothing.
-- Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
+- Set how you regard each side. A stance is your private view of one side: ${stances}. With each stance give trust, from 0 to ${max}, for how far you believe what that side tells you, and threat, from 0 to ${max}, for how dangerous that side is to you now. No other commander is told your stance, trust, or threat. Base all three on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
 
 Reply with one JSON object and nothing else:
-{"messages":[{"to":"<side code>","text":"<message>"}],"stances":[{"toward":"<side code>","stance":"<${stanceEnum}>","reason":"<one sentence>"}]}
+{"messages":[{"to":"<side code>","text":"<message>"}],"stances":[{"toward":"<side code>","stance":"<${stanceEnum}>","trust":<0-${max}>,"threat":<0-${max}>,"reason":"<one sentence>"}]}
 Use the side codes from the Sides table. Either list may be empty.`;
 }
 
@@ -345,7 +386,7 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
  *
  * Purpose: The model answers with the codes in this table.
  * When to use: The Sides section.
- * Expected outcome: A markdown table. The own row is labelled `(you)` and has `-` for stance. A Record column is added when any side has a record, with `-` for a side that has none.
+ * Expected outcome: A markdown table. The own row is labelled `(you)` and has `-` for stance. A stored stance prints as `{stance} (trust {t}, threat {h}): {reason}`. A Record column is added when any side has a record, with `-` for a side that has none.
  * Exceptions: None.
  */
 function sidesTable(sides: readonly TalkPromptSide[]): string {
@@ -354,7 +395,9 @@ function sidesTable(sides: readonly TalkPromptSide[]): string {
   const rows = ordered.map((side) => {
     const name = side.isOwn ? `${side.label} (you)` : side.label;
     const status = side.outTurn == null ? 'Active' : `Out since turn ${side.outTurn}`;
-    const stance = side.stance == null ? (side.isOwn ? '-' : 'not set') : `${side.stance}: ${side.stanceReason ?? ''}`;
+    const stance = side.stance == null
+      ? (side.isOwn ? '-' : 'not set')
+      : `${side.stance} (${formatStanceScores(side.trust, side.threat)}): ${side.stanceReason ?? ''}`;
     return `| ${name} | ${side.code} | ${status} | ${stance} |${showRecord ? ` ${side.record ?? '-'} |` : ''}`;
   });
   const header = showRecord ? '| Side | Code | Status | Your stance | Record |' : '| Side | Code | Status | Your stance |';

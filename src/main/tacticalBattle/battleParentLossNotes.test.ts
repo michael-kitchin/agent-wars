@@ -10,9 +10,12 @@ import { emptyPlayerLossSummary, type PlayerLossSummary } from '../../shared/los
 import { parsePlayerLossSummaryJson, serializePlayerLossSummary } from '../../shared/lossSummaryJson';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { activeAiSeatIds } from '../../shared/seatRoster';
+import { stepKeyText, tacticalStep } from '../../shared/matchRecording';
+import { isAttributedLossesRecord } from '../../shared/lossHistory';
 import { getSeatRoster, upsertTurnLossNote } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { getTurnLossNoteColumns } from '../gameDb/turnNotesHistory';
+import { listMatchEventsOfType } from '../recorder/matchRecordStore';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 import {
   battleLossResponsibleOwnerIds,
@@ -24,11 +27,12 @@ import {
 const AI_BATTLE: BattleLossContext = {
   battleId: 'tb-ai',
   strategicTurnNumber: 4,
+  beatNumber: 2,
   leadPartyId: 'opponent',
   opposingPartyId: 'opponent2',
 };
-const HUMAN_BATTLE: BattleLossContext = { battleId: 'tb-human', strategicTurnNumber: 4, opposingPartyId: 'opponent' };
-const SEAT_BATTLE: BattleLossContext = { battleId: 'tb-seat', strategicTurnNumber: 6, opposingPartyId: AI_SEAT_IDS[0] };
+const HUMAN_BATTLE: BattleLossContext = { battleId: 'tb-human', strategicTurnNumber: 4, beatNumber: 1, opposingPartyId: 'opponent' };
+const SEAT_BATTLE: BattleLossContext = { battleId: 'tb-seat', strategicTurnNumber: 6, beatNumber: 3, opposingPartyId: AI_SEAT_IDS[0] };
 
 /**
  * Builds one destroyed parent for a test.
@@ -76,7 +80,7 @@ test('a human battle credits the opposing party for the human and the human for 
 });
 
 test('a battle with no opposing party credits no one', () => {
-  assert.equal(battleLossResponsibleOwnerIds({ battleId: 'tb', strategicTurnNumber: 1 }, 'opponent'), null);
+  assert.equal(battleLossResponsibleOwnerIds({ battleId: 'tb', strategicTurnNumber: 1, beatNumber: 1 }, 'opponent'), null);
 });
 
 test('a destroyed parent becomes a loss row with its attribution, and a non-unit type is skipped', () => {
@@ -128,5 +132,23 @@ test('a battle write leaves the turn\'s own row untouched, and an empty list wri
     assert.deepEqual(turnRow, { ownLossJson: own, otherLossJson: own });
     writeBattleParentLossNotes([], { ...SEAT_BATTLE, battleId: 'tb-empty' });
     assert.equal(readBattleRow(AI_SEAT_IDS[0], { ...SEAT_BATTLE, battleId: 'tb-empty' }), null);
+  });
+});
+
+test('a battle write records one attributed-losses event with each owner\'s parents in its other bucket', () => {
+  withSeatedTempGameDb('aw-battle-loss-history-', { fogOfWarEnabled: false }, () => {
+    writeBattleParentLossNotes([parent('a1-t1', AI_SEAT_IDS[0]), parent('h1-t1', HUMAN_SEAT_ID)], SEAT_BATTLE);
+    writeBattleParentLossNotes([], { ...SEAT_BATTLE, battleId: 'tb-empty' });
+    const events = listMatchEventsOfType(gameDbOps, 'losses_attributed');
+    assert.equal(events.length, 1);
+    const event = events[0]!;
+    assert.equal(event.stepKey, stepKeyText(tacticalStep(SEAT_BATTLE.strategicTurnNumber, SEAT_BATTLE.battleId, SEAT_BATTLE.beatNumber)));
+    assert.equal(event.visibility, 'engine');
+    assert.ok(isAttributedLossesRecord(event.payload));
+    assert.equal(event.payload.source, 'battleParents');
+    assert.deepEqual(Object.keys(event.payload.byOwner).sort(), [AI_SEAT_IDS[0], HUMAN_SEAT_ID].sort());
+    assert.deepEqual(event.payload.byOwner[AI_SEAT_IDS[0]]?.other.map((unit) => unit.unitId), ['a1-t1']);
+    assert.deepEqual(event.payload.byOwner[HUMAN_SEAT_ID]?.other.map((unit) => unit.unitId), ['h1-t1']);
+    assert.equal(event.payload.byOwner[HUMAN_SEAT_ID]?.ranged.length, 0);
   });
 });

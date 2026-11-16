@@ -9,6 +9,7 @@
 
 import { gameDbOps, hasDbHandle } from '../gameDb/dbConnection';
 import { ensureMatchId } from '../gameDb/gameConfigKv';
+import { readSeatRoster } from '../gameDb/seatRosterStore';
 import { selectGameConfigValue } from '../gameDb/gameConfigRows';
 import { isEnvFlagEnabled } from '../envFlag';
 import { logDebug, logError, logTrace } from '../logger';
@@ -21,6 +22,7 @@ import {
   type RecordVisibility,
   type StepKey,
 } from '../../shared/matchRecording';
+import { recordTurnStatistics } from '../matchStatistics/statisticsRecording';
 import { buildFramePayload } from './matchFrameCapture';
 import { currentStepKey } from './recorderStepKey';
 import {
@@ -245,7 +247,7 @@ function insertFrameIfStepChanged(step: StepKey): boolean {
  *
  * Purpose: The step-change path and the match-end path share the frame row.
  * When to use: From `recordStepBoundary` only.
- * Expected outcome: One frame row.
+ * Expected outcome: One frame row, then the statistics event for a strategic step.
  * Exceptions: Propagates an insert failure.
  */
 function insertFrame(step: StepKey): void {
@@ -259,4 +261,21 @@ function insertFrame(step: StepKey): void {
     recordedAt: nowIso(),
     payload: buildFramePayload(gameDbOps),
   });
+  recordStatisticsAfterFrame(step);
+}
+
+/**
+ * Records the turn's statistics event directly after its frame.
+ *
+ * Purpose: Every strategic frame, including the forced final frame at match end, is followed by one `side_statistics` event.
+ * When to use: From `insertFrame` only.
+ * Expected outcome: One statistics event for a strategic step, nothing for a tactical step.
+ * Exceptions: None. A failure is logged and swallowed, so the match-end event is still written.
+ */
+function recordStatisticsAfterFrame(step: StepKey): void {
+  try {
+    recordTurnStatistics(step, readSeatRoster(gameDbOps), recordMatchEvent);
+  } catch (err) {
+    logError('matchRecorder recordStatisticsAfterFrame failed', { step: stepKeyText(step), err });
+  }
 }

@@ -155,7 +155,7 @@ export const MATCH_FRAME_FORMAT_VERSION = 1;
  *
  * Purpose: The format-version map and the database share one list.
  * When to use: A new event type is added to this list and to `MATCH_EVENT_FORMAT_VERSIONS` together.
- * Expected outcome: The ten event names, in record order.
+ * Expected outcome: The twelve event names, in record order.
  * Exceptions: None.
  */
 export const MATCH_EVENT_TYPES = [
@@ -169,6 +169,8 @@ export const MATCH_EVENT_TYPES = [
   'match_ended',
   'message_sent',
   'stance_declared',
+  'side_statistics',
+  'losses_attributed',
 ] as const;
 
 /**
@@ -176,7 +178,7 @@ export const MATCH_EVENT_TYPES = [
  *
  * Contract: A member of that list.
  * When to use: The `type` of a recorded event.
- * Expected outcome: One of the ten names.
+ * Expected outcome: One of the twelve names.
  * Exceptions: None.
  */
 export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
@@ -186,7 +188,7 @@ export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
  *
  * Purpose: A later change to one payload raises that type's number only.
  * When to use: Inserting an event.
- * Expected outcome: Every event type maps to 1.
+ * Expected outcome: Every event type maps to 1, except `stance_declared`, which maps to 2 because its payload gained `trust` and `threat`.
  * Exceptions: None.
  */
 export const MATCH_EVENT_FORMAT_VERSIONS: Readonly<Record<MatchEventType, number>> = {
@@ -199,7 +201,9 @@ export const MATCH_EVENT_FORMAT_VERSIONS: Readonly<Record<MatchEventType, number
   commander_strategy: 1,
   match_ended: 1,
   message_sent: 1,
-  stance_declared: 1,
+  stance_declared: 2,
+  side_statistics: 1,
+  losses_attributed: 1,
 };
 
 /**

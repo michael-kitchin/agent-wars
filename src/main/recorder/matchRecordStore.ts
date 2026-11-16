@@ -309,6 +309,23 @@ export function listMatchRecords(ops: BasicDbOps): MatchRecord[] {
 }
 
 /**
+ * Lists the events of one type in write order.
+ *
+ * Purpose: Reading the statistics series must not decode a frame.
+ * When to use: When a caller wants one event type, such as the match charts.
+ * Expected outcome: Only rows with that `record_type`, ordered by `record_id`, payloads decoded.
+ * Exceptions: Throws when a payload cannot be decoded.
+ */
+export function listMatchEventsOfType(ops: BasicDbOps, recordType: MatchEventType): MatchRecord[] {
+  const rows = ops.getAll<StoredMatchRecordRow>(
+    `SELECT ${RECORD_COLUMNS} FROM match_records WHERE kind = 'event' AND record_type = ? ORDER BY record_id ASC`,
+    [recordType]
+  );
+  logTrace('matchRecordStore listMatchEventsOfType', { recordType, count: rows.length });
+  return rows.map(toMatchRecord);
+}
+
+/**
  * The step text of the newest frame.
  *
  * Purpose: A boundary writes a frame only when the step has changed.

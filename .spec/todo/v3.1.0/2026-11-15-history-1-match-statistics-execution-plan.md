@@ -580,14 +580,14 @@ If you can run the app with a key, play an Observe match with battles on until o
 
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `check:circular` cycle list | |
-| Prerequisites | |
-| Line counts of the long files | |
-| Missing symbols | |
-| Loss summary perspective check | |
+| `git status --short` | `?? .claude/` only (tracked files clean) |
+| `npm test` | Not run before the edits, by the user's instruction to run it once at the end. Run at the end of the work: see the Completion Log |
+| `npm run build:renderer` | Run at the end: see the Completion Log |
+| `check:circular` cycle list | Three cycles: `src/main/tools/orderlessUnitSuggestions.ts` through `promptText`, `consultationText`, `envelopeContract`, `callbackVocabularyText`, `orderResponseParsing`, `productionTools`, `gameActions`, `gameActionsCore`, `standingOrders`, `standingOrdersInjectionText` and back. `src/renderer/openRouter/openRouterUiHelpers.ts` through `mapToastBody`, `toastInlineMarks`, `unitDrawing`, `mapHelpers`, `worldLeafletMap`, `basemapLayer` and back. `src/renderer/openRouter/openRouterUiHelpers.ts` through `aiPlanningState`, `commanderPoolClient`, `newGameReturn`, `controlTooltip`, `terrainTooltipStrategicState`, `selection` and back. The same three after the last phase |
+| Prerequisites | Every file and symbol the plan lists exists |
+| Line counts of the long files | `gameDb.ts` 866, `main.ts` 685, `preload.ts` 940, `gameApiTypes.ts` 870. After the work: 869, 687, 952, 880. None past 1000 |
+| Missing symbols | None |
+| Loss summary perspective check | `buildTurnLossSummary` reads `perspectivePlayerId` only as the always-visible player, and `captureTurnLossNoteFromResolution` passes no `isVictimVisible`, so every victim is visible and the summary is the same for every seat. `attributeTurnLosses` does not read a perspective. A battle's `strategicTurnNumber` is `turn_state.turn_number` (`computeTacticalBattleSnapshot`), and `currentStepKey` uses the same turn number |
 
 ## Defect Inventory
 
@@ -598,3 +598,11 @@ If you can run the app with a key, play an Observe match with battles on until o
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
+| 0 | Done | None | None | None | Baseline gates recorded; full test not run before edits, per instruction |
+| 1 | Done | `RELATIONSHIP_SCALE_MAX` is defined in `src/shared/sideMessages.ts` and re-exported from `matchStatistics.ts`, so the score cleaner needs no import from a later file. `upsertSideStance` takes `trust` and `threat` as required arguments | `src/main/openRouter/talk/ordersMessagesBlock.test.ts` (new required arguments); new fixture `src/main/fixtures/recording-stance-scores.jsonl`; `src/main/recorder/matchRecordingFile.test.ts` | `doc/save-files.md`, `doc/match-recording.md`, `doc/commander-messages.md` | No app run (no paid calls) |
+| 2 | Done | `SeatForStatistics` is defined in `src/shared/matchStatistics.ts` and shared by the reader and the recorder | None | None | No app run |
+| 3 | Done | The hook is in `insertFrame` (covers both the step-change frame and the forced final frame) through a private wrapper that cannot throw. `resetGame.ts` needed no change | `src/main/recorder/matchRecorder.test.ts` (rows now include `side_statistics`); `src/main/recorder/matchRecordingExport.test.ts` (5 records instead of 3, since two frames each add a statistics row) | `doc/match-recording.md` | No app run |
+| 4 | Done | None | None | None | No app run |
+| 5 | Done | `formatStanceScores` is exported from `talkPrompt.ts` and used by both prompts. The example prompt documents hold no stance text, so they needed no edit | None | `doc/ai-commander-prompts/` (talk, strategic, tactical, assembly-contract, source-inventory, crosswalk), `doc/commander-messages.md` | No app run |
+| 6 | Done | No new leaf file was needed: `check:circular` shows only the baseline cycles | None | `doc/match-recording.md` | No app run |
+| 7 | Done | None | None | `doc/match-statistics.md` (new), `doc/README.md`. `npm test` passed on the third run (earlier runs failed only on the export test above and on the event format version test, both updated), `build:renderer` passed, `check:circular` prints the same three baseline cycles. `ui:smoke` not run: no renderer file changed | No app run |

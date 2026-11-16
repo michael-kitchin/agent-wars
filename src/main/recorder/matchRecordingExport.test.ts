@@ -36,8 +36,8 @@ test('a recording file round-trips and a finished match is exported once until n
     try {
       writeMatchRecordingFile({ ops: gameDbOps, targetPath: target, appVersion: '1.0.0', exportedAt: '2026-01-01T00:00:00.000Z' });
       const recording = readRecordingFile(target);
-      assert.equal(recording.records.length, 3);
-      assert.deepEqual(recording.records.map((row) => row.recordId), [1, 2, 3]);
+      assert.equal(recording.records.length, 5);
+      assert.deepEqual(recording.records.map((row) => row.recordId), [1, 2, 3, 4, 5]);
       assert.deepEqual(recording.records.map((row) => row.payload), listMatchRecords(gameDbOps).map((row) => row.payload));
       const hexCount = Number(gameDbOps.getOne<{ n: number }>('SELECT COUNT(*) AS n FROM hexes')?.n);
       assert.equal(recording.staticData.hexes.rows.length, hexCount);

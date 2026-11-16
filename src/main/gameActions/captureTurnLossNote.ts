@@ -16,9 +16,12 @@ import {
   fallbackDisplayNameFromUnitId,
   type UnitDisplayIdentity,
 } from '../../shared/unitDisplayNames';
+import type { LossHistorySource } from '../../shared/lossHistory';
+import type { StepKey } from '../../shared/matchRecording';
 import { activeAiSeatIds } from '../../shared/seatRoster';
 import { getSeatRoster, upsertTurnLossNote, type TurnNotesScope } from '../gameDb';
 import { logDebug } from '../logger';
+import { recordAttributedLosses } from '../recorder/matchRecordingEvents';
 
 /**
  * Arguments for persisting one turn/beat loss note from a resolution payload (no fog filtering).
@@ -150,6 +153,24 @@ export interface CaptureTurnLossNoteArgs {
    * Exceptions: None.
    */
   attribution: LossAttributionContext;
+  /**
+   * The step the match history files these losses under.
+   *
+   * Contract: The strategic step of the resolved turn, or the tactical step of the beat that resolved.
+   * When to use: Always. It is a required field so the compiler finds every caller.
+   * Expected outcome: The `losses_attributed` event carries this step.
+   * Exceptions: None.
+   */
+  historyStep: StepKey;
+  /**
+   * Which capture point is writing.
+   *
+   * Contract: `strategicTurn` for a resolved world-map turn, `tacticalBeat` for a resolved battle beat. `battleParents` is written elsewhere.
+   * When to use: Always.
+   * Expected outcome: The `source` of the `losses_attributed` event.
+   * Exceptions: None.
+   */
+  historySource: Extract<LossHistorySource, 'strategicTurn' | 'tacticalBeat'>;
 }
 
 /**
@@ -157,7 +178,7 @@ export interface CaptureTurnLossNoteArgs {
  *
  * Purpose: Shared write path for strategic finalize and tactical beat commit.
  * When to use: Immediately after combat resolution produces removed units and kill edges.
- * Expected outcome: `turn_notes_history` row updated via `upsertTurnLossNote`.
+ * Expected outcome: `turn_notes_history` row updated via `upsertTurnLossNote` for each active AI seat, and one `losses_attributed` event at `historyStep` holding every owner's attributed losses, none when nobody lost a unit.
  * Exceptions: None; underlying DB helpers log errors without throwing.
  */
 export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs): void {
@@ -176,6 +197,8 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     labelUnits,
     airStrikeMoves,
     attribution,
+    historyStep,
+    historySource,
   } = args;
   logDebug('captureTurnLossNoteFromResolution', {
     scope,
@@ -217,6 +240,9 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     },
     resolveUnitMeta: (id: string) => metaMap.get(id),
   };
+  // The history keeps one engine-wide summary, so a match with no active AI seat still records the capture.
+  const engineSummary = attributeTurnLosses(buildTurnLossSummary(lossArgs), attribution);
+  recordAttributedLosses(historyStep, { source: historySource, byOwner: engineSummary.byOwner });
   for (const seatId of activeAiSeatIds(getSeatRoster())) {
     const built = buildTurnLossSummary({ ...lossArgs, perspectivePlayerId: seatId });
     const summary = attributeTurnLosses(built, attribution);

@@ -5,9 +5,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePlayerLossSummaryJson } from '../../shared/lossSummaryJson';
-import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { isAttributedLossesRecord } from '../../shared/lossHistory';
+import { strategicStep } from '../../shared/matchRecording';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { getRecentTurnNotes } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
 import { buildStrategicLossAttributionContext } from '../lossAttribution/strategicLossAttribution';
+import { listMatchEventsOfType } from '../recorder/matchRecordStore';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 import { captureTurnLossNoteFromResolution, type CaptureTurnLossNoteArgs } from './captureTurnLossNote';
 
@@ -28,6 +32,8 @@ function captureAndRead(emptyContext: boolean) {
     scope: 'strategic',
     battleId: '',
     turnNumber: 1,
+    historyStep: strategicStep(1),
+    historySource: 'strategicTurn',
     killsByDirectFire: [{ victimId: VICTIM.id, killerIds: [KILLER.id] }],
     removedUnits: [VICTIM],
   };
@@ -57,5 +63,33 @@ test('a capture whose context knows no killers stores an unknown responsible sid
     const lost = captureAndRead(true).ranged[0];
     assert.ok(lost);
     assert.equal(lost.attribution?.responsibleOwnerIds, null);
+  });
+});
+
+test('a strategic capture also records one attributed-losses event, and the recorder flag only stops the event', () => {
+  withSeatedTempGameDb('aw-capture-loss-history-', { fogOfWarEnabled: false }, () => {
+    captureAndRead(false);
+    const events = listMatchEventsOfType(gameDbOps, 'losses_attributed');
+    assert.equal(events.length, 1);
+    assert.equal(events[0]?.stepKey, 's1');
+    assert.equal(events[0]?.visibility, 'engine');
+    const payload = events[0]?.payload;
+    assert.ok(isAttributedLossesRecord(payload));
+    assert.equal(payload.source, 'strategicTurn');
+    const lost = payload.byOwner[SEAT]?.ranged[0];
+    assert.equal(lost?.unitId, 'a1-i1');
+    assert.equal(lost?.attribution?.ownerId, SEAT);
+    assert.deepEqual(lost?.attribution?.responsibleOwnerIds, [HUMAN_SEAT_ID]);
+    assert.deepEqual(lost?.attribution?.killerUnits.map((unit) => unit.unitId), ['h1-a1']);
+  });
+  withSeatedTempGameDb('aw-capture-loss-history-off-', { fogOfWarEnabled: false }, () => {
+    process.env.AGENT_WARS_DISABLE_RECORDER = '1';
+    try {
+      const lost = captureAndRead(false).ranged[0];
+      assert.ok(lost, 'the note is still written');
+      assert.equal(listMatchEventsOfType(gameDbOps, 'losses_attributed').length, 0);
+    } finally {
+      delete process.env.AGENT_WARS_DISABLE_RECORDER;
+    }
   });
 });

@@ -20,6 +20,8 @@ const own: TalkPromptSide = {
   outTurn: null,
   stance: null,
   stanceReason: null,
+  trust: null,
+  threat: null,
   record: null,
 };
 
@@ -30,6 +32,8 @@ const other: TalkPromptSide = {
   outTurn: null,
   stance: 'wary',
   stanceReason: 'Massing',
+  trust: 3,
+  threat: 1,
   record: null,
 };
 
@@ -40,6 +44,8 @@ const quiet: TalkPromptSide = {
   outTurn: null,
   stance: null,
   stanceReason: null,
+  trust: null,
+  threat: null,
   record: null,
 };
 
@@ -70,13 +76,19 @@ test('the system text names the side, the limit, the trust rules, and the stance
   assert.match(text, /commander of Iberia/);
   assert.match(text, /280/);
   for (const stance of SIDE_STANCES) assert.match(text, new RegExp(stance));
-  assert.deepEqual(text.match(/\d+/g), ['280']);
+  const digitRuns = text.match(/\d+/g) ?? [];
+  assert.ok(digitRuns.every((run) => run === '280' || run === '0' || run === '4'), digitRuns.join(','));
+  assert.equal(digitRuns.filter((run) => run === '280').length, 1);
+  assert.match(text, /trust, from 0 to 4/);
+  assert.match(text, /threat, from 0 to 4/);
+  assert.match(text, /"trust":<0-4>,"threat":<0-4>/);
+  assert.match(text, /No other commander is told your stance, trust, or threat/);
   assert.match(text, /a human player or another AI model/);
   assert.match(text, /may or may not be telling the truth/);
   assert.match(text, /may or may not have your interests in mind/);
   assert.match(text, /written by the commander of one of the other sides/);
   assert.match(text, /A loss line in Recent Turn Notes is a fact reported by the game/);
-  assert.match(text, /Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says/);
+  assert.match(text, /Base all three on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says/);
 });
 
 test('the situation text nests, marks one new line, and quotes safely', () => {
@@ -95,7 +107,7 @@ test('the Sides table has a Record column only when a side has a record', () => 
   assert.equal(plain.includes('Record'), false);
   const withRecord = buildTalkSituationText(input({ sides: [own, { ...other, record: 'Record, turn 3: no losses either way.' }, quiet] }));
   assert.ok(withRecord.includes('| Side | Code | Status | Your stance | Record |'));
-  assert.ok(withRecord.includes('| France | h1 | Active | wary: Massing | Record, turn 3: no losses either way. |'));
+  assert.ok(withRecord.includes('| France | h1 | Active | wary (trust 3, threat 1): Massing | Record, turn 3: no losses either way. |'));
   assert.ok(withRecord.includes('| Britain | a2 | Active | not set | - |'));
   assert.ok(withRecord.includes('| Iberia (you) | a1 | Active | - | - |'));
 });
@@ -105,4 +117,9 @@ test('a battle input names the beat and the opponent', () => {
   assert.match(text, /battle beat 2/);
   assert.match(text, /You are fighting France in this battle/);
   assert.match(text, /During a battle you can write only to the side you are fighting, code a2, and set your stance only toward that side\./);
+});
+
+test('a stance with a missing score prints not reported in its place', () => {
+  const text = buildTalkSituationText(input({ sides: [own, { ...other, trust: 3, threat: null }, quiet] }));
+  assert.ok(text.includes('| France | h1 | Active | wary (trust 3, threat not reported): Massing |'), text);
 });

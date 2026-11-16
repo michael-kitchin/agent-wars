@@ -4,7 +4,8 @@
 
 import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
 import { isBuildUnitType } from '../../shared/ipc/productionTypes';
-import { lostUnitIdsOf, type LostUnit } from '../../shared/lossSummary';
+import { emptyPlayerLossSummary, lostUnitIdsOf, type LostUnit, type PlayerLossSummary } from '../../shared/lossSummary';
+import { tacticalStep } from '../../shared/matchRecording';
 import { parsePlayerLossSummaryJson, serializePlayerLossSummary } from '../../shared/lossSummaryJson';
 import { HUMAN_SEAT_ID, type AiSeatId, type OwnerId } from '../../shared/seatIds';
 import { activeAiSeatIds } from '../../shared/seatRoster';
@@ -12,6 +13,7 @@ import { getSeatRoster, upsertTurnLossNote } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { getTurnLossNoteColumns } from '../gameDb/turnNotesHistory';
 import { logDebug, logError, logTrace } from '../logger';
+import { recordAttributedLosses } from '../recorder/matchRecordingEvents';
 
 /**
  * What a battle-loss write needs to know about the battle.
@@ -40,6 +42,15 @@ export interface BattleLossContext {
    * Exceptions: None.
    */
   readonly strategicTurnNumber: number;
+  /**
+   * The battle's tactical beat when the parents were deleted.
+   *
+   * Contract: The snapshot's `tacticalTurnNumber` at that moment.
+   * When to use: The beat of the step the match history files the losses under.
+   * Expected outcome: A positive integer.
+   * Exceptions: None.
+   */
+  readonly beatNumber: number;
   /**
    * The lead party of an AI-versus-AI battle.
    *
@@ -138,11 +149,30 @@ function mergeBattleLossesForSeat(seatId: AiSeatId, units: readonly LostUnit[], 
 }
 
 /**
+ * Groups lost units by their owner into loss summaries.
+ *
+ * Purpose: The match history keeps one record per capture, with each owner's losses in the `other` bucket, as the notes store a battle parent.
+ * When to use: `writeBattleParentLossNotes`, once per call.
+ * Expected outcome: One summary per victim owner. A unit with no attribution is not included.
+ * Exceptions: None.
+ */
+function battleLossesByOwner(units: readonly LostUnit[]): Record<string, PlayerLossSummary> {
+  const byOwner: Record<string, PlayerLossSummary> = {};
+  for (const unit of units) {
+    const ownerId = unit.attribution?.ownerId;
+    if (!ownerId) continue;
+    const summary = byOwner[ownerId] ?? emptyPlayerLossSummary();
+    byOwner[ownerId] = { ...summary, other: [...summary.other, unit] };
+  }
+  return byOwner;
+}
+
+/**
  * Writes the parents a battle destroyed into every active commander's strategic loss notes.
  *
  * Purpose: A parent destroyed whole in a battle never reaches the turn's resolution loss capture, so the commanders' Recent Turn Notes and combat record would miss it.
  * When to use: `recordDestroyedBattleParents`, each time a battle deletes strategic parents. The write happens then, not at battle end, so a mid-battle save keeps it.
- * Expected outcome: Each active AI seat has a strategic row for this battle id and turn that lists the units. The turn's own row is not touched. An empty list writes nothing.
+ * Expected outcome: Each active AI seat has a strategic row for this battle id and turn that lists the units. The turn's own row is not touched. The history gains one `losses_attributed` event for the call, at the battle's step for the beat in progress. An empty list writes nothing.
  * Exceptions: None. A failure is logged and the battle continues.
  */
 export function writeBattleParentLossNotes(parents: readonly DestroyedBattleParent[], context: BattleLossContext): void {
@@ -154,6 +184,10 @@ export function writeBattleParentLossNotes(parents: readonly DestroyedBattlePare
   try {
     const units = parents.flatMap((parent) => battleParentLostUnit(parent, context) ?? []);
     if (units.length === 0) return;
+    recordAttributedLosses(tacticalStep(context.strategicTurnNumber, context.battleId, context.beatNumber), {
+      source: 'battleParents',
+      byOwner: battleLossesByOwner(units),
+    });
     for (const seatId of activeAiSeatIds(getSeatRoster())) mergeBattleLossesForSeat(seatId, units, context);
   } catch (err) {
     logError('battleParentLossNotes writeBattleParentLossNotes failed', {

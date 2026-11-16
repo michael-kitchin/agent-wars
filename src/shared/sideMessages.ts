@@ -28,6 +28,16 @@ export const SIDE_MESSAGE_MAX_CHARS = 280;
 export const SIDE_STANCE_REASON_MAX_CHARS = 160;
 
 /**
+ * The highest value of a trust or threat score.
+ *
+ * Purpose: A commander reports trust and threat on a scale from 0 to this value, and the reply schema, the parser, and the database check share it.
+ * When to use: Cleaning a score, building the reply schema, and writing the column checks.
+ * Expected outcome: 4.
+ * Exceptions: None.
+ */
+export const RELATIONSHIP_SCALE_MAX = 4;
+
+/**
  * The five private stances, from opposition to warmth.
  *
  * Purpose: The talk reply and the stance table share one list.
@@ -120,6 +130,20 @@ export type SideMessageViewer =
  */
 export function isSideStance(value: unknown): value is SideStance {
   return typeof value === 'string' && (SIDE_STANCES as readonly string[]).includes(value);
+}
+
+/**
+ * Cleans one reported trust or threat score.
+ *
+ * Purpose: A model can send a score that is missing, out of range, or not a whole number.
+ * When to use: Parsing the `trust` and `threat` of a stance entry in a talk reply.
+ * Expected outcome: The whole number from 0 to `RELATIONSHIP_SCALE_MAX` when `raw` is a number or a numeric string with that value. Null for anything else, including `2.5`, `5`, and `'x'`.
+ * Exceptions: None.
+ */
+export function cleanRelationshipScore(raw: unknown): number | null {
+  const numeric = typeof raw === 'string' && raw.trim().length > 0 ? Number(raw) : raw;
+  if (typeof numeric !== 'number' || !Number.isInteger(numeric)) return null;
+  return numeric >= 0 && numeric <= RELATIONSHIP_SCALE_MAX ? numeric : null;
 }
 
 /**

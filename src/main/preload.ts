@@ -5,6 +5,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
+import type { MatchChartsSnapshot } from '../shared/matchStatistics';
 import type { SideMessageThreadSnapshot } from '../shared/sideMessageView';
 import type { BasemapVectorName } from '../shared/vectorPackTypes';
 import type { DismissMercenaryResult } from '../shared/mercenaryDismiss';
@@ -95,6 +96,7 @@ const IPC_GAME = {
   stopCommanderPlanning: 'game:stopCommanderPlanning',
   readCommanderPool: 'game:readCommanderPool',
   readSideMessages: 'game:readSideMessages',
+  readMatchCharts: 'game:readMatchCharts',
   stageSideMessage: 'game:stageSideMessage',
   cancelStagedSideMessage: 'game:cancelStagedSideMessage',
   submitOrders: 'game:submitOrders',
@@ -456,6 +458,16 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    */
   readSideMessages: (): Promise<SideMessageThreadSnapshot> =>
     ipcRenderer.invoke(IPC_GAME.readSideMessages),
+  /**
+   * Reads the recorded statistics of every strategic turn.
+   *
+   * Purpose: The charts show every side's numbers to the player.
+   * When to use: When a chart view opens or refreshes.
+   * Expected outcome: The seats in side order, the recorded turns in turn order, and the current turn. No fog of war is applied.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readMatchCharts: (): Promise<MatchChartsSnapshot> =>
+    ipcRenderer.invoke(IPC_GAME.readMatchCharts),
   /**
    * Stores one draft from the player to one side.
    *

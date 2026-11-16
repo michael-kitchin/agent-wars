@@ -30,3 +30,13 @@ test('the format fixture parses, and a newer file or a broken line does not', ()
   const lines = text.split('\n').filter((line) => line.length > 0);
   assert.throws(() => parseRecordingLines(`${lines[0]}\n${lines[1]}\n{`), /Line 3 is not valid JSON/);
 });
+
+test('a stance event at format version 2 parses with its trust and threat', () => {
+  const fixturePath = path.join(__dirname, '..', '..', '..', 'src', 'main', 'fixtures', 'recording-stance-scores.jsonl');
+  const recording = parseRecordingLines(fs.readFileSync(fixturePath, 'utf8'));
+  assert.equal(recording.records.length, 1);
+  assert.equal(recording.records[0]?.recordType, 'stance_declared');
+  assert.equal(recording.records[0]?.formatVersion, 2);
+  const payload = recording.records[0]?.payload as { trust: number; threat: number };
+  assert.deepEqual([payload.trust, payload.threat], [2, 3]);
+});

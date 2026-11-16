@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  cleanRelationshipScore,
   cleanSideMessageText,
   isSideStance,
   SIDE_MESSAGE_MAX_CHARS,
@@ -47,4 +48,11 @@ test('cleaning collapses whitespace, strips controls, and cuts at the limit', ()
   }), false);
   assert.equal(isSideStance('wary'), true);
   assert.equal(isSideStance('allied'), false);
+});
+
+test('a relationship score is a whole number from 0 to 4, or null', () => {
+  assert.equal(cleanRelationshipScore(0), 0);
+  assert.equal(cleanRelationshipScore(4), 4);
+  assert.equal(cleanRelationshipScore('3'), 3);
+  for (const bad of [5, -1, 2.5, 'x', '', null, undefined]) assert.equal(cleanRelationshipScore(bad), null);
 });

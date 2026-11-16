@@ -20,6 +20,7 @@ import { logDebug, logTrace } from '../logger';
 import { tacticalMarchFirstStopAlongPath } from '../tacticalBattle/tacticalRulesAdapter';
 import type { TacticalBeatOutcome } from '../tacticalBattle/tacticalBeatOutcome';
 import { buildTacticalLossAttributionContext, lossNoteAirStrikeRemovedUnits } from '../lossAttribution/tacticalLossAttribution';
+import { tacticalStep } from '../../shared/matchRecording';
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 
 /**
@@ -222,7 +223,7 @@ export function reconcileInfrastructureAfterTacticalBeat(outcome: TacticalBeatOu
  *
  * Purpose: Recent Turn Notes in the next tactical briefing can name who was lost on the beat that just finished.
  * When to use: After embark rows for this beat have been written, so the note matches the stored battle.
- * Expected outcome: One note at `tacticalTurnNumber - 1` (at least 1). Air-strike victims are filed as air-strike losses. A striker that did not return is included for every owner and filed as return fire. Each loss carries who was responsible.
+ * Expected outcome: One note at `tacticalTurnNumber - 1` (at least 1), and one `losses_attributed` event at that beat's step. Air-strike victims are filed as air-strike losses. A striker that did not return is included for every owner and filed as return fire. Each loss carries who was responsible.
  * Exceptions: None. The note writer logs a database failure.
  */
 export function captureTacticalBeatLossNote(outcome: TacticalBeatOutcome): void {
@@ -232,6 +233,7 @@ export function captureTacticalBeatLossNote(outcome: TacticalBeatOutcome): void 
     tacticalTurnNumber: battle.tacticalTurnNumber,
     removedCount: outcome.removedUnits.length,
   });
+  const beatNumber = Math.max(1, battle.tacticalTurnNumber - 1);
   const tacticalRemovedById = new Map(outcome.removedUnits.map((unit) => [unit.id, unit] as const));
   for (const unit of outcome.meleePack.meleeRemovedUnits ?? []) tacticalRemovedById.set(unit.id, unit);
   const tacticalRemovedAll = [...tacticalRemovedById.values()];
@@ -245,7 +247,9 @@ export function captureTacticalBeatLossNote(outcome: TacticalBeatOutcome): void 
   captureTurnLossNoteFromResolution({
     scope: 'tactical',
     battleId: battle.battleId,
-    turnNumber: Math.max(1, battle.tacticalTurnNumber - 1),
+    turnNumber: beatNumber,
+    historyStep: tacticalStep(battle.strategicTurnNumber, battle.battleId, beatNumber),
+    historySource: 'tacticalBeat',
     killsByDirectFire: outcome.killsByDirectFire,
     killsByReturnFire: outcome.killsByReturnFire,
     killsByMelee,

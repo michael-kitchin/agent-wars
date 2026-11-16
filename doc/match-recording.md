@@ -8,7 +8,7 @@ The engine is the authority. The symbols named below are the ones to check when 
 
 History lives in `match_records`, in the open match database. `ensureMatchRecordsTable` creates the table on open, the same way `ensurePendingAirDropOrdersTable` does. `EXPECTED_USER_VERSION` stays 26, and the table is not in `GAME_DB_REQUIRED_TABLES`. An older file at version 26 gains the table when it is opened. A save copies the table with the rest of the match. See [save-files.md](save-files.md).
 
-A frame is a snapshot of the match tables at one step. An event is one thing that happened at that step and cannot be recovered by comparing frames. Each row stores `record_id`, `kind` (`frame` or `event`), `record_type`, `format_version`, `step_key`, `scope` (`strategic` or `tactical`), `turn_number`, `battle_id` (empty outside a battle), `beat_number` (0 outside a battle), `visibility`, `display_text`, `recorded_at`, and a `payload`. The payload is zlib-compressed JSON. A frame's `record_type` is `state` (`MATCH_FRAME_RECORD_TYPE`) at format version `MATCH_FRAME_FORMAT_VERSION` (1). This build writes ten event types, each at format version 1 (`MATCH_EVENT_FORMAT_VERSIONS`):
+A frame is a snapshot of the match tables at one step. An event is one thing that happened at that step and cannot be recovered by comparing frames. Each row stores `record_id`, `kind` (`frame` or `event`), `record_type`, `format_version`, `step_key`, `scope` (`strategic` or `tactical`), `turn_number`, `battle_id` (empty outside a battle), `beat_number` (0 outside a battle), `visibility`, `display_text`, `recorded_at`, and a `payload`. The payload is zlib-compressed JSON. A frame's `record_type` is `state` (`MATCH_FRAME_RECORD_TYPE`) at format version `MATCH_FRAME_FORMAT_VERSION` (1). This build writes twelve event types, each at format version 1 except `stance_declared`, which is at 2 (`MATCH_EVENT_FORMAT_VERSIONS`):
 
 | `record_type` | When it is written |
 | --- | --- |
@@ -21,7 +21,9 @@ A frame is a snapshot of the match tables at one step. An event is one thing tha
 | `commander_strategy` | The strategy line of that consult, when the line is not blank. The same New or Load rule as `consultation` applies. `display_text` is the line. |
 | `match_ended` | The match is over. The payload has `winner` and `reason` as stored, including an empty `winner` for a tie. |
 | `message_sent` | A side message was sent. The payload has `messageId`, `fromSeatId`, `toSeatId`, and `text`. Visibility is the sender and the recipient. `display_text` is the text. |
-| `stance_declared` | A commander changed its private stance or the reason for it. The payload has `seatId`, `towardSeatId`, `stance`, `reason`, and `previousStance`. Visibility is that commander. |
+| `stance_declared` | A commander changed its private stance or the reason for it. The payload (format version 2) has `seatId`, `towardSeatId`, `stance`, `reason`, `trust`, `threat`, and `previousStance`. `trust` and `threat` are each null when the commander did not report them. A change to the trust or the threat alone is also an event. Visibility is that commander. |
+| `side_statistics` | Every side's numbers at one strategic step, written directly after that step's frame. The payload is `TurnStatistics` (`src/shared/matchStatistics.ts`): per seat the built units, mercenaries, hexes, production per turn, stored points, treasury, upkeep, units lost, and model cost, every stored stance row as a relationship report, and the hexes taken. `unitsLost` and `hexesTaken` are differences from the previous turn, which `src/main/matchStatistics/turnDifferences.ts` keeps in memory, so both are null for the first turn after a load and after a gap. A turn with a battle has a second strategic frame and so a second event. Readers use the last one for each turn. A tactical step writes none. Visibility is `engine`, because the event holds every side's numbers without fog and every commander's private scores. |
+| `losses_attributed` | Every owner's losses from one loss capture, with who was responsible for each unit. The payload is `AttributedLossesRecord` (`src/shared/lossHistory.ts`): a `source` and `byOwner`, the six cause buckets for each victim owner as `attributeTurnLosses` returns them, the human seat and Neutral included. Each lost unit keeps its attribution (`ownerId`, `lossH3Index`, `responsibleOwnerIds`, `killerUnits`) as the commanders' loss notes store it. There are three sources. `strategicTurn` is written by `captureStrategicTurnLossNote` at the strategic step of the turn that resolved. `tacticalBeat` is written by `captureTacticalBeatLossNote` at the tactical step of the beat that resolved (`tacticalTurnNumber - 1`, at least 1). `battleParents` is written by `writeBattleParentLossNotes` when a battle deletes strategic parents, at the tactical step of the beat in progress, once per call with the units that call added, each in its owner's `other` bucket. The first two are written once per capture, before the per-seat note loop, so a match with no active AI seat still records them. Nothing is written when no owner lost a unit. The event ignores fog of war, so its visibility is `engine`. |
 
 Human strategic orders are copied from `pending_orders`, `pending_ranged_orders`, `pending_air_orders`, `pending_missile_launches`, `pending_ferry_orders`, and `pending_air_drop_orders` before resolution clears them. The human seat writes no event when those tables are empty. An AI owner writes one event for each set of orders it returned, even an empty one.
 
@@ -46,7 +48,7 @@ When `game_over` is `1` and `match_ended` is missing, the boundary writes one fr
 | Table | Reason |
 | --- | --- |
 | `hexes` | Terrain does not change during a match. The recording file writes it once. |
-| `turn_notes_history` | A growing log. A strategy is a `commander_strategy` event, and a loss is the difference between two frames. |
+| `turn_notes_history` | A growing log. Strategies are commander_strategy events, and losses with who was responsible are losses_attributed events. |
 | `match_records` | The history itself. |
 | `side_messages` | A growing log. Each sent message is a `message_sent` event. `side_stances` is a frame table. |
 
@@ -56,7 +58,7 @@ A new table has to be added to `MATCH_TABLE_RECORDING_POLICY` in the same change
 
 ## Who may be shown a row
 
-The `visibility` column is `everyone`, `engine`, or `seats:` plus seat ids. `match_started` and `match_ended` are `everyone`. Frames, resolutions, both tactical events, and a consult with no seat are `engine`. A strategic orders event, a strategy, and a consult that names a seat are `seats:` plus that owner's id. Text that is not one of those forms, including an empty seat list, reads back as `engine` (`parseVisibilityText`).
+The `visibility` column is `everyone`, `engine`, or `seats:` plus seat ids. `match_started` and `match_ended` are `everyone`. Frames, statistics, attributed losses, resolutions, both tactical events, and a consult with no seat are `engine`. A strategic orders event, a strategy, and a consult that names a seat are `seats:` plus that owner's id. Text that is not one of those forms, including an empty seat list, reads back as `engine` (`parseVisibilityText`).
 
 ## The recording file
 
@@ -82,4 +84,4 @@ A file whose `formatVersion` is newer than this build is refused: "This recordin
 
 ## What is derived, not stored
 
-A frame is the tables. These are not their own events, because a later reader gets them by comparing frames or by reading the resolution payload: captures, production, treasury, knockouts, and the start and end of a battle.
+A frame is the tables. These are not their own events, because a later reader gets them by comparing frames or by reading the resolution payload: captures, production, treasury, knockouts, and the start and end of a battle. A unit's disappearance is found by comparing frames. Who destroyed it is the `losses_attributed` event. Per-turn counts that need engine functions, such as upkeep and production, are the `side_statistics` event, described in [match-statistics.md](match-statistics.md).

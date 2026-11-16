@@ -52,7 +52,7 @@ export function clearDestroyedBattleParents(): void {
  *
  * Purpose: Both tactical delete sites share one list, and the same units go into every commander's strategic loss notes for the battle's turn.
  * When to use: With the array returned by `deleteStrategicParentUnitAndApplyTransportOutcome`.
- * Expected outcome: New ids are kept in order. An id already recorded is skipped. An empty array changes nothing. While a battle is active, the new units are also written by `writeBattleParentLossNotes`; with no active battle nothing is written.
+ * Expected outcome: New ids are kept in order. An id already recorded is skipped. An empty array changes nothing. While a battle is active, the new units are also written by `writeBattleParentLossNotes`, which adds one `losses_attributed` event to the history; with no active battle nothing is written.
  * Exceptions: None.
  */
 export function recordDestroyedBattleParents(units: readonly DestroyedBattleParent[]): void {
@@ -69,6 +69,7 @@ export function recordDestroyedBattleParents(units: readonly DestroyedBattlePare
   writeBattleParentLossNotes(addedUnits, {
     battleId: battle.battleId,
     strategicTurnNumber: battle.strategicTurnNumber,
+    beatNumber: battle.tacticalTurnNumber,
     leadPartyId: battle.leadPartyId,
     opposingPartyId: battle.opposingPartyId,
   });

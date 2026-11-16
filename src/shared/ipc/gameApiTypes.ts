@@ -20,6 +20,7 @@ import type { BasemapVectorName } from '../vectorPackTypes';
 import type { DismissMercenaryResult } from '../mercenaryDismiss';
 import type { HexHireView, HireMutationResult, HireOrderRequest } from './mercenaryTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
+import type { MatchChartsSnapshot } from '../matchStatistics';
 import type { SideMessageThreadSnapshot } from '../sideMessageView';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
@@ -398,6 +399,15 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    * Exceptions: Rejects when the IPC channel fails.
    */
   readSideMessages: () => Promise<SideMessageThreadSnapshot>;
+  /**
+   * Reads the recorded statistics of every strategic turn.
+   *
+   * Contract: Applies no fog of war. The player sees every value.
+   * When to use: When a chart view opens or refreshes.
+   * Expected outcome: The seats in side order, the recorded turns in turn order, and the current turn.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readMatchCharts: () => Promise<MatchChartsSnapshot>;
   /**
    * Stores one draft from the player to one side.
    *

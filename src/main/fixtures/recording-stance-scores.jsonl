@@ -1,0 +1,3 @@
+{"line":"header","format":"agent-wars-recording","formatVersion":1,"appVersion":"0.0.0-fixture","matchId":"fixture-match","exportedAt":"2026-01-01T00:00:00.000Z"}
+{"line":"static","hexes":{"columns":["h3_index","terrain","terrain_kind","map_role"],"rows":[["8001fffffffffff","land","plains",null]]}}
+{"line":"record","recordId":1,"kind":"event","recordType":"stance_declared","formatVersion":2,"stepKey":"s1","scope":"strategic","turnNumber":1,"battleId":"","beatNumber":0,"visibility":"seats:opponent","displayText":null,"recordedAt":"2026-01-01T00:00:00.000Z","payload":{"seatId":"opponent","towardSeatId":"human","stance":"wary","reason":"fixture","trust":2,"threat":3,"previousStance":null}}

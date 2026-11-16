@@ -45,7 +45,7 @@ function spoke(to: SeatId, text: string, stance: boolean): TalkSeatResult {
     costUsd: 0.1,
     reply: {
       messages: [{ toSeatId: to, text }],
-      stances: stance ? [{ towardSeatId: to, stance: 'wary', reason: 'massing' }] : [],
+      stances: stance ? [{ towardSeatId: to, stance: 'wary', reason: 'massing', trust: 1, threat: 3 }] : [],
       droppedCount: 0,
     },
   };
@@ -76,7 +76,13 @@ test('a closed round stores messages, stances, and events, and skips a seat that
     const stored = persistTalkRound(step, results, generation);
     assert.equal(stored.get(AI_SEAT_IDS[0])?.[0]?.text, 'from-a');
     assert.equal(listSentSideMessages(gameDbOps).length, 2);
-    assert.equal(listSideStances(gameDbOps, AI_SEAT_IDS[0])[0]?.stance, 'wary');
+    const storedStance = listSideStances(gameDbOps, AI_SEAT_IDS[0])[0];
+    assert.equal(storedStance?.stance, 'wary');
+    assert.deepEqual([storedStance?.trust, storedStance?.threat], [1, 3]);
+    const stanceEvent = decodeRecordPayload(gameDbOps.getOne<{ payload: Buffer }>(
+      `SELECT payload FROM match_records WHERE record_type = 'stance_declared' ORDER BY record_id LIMIT 1`
+    )?.payload ?? Buffer.alloc(0)) as { trust?: number; threat?: number };
+    assert.deepEqual([stanceEvent.trust, stanceEvent.threat], [1, 3]);
     assert.deepEqual(eventTypes(), ['message_sent', 'stance_declared', 'message_sent', 'stance_declared']);
 
     gameDbOps.run(`UPDATE seats SET out_turn = 2 WHERE seat_id = ?`, [AI_SEAT_IDS[0]]);

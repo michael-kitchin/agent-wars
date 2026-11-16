@@ -60,7 +60,7 @@ export const MATCH_TABLE_RECORDING_POLICY: Readonly<Record<string, TableRecordin
   seats: { mode: 'frame' },
   turn_notes_history: {
     mode: 'excluded',
-    reason: 'A growing log. Strategies are commander_strategy events, and losses are found by comparing frames.',
+    reason: 'A growing log. Strategies are commander_strategy events, and losses with who was responsible are losses_attributed events.',
   },
   match_records: { mode: 'excluded', reason: 'The recording itself.' },
   side_stances: { mode: 'frame' },

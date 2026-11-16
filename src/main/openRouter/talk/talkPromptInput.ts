@@ -50,7 +50,10 @@ function battleOpponentSeatId(seatId: AiSeatId, battle: TacticalBattleSnapshot):
 function sideFromRoster(
   seat: SeatRecord,
   ownSeatId: AiSeatId,
-  stanceByTarget: ReadonlyMap<string, { stance: TalkPromptSide['stance']; reason: string }>,
+  stanceByTarget: ReadonlyMap<
+    string,
+    { stance: TalkPromptSide['stance']; reason: string; trust: number | null; threat: number | null }
+  >,
   records: ReadonlyMap<string, SideCombatRecordView>,
   currentTurnNumber: number
 ): TalkPromptSide {
@@ -68,6 +71,8 @@ function sideFromRoster(
     outTurn: seat.outTurn,
     stance: own ? null : stance?.stance ?? null,
     stanceReason: own ? null : stance?.reason ?? null,
+    trust: own ? null : stance?.trust ?? null,
+    threat: own ? null : stance?.threat ?? null,
     record: view ? (conflict ? `${view.text} ${conflict}` : view.text) : null,
   };
 }
@@ -130,12 +135,12 @@ export function countUnreadPromptMessages(seatId: AiSeatId): number {
  *
  * Purpose: The talk prompt and the orders prompt name sides the same way.
  * When to use: Before either prompt prints a side label or a stance.
- * Expected outcome: One row per roster seat. The label is the home region. A stance is this commander's stored stance toward that side. A record is this commander's combat record with that side over the strategic window before the stored turn, which a battle shares with the world map.
+ * Expected outcome: One row per roster seat. The label is the home region. A stance, with its trust and threat, is this commander's own stored report toward that side. A record is this commander's combat record with that side over the strategic window before the stored turn, which a battle shares with the world map.
  * Exceptions: Propagates a SQLite error. `playerIdCodeFor` throws when a roster id is not a seat.
  */
 export function readTalkSides(seatId: AiSeatId): TalkPromptSide[] {
   const roster = sortSeatsByOrder(readSeatRoster(gameDbOps)).filter((seat) => isSeatId(seat.seatId));
-  const stanceByTarget = new Map(listSideStances(gameDbOps, seatId).map((row) => [row.towardSeatId, { stance: row.stance, reason: row.reason }] as const));
+  const stanceByTarget = new Map(listSideStances(gameDbOps, seatId).map((row) => [row.towardSeatId, { stance: row.stance, reason: row.reason, trust: row.trust, threat: row.threat }] as const));
   const currentTurnNumber = readTurnNumberOrFirst(gameDbOps.getOne);
   const records = readSideCombatRecords(seatId, currentTurnNumber);
   logTrace('talkPromptInput readTalkSides', { seatId, sideCount: roster.length, recordCount: records.size });

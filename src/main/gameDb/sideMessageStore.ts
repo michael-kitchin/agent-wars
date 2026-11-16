@@ -140,6 +140,64 @@ export interface SideStanceRow {
    * Exceptions: None.
    */
   readonly updatedTurn: number;
+  /**
+   * How far the commander believes this side, from 0 to `RELATIONSHIP_SCALE_MAX`.
+   *
+   * Contract: Null when the commander has not reported it.
+   * When to use: The prompt, the recorder event, and the match charts.
+   * Expected outcome: The stored score, or null.
+   * Exceptions: None.
+   */
+  readonly trust: number | null;
+  /**
+   * How dangerous the commander finds this side, from 0 to `RELATIONSHIP_SCALE_MAX`.
+   *
+   * Contract: Null when the commander has not reported it.
+   * When to use: The prompt, the recorder event, and the match charts.
+   * Expected outcome: The stored score, or null.
+   * Exceptions: None.
+   */
+  readonly threat: number | null;
+}
+
+/**
+ * A stance row as SQLite returns it.
+ *
+ * Contract: The columns of `side_stances`, with the scores null when never reported.
+ * When to use: The two stance queries in this file.
+ * Expected outcome: One stored stance.
+ * Exceptions: None.
+ */
+type StanceSqlRow = {
+  readonly seat_id: string;
+  readonly toward_seat_id: string;
+  readonly stance: SideStance;
+  readonly reason: string;
+  readonly updated_turn: number;
+  readonly trust: number | null;
+  readonly threat: number | null;
+};
+
+const STANCE_COLUMNS = `seat_id, toward_seat_id, stance, reason, updated_turn, trust, threat`;
+
+/**
+ * Rebuilds a stance row from the columns SQLite returns.
+ *
+ * Purpose: Callers see camel case fields.
+ * When to use: Every stance query in this file.
+ * Expected outcome: One `SideStanceRow`.
+ * Exceptions: None.
+ */
+function toStanceRow(row: StanceSqlRow): SideStanceRow {
+  return {
+    seatId: row.seat_id,
+    towardSeatId: row.toward_seat_id,
+    stance: row.stance,
+    reason: row.reason,
+    updatedTurn: row.updated_turn,
+    trust: row.trust,
+    threat: row.threat,
+  };
 }
 
 /**
@@ -376,7 +434,7 @@ export function listSentSideMessages(ops: BasicDbOps): SideMessageRow[] {
  *
  * Purpose: The stance table holds the current view. A recorder event is written only when this reports a change.
  * When to use: When a closed talk round stores a stance.
- * Expected outcome: `changed` is false when the stance and the reason are both unchanged, and then nothing is written. Otherwise the row is replaced and `previousStance` is the old stance, or null the first time.
+ * Expected outcome: `changed` is false when the stance, the reason, the trust, and the threat are all unchanged, and then nothing is written. Otherwise the row is replaced and `previousStance` is the old stance, or null the first time.
  * Exceptions: Propagates a SQLite error.
  */
 export function upsertSideStance(
@@ -386,14 +444,22 @@ export function upsertSideStance(
     readonly towardSeatId: string;
     readonly stance: SideStance;
     readonly reason: string;
+    readonly trust: number | null;
+    readonly threat: number | null;
     readonly turnNumber: number;
   }
 ): { readonly changed: boolean; readonly previousStance: SideStance | null } {
-  const existing = ops.getOne<{ stance: SideStance; reason: string }>(
-    `SELECT stance, reason FROM side_stances WHERE seat_id = ? AND toward_seat_id = ?`,
+  const existing = ops.getOne<{ stance: SideStance; reason: string; trust: number | null; threat: number | null }>(
+    `SELECT stance, reason, trust, threat FROM side_stances WHERE seat_id = ? AND toward_seat_id = ?`,
     [args.seatId, args.towardSeatId]
   );
-  if (existing && existing.stance === args.stance && existing.reason === args.reason) {
+  if (
+    existing &&
+    existing.stance === args.stance &&
+    existing.reason === args.reason &&
+    existing.trust === args.trust &&
+    existing.threat === args.threat
+  ) {
     logDebug('sideMessageStore upsertSideStance', { seatId: args.seatId, towardSeatId: args.towardSeatId, changed: false });
     return { changed: false, previousStance: existing.stance };
   }
@@ -404,13 +470,15 @@ export function upsertSideStance(
     hadPrevious: existing !== undefined,
   });
   ops.run(
-    `INSERT INTO side_stances (seat_id, toward_seat_id, stance, reason, updated_turn)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO side_stances (seat_id, toward_seat_id, stance, reason, updated_turn, trust, threat)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (seat_id, toward_seat_id) DO UPDATE SET
        stance = excluded.stance,
        reason = excluded.reason,
-       updated_turn = excluded.updated_turn`,
-    [args.seatId, args.towardSeatId, args.stance, args.reason, args.turnNumber]
+       updated_turn = excluded.updated_turn,
+       trust = excluded.trust,
+       threat = excluded.threat`,
+    [args.seatId, args.towardSeatId, args.stance, args.reason, args.turnNumber, args.trust, args.threat]
   );
   return { changed: true, previousStance: existing?.stance ?? null };
 }
@@ -420,27 +488,28 @@ export function upsertSideStance(
  *
  * Purpose: A prompt prints the commander's private view of each other side.
  * When to use: Building a talk prompt or an orders prompt.
- * Expected outcome: That seat's rows, ordered by `toward_seat_id`.
+ * Expected outcome: That seat's rows, with their trust and threat, ordered by `toward_seat_id`.
  * Exceptions: Propagates a SQLite error.
  */
 export function listSideStances(ops: BasicDbOps, seatId: string): SideStanceRow[] {
-  const rows = ops.getAll<{
-    seat_id: string;
-    toward_seat_id: string;
-    stance: SideStance;
-    reason: string;
-    updated_turn: number;
-  }>(
-    `SELECT seat_id, toward_seat_id, stance, reason, updated_turn
-     FROM side_stances WHERE seat_id = ? ORDER BY toward_seat_id`,
+  const rows = ops.getAll<StanceSqlRow>(
+    `SELECT ${STANCE_COLUMNS} FROM side_stances WHERE seat_id = ? ORDER BY toward_seat_id`,
     [seatId]
   );
   logTrace('sideMessageStore listSideStances', { seatId, count: rows.length });
-  return rows.map((row) => ({
-    seatId: row.seat_id,
-    towardSeatId: row.toward_seat_id,
-    stance: row.stance,
-    reason: row.reason,
-    updatedTurn: row.updated_turn,
-  }));
+  return rows.map(toStanceRow);
+}
+
+/**
+ * Lists every seat's current stances.
+ *
+ * Purpose: The match statistics record every commander's stance, trust, and threat each turn.
+ * When to use: Only in the main process, for the engine-only statistics event. Never in a prompt.
+ * Expected outcome: Every row, ordered by `seat_id` and then `toward_seat_id`.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function listAllSideStances(ops: BasicDbOps): SideStanceRow[] {
+  const rows = ops.getAll<StanceSqlRow>(`SELECT ${STANCE_COLUMNS} FROM side_stances ORDER BY seat_id, toward_seat_id`);
+  logTrace('sideMessageStore listAllSideStances', { count: rows.length });
+  return rows.map(toStanceRow);
 }

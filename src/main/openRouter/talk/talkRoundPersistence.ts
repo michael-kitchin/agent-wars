@@ -74,6 +74,8 @@ export function persistTalkRound(
           towardSeatId: stance.towardSeatId,
           stance: stance.stance,
           reason: stance.reason,
+          trust: stance.trust,
+          threat: stance.threat,
           turnNumber: step.turnNumber,
         });
         if (written.changed) {
@@ -83,6 +85,8 @@ export function persistTalkRound(
             towardSeatId: stance.towardSeatId,
             stance: stance.stance,
             reason: stance.reason,
+            trust: stance.trust,
+            threat: stance.threat,
             previousStance: written.previousStance,
           });
         }

@@ -33,6 +33,7 @@ export const IPC_GAME = {
   stopCommanderPlanning: 'game:stopCommanderPlanning',
   readCommanderPool: 'game:readCommanderPool',
   readSideMessages: 'game:readSideMessages',
+  readMatchCharts: 'game:readMatchCharts',
   stageSideMessage: 'game:stageSideMessage',
   cancelStagedSideMessage: 'game:cancelStagedSideMessage',
   submitOrders: 'game:submitOrders',

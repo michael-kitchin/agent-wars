@@ -32,7 +32,8 @@ test('boundaries write one frame per step change and one final frame at game ove
 
       recordStepBoundary(strategicStep(1), '1.0.0');
       const started = listMatchRecords(gameDbOps);
-      assert.deepEqual(started.map((row) => row.recordType), ['match_started', 'state']);
+      assert.deepEqual(started.map((row) => row.recordType), ['match_started', 'state', 'side_statistics']);
+      assert.equal(started[2]?.stepKey, 's1');
       assert.equal(started[1]?.stepKey, 's1');
       const afterSameStep = countMatchRecords(gameDbOps);
       recordStepBoundary(strategicStep(1), '1.0.0');
@@ -124,5 +125,17 @@ test('the first recorded turn is the turn already stored', () => {
     assert.equal(payload.firstRecordedTurn, 7);
     assert.ok(payload.matchId.length > 0);
     assert.equal(rows.find((row) => row.kind === 'frame')?.stepKey, 's7');
+  });
+});
+
+test('each strategic frame is followed by its statistics event, and a battle step has none', () => {
+  withTempGameDb('aw-match-statistics-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    recordStepBoundary(tacticalStep(1, 'b1', 1), '1.0.0');
+    recordStepBoundary(strategicStep(2), '1.0.0');
+    const rows = listMatchRecords(gameDbOps).filter((row) => row.recordType !== 'match_started');
+    assert.deepEqual(rows.map((row) => row.recordType), ['state', 'side_statistics', 'state', 'state', 'side_statistics']);
+    assert.equal(rows[1]?.visibility, 'engine');
+    assert.equal(rows[4]?.stepKey, 's2');
   });
 });

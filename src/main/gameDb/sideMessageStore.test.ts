@@ -13,11 +13,12 @@ import { strategicStep } from '../../shared/matchRecording';
 import { resetGameForNewMatch } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { gameDbOps } from './dbConnection';
-import { ensureSideMessageTables } from './sideMessageTables';
+import { ensureSideMessageTables, ensureSideStanceScoreColumns } from './sideMessageTables';
 import {
   deleteStagedSideMessage,
   insertSentSideMessage,
   listSideMessageThread,
+  listAllSideStances,
   listSideStances,
   listStagedSideMessages,
   listUnseenInboundSideMessages,
@@ -62,6 +63,8 @@ test('a stance is written only when it changes, and a seat cannot message itself
       towardSeatId: 'human',
       stance: 'wary',
       reason: 'massing',
+      trust: null,
+      threat: null,
       turnNumber: 1,
     });
     assert.deepEqual(first, { changed: true, previousStance: null });
@@ -70,6 +73,8 @@ test('a stance is written only when it changes, and a seat cannot message itself
       towardSeatId: 'human',
       stance: 'wary',
       reason: 'massing',
+      trust: null,
+      threat: null,
       turnNumber: 2,
     });
     assert.equal(same.changed, false);
@@ -78,6 +83,8 @@ test('a stance is written only when it changes, and a seat cannot message itself
       towardSeatId: 'human',
       stance: 'hostile',
       reason: 'crossed',
+      trust: null,
+      threat: null,
       turnNumber: 3,
     });
     assert.deepEqual(changed, { changed: true, previousStance: 'wary' });
@@ -92,7 +99,7 @@ test('a stance is written only when it changes, and a seat cannot message itself
 test('a new match clears both tables, and opening creates them again', () => {
   withTempGameDb('aw-side-reset-', () => {
     insertSentSideMessage(gameDbOps, { fromSeatId: 'opponent', toSeatId: 'human', body: 'keep', step: strategicStep(1) });
-    upsertSideStance(gameDbOps, { seatId: 'opponent', towardSeatId: 'human', stance: 'neutral', reason: '', turnNumber: 1 });
+    upsertSideStance(gameDbOps, { seatId: 'opponent', towardSeatId: 'human', stance: 'neutral', reason: '', trust: null, threat: null, turnNumber: 1 });
     resetGameForNewMatch();
     assert.equal(gameDbOps.getOne<{ n: number }>('SELECT COUNT(*) AS n FROM side_messages')?.n, 0);
     assert.equal(gameDbOps.getOne<{ n: number }>('SELECT COUNT(*) AS n FROM side_stances')?.n, 0);
@@ -101,5 +108,37 @@ test('a new match clears both tables, and opening creates them again', () => {
     ensureSideMessageTables((sql) => gameDbOps.run(sql));
     assert.equal(gameDbOps.getAll('PRAGMA table_info(side_messages)').length > 0, true);
     assert.equal(gameDbOps.getAll('PRAGMA table_info(side_stances)').length > 0, true);
+  });
+});
+
+test('trust and threat are stored, change the row, and are added to an older table', () => {
+  withTempGameDb('aw-side-scores-', () => {
+    const base = { seatId: 'opponent', towardSeatId: 'human', stance: 'wary' as const, reason: 'massing', turnNumber: 1 };
+    upsertSideStance(gameDbOps, { ...base, trust: 1, threat: 3 });
+    const stored = listSideStances(gameDbOps, 'opponent')[0];
+    assert.deepEqual([stored?.trust, stored?.threat], [1, 3]);
+    assert.equal(upsertSideStance(gameDbOps, { ...base, trust: 1, threat: 3 }).changed, false);
+    assert.equal(upsertSideStance(gameDbOps, { ...base, trust: 2, threat: 3 }).changed, true);
+    assert.equal(upsertSideStance(gameDbOps, { ...base, trust: 2, threat: null }).changed, true);
+
+    upsertSideStance(gameDbOps, { ...base, seatId: 'opponent2', trust: null, threat: null });
+    assert.deepEqual(
+      listAllSideStances(gameDbOps).map((row) => row.seatId),
+      ['opponent', 'opponent2']
+    );
+
+    gameDbOps.run('DROP TABLE side_stances');
+    gameDbOps.run(`CREATE TABLE side_stances (
+      seat_id TEXT NOT NULL,
+      toward_seat_id TEXT NOT NULL,
+      stance TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      updated_turn INTEGER NOT NULL,
+      PRIMARY KEY (seat_id, toward_seat_id)
+    )`);
+    ensureSideStanceScoreColumns(gameDbOps);
+    ensureSideStanceScoreColumns(gameDbOps);
+    const columns = gameDbOps.getAll<{ name: string }>('PRAGMA table_info(side_stances)').map((column) => column.name);
+    assert.deepEqual(columns.filter((name) => name === 'trust' || name === 'threat').sort(), ['threat', 'trust']);
   });
 });

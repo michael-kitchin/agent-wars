@@ -122,7 +122,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
-| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Omitted when this commander has no visible message, no stance, and no combat record. |
+| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Stance lines carry this commander's own trust and threat. Omitted when this commander has no visible message, no stance, and no combat record. |
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
 | `### Production Priorities` | Under Production Status, after Paused Queues and before Controlled Hex Queues, when `buildProductionPriorityLines` returns a line. |

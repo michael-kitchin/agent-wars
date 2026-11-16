@@ -19,6 +19,7 @@ import { strategicStep, tacticalStep } from '../../shared/matchRecording';
 import { readHumanOrderTables } from './matchFrameCapture';
 import { listMatchRecords } from './matchRecordStore';
 import {
+  recordAttributedLosses,
   recordCommanderStrategy,
   recordConsultation,
   recordStrategicOrders,
@@ -154,5 +155,21 @@ test('a consult and a strategy record the summary that was already built', () =>
     assert.equal(listMatchRecords(gameDbOps).length, count);
     assert.deepEqual(stepForConsult(4, { battleId: 'b', tacticalTurnNumber: 2 }), tacticalStep(4, 'b', 2));
     assert.deepEqual(stepForConsult(4, null), strategicStep(4));
+  });
+});
+
+test('attributed losses are one engine-only event at the given step, and an empty record writes nothing', () => {
+  withTempGameDb('aw-match-losses-', () => {
+    const empty = { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
+    const record = { source: 'tacticalBeat' as const, byOwner: { opponent: { ...empty, melee: [{ displayName: 'M', unitType: 'armor' as const, unitId: 'a1-a1' }] } } };
+    recordAttributedLosses(tacticalStep(3, 'b1', 2), record);
+    recordAttributedLosses(strategicStep(3), { source: 'strategicTurn', byOwner: {} });
+    const rows = listMatchRecords(gameDbOps);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.recordType, 'losses_attributed');
+    assert.equal(rows[0]?.visibility, 'engine');
+    assert.equal(rows[0]?.displayText, null);
+    assert.equal(rows[0]?.stepKey, 's3-bb1-t2');
+    assert.deepEqual(rows[0]?.payload, record);
   });
 });

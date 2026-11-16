@@ -16,6 +16,7 @@ import {
   insertMatchRecord,
   lastFrameStepKeyText,
   lastMatchRecordId,
+  listMatchEventsOfType,
   listMatchRecords,
   matchHasEventOfType,
 } from './matchRecordStore';
@@ -64,5 +65,7 @@ test('a frame and two events round-trip in record order', () => {
     assert.equal(matchHasEventOfType(gameDbOps, 'consultation'), false);
     assert.equal(countMatchRecords(gameDbOps), 3);
     assert.equal(lastMatchRecordId(gameDbOps), 3);
+    assert.deepEqual(listMatchEventsOfType(gameDbOps, 'orders_committed').map((row) => row.recordId), [2]);
+    assert.deepEqual(listMatchEventsOfType(gameDbOps, 'consultation'), []);
   });
 });

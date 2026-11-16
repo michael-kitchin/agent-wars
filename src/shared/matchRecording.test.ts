@@ -29,5 +29,5 @@ test('step keys and visibility text round-trip', () => {
   assert.deepEqual(parseVisibilityText(visibilityText({ seats: ['human', 'opponent'] })), { seats: ['human', 'opponent'] });
   assert.equal(parseVisibilityText('seats:'), 'engine');
   assert.equal(parseVisibilityText('later'), 'engine');
-  for (const type of MATCH_EVENT_TYPES) assert.equal(MATCH_EVENT_FORMAT_VERSIONS[type], 1);
+  for (const type of MATCH_EVENT_TYPES) assert.equal(MATCH_EVENT_FORMAT_VERSIONS[type], type === 'stance_declared' ? 2 : 1);
 });

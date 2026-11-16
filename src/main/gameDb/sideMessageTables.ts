@@ -8,6 +8,28 @@
  */
 
 import { logDebug } from '../logger';
+import type { BasicDbOps } from './dbOps';
+import { RELATIONSHIP_SCALE_MAX } from '../../shared/sideMessages';
+
+/**
+ * Column definition for a commander's reported trust in another side.
+ *
+ * Purpose: The table statement and the upgrade of an older table add the same column text.
+ * When to use: Building `SIDE_MESSAGE_TABLES_DDL` and `ensureSideStanceScoreColumns`.
+ * Expected outcome: A nullable integer column limited to 0 through `RELATIONSHIP_SCALE_MAX`.
+ * Exceptions: None.
+ */
+const TRUST_COLUMN_DEFINITION = `trust INTEGER CHECK (trust IS NULL OR trust BETWEEN 0 AND ${RELATIONSHIP_SCALE_MAX})`;
+
+/**
+ * Column definition for a commander's reported threat from another side.
+ *
+ * Purpose: The table statement and the upgrade of an older table add the same column text.
+ * When to use: Building `SIDE_MESSAGE_TABLES_DDL` and `ensureSideStanceScoreColumns`.
+ * Expected outcome: A nullable integer column limited to 0 through `RELATIONSHIP_SCALE_MAX`.
+ * Exceptions: None.
+ */
+const THREAT_COLUMN_DEFINITION = `threat INTEGER CHECK (threat IS NULL OR threat BETWEEN 0 AND ${RELATIONSHIP_SCALE_MAX})`;
 
 /**
  * `CREATE TABLE` text for `side_messages` and `side_stances`.
@@ -36,6 +58,8 @@ CREATE TABLE IF NOT EXISTS side_stances (
   stance TEXT NOT NULL CHECK (stance IN ('hostile', 'wary', 'neutral', 'cordial', 'friendly')),
   reason TEXT NOT NULL,
   updated_turn INTEGER NOT NULL,
+  ${TRUST_COLUMN_DEFINITION},
+  ${THREAT_COLUMN_DEFINITION},
   PRIMARY KEY (seat_id, toward_seat_id),
   CHECK (seat_id <> toward_seat_id)
 );`;
@@ -53,5 +77,24 @@ export function ensureSideMessageTables(exec: (sql: string) => void): void {
   for (const statement of SIDE_MESSAGE_TABLES_DDL.split(';')) {
     const sql = statement.trim();
     if (sql.length > 0) exec(sql);
+  }
+}
+
+/**
+ * Adds the trust and threat columns to a `side_stances` table saved before they existed.
+ *
+ * Purpose: Save version 26 stays. An older file has the stance table without the two score columns until it is opened.
+ * When to use: Directly after every `ensureSideMessageTables` call. Pass the open database's operations.
+ * Expected outcome: `side_stances` lists both columns. A table that already has them is left alone, so a second call does nothing.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function ensureSideStanceScoreColumns(ops: BasicDbOps): void {
+  logDebug('sideMessageTables ensureSideStanceScoreColumns');
+  const existing = new Set(ops.getAll<{ name: string }>('PRAGMA table_info(side_stances)').map((column) => column.name));
+  for (const [name, definition] of [
+    ['trust', TRUST_COLUMN_DEFINITION],
+    ['threat', THREAT_COLUMN_DEFINITION],
+  ] as const) {
+    if (!existing.has(name)) ops.run(`ALTER TABLE side_stances ADD COLUMN ${definition}`);
   }
 }

@@ -16,7 +16,11 @@ A commander sees a message only when `sideMessageVisibleTo` says so. For a comma
 
 A stance is a commander's private view of one other side. The values are `SIDE_STANCES`: `hostile`, `wary`, `neutral`, `cordial`, `friendly`. Each stored stance has a reason of at most `SIDE_STANCE_REASON_MAX_CHARS` (160) characters. An empty reason is kept. No other commander is told a stance. A stance does not create an alliance. The talk prompt tells the commander to base a stance on what a side has done to it, as the loss lines in Recent Turn Notes and the Record column of the Sides table show, more than on what that side says. The orders system text does not name that column. It still says a loss line under Your Losses is the game's record that the named side destroyed those units.
 
-`side_stances` holds one row per commander and target. `upsertSideStance` writes a row only when the stance or the reason changed.
+`side_stances` holds one row per commander and target. `upsertSideStance` writes a row only when the stance, the reason, the trust, or the threat changed.
+
+## Trust and threat
+
+A commander reports two scores with each stance, each a whole number from 0 to `RELATIONSHIP_SCALE_MAX` (4). Trust is how far the commander believes what that side tells it. Threat is how dangerous the commander finds that side. `cleanRelationshipScore` keeps a valid value and returns null for anything else, so a missing or out-of-range score is stored as null and does not drop the stance. Both are stored in the `trust` and `threat` columns of `side_stances` and are as private to the commander as the stance is. No prompt shows another commander's stance, trust, or threat, whether fog of war is on or off. A commander sees its own two scores beside its own stance, in the Sides table of the talk prompt and in the stance list of the orders prompt, and `not reported` stands in for a null score. The player's match charts show every commander's reports (see [match-statistics.md](match-statistics.md)). The reply schema asks for both scores with each stance, as integers limited to 0 through 4 by an enum.
 
 ## The two stages
 

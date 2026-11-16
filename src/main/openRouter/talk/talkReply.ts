@@ -11,6 +11,7 @@ import { logTrace } from '../../logger';
 import { isSeatId, type SeatId } from '../../../shared/seatIds';
 import { playerIdCodeFor } from '../../../shared/unitIds';
 import {
+  cleanRelationshipScore,
   cleanSideMessageText,
   isSideStance,
   SIDE_MESSAGE_MAX_CHARS,
@@ -50,7 +51,7 @@ export interface TalkReplyMessage {
 /**
  * One stance a commander chose to set.
  *
- * Contract: `towardSeatId` is another active seat. `stance` is one of the five. `reason` may be empty.
+ * Contract: `towardSeatId` is another active seat. `stance` is one of the five. `reason` may be empty. A score the reply did not give validly is null.
  * When to use: Writing `side_stances`.
  * Expected outcome: The private view of one side.
  * Exceptions: None.
@@ -83,6 +84,24 @@ export interface TalkReplyStance {
    * Exceptions: None.
    */
   readonly reason: string;
+  /**
+   * How far the commander believes this side, after cleaning.
+   *
+   * Contract: A whole number from 0 to `RELATIONSHIP_SCALE_MAX`, or null when the reply left it out or sent a value outside that range.
+   * When to use: The trust column.
+   * Expected outcome: The stored score, or null.
+   * Exceptions: None.
+   */
+  readonly trust: number | null;
+  /**
+   * How dangerous the commander finds this side, after cleaning.
+   *
+   * Contract: A whole number from 0 to `RELATIONSHIP_SCALE_MAX`, or null when the reply left it out or sent a value outside that range.
+   * When to use: The threat column.
+   * Expected outcome: The stored score, or null.
+   * Exceptions: None.
+   */
+  readonly threat: number | null;
 }
 
 /**
@@ -218,7 +237,13 @@ export function parseTalkReply(args: {
 
   for (const entry of entryList(record.stances)) {
     const row = entry !== null && typeof entry === 'object'
-      ? (entry as { readonly toward?: unknown; readonly stance?: unknown; readonly reason?: unknown })
+      ? (entry as {
+          readonly toward?: unknown;
+          readonly stance?: unknown;
+          readonly reason?: unknown;
+          readonly trust?: unknown;
+          readonly threat?: unknown;
+        })
       : null;
     const towardSeatId = row ? seatIdForSideCode(row.toward, args.addressableSeatIds) : null;
     if (!towardSeatId || towardSeatId === args.ownSeatId || !isSideStance(row?.stance) || seenStances.has(towardSeatId)) {
@@ -230,6 +255,8 @@ export function parseTalkReply(args: {
       towardSeatId,
       stance: row.stance,
       reason: cleanSideMessageText(row.reason, SIDE_STANCE_REASON_MAX_CHARS),
+      trust: cleanRelationshipScore(row.trust),
+      threat: cleanRelationshipScore(row.threat),
     });
   }
 

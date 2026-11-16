@@ -15,6 +15,7 @@ import {
   type StrategicKillEdge,
 } from '../lossAttribution/strategicLossAttribution';
 import { logDebug, logTrace } from '../logger';
+import { strategicStep } from '../../shared/matchRecording';
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { mergeCarrierMaps } from './transportCargoLoss';
 
@@ -265,6 +266,8 @@ export function captureStrategicTurnLossNote(args: StrategicTurnLossNoteArgs): v
     scope: 'strategic',
     battleId: '',
     turnNumber: args.turnNumber,
+    historyStep: strategicStep(args.turnNumber),
+    historySource: 'strategicTurn',
     kills: args.allKills,
     killsByDirectFire: args.killsByDirectFire,
     killsByReturnFire: args.killsByReturnFire,

@@ -9,6 +9,7 @@
 
 import type { ConsultTelemetrySummary } from '../openRouter/consultTelemetrySummary';
 import { logDebug, logTrace } from '../logger';
+import type { AttributedLossesRecord } from '../../shared/lossHistory';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { stepKeyText, strategicStep, tacticalStep, type StepKey } from '../../shared/matchRecording';
 import type { FramePayload } from './matchFrameCapture';
@@ -185,8 +186,8 @@ export function recordSideMessageSent(args: {
  * Records a change to one commander's private stance.
  *
  * Purpose: The stance table keeps only the current row. The recording keeps the change.
- * When to use: When `upsertSideStance` reports that the stance or the reason changed.
- * Expected outcome: One `stance_declared` event visible only to that commander.
+ * When to use: When `upsertSideStance` reports that the stance, the reason, the trust, or the threat changed.
+ * Expected outcome: One `stance_declared` event visible only to that commander. Its payload carries `trust` and `threat`, each null when the commander did not report it.
  * Exceptions: None. `recordMatchEvent` swallows its own failure.
  */
 export function recordSideStanceDeclared(args: {
@@ -195,6 +196,8 @@ export function recordSideStanceDeclared(args: {
   readonly towardSeatId: string;
   readonly stance: string;
   readonly reason: string;
+  readonly trust: number | null;
+  readonly threat: number | null;
   readonly previousStance: string | null;
 }): void {
   logDebug('matchRecordingEvents recordSideStanceDeclared', {
@@ -213,9 +216,26 @@ export function recordSideStanceDeclared(args: {
       towardSeatId: args.towardSeatId,
       stance: args.stance,
       reason: args.reason,
+      trust: args.trust,
+      threat: args.threat,
       previousStance: args.previousStance,
     },
   });
+}
+
+/**
+ * Records every owner's losses from one capture, with who was responsible.
+ *
+ * Purpose: A frame difference shows that a unit is gone but not who destroyed it or how, so each loss capture is kept as its own event.
+ * When to use: From the three loss captures, at the step they file their loss notes under.
+ * Expected outcome: One `losses_attributed` event with engine visibility and no display text. Nothing when `record.byOwner` has no owner.
+ * Exceptions: None. `recordMatchEvent` swallows its own failure.
+ */
+export function recordAttributedLosses(step: StepKey, record: AttributedLossesRecord): void {
+  const ownerCount = Object.keys(record.byOwner).length;
+  logDebug('matchRecordingEvents recordAttributedLosses', { step: stepKeyText(step), source: record.source, ownerCount });
+  if (ownerCount === 0) return;
+  recordMatchEvent({ type: 'losses_attributed', step, visibility: 'engine', payload: record });
 }
 
 /**
