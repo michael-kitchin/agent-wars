@@ -3,7 +3,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { canEmbarkAtHex } from './sealiftEmbarkEligibility';
+import { canEmbarkAtHex, canManualDebarkAtHex } from './sealiftEmbarkEligibility';
 
 /**
  * Locks the embark truth table that stack UI and IPC must match.
@@ -15,25 +15,39 @@ import { canEmbarkAtHex } from './sealiftEmbarkEligibility';
  */
 function testCanEmbarkAtHexTerrainPortAndControl(): void {
   assert.equal(
-    canEmbarkAtHex({ nativeTerrain: 'coastal', hasSeaport: false, hexControlledByPlayer: false }),
+    canEmbarkAtHex({ nativeTerrain: 'coastal', hasSeaport: false, hexControlledByPlayer: false, seaAccess: true }),
     true
   );
   assert.equal(
-    canEmbarkAtHex({ nativeTerrain: 'land', hasSeaport: true, hexControlledByPlayer: false }),
+    canEmbarkAtHex({ nativeTerrain: 'land', hasSeaport: true, hexControlledByPlayer: false, seaAccess: true }),
     true
   );
   assert.equal(
-    canEmbarkAtHex({ nativeTerrain: 'water', hasSeaport: true, hexControlledByPlayer: true }),
+    canEmbarkAtHex({ nativeTerrain: 'water', hasSeaport: true, hexControlledByPlayer: true, seaAccess: true }),
     true
   );
   assert.equal(
-    canEmbarkAtHex({ nativeTerrain: 'water', hasSeaport: true, hexControlledByPlayer: false }),
+    canEmbarkAtHex({ nativeTerrain: 'water', hasSeaport: true, hexControlledByPlayer: false, seaAccess: true }),
     false
   );
   assert.equal(
-    canEmbarkAtHex({ nativeTerrain: 'water', hasSeaport: false, hexControlledByPlayer: true }),
+    canEmbarkAtHex({ nativeTerrain: 'water', hasSeaport: false, hexControlledByPlayer: true, seaAccess: true }),
     false
   );
+}
+
+/**
+ * Boarding at a land seaport needs sea access; unloading there does not.
+ *
+ * Purpose: A ship stuck at a port with only land around it must still be able to put its cargo ashore.
+ * When to use: After edits to the land-seaport branches of `canEmbarkAtHex` or `canManualDebarkAtHex`.
+ * Expected outcome: Embark false and debark true for a land seaport with no sea access.
+ * Exceptions: Propagates assertion errors.
+ */
+function testLandSeaportBoardingNeedsSeaAccess(): void {
+  const port = { nativeTerrain: 'land', hasSeaport: true, hexControlledByPlayer: false };
+  assert.equal(canEmbarkAtHex({ ...port, seaAccess: false }), false);
+  assert.equal(canManualDebarkAtHex(port), true);
 }
 
 /**
@@ -46,6 +60,7 @@ function testCanEmbarkAtHexTerrainPortAndControl(): void {
  */
 function run(): void {
   testCanEmbarkAtHexTerrainPortAndControl();
+  testLandSeaportBoardingNeedsSeaAccess();
   console.log('sealiftEmbarkEligibility.test.ts passed');
 }
 

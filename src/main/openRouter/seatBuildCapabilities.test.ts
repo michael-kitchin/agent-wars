@@ -46,9 +46,20 @@ const urban = Math.max(buildMinimumUrbanCells('missile'), buildMinimumUrbanCells
 test('a qualifying city can build a naval unit and a missile', () => {
   const result = seatBuildCapabilities(
     stateFor([{ h3Index: ORIGIN, urbanHexCount: urban, airportCount: 0, seaportCount: 1 }], []),
-    OWN
+    OWN,
+    // This snapshot omits the port's neighbors; the case is not about sea access.
+    () => true
   );
   assert.deepEqual(result, { canBuildNaval: true, canBuildMissile: true });
+});
+
+test('a seaport with no sea access cannot build a naval unit but can still build a missile', () => {
+  const result = seatBuildCapabilities(
+    stateFor([{ h3Index: ORIGIN, urbanHexCount: urban, airportCount: 0, seaportCount: 1 }], []),
+    OWN,
+    () => false
+  );
+  assert.deepEqual(result, { canBuildNaval: false, canBuildMissile: true });
 });
 
 test('a seat at the naval cap can still build a missile', () => {

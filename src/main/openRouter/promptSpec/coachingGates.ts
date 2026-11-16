@@ -204,7 +204,7 @@ export interface CoachingGates {
    *
    * Contract: Omitted means false. Comes from `seatBuildCapabilities`, not from the queue snapshot.
    * When to use: The naval tools line.
-   * Expected outcome: False when the seat has no seaport city or is at the naval cap.
+   * Expected outcome: False when the seat has no seaport city with sea access or is at the naval cap.
    * Exceptions: None.
    */
   readonly canBuildNaval?: boolean;

@@ -20,6 +20,8 @@ import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { canLandUnitTraverseEdge, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
+import type { SeaAccessCheck } from '../../shared/seaAccess';
+import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 
 /**
  * Reads of one snapshot for lift.
@@ -99,7 +101,7 @@ export interface LiftTerrain {
  * Builds the lift readings for one snapshot and one seat.
  *
  * Purpose: Embark, debark, sailing, landing, and nearby units stay on one pass over the snapshot.
- * When to use: Once per seat per decision, with that seat's id and the land mass for landing steps.
+ * When to use: Once per seat per decision, with that seat's id and the land mass for landing steps. Boarding at a land seaport also needs sea access (`seaAccessOf`).
  * Expected outcome: Methods that read the snapshot and do not touch the database. The construction logs once.
  * Exceptions: None. Neighbour-ring failures are reported by `landingHexes`.
  */
@@ -107,7 +109,10 @@ export function buildLiftTerrain(args: {
   readonly state: GameStateSnapshot;
   readonly seatId: string;
   readonly landMass: LandMassByH3;
+  // Answers whether a land seaport has water or coast next to it. Defaults to the database read `hexHasSeaAccess`; only a test with no database passes another.
+  readonly seaAccessOf?: SeaAccessCheck;
 }): LiftTerrain {
+  const seaAccessOf = args.seaAccessOf ?? hexHasSeaAccess;
   const infraByHex = new Map((args.state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
   const controlByHex = new Map((args.state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   const hexById = new Map(args.state.hexes.map((hex) => [hex.h3Index, hex]));
@@ -137,7 +142,7 @@ export function buildLiftTerrain(args: {
 
   const embarkLegal = (h3Index: string): boolean => {
     const attrs = eligibility(h3Index);
-    return attrs !== null && canEmbarkAtHex(attrs);
+    return attrs !== null && canEmbarkAtHex({ ...attrs, seaAccess: attrs.hasSeaport && seaAccessOf(h3Index) });
   };
   const debarkLegal = (h3Index: string): boolean => {
     const attrs = eligibility(h3Index);

@@ -21,8 +21,8 @@ import { getAvailableBuildUnitTypes } from './productionRules';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 
 test('missiles are offered at the Advanced urban threshold', () => {
-  assert.equal(getAvailableBuildUnitTypes(20, 0, 0).includes('missile'), false);
-  assert.equal(getAvailableBuildUnitTypes(21, 0, 0).includes('missile'), true);
+  assert.equal(getAvailableBuildUnitTypes({ urbanHexCount: 20, seaportCount: 0, airportCount: 0, seaAccess: true }).includes('missile'), false);
+  assert.equal(getAvailableBuildUnitTypes({ urbanHexCount: 21, seaportCount: 0, airportCount: 0, seaAccess: true }).includes('missile'), true);
 });
 
 test('a funded missile queue spawns a missile that is already holding', () => {

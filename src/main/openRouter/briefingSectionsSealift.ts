@@ -13,13 +13,15 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
+import type { SeaAccessCheck } from '../../shared/seaAccess';
+import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 import { gridHopDistancesFrom } from '../tools/assessUnitProximity';
 import { SECTION_TITLE_NAVAL_TRANSPORT_STATUS, topLevelHeading } from './promptSpec/sectionHeadings';
 
 /**
  * Returns the closest hex where this player may embark, using the same rule as stack sealift.
  *
- * Purpose: Naval Transport Status "Nearest Embark Hex" must match `canEmbarkAtHex` (coastal and land seaports without control; water seaports only when controlled).
+ * Purpose: Naval Transport Status "Nearest Embark Hex" must match `canEmbarkAtHex` (coastal and land seaports with sea access without control; water seaports only when controlled). Sea access comes from `seaAccessOf`, never from `state.hexes`, because a commander's snapshot can mask terrain.
  * When to use: Strategic `buildSealiftBriefingBlock` for each opponent naval unit.
  * Expected outcome: Formatted hex plus hop count, or `—` when no eligible hex is in the snapshot. Hops use neighbor BFS so pentagon-crossing pairs still score.
  * Exceptions: Unreachable or invalid cells are omitted.
@@ -28,7 +30,8 @@ function findNearestOpponentEmbarkHex(
   navalH3: string,
   state: GameStateSnapshot,
   format: (h3: string) => string,
-  ownSeatId: string
+  ownSeatId: string,
+  seaAccessOf: SeaAccessCheck
 ): string {
   const infraByHex = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
   const controlByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
@@ -41,6 +44,7 @@ function findNearestOpponentEmbarkHex(
         terrainKind: hex.terrainKind,
         hasSeaport: seaport > 0,
         hexControlledByPlayer: controlByHex.get(hex.h3Index) === ownSeatId,
+        seaAccess: seaport > 0 && seaAccessOf(hex.h3Index),
       })
     ) {
       legalH3.push(hex.h3Index);
@@ -61,7 +65,7 @@ function findNearestOpponentEmbarkHex(
 /**
  * Builds the Naval Transport Status briefing block (strategic embark table, or tactical embark links).
  *
- * Purpose: Shared shell sealift section; tactical uses `embarkedOnSubUnitId` and omits empty battles.
+ * Purpose: Shared shell sealift section; tactical uses `embarkedOnSubUnitId` and omits empty battles. `seaAccessOf` defaults to the database read; only a test with no database passes another.
  * When to use: `buildSystemPromptForTools` for both modes.
  * Expected outcome: Empty string when the opponent has neither naval nor air units. Air without ships is the heading plus the airlift sentence. Ships add the embark table.
  * Exceptions: None.
@@ -69,7 +73,8 @@ function findNearestOpponentEmbarkHex(
 export function buildSealiftBriefingBlock(
   state: GameStateSnapshot,
   format: (h3: string) => string,
-  mode: 'strategic' | 'tactical' = 'strategic'
+  mode: 'strategic' | 'tactical' = 'strategic',
+  seaAccessOf: SeaAccessCheck = hexHasSeaAccess
 ): string {
   const lines: string[] = [];
   const ownSeat = briefingOwnSeatId(state);
@@ -116,7 +121,7 @@ export function buildSealiftBriefingBlock(
     const embarked = opponentLand.filter((land) => land.embarkedOnCarrierUnitId === naval.id);
     const armor = embarked.filter((unit) => unit.unitType === 'armor').length;
     const infantry = embarked.filter((unit) => unit.unitType === 'infantry').length;
-    const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format, ownSeat);
+    const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format, ownSeat, seaAccessOf);
     const capacityUsed = armor >= 1 ? 2 : Math.min(infantry, 2);
     const aboard = `infantry ${infantry}, armor ${armor}`;
     navalRows.push([

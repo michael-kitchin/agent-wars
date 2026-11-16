@@ -42,6 +42,21 @@ import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 
 /**
+ * Lists the types one queue row's select offers.
+ *
+ * Purpose: A row whose type the hex can no longer build (a ship queued at a port with no sea access) must still show that type, not a blank select.
+ * When to use: When filling a row's type select from the hex's available types and the row's own type.
+ * Expected outcome: `available` when it includes `current`; otherwise `current` first, then `available`.
+ * Exceptions: None.
+ */
+function rowTypeOptions(
+  available: readonly BuildQueueItemType[],
+  current: BuildQueueItemType
+): BuildQueueItemType[] {
+  return available.includes(current) ? [...available] : [current, ...available];
+}
+
+/**
  * Re-exports build-count sanitizer for existing `buildQueuePopup` import paths.
  *
  * Purpose: Preserves call sites that imported `sanitizeBuildCountInputText` from this module.
@@ -443,7 +458,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       const row = document.createElement('div');
       row.className = 'build-queue-row';
       const typeSelect = document.createElement('select');
-      for (const unitType of options) {
+      for (const unitType of rowTypeOptions(options, entry.unitType)) {
         const opt = document.createElement('option');
         opt.value = unitType;
         opt.textContent = formatBuildQueueItemLabel(unitType);

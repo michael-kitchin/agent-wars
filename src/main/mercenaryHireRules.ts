@@ -28,6 +28,8 @@ import { NEUTRAL_OWNER_ID, type SeatId } from '../shared/seatIds';
 import { buildStrategicUnitDisplayLabelResolver } from '../shared/unitDisplayNames';
 import { logTrace } from './logger';
 import { getAvailableBuildUnitTypes } from './productionRules';
+import { hexHasSeaAccess } from './gameDb/seaAccessReads';
+import type { SeaAccessCheck } from '../shared/seaAccess';
 import { techLevelForBirthHex } from './techBonus/techLevelForBirthHex';
 
 /**
@@ -57,6 +59,15 @@ export interface HireContext {
    * Exceptions: None.
    */
   readonly seatId: SeatId;
+  /**
+   * Answers whether a hex has water or coast in or next to it.
+   *
+   * Contract: Reads the true terrain, never the seat's masked snapshot. The default is `hexHasSeaAccess`; tests with no database pass their own check.
+   * When to use: `evaluateHexHire` asks it for naval raises at a hex with a seaport.
+   * Expected outcome: True when `hasSeaAccess` is true for the hex.
+   * Exceptions: None.
+   */
+  readonly seaAccessOf: SeaAccessCheck;
   /**
    * Whether this seat is still in the match.
    *
@@ -267,11 +278,15 @@ export interface HexHireEvaluation {
  * Indexes one snapshot for hire checks.
  *
  * Purpose: The panel and the end of the turn must not disagree about homes, cargo, or tech.
- * When to use: Once per snapshot per seat. Pass the seat's own snapshot for placement, and the full board at the end of the turn.
+ * When to use: Once per snapshot per seat. Pass the seat's own snapshot for placement, and the full board at the end of the turn. `seaAccessOf` defaults to the database read; only a test with no database passes another.
  * Expected outcome: A context. A missing seat list treats every home-region entry as an active seat.
  * Exceptions: None.
  */
-export function buildHireContext(state: GameStateSnapshot, seatId: SeatId): HireContext {
+export function buildHireContext(
+  state: GameStateSnapshot,
+  seatId: SeatId,
+  seaAccessOf: SeaAccessCheck = hexHasSeaAccess
+): HireContext {
   logTrace('mercenaryHireRules buildHireContext', { seatId, unitCount: state.units.length });
   const unitsByHex = new Map<string, GameStateSnapshot['units'][number][]>();
   const cargoByShip = new Map<string, string[]>();
@@ -300,6 +315,7 @@ export function buildHireContext(state: GameStateSnapshot, seatId: SeatId): Hire
   return {
     state,
     seatId,
+    seaAccessOf,
     seatActive: requesterIsActive(state, seatId),
     techBonusEnabled: state.techBonusEnabled === true,
     unitsByHex,
@@ -336,7 +352,12 @@ export function evaluateHexHire(context: HireContext, h3Index: string): HexHireE
     };
   }
   const tier = context.techBonusEnabled ? techLevelForBirthHex(h3Index) : undefined;
-  const options = getAvailableBuildUnitTypes(isNeutralBorderHex(h3Index) ? 0 : urban, infra?.seaportCount ?? 0, infra?.airportCount ?? 0)
+  const options = getAvailableBuildUnitTypes({
+    urbanHexCount: isNeutralBorderHex(h3Index) ? 0 : urban,
+    seaportCount: infra?.seaportCount ?? 0,
+    airportCount: infra?.airportCount ?? 0,
+    seaAccess: (infra?.seaportCount ?? 0) > 0 && context.seaAccessOf(h3Index),
+  })
     .filter(isHireableUnitType)
     .filter((unitType) => unitCostFor(unitType) <= raiseCapacityPerTurn)
     .map((unitType): HireRaiseOption => {

@@ -249,27 +249,65 @@ export function isValidBuildCount(value: number): boolean {
  *
  * Purpose: Menus and pruning share one list. A fortification needs an intact city cell, not merely urban rubble.
  * When to use: Eligibility, Keep building, and queue pruning. Pass 0 intact cells wherever urban count is 0.
- * Expected outcome: The unit list from `getAvailableBuildUnitTypes`, then `fortification` when `intactCityCells` is above 0, then `credits` when `urbanHexCount` is above 0.
+ * Expected outcome: The unit list from `getAvailableBuildUnitTypes` (naval also needs `seaAccess`), then `fortification` when `intactCityCells` is above 0, then `credits` when `urbanHexCount` is above 0.
  * Exceptions: None.
  */
 export function getAvailableBuildQueueItemTypes(
-  urbanHexCount: number,
-  seaportCount: number,
-  airportCount: number,
-  intactCityCells: number
+  input: BuildAvailabilityInput & { readonly intactCityCells: number }
 ): BuildQueueItemType[] {
-  const available = getAvailableBuildUnitTypes(urbanHexCount, seaportCount, airportCount);
+  const available = getAvailableBuildUnitTypes(input);
   const items: BuildQueueItemType[] = [...available];
-  if (intactCityCells > 0) items.push(FORTIFICATION_QUEUE_ITEM);
-  if (urbanHexCount > 0) items.push(CREDITS_QUEUE_ITEM);
-  logTrace('getAvailableBuildQueueItemTypes', {
-    urbanHexCount,
-    seaportCount,
-    airportCount,
-    intactCityCells,
-    items,
-  });
+  if (input.intactCityCells > 0) items.push(FORTIFICATION_QUEUE_ITEM);
+  if (input.urbanHexCount > 0) items.push(CREDITS_QUEUE_ITEM);
+  logTrace('getAvailableBuildQueueItemTypes', { ...input, items });
   return items;
+}
+
+/**
+ * Facts about one hex that decide which unit types it may build.
+ *
+ * Purpose: Keeps the build functions to one argument and makes sea access an explicit input.
+ * When to use: Build the object from a hex's infrastructure counts and its sea access, then pass it to `getAvailableBuildUnitTypes` or `getAvailableBuildQueueItemTypes`.
+ * Expected outcome: Every field is required, so a caller cannot forget one.
+ * Exceptions: None.
+ */
+export interface BuildAvailabilityInput {
+  /**
+   * Urban cells the hex counts for production.
+   *
+   * Contract: Zero for a neutral border hex.
+   * When to use: Gates every unit type through `buildMinimumUrbanCells`.
+   * Expected outcome: A non-negative integer.
+   * Exceptions: None.
+   */
+  readonly urbanHexCount: number;
+  /**
+   * Seaports on the hex.
+   *
+   * Contract: Naval needs at least its prerequisite minimum.
+   * When to use: Read from the strategic infrastructure row.
+   * Expected outcome: A non-negative integer.
+   * Exceptions: None.
+   */
+  readonly seaportCount: number;
+  /**
+   * Airports on the hex.
+   *
+   * Contract: Air needs at least one.
+   * When to use: Read from the strategic infrastructure row; pass 0 when unknown.
+   * Expected outcome: A non-negative integer.
+   * Exceptions: None.
+   */
+  readonly airportCount: number;
+  /**
+   * Whether the hex or a neighbor is water or coast.
+   *
+   * Contract: True when `hasSeaAccess` (or `hexHasSeaAccess` in the main process) is true for the hex. Naval is the only type that reads it.
+   * When to use: Pass `seaportCount > 0 && hexHasSeaAccess(h3Index)` so a hex without a seaport never runs the query.
+   * Expected outcome: False removes naval from the result and changes nothing else.
+   * Exceptions: None.
+   */
+  readonly seaAccess: boolean;
 }
 
 /**
@@ -277,21 +315,19 @@ export function getAvailableBuildQueueItemTypes(
  *
  * Purpose: The urban gate follows the active map. Seaport minimums stay on the static prerequisite table.
  * When to use: `getAvailableBuildQueueItemTypes` and prompt sentences that need the unit types a hex can start.
- * Expected outcome: Infantry needs one urban cell. Armor, air, and naval need `buildMinimumUrbanCells`. A missile needs the Advanced urban-cell count. Naval also needs its seaport minimum. Air needs an airport.
+ * Expected outcome: Infantry needs one urban cell. Armor, air, and naval need `buildMinimumUrbanCells`. A missile needs the Advanced urban-cell count. Naval also needs its seaport minimum and sea access. Air needs an airport.
  * Exceptions: None.
  */
-export function getAvailableBuildUnitTypes(
-  urbanHexCount: number,
-  seaportCount: number,
-  airportCount = 0
-): BuildUnitType[] {
+export function getAvailableBuildUnitTypes(input: BuildAvailabilityInput): BuildUnitType[] {
+  const { urbanHexCount, seaportCount, airportCount, seaAccess } = input;
   const available = ALL_BUILD_UNIT_TYPES.filter((unitType) => {
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
     if (urbanHexCount < buildMinimumUrbanCells(unitType) || seaportCount < req.minSeaports) return false;
+    if (unitType === 'naval' && !seaAccess) return false;
     if (unitType === 'air') return airportCount > 0;
     return true;
   });
-  logTrace('getAvailableBuildUnitTypes', { urbanHexCount, seaportCount, airportCount, available });
+  logTrace('getAvailableBuildUnitTypes', { ...input, available });
   return available;
 }
 

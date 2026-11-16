@@ -21,6 +21,7 @@ import {
   type SealiftSlotPair,
 } from './sealiftSlotAssignment';
 import { isLandUnitType } from '../../shared/landUnitType';
+import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 
 /**
  * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
@@ -256,7 +257,7 @@ function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
  *
  * Purpose: Shared predicate for stack context mode, slot IPC, and LLM `applyEmbarkOrdersForPlayer`.
  * When to use: Before treating a hex as a valid embark port.
- * Expected outcome: True for native coastal, land seaports, and water seaports this player controls.
+ * Expected outcome: True for native coastal, land seaports with sea access, and water seaports this player controls.
  * Exceptions: False when the hex is missing from `hexes`.
  */
 function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
@@ -267,6 +268,7 @@ function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
     terrainKind: context.terrainKind,
     hasSeaport: context.seaportCount > 0,
     hexControlledByPlayer: context.controllerPlayerId === playerId,
+    seaAccess: context.seaportCount > 0 && hexHasSeaAccess(h3Index),
   });
 }
 

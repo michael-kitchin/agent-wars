@@ -268,7 +268,7 @@ Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, 
 | Tempo: copy each listed Best Options ranged or air-strike row; do not invent a target | engine-true as instruction; sweep still fills omitted shots (`TEMPO_SWEEP_SILENCE`) | `collectTempoRuleAttacks` |
 | `damage given up for free` | **not emitted** | matrix tests forbid the substring |
 | Unconditional "enemy remains in play and is hunting you" | **not emitted** | matrix tests forbid the substring |
-| Embark: coastal or land seaport, or a controlled water seaport | engine-true | `canEmbarkAtHex` |
+| Embark: coastal, a land seaport with water or coast next to it, or a controlled water seaport | engine-true | `canEmbarkAtHex` |
 | Production income = urban count per turn | engine-true | production rules |
 | Callback vocabulary excluding `territory_changed` | engine-true for taught events; parser still accepts the unfired name | `callbackEvaluation.ts` |
 | An explicit_move farther than this turn's budget becomes a standing march when standing orders are on | engine-true when a route of at least two turns exists and the first step is legal; otherwise the move is dropped. Air, missiles, an invalid distance, an armor halt, and a blocked land route are not converted | `convertOverBudgetExplicitMoveToMarch` |

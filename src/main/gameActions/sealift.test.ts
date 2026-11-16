@@ -22,6 +22,7 @@ import {
 } from './sealift';
 import { getStrategicProductionContext } from '../terrainClassificationCache';
 import { applyTransportLossForRemovedCarriers } from './transportCargoLoss';
+import { listLandSeaportsBySeaAccess } from '../testSupport/seaAccessFixtures';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -756,6 +757,30 @@ function testLandSeaportSealiftWithoutControl(): void {
 }
 
 /**
+ * Boarding at a land seaport needs sea access; unloading there does not.
+ *
+ * Purpose: A seaport with only land around it lets no cargo board, but a ship stuck there can still unload.
+ * When to use: After changes to land-seaport boarding or sea access.
+ * Expected outcome: Embark at the dry port writes no assignment; embark at a port with sea access does; manual debark at the dry port is allowed.
+ * Exceptions: None.
+ */
+function testLandSeaportBoardingNeedsSeaAccess(): void {
+  withTempDb(() => {
+    const { dry, wet } = listLandSeaportsBySeaAccess();
+    const board = (port: string, suffix: string): void => {
+      insertUnit(`human-naval-${suffix}`, 'human', 'naval', port);
+      insertUnit(`human-inf-${suffix}`, 'human', 'infantry', port);
+      applyEmbarkOrdersForPlayer([{ unitId: `human-inf-${suffix}`, navalUnitId: `human-naval-${suffix}` }], 'human');
+    };
+    board(dry[0]!, 'dry');
+    assert.deepStrictEqual(loadAssignments(), []);
+    assert.strictEqual(canManualDebarkFromHex(dry[0]!, 'human'), true);
+    board(wet[0]!, 'wet');
+    assert.deepStrictEqual(loadAssignments(), [{ landUnitId: 'human-inf-wet', navalUnitId: 'human-naval-wet' }]);
+  });
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -772,6 +797,7 @@ function run(): void {
   testClearEmbarkAssignmentForLandUnitRemovesRow();
   testCanManualDebarkFromHexCoastalWaterPortAndOpenWater();
   testLandSeaportSealiftWithoutControl();
+  testLandSeaportBoardingNeedsSeaAccess();
   testGameStateSnapshotIncludesEmbarkedOnNavalUnitId();
   testTransportLossSparesManuallyDebarkedCoLocatedLand();
   testSealiftStateDisablesDebarkButtonsOnOpenWater();

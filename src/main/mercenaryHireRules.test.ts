@@ -88,6 +88,16 @@ test('capacity drops a type that costs more than twice the city cells', () => {
   assert.equal(unitCostFor('armor') > 20, true);
 });
 
+test('a naval raise needs sea access at its seaport', () => {
+  const portBoard = board({
+    strategicInfrastructure: [{ ...infra(HEX, 60, 0), seaportCount: 1 }],
+  });
+  const dry = evaluateHexHire(buildHireContext(portBoard, HUMAN_SEAT_ID, () => false), HEX);
+  assert.equal(dry.raiseOptions.some((option) => option.unitType === 'naval'), false);
+  const wet = evaluateHexHire(buildHireContext(portBoard, HUMAN_SEAT_ID, () => true), HEX);
+  assert.equal(wet.raiseOptions.some((option) => option.unitType === 'naval'), true);
+});
+
 test('a missile, an embarked unit, a loaded ship, a loaded air unit, and a fortified Neutral hex are not candidates', () => {
   const evaluation = evaluateHexHire(buildHireContext(board({
     units: [

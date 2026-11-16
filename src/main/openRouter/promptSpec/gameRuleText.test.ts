@@ -37,6 +37,7 @@ import {
   type GameRuleTextGates,
 } from './gameRuleText';
 import { MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
+import { NAVAL_SEA_ACCESS_RULE_PART } from '../../../shared/seaAccess';
 
 /**
  * Default gates for composing the combat paragraph in tests.
@@ -370,6 +371,7 @@ test('buildProductionCostRulesLine interpolates engine costs', () => {
   assert.ok(text.includes(`naval cost ${UNIT_COST_BY_TYPE.naval}`));
   assert.ok(text.includes(`air cost ${UNIT_COST_BY_TYPE.air}`));
   assert.match(text, /requires airport/);
+  assert.ok(text.includes(NAVAL_SEA_ACCESS_RULE_PART));
 });
 
 test('the terrain cover sentences keep their exact wording', () => {

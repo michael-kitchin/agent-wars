@@ -24,6 +24,8 @@ import {
   type BuildQueueItemType,
 } from '../productionRules';
 import { CREDITS_NOT_AVAILABLE_REASON, CREDITS_QUEUE_ITEM } from '../../shared/creditsRules';
+import { NAVAL_NO_SEA_ACCESS_REASON } from '../../shared/seaAccess';
+import { hexHasSeaAccess, navalBlockedBySeaAccess } from '../gameDb/seaAccessReads';
 import { FORTIFICATION_NOT_AVAILABLE_REASON, FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import type {
   ApplyBuildQueueTemplateResult,
@@ -268,23 +270,24 @@ noBuildReason: string | null;
 /**
  * Explains why a queue item cannot be written on this hex.
  *
- * Purpose: A fortification has its own sentence. Unit messages stay the same.
- * When to use: The update path and a template skip.
- * Expected outcome: The fortification sentence, or `Unit type "…" is not available for this hex.`
+ * Purpose: A fortification has its own sentence, and naval at a seaport with no sea access names that cause. Unit messages stay the same.
+ * When to use: The update path and a template skip, with the hex the item was refused at.
+ * Expected outcome: The fortification sentence, `NAVAL_NO_SEA_ACCESS_REASON`, or `Unit type "…" is not available for this hex.`
  * Exceptions: None.
  */
-function unavailableQueueItemReason(unitType: BuildQueueItemType): string {
+function unavailableQueueItemReason(unitType: BuildQueueItemType, h3Index: string): string {
   if (unitType === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_NOT_AVAILABLE_REASON;
   if (unitType === CREDITS_QUEUE_ITEM) return CREDITS_NOT_AVAILABLE_REASON;
+  if (unitType === 'naval' && navalBlockedBySeaAccess(h3Index)) return NAVAL_NO_SEA_ACCESS_REASON;
   return `Unit type "${unitType}" is not available for this hex.`;
 }
 
 /**
- * Defines the `buildProductionEligibilityView` function shape (function buildProductionEligibilityView().
-
- * Purpose: Supports maintainability by documenting why `buildProductionEligibilityView` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds the production eligibility view for one hex: which queue items it may build and why not.
+ *
+ * Purpose: Every build menu, tool, and prompt reads `availableUnitTypes` from this view. Naval needs a seaport and sea access (`hexHasSeaAccess`), so a port with only land around it does not offer naval.
+ * When to use: Before any queue mutation or read on a hex.
+ * Expected outcome: The production context plus `availableUnitTypes`, `buildSectionVisible`, and `noBuildReason`.
  * Exceptions: None.
  */
 function buildProductionEligibilityView(
@@ -296,12 +299,13 @@ function buildProductionEligibilityView(
       ? null
       : getStrategicInfrastructureForHex(h3Index);
   const availableUnitTypes = eligibilityInfra
-    ? getAvailableBuildQueueItemTypes(
-        productionContext.urbanHexCount,
-        productionContext.seaportCount,
-        productionContext.airportCount,
-        eligibilityInfra.fortifiedCount + eligibilityInfra.fortifiableCount
-      )
+    ? getAvailableBuildQueueItemTypes({
+        urbanHexCount: productionContext.urbanHexCount,
+        seaportCount: productionContext.seaportCount,
+        airportCount: productionContext.airportCount,
+        seaAccess: productionContext.seaportCount > 0 && hexHasSeaAccess(h3Index),
+        intactCityCells: eligibilityInfra.fortifiedCount + eligibilityInfra.fortifiableCount,
+      })
     : [];
   const buildSectionVisible = availableUnitTypes.length > 0;
   return {
@@ -505,7 +509,7 @@ export function executeUpdateHexBuildQueueEntry(
     if (!context.valid) return { success: false, reason: context.reason };
     const queueView = context.queueView;
     if (!queueView.availableUnitTypes.includes(unitType)) {
-      return { success: false, reason: unavailableQueueItemReason(unitType) };
+      return { success: false, reason: unavailableQueueItemReason(unitType, h3Index) };
     }
     if (!isValidBuildCount(count)) {
       return {
@@ -621,7 +625,7 @@ export function executeApplyBuildQueueTemplateToHexes(
         result.skipped.push({
           h3Index,
           unitType: entry.unitType,
-          reason: unavailableQueueItemReason(entry.unitType),
+          reason: unavailableQueueItemReason(entry.unitType, h3Index),
         });
         return [];
       });

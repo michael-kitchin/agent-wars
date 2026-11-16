@@ -63,7 +63,14 @@ export function pruneBuildQueueForInfrastructureState(h3Index: string): void {
 
   const intactCityCells = infra.urbanHexCount <= 0 ? 0 : infra.fortifiedCount + infra.fortifiableCount;
   const allowed = new Set(
-    getAvailableBuildQueueItemTypes(infra.urbanHexCount, infra.seaportCount, infra.airportCount, intactCityCells)
+    getAvailableBuildQueueItemTypes({
+      urbanHexCount: infra.urbanHexCount,
+      seaportCount: infra.seaportCount,
+      airportCount: infra.airportCount,
+      // A naval row already queued finishes even when the port has no water or coast next to it. Only losing the seaport removes naval here.
+      seaAccess: true,
+      intactCityCells,
+    })
   );
   const rows = listBuildQueueRowsForHex(h3Index);
   const standing = getKeepBuildingForHex(h3Index);

@@ -112,7 +112,7 @@ A unit that should not engage is given a fire-withholding standing order, which 
 
 ## Production
 
-Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21). fortification cost 20 per city cell (queue unitType "fortification", one cell per item). a credits item costs 20 production points and adds 20 credits to your treasury (queue unitType "credits").
+Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1 + water or coast in or next to the hex), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21). fortification cost 20 per city cell (queue unitType "fortification", one cell per item). a credits item costs 20 production points and adds 20 credits to your treasury (queue unitType "credits").
 
 Deployment caps (per side): infantry 12, armor 8, naval 8, air 6, missile 2.
 
@@ -236,7 +236,7 @@ Callback support: subscribe with event "infrastructure_destroyed" and parameters
 
 ## Transport
 
-Embark: coastal or land seaport (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.
+Embark: coastal, a land seaport with water or coast next to it (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.
 
 An air unit carries one infantry unit, boarded with embark, moved with ferryOrders, unloaded with disembark or airDrops.
 
@@ -306,7 +306,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 - For every air unit with no strike and no drop, ferry along owned airports toward the fighting, but only when Air Operations Status shows that unit's Base Intact and Base Controlled columns as yes. Air-drop embarked infantry onto the fight when the target is within 3 and a land march cannot reach it this turn. An air unit cannot strike and drop, or drop and ferry, on the same turn.
 - Prefer airlift when an airport chain reaches and a ship would take longer.
 - Naval units cannot enter land cells; to engage a land target, move to the nearest water or coastal cell within range.
-- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.
+- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport with water or coast next to it, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.
 
 ## Production Queues
 

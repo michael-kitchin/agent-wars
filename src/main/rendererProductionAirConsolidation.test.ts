@@ -401,6 +401,11 @@ function testTacticalRubbleTooltipAndTerrainVariantContracts(): void {
     'feature lines omit Rubble'
   );
   assert.ok(
+    getFunctionSource(terrainTooltipStateSource, 'featureLabelsForStrategicHex').includes('hasSeaAccess(') &&
+      getFunctionSource(terrainTooltipStateSource, 'featureLabelsForStrategicHex').includes('SEAPORT_NO_SEA_ACCESS_LABEL'),
+    'a seaport with no sea access is labeled as such on the Features line'
+  );
+  assert.ok(
     !getFunctionSource(terrainTooltipStateSource, 'getStrategicTerrainSummary').includes('Urban') &&
       !getFunctionSource(terrainTooltipStateSource, 'getStrategicTerrainSummary').includes('Rubble'),
     'a world hex terrain summary stays the kind mix'

@@ -3,7 +3,7 @@
  *
  * Purpose: Strategic sealift and tactical opponent embark share one rule after seaport-to-coastal promotion is removed.
  * When to use: Occupied stacks deciding whether cargo may board or leave a naval unit.
- * Expected outcome: Native coastal and land seaports always allow; water seaports still require hex control.
+ * Expected outcome: Native coastal always allows; land seaports allow when they have sea access (boarding only; unloading never needs it); water seaports still require hex control.
  * Exceptions: None; callers supply already-resolved seaport and control flags.
  */
 
@@ -57,17 +57,37 @@ export interface SealiftHexEligibilityAttrs {
 }
 
 /**
- * Returns whether cargo may embark at this hex for the acting player.
+ * Eligibility facts for boarding, which add sea access to the shared hex facts.
  *
- * Purpose: Coastal and occupied land seaports do not require a control check; water seaports do.
- * When to use: Strategic `canPlayerEmbarkFromHex` and tactical opponent embark validation.
- * Expected outcome: True for native coastal, land seaports, and controlled water seaports.
+ * Purpose: Boarding at a land seaport needs water or coast in or next to the hex; unloading does not, so only boarding reads this field.
+ * When to use: The argument of `canEmbarkAtHex`.
+ * Expected outcome: Every `SealiftHexEligibilityAttrs` field plus `seaAccess`.
  * Exceptions: None.
  */
-export function canEmbarkAtHex(attrs: SealiftHexEligibilityAttrs): boolean {
+export interface SealiftEmbarkAttrs extends SealiftHexEligibilityAttrs {
+  /**
+   * Whether the hex or a neighbor is water or coast.
+   *
+   * Contract: True when `hasSeaAccess` (`hexHasSeaAccess` in the main process) is true for the hex. Only boarding at a land seaport reads it.
+   * When to use: Always set by embark callers; compute it from true terrain, never a masked snapshot.
+   * Expected outcome: False makes a land seaport refuse boarding.
+   * Exceptions: None.
+   */
+  readonly seaAccess: boolean;
+}
+
+/**
+ * Returns whether cargo may embark at this hex for the acting player.
+ *
+ * Purpose: Coastal hexes and land seaports with sea access do not require a control check; water seaports do.
+ * When to use: Strategic `canPlayerEmbarkFromHex` and tactical opponent embark validation.
+ * Expected outcome: True for native coastal, land seaports with sea access, and controlled water seaports.
+ * Exceptions: None.
+ */
+export function canEmbarkAtHex(attrs: SealiftEmbarkAttrs): boolean {
   if (attrs.nativeTerrain === 'coastal' || attrs.terrainKind === 'coastal') return true;
   if (isLandSeaportHex({ nativeTerrain: attrs.nativeTerrain, terrainKind: attrs.terrainKind, hasSeaport: attrs.hasSeaport })) {
-    return true;
+    return attrs.seaAccess;
   }
   if (isNativeNavalTransitTerrain(attrs.nativeTerrain, attrs.terrainKind) && attrs.hasSeaport) {
     return attrs.hexControlledByPlayer;
@@ -78,7 +98,7 @@ export function canEmbarkAtHex(attrs: SealiftHexEligibilityAttrs): boolean {
 /**
  * Returns whether cargo may manually debark at this hex for the acting player.
  *
- * Purpose: Land seaports match coastal (always); wetlands keep their existing always-debark rule; water seaports need control.
+ * Purpose: Unloading needs no sea access. Land seaports match coastal (always); wetlands keep their existing always-debark rule; water seaports need control.
  * When to use: Stack-popup debark and `canManualDebarkFromHex`.
  * Expected outcome: True for coastal, wetlands, land seaports, and controlled water seaports.
  * Exceptions: None.
@@ -90,5 +110,6 @@ export function canManualDebarkAtHex(attrs: SealiftHexEligibilityAttrs): boolean
     return true;
   }
   if (attrs.nativeTerrain === 'water' && attrs.hasSeaport) return attrs.hexControlledByPlayer;
-  return canEmbarkAtHex(attrs);
+  // Land seaports returned above, so seaAccess is never read on this path.
+  return canEmbarkAtHex({ ...attrs, seaAccess: true });
 }

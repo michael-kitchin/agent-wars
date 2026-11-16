@@ -41,6 +41,7 @@ import { maxedUnitTypesFor, pointsKeptAfterPass, recordQueuePause, selectNewlyPa
 import { readPausedQueueHexes, writePausedQueueHexes } from '../gameDb/queuePauseMemory';
 import { spawnProducedUnitsForHex } from './strategicUnitSpawn';
 import { isLandUnitType } from '../../shared/landUnitType';
+import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 
 /**
  * Documents the `DeployedUnitsByType` type alias (type DeployedUnitsByType).
@@ -321,12 +322,13 @@ export function processProductionAfterControlResolution(): {
     const spawnedUnitTypes: BuildUnitType[] = [];
     let blockedByCapType: BuildUnitType | null = null;
     let lastDepletedUnitType: BuildQueueItemType | null = null;
-    const availableTypes = getAvailableBuildQueueItemTypes(
-      neutralBorder ? 0 : urbanHexCount,
+    const availableTypes = getAvailableBuildQueueItemTypes({
+      urbanHexCount: neutralBorder ? 0 : urbanHexCount,
       seaportCount,
       airportCount,
-      neutralBorder ? 0 : fortifiedCount + fortifiableCount
-    );
+      seaAccess: seaportCount > 0 && hexHasSeaAccess(control.h3Index),
+      intactCityCells: neutralBorder ? 0 : fortifiedCount + fortifiableCount,
+    });
     const maxLoopIterations = 10_000;
     let loopIterations = 0;
 

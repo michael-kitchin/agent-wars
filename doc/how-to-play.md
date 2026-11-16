@@ -179,7 +179,7 @@ Each piece, on the global map and across the 23 regional maps.
 | --- | --- | --- | --- |
 | ![Infantry token](media/token-infantry.png) | **Infantry**<br>Attack 3, defense 7<br>Cap 12 | Field armies<br>⚒︎20, 1+ city cells<br>Moves 1 hex<br>Melee only | Divisions<br>⚒︎8–60, 1+ city cells<br>Moves 1 hex<br>Melee only |
 | ![Armor token](media/token-armor.png) | **Armor**<br>Attack 10, defense 7<br>Cap 8 | Field armies<br>⚒︎40, 2+ city cells<br>Moves 2 hexes<br>Fires 1 hex | Divisions<br>⚒︎16–120, 2–7 city cells<br>Moves 2 hexes<br>Fires 1 hex |
-| ![Naval token](media/token-naval.png) | **Naval**<br>Attack 7, defense 7<br>Cap 8 | Fleets<br>⚒︎100, 10+ city cells and a seaport<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry | Task forces<br>⚒︎40–300, 5–31 city cells and a seaport<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry |
+| ![Naval token](media/token-naval.png) | **Naval**<br>Attack 7, defense 7<br>Cap 8 | Fleets<br>⚒︎100, 10+ city cells and a seaport on the water<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry | Task forces<br>⚒︎40–300, 5–31 city cells and a seaport on the water<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry |
 | ![Air token](media/token-air.png) | **Air**<br>Attack 10, defense 3<br>Cap 6 | Air wings<br>⚒︎60, 5+ city cells and an airport<br>Ferries through owned airports, 4 hexes per hop<br>Strikes 3 hexes from base | Air groups<br>⚒︎24–180, 3–17 city cells and an airport<br>Ferries through owned airports, 4 hexes per hop<br>Strikes 3 hexes from base |
 | ![Missile token](media/token-missile.png) | **Missile**<br>Never rolls, hit last<br>Cap 2 | ⚒︎200, 21+ city cells (Advanced)<br>Doesn't move<br>Launches once, 12 hexes | ⚒︎80–600, 6–59 city cells (Advanced)<br>Doesn't move<br>Launches once, 5–14 hexes |
 | ![Mercenary token](media/token-mercenary.png) | **Mercenary**<br>Any type but missile<br>No cap | Raise: ⚒︎ unit price + one turn of upkeep<br>Rehire: two turns of upkeep<br>Fee paid when ordered; returned if removed or unfilled<br>Upkeep: ¤3 infantry, ¤5 armor, ¤8 air, ¤13 naval | Same credits<br>⚒︎ at that map's unit price |
@@ -208,6 +208,7 @@ Each piece, on the global map and across the 23 regional maps.
 - **Several hexes:** Shift-click more build markers to give them all one queue. Shift-clicking a Hire marker, or a build marker while a Hire popup is open, acts as a plain click. A hex that can't build a type skips it. A hex with no intact city cell skips a fortification. A hex with no urban production skips Credits. The several-hex popup is build only.
 - **Spawning:** points build up toward the next unit. It appears at that hex once the points cover its cost.
 - **Only legal choices:** the type list offers only what that hex can build. Fortification stays in that list while the hex has an intact city cell, even after every one of those cells is fortified. See [Fortifications](#fortifications).
+- **Ports on land:** a port with only land around it, with no water or coast in or next to its hex, cannot build ships or raise naval mercenaries, and the build list leaves Naval out. A ship already queued there is still built. The hex tooltip reads Seaports (no sea access).
 - **Bombing hurts:** destroyed urban cells lower income for the rest of the match.
 
 Costs, city-cell minimums, and caps are in [Units at a Glance](#units-at-a-glance).
@@ -327,7 +328,7 @@ A missile is built at an Advanced city. On the world map it launches once, at an
 ![Select a stack including naval and ground units within a seaport hex, then load/unload units using the stack popup. Ground units can be unloaded in any coastal hex.](media/sealift.png)
 
 - **Capacity:** each naval unit carries one armor or two infantry. Each air unit carries one infantry unit. Load it from the stack list on the hex where the air unit is. It ferries through airports you control, or you drop it with the button immediately left of the reticle onto a land hex within strike range. The air unit stays at its airport. Unload on the hex the air unit occupies. If the air unit is destroyed, by a shot, by a battle, by losing its airport, or by a ferry that has nowhere to land, the infantry is destroyed with it. Infantry aboard an air unit never fights.
-- **Where to load:** a coastal hex or a land seaport, or a water seaport you control.
+- **Where to load:** a coastal hex, a land seaport with water or coast next to it, or a water seaport you control.
 - **Loading:** put the land units and the ship in the same hex. Open the hex's stack list and pick units in the ship's slot lists.
 - **At once:** slot changes take effect immediately. They aren't queued orders and don't wait for Ready.
 - **Moving:** select the ship and double-click a destination. The cargo goes with it.

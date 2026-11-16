@@ -18,6 +18,7 @@ import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTy
 import { shouldRenderTacticalHexes } from './terrainView';
 import type { HexNamingCaption } from '../../shared/hexNamingCaption';
 import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
+import { hasSeaAccess, SEAPORT_NO_SEA_ACCESS_LABEL } from '../../shared/seaAccess';
 import { getMainLeafletMap } from './worldLeafletMap';
 
 export { getCachedTerrainTooltipHtml } from './terrainTooltipHtml';
@@ -187,7 +188,7 @@ export function infraGlyphsAllowedForTacticalChild(parentH3: string, childH3: st
  *
  * Purpose: Names airports and seaports when the hex is explored.
  * When to use: From `terrainTooltipStateForStrategicHex`.
- * Expected outcome: Airports and Seaports when those counts are positive. Empty when the hex is unexplored or has neither.
+ * Expected outcome: Airports and Seaports when those counts are positive. A seaport with no water or coast in or next to its hex reads `SEAPORT_NO_SEA_ACCESS_LABEL` instead of Seaports; the lookup uses the snapshot terrain, which is true terrain in the renderer. Empty when the hex is unexplored or has neither.
  * Exceptions: None.
  */
 function featureLabelsForStrategicHex(h3: string): string[] {
@@ -195,7 +196,10 @@ function featureLabelsForStrategicHex(h3: string): string[] {
   const counts = getStrategicFeatureCounts(h3);
   const labels: string[] = [];
   if (counts.airportCount > 0) labels.push('Airports');
-  if (counts.seaportCount > 0) labels.push('Seaports');
+  if (counts.seaportCount > 0) {
+    const seaAccess = hasSeaAccess(h3, (hexId) => S.gameState?.hexes.find((hex) => hex.h3Index === hexId));
+    labels.push(seaAccess ? 'Seaports' : SEAPORT_NO_SEA_ACCESS_LABEL);
+  }
   return labels;
 }
 

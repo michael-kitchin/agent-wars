@@ -64,7 +64,7 @@ function testStrategicEmbarkSentenceMatchesEngine(): void {
     'strategic'
   );
   assert.doesNotMatch(md, /Embark: coastal/);
-  assert.match(NAVAL_EMBARK_RULE, /Embark: coastal or land seaport \(control not required\), or a water seaport you control\./);
+  assert.match(NAVAL_EMBARK_RULE, /Embark: coastal, a land seaport with water or coast next to it \(control not required\), or a water seaport you control\./);
   assert.doesNotMatch(md, /your-controlled coastal hex/);
 }
 
@@ -96,13 +96,13 @@ function testNearestEmbarkUsesEngineEligibility(): void {
 /**
  * Verifies an uncontrolled land seaport is a legal nearest-embark hex.
  *
- * Purpose: Land seaports embark without control, matching `canEmbarkAtHex`.
+ * Purpose: Land seaports embark without control when they have sea access, matching `canEmbarkAtHex`.
  * When to use: After edits to nearest-embark scoring.
- * Expected outcome: The land seaport is listed as nearest.
+ * Expected outcome: The land seaport is listed as nearest with sea access and is not listed without it.
  * Exceptions: Propagates assertion errors.
  */
 function testNearestEmbarkIncludesUncontrolledLandSeaport(): void {
-  const md = buildSealiftBriefingBlock(
+  const briefing = (seaAccessOf: () => boolean): string => buildSealiftBriefingBlock(
     sealiftSnapshot({
       navalH3: WATER_NO_PORT,
       hexes: [
@@ -119,9 +119,13 @@ function testNearestEmbarkIncludesUncontrolledLandSeaport(): void {
       ],
     }),
     (h3) => h3,
-    'strategic'
+    'strategic',
+    seaAccessOf
   );
-  assert.match(md, new RegExp(`${LAND_SEAPORT_NO_CONTROL} at hex distance `));
+  const nearest = new RegExp(`${LAND_SEAPORT_NO_CONTROL} at hex distance `);
+  // This snapshot omits the port's neighbors; the sea access answer is injected.
+  assert.match(briefing(() => true), nearest);
+  assert.doesNotMatch(briefing(() => false), nearest);
 }
 
 /**

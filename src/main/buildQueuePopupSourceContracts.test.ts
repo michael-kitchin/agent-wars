@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readRendererSource } from './testSupport/rendererSourceAssertions';
+import { getFunctionSource, readRendererSource } from './testSupport/rendererSourceAssertions';
 
 /**
  * Counts a substring in renderer source.
@@ -21,4 +21,10 @@ test('build queue type and count edits share one submit helper', () => {
   assert.equal(occurrenceCount(source, 'Failed to update build queue entry.'), 1);
   assert.equal(occurrenceCount(source, 'Failed to update build count.'), 1);
   assert.equal(occurrenceCount(source, 'Failed to remove build queue entry.'), 1);
+});
+
+test('a queued row keeps its own type in the select when the hex no longer offers it', () => {
+  const source = readRendererSource('gameplay', 'buildQueuePopup.ts');
+  assert.ok(source.includes('rowTypeOptions(options, entry.unitType)'));
+  assert.ok(getFunctionSource(source, 'rowTypeOptions').includes('available.includes(current)'));
 });

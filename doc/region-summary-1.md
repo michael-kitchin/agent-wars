@@ -109,7 +109,7 @@ Hits are air-strike hits on urban cells. The average side is the map's land hexe
 
 **Economy (Table 2)**
 - One cost scale per map applies to all five units, which keeps the global price ratio of 1:2:5:3:10 (infantry : armor : naval : air : missile).
-- Build minimums (armor, air, naval) and the Advanced tech threshold are set per map so that the same share of producing hexes qualifies as in the global game. Naval still needs a seaport and air an airport, as now.
+- Build minimums (armor, air, naval) and the Advanced tech threshold are set per map so that the same share of producing hexes qualifies as in the global game. Naval still needs a seaport with water or coast in or next to its hex, and air an airport.
 - Tech tier still comes from the generated urban count of a unit's birth hex.
 
 **Air strikes on cities**

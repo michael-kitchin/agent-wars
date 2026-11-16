@@ -18,6 +18,7 @@ import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInfrastructureStrikeStaysOnEnclosingHex } from './tacticalSnapshotGuards';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
+import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 
 /**
  * Resolves whether a player may embark sealift from a tactical cell using the same port/coastal rules as strategic sealift.
@@ -41,6 +42,7 @@ export function canPlayerEmbarkFromTacticalHex(
     terrainKind: facts.terrainKind,
     hasSeaport: facts.seaportCount > 0,
     hexControlledByPlayer: facts.controllerPlayerId === playerId,
+    seaAccess: facts.seaportCount > 0 && hexHasSeaAccess(strategic),
   });
 }
 

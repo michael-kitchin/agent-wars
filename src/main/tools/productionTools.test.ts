@@ -4,7 +4,7 @@
 
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
-import { getGameState, replaceBuildQueueForHex, setHexController, setStrategicInfrastructureForHex } from '../gameDb';
+import { dbRun, getGameState, replaceBuildQueueForHex, setHexController, setStrategicInfrastructureForHex } from '../gameDb';
 import { addHexBuildQueueEntry, getHexBuildQueue } from '../gameActions';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { setActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
@@ -13,6 +13,8 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { executeProductionTools } from './productionTools';
 import { isBuildUnitType } from '../productionRules';
+import { listLandSeaportsBySeaAccess } from '../testSupport/seaAccessFixtures';
+import { NAVAL_NO_SEA_ACCESS_REASON } from '../../shared/seaAccess';
 
 /**
  * Locates or provisions an opponent-controlled hex with the requested urban count.
@@ -255,7 +257,41 @@ function testQueryProductionReportsBuildPausedOutsideHome(): void {
   });
 }
 
+/**
+ * Ensures `set_build_queue` names the sea access reason for naval at a port with only land around it.
+ *
+ * Purpose: A commander that tries naval there must learn why, not read the generic unavailable message.
+ * When to use: After edits to Tool 6 availability rejection.
+ * Expected outcome: Naval is rejected with `NAVAL_NO_SEA_ACCESS_REASON` and the queue stays empty.
+ * Exceptions: None.
+ */
+function testSetBuildQueueRejectsNavalWithoutSeaAccess(): void {
+  withTempGameDb('aw-tool6-sea-access-', () => {
+    const port = listLandSeaportsBySeaAccess().dry[0]!;
+    setHexController(port, 'opponent');
+    setStrategicInfrastructureForHex(port, { urbanHexCount: 60, airportCount: 0, seaportCount: 1 });
+    dbRun(
+      "UPDATE units SET h3_index = ? WHERE id = (SELECT id FROM units WHERE player = 'opponent' AND unit_type = 'infantry' LIMIT 1)",
+      [port]
+    );
+    const state = getGameState();
+    const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
+    const result = executeProductionTools(
+      'opponent',
+      'set_build_queue',
+      { hex: latLngByH3.get(port), unitType: 'naval', count: 1 },
+      state,
+      latLngByH3,
+      resolveToH3
+    );
+    assert.equal(result.status, 'error');
+    assert.ok(String(result.error ?? '').includes(NAVAL_NO_SEA_ACCESS_REASON), String(result.error));
+    assert.equal(getHexBuildQueue(port, 'opponent').entries.length, 0);
+  });
+}
+
 function run(): void {
+  testSetBuildQueueRejectsNavalWithoutSeaAccess();
   testSetBuildQueueRejectsCappedTypeWhenAlternativeExists();
   testSetBuildQueueAllowsCappedTypeWhenNoAlternative();
   testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed();

@@ -328,7 +328,7 @@ const NAVAL_ROUTING_BULLET =
  * Exceptions: None.
  */
 const SEALIFT_BULLET =
-  '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
+  '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport with water or coast next to it, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
 
 /**
  * A missile with a listed target should be launched this turn.

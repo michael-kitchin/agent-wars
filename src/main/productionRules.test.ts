@@ -30,25 +30,45 @@ import {
  * Exceptions: None.
  */
 function testBuildTypeAvailabilityGates(): void {
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0, 0), []);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0, 0), ['infantry']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(2, 0, 0), ['infantry', 'armor']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 0, 0), ['infantry', 'armor']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 1, 0), []);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 1, 0), ['infantry']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1, 0), ['infantry', 'armor']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(10, 1, 0), ['infantry', 'armor', 'naval']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0, 1), []);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0, 1), ['infantry']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 0, 1), ['infantry', 'armor', 'air']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1, 1), ['infantry', 'armor', 'air']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(10, 1, 1), ['infantry', 'armor', 'naval', 'air']);
-  const withCity = getAvailableBuildQueueItemTypes(1, 0, 0, 1);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 0, seaportCount: 0, airportCount: 0, seaAccess: true }), []);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 1, seaportCount: 0, airportCount: 0, seaAccess: true }), ['infantry']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 2, seaportCount: 0, airportCount: 0, seaAccess: true }), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 5, seaportCount: 0, airportCount: 0, seaAccess: true }), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 0, seaportCount: 1, airportCount: 0, seaAccess: true }), []);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 1, seaportCount: 1, airportCount: 0, seaAccess: true }), ['infantry']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 5, seaportCount: 1, airportCount: 0, seaAccess: true }), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 10, seaportCount: 1, airportCount: 0, seaAccess: true }), ['infantry', 'armor', 'naval']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 0, seaportCount: 0, airportCount: 1, seaAccess: true }), []);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 1, seaportCount: 0, airportCount: 1, seaAccess: true }), ['infantry']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 5, seaportCount: 0, airportCount: 1, seaAccess: true }), ['infantry', 'armor', 'air']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 5, seaportCount: 1, airportCount: 1, seaAccess: true }), ['infantry', 'armor', 'air']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes({ urbanHexCount: 10, seaportCount: 1, airportCount: 1, seaAccess: true }), ['infantry', 'armor', 'naval', 'air']);
+  const withCity = getAvailableBuildQueueItemTypes({ urbanHexCount: 1, seaportCount: 0, airportCount: 0, seaAccess: true, intactCityCells: 1 });
   assert.deepStrictEqual(withCity.slice(-2), ['fortification', 'credits']);
-  const urbanOnly = getAvailableBuildQueueItemTypes(1, 0, 0, 0);
+  const urbanOnly = getAvailableBuildQueueItemTypes({ urbanHexCount: 1, seaportCount: 0, airportCount: 0, seaAccess: true, intactCityCells: 0 });
   assert.strictEqual(urbanOnly[urbanOnly.length - 1], 'credits');
   assert.strictEqual(urbanOnly.includes('fortification'), false);
-  assert.deepStrictEqual(getAvailableBuildQueueItemTypes(0, 0, 0, 0), []);
+  assert.deepStrictEqual(getAvailableBuildQueueItemTypes({ urbanHexCount: 0, seaportCount: 0, airportCount: 0, seaAccess: true, intactCityCells: 0 }), []);
+}
+
+/**
+ * Checks that sea access gates naval and nothing else.
+ *
+ * Purpose: A seaport with only land around it builds no ships but builds everything else.
+ * When to use: Run from `main`.
+ * Expected outcome: Naval is listed only with `seaAccess: true`; every other type and item is unchanged.
+ * Exceptions: Propagates assertion errors.
+ */
+function testSeaAccessGatesNavalOnly(): void {
+  const base = { urbanHexCount: 25, seaportCount: 1, airportCount: 1 };
+  const wet = getAvailableBuildUnitTypes({ ...base, seaAccess: true });
+  const dry = getAvailableBuildUnitTypes({ ...base, seaAccess: false });
+  assert.equal(wet.includes('naval'), true);
+  assert.equal(dry.includes('naval'), false);
+  assert.deepStrictEqual(dry, wet.filter((unitType) => unitType !== 'naval'));
+  const wetItems = getAvailableBuildQueueItemTypes({ ...base, seaAccess: true, intactCityCells: 1 });
+  const dryItems = getAvailableBuildQueueItemTypes({ ...base, seaAccess: false, intactCityCells: 1 });
+  assert.deepStrictEqual(dryItems, wetItems.filter((item) => item !== 'naval'));
 }
 
 /**
@@ -242,6 +262,7 @@ function testKeepBuildingRefillCount(): void {
 
 function run(): void {
   testBuildTypeAvailabilityGates();
+  testSeaAccessGatesNavalOnly();
   testBuildCountValidationBounds();
   testProductionExamplesFromSpec();
   testTurnsToNextSpawnEstimateUsesNextUnitOnly();

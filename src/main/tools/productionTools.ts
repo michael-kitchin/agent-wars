@@ -29,6 +29,8 @@ import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCach
 import { getMaxedUnitTypesForPlayer, shouldRejectCappedQueueType, filterQueueableUnitTypes } from '../productionCaps';
 import { parseGameSize } from '../../shared/gameSize';
 import type { AiSeatId } from '../../shared/seatIds';
+import { NAVAL_NO_SEA_ACCESS_REASON } from '../../shared/seaAccess';
+import { navalBlockedBySeaAccess } from '../gameDb/seaAccessReads';
 
 
 /**
@@ -201,6 +203,9 @@ function setBuildQueue(
   }
   const queueableTypes = currentQueue.availableUnitTypes;
   if (!queueableTypes.includes(args.unitType)) {
+    if (args.unitType === 'naval' && navalBlockedBySeaAccess(resolved.h3Index)) {
+      return reject(NAVAL_NO_SEA_ACCESS_REASON, resolved.h3Index);
+    }
     return reject(
       `set_build_queue unitType ${args.unitType} is not available for this hex; available: ${
         queueableTypes.filter(isBuildQueueItemType).join(', ') || 'none'

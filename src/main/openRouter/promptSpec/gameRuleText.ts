@@ -66,6 +66,7 @@ import {
   buildMercenaryRule,
   buildMercenaryUpkeepRule,
 } from './gameRuleMercenaryText';
+import { NAVAL_SEA_ACCESS_RULE_PART } from '../../../shared/seaAccess';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 export { buildTerrainCoverRule, buildWeatherRule };
@@ -575,7 +576,7 @@ export function buildProductionIncomeRule(): string {
  *
  * Purpose: The production status block must not retype costs or urban minima as literals.
  * When to use: The first paragraph of the Production subsection of Rules.
- * Expected outcome: Each buildable type names its cost from `unitCostFor` and its urban minimum from `buildMinimumUrbanCells`. Seaport minimums come from `BUILD_PREREQUISITES_BY_TYPE`. Air also requires an airport.
+ * Expected outcome: Each buildable type names its cost from `unitCostFor` and its urban minimum from `buildMinimumUrbanCells`. Seaport minimums come from `BUILD_PREREQUISITES_BY_TYPE`. Naval also names `NAVAL_SEA_ACCESS_RULE_PART`. Air also requires an airport.
  * Exceptions: None.
  */
 export function buildProductionCostRulesLine(): string {
@@ -585,6 +586,7 @@ export function buildProductionCostRulesLine(): string {
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
     const extras: string[] = [`min urban ${buildMinimumUrbanCells(unitType)}`];
     if (req.minSeaports > 0) extras.push(`min seaports ${req.minSeaports}`);
+    if (unitType === 'naval') extras.push(NAVAL_SEA_ACCESS_RULE_PART);
     if (unitType === 'air') extras.push('requires airport');
     return `${unitType} cost ${cost} (${extras.join(' + ')})`;
   });

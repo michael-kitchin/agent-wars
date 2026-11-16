@@ -171,11 +171,11 @@ export const TACTICAL_AIR_OPERATIONS_TABLE_RULES =
  *
  * Purpose: The sentence used to sit under Naval Transport Status.
  * When to use: The Transport subsection when the side has naval units.
- * Expected outcome: Coastal or land seaport, or a water seaport the side controls, and the capacity line.
+ * Expected outcome: Coastal, a land seaport with water or coast next to it, or a water seaport the side controls, and the capacity line.
  * Exceptions: None.
  */
 export const NAVAL_EMBARK_RULE =
-  'Embark: coastal or land seaport (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.';
+  'Embark: coastal, a land seaport with water or coast next to it (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.';
 
 /**
  * Battle naval capacity rule.

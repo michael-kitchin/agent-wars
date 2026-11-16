@@ -13,6 +13,8 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logTrace } from '../logger';
 import { getMaxedUnitTypesForPlayer } from '../productionCaps';
 import { getAvailableBuildUnitTypes } from '../productionRules';
+import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
+import type { SeaAccessCheck } from '../../shared/seaAccess';
 
 /**
  * Build rights for one seat on this turn.
@@ -28,7 +30,7 @@ export interface SeatBuildCapabilities {
    *
    * Contract: True when some controlled hex lists `naval` and the naval cap is not reached.
    * When to use: The naval rule and the naval tools line.
-   * Expected outcome: False for a seat with no seaport city, or a seat already at the naval cap.
+   * Expected outcome: False for a seat with no seaport city that has sea access, or a seat already at the naval cap.
    * Exceptions: None.
    */
   readonly canBuildNaval: boolean;
@@ -48,10 +50,14 @@ export interface SeatBuildCapabilities {
  *
  * Purpose: Ownership is the wrong gate. A seat with a qualifying city and room under the cap should be told how the type works.
  * When to use: Strategic consultations with production enabled. Tactical consultations should not call it.
- * Expected outcome: Flags from controlled hexes, their infrastructure, and `getMaxedUnitTypesForPlayer`. Neutral border hexes are skipped. The queue snapshot is not read.
+ * Expected outcome: Flags from controlled hexes, their infrastructure, sea access for naval (`seaAccessOf`, which reads true terrain from the database, never `state.hexes`, because a commander's snapshot can mask terrain), and `getMaxedUnitTypesForPlayer`. Neutral border hexes are skipped. The queue snapshot is not read.
  * Exceptions: None.
  */
-export function seatBuildCapabilities(state: GameStateSnapshot, ownSeat: string): SeatBuildCapabilities {
+export function seatBuildCapabilities(
+  state: GameStateSnapshot,
+  ownSeat: string,
+  seaAccessOf: SeaAccessCheck = hexHasSeaAccess
+): SeatBuildCapabilities {
   const infraByH3 = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
   const maxed = new Set(getMaxedUnitTypesForPlayer(state.units, ownSeat, parseGameSize(state.gameSize)));
   let canBuildNaval = false;
@@ -59,7 +65,12 @@ export function seatBuildCapabilities(state: GameStateSnapshot, ownSeat: string)
   for (const row of state.strategicControl ?? []) {
     if (row.controllerPlayerId !== ownSeat || isNeutralBorderHex(row.h3Index)) continue;
     const infra = infraByH3.get(row.h3Index);
-    const available = getAvailableBuildUnitTypes(infra?.urbanHexCount ?? 0, infra?.seaportCount ?? 0, infra?.airportCount ?? 0);
+    const available = getAvailableBuildUnitTypes({
+      urbanHexCount: infra?.urbanHexCount ?? 0,
+      seaportCount: infra?.seaportCount ?? 0,
+      airportCount: infra?.airportCount ?? 0,
+      seaAccess: (infra?.seaportCount ?? 0) > 0 && seaAccessOf(row.h3Index),
+    });
     if (!maxed.has('naval') && available.includes('naval')) canBuildNaval = true;
     if (!maxed.has('missile') && available.includes('missile')) canBuildMissile = true;
   }
