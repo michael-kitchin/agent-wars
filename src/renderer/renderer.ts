@@ -124,6 +124,7 @@ import { wireConsoleFrame } from './chrome/consoleFrame';
 import { fetchMatchSnapshot } from './core/matchSnapshotClient';
 import { wireObserveMode } from './gameplay/observeChrome';
 import { wireGameMenu } from './chrome/gameMenu';
+import { wireChartsDialog } from './charts/chartsDialog';
 import { showLoadedSaveToastAfterReload, wireSaveLoadMenu } from './gameplay/saveLoadMenu';
 import {
   tacticalMaybeScheduleAnnihilationExit,
@@ -729,6 +730,7 @@ function init(): void {
     redrawSelectionPanel: renderSelectionPanel,
   });
   wireGameMenu();
+  wireChartsDialog();
   wireSaveLoadMenu();
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('shift_pressed');

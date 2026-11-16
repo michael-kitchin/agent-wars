@@ -29,6 +29,8 @@ import {
 } from './readyResolutionAnnouncements';
 import { dropHeldBattleTurnUpdate, hasPendingDestroyedBattleParents } from './heldBattleTurnUpdate';
 import { announceKnockouts } from './knockoutNotices';
+import { closeChartsDialogIfOpen, refreshChartsDialogIfOpen } from '../charts/chartsDialog';
+import { isHumanSeatId } from '../../shared/seatIds';
 import { buildAirDropOutboundPlaybackMoves, buildAirDropReturnPlaybackMoves } from '../rendering/orderDrawing';
 import { offerHumanKnockoutChoice } from './knockoutDialog';
 import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
@@ -196,11 +198,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       const outcome: MeleeInterceptModalOutcome = readyResult.aiOnlyBattleH3Index && S.autoAdvance
         ? { decision: 'fight', selectedH3Index: readyResult.aiOnlyBattleH3Index }
         : readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()
-          ? await deps.openMeleeInterceptModal({
+          ? await (closeChartsDialogIfOpen(), deps.openMeleeInterceptModal({
               candidates: readyResult.meleeInterceptCandidates ?? [],
               buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
               preselectH3Index: readyResult.aiOnlyBattleH3Index,
-            })
+            }))
           : { decision: 'ignore' };
       const resolveResult = await window.gameApi.resolveMeleeIntercept({
         meleeDecisionToken: readyResult.meleeDecisionToken ?? '',
@@ -226,6 +228,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     await deps.refreshTacticalTerrainOverridesForRenderer();
     const nextState = await fetchMatchSnapshot();
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    if ((readyResult.knockouts ?? []).some((knockout) => isHumanSeatId(knockout.seatId))) closeChartsDialogIfOpen();
     announceKnockouts(readyResult.knockouts ?? [], S.gameState, nextState.seats, readyResult.removedUnitIdsBySeat);
     const state = nextState;
     await deps.applyGameStateSnapshot(state, {
@@ -238,6 +241,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       redraw: false,
     });
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    void refreshChartsDialogIfOpen();
     const aiMoves = readyResult.aiMoves ?? [];
     const resolutionMoves = [...humanMoves, ...aiMoves];
     const visibleHexes = deps.getVisibleHexSet(state);

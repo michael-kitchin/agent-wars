@@ -46,6 +46,12 @@
   --seat-2-text: #F0B4C8;
   --seat-3-text: #FDBA74;
   --seat-4-text: #A9C1F5;
+  /* A commander's private stance toward a side, on the charts dialog's graphs, pills, and strip. */
+  --stance-hostile: #E24B4A;
+  --stance-wary: #EF9F27;
+  --stance-neutral: #9AA5A3;
+  --stance-cordial: #5DCAA5;
+  --stance-friendly: #7FB93A;
   --neutral-map: #141414;
   --neutral-outline: #1F1F1F;
   --neutral-bar: #9CA3AF;

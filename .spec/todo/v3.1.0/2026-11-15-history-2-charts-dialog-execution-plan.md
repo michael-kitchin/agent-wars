@@ -600,3 +600,11 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app: open the dialog in
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
+
+| 0 | Pass | Prerequisites confirmed. `upsertSideStance` re-stamps `updated_turn` on any change of stance, reason, trust, or threat (not stance and reason only). | none | none | n/a |
+| 1 | Pass | Types moved to `src/shared/matchChartSeriesTypes.ts` (re-exported) to stay under 600 lines. | `src/shared/matchChartSeriesTypes.ts` | none | n/a |
+| 2 | Pass | uPlot 1.6.32. All named members exist in `uPlot.d.ts`. | none | `THIRD-PARTY-NOTICES.md` | n/a |
+| 3 | Pass | `chartPlotHeight` is the room left after the title row. Chart definitions are in `chartsDialogState.ts`. | `chartsDialogTypes.ts`, `chartSeatLookups.ts` | `charts-dialog.md`, `input-map.md`, `modes-and-transitions.md`, `control-tooltips.md`, `ux-specification.md`, `ui-style-guide.md` | Not run by hand |
+| 4-6 | Pass | `buildRelationshipStack` takes `seatNumberOf` and `subjectIsViewer`. The strip's `update` takes the strip only and derives the full range. | none | `charts-dialog.md` | Not run by hand |
+| 7 | Pass | The knockout close runs only when the human seat is knocked out, because an unconditional close would close the dialog every turn. The melee close is a comma expression before the modal call. Smoke scenes `charts-open` and `charts-closed` added. | `scripts/ui-smoke/*` | `charts-dialog.md` | See hand-off |
+| 8 | Pass | `npm test`, `build:renderer`, `check:circular` (3 baseline cycles) pass. | none | `how-to-play.md`, `match-statistics.md`, `README.md` | n/a |

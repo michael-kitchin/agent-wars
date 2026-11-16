@@ -203,6 +203,7 @@ function copyrightSnippets(licenseText) {
  */
 const vendoredLicenseRequirements = [
   ['static/vendor/leaflet/LICENSE', 'Copyright (c) 2010-2023, Volodymyr Agafonkin'],
+  ['static/vendor/uplot/LICENSE', 'Copyright (c) 2022 Leon Sorokin'],
   ['static/flags/subdivisions/LICENSE', 'Copyright (c) 2021 AJ McKenna'],
 ];
 

@@ -392,6 +392,22 @@ const FRAME_CHECKS = Object.freeze([
     needs: ['#game-menu', '#game-menu-btn'],
     run: (p, el) => (!el('#game-menu').shown && el('#game-menu-btn').expanded === 'false' ? null : 'a click outside the menu left it open'),
   },
+  {
+    name: 'charts-dialog-opens-over-the-window',
+    scenes: [SCENES.chartsOpen],
+    needs: ['#charts-overlay'],
+    run: (p, el) => {
+      const o = el('#charts-overlay');
+      if (!o.shown) return 'the charts dialog is not shown';
+      return near(o.w, p.viewport.w) && near(o.h, p.viewport.h) ? null : `charts overlay is ${fmt(o)}, expected the whole ${p.viewport.w}x${p.viewport.h} window`;
+    },
+  },
+  {
+    name: 'charts-dialog-escape-closes',
+    scenes: [SCENES.chartsClosed],
+    needs: ['#charts-overlay'],
+    run: (p, el) => (el('#charts-overlay').shown ? 'Escape left the charts dialog open' : null),
+  },
 ]);
 
 /**

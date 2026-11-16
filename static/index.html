@@ -6,11 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Wars</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="vendor/uplot/uPlot.min.css" />
   <link rel="stylesheet" href="shellChrome.css" />
   <link rel="stylesheet" href="mapFonts.css" />
   <link rel="stylesheet" href="frameChrome.css" />
   <link rel="stylesheet" href="consoleChrome.css" />
   <link rel="stylesheet" href="selectionChrome.css" />
+  <link rel="stylesheet" href="chartsChrome.css" />
   <link rel="stylesheet" href="chatChrome.css" />
   <link rel="stylesheet" href="feedbackChrome.css" />
   <link rel="stylesheet" href="newGameChrome.css" />
@@ -465,6 +467,15 @@
   <div id="model-description-tooltip" class="hex-tooltip model-description-tooltip hidden" aria-hidden="true"></div>
   <div id="control-tooltip" class="hex-tooltip control-tooltip hidden" aria-hidden="true"></div>
   <div id="unit-origin-tooltip" class="hex-tooltip unit-origin-tooltip hidden" aria-hidden="true"></div>
+  <div id="charts-overlay" class="charts-overlay" hidden>
+    <section id="charts-dialog" class="charts-dialog" role="dialog" aria-modal="true" aria-labelledby="charts-dialog-title">
+      <header class="charts-dialog-header">
+        <h2 id="charts-dialog-title">Charts</h2>
+        <button type="button" id="charts-dialog-close" class="charts-dialog-close" aria-label="Close the charts" data-control-tooltip="Close the charts. You can also press C or Escape.">×</button>
+      </header>
+      <div id="charts-dialog-body" class="charts-dialog-body"></div>
+    </section>
+  </div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="renderer.js"></script>
 </body>

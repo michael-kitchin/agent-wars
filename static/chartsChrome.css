@@ -1,0 +1,151 @@
+/* The charts dialog: the overlay, the scrolling body, the chart blocks, the relationship stacks, the stance strip, and the tooltip. Colors come from the chrome variables in shellChrome.css. */
+.charts-overlay[hidden] { display: none; }
+/* Above the start and load confirmations (7070), below tooltips (7100 and 8100). */
+.charts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 7080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.charts-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 90vw;
+  height: 90vh;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+.charts-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--chrome-bg-raised);
+}
+.charts-dialog-header h2 { margin: 0; font-size: 1.1rem; }
+.charts-dialog-close { padding: 0.1rem 0.5rem; font-size: 1.2rem; line-height: 1.2; }
+.charts-dialog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0.75rem 1rem 1rem;
+}
+.charts-block { margin: 0 0 0.5rem; }
+.charts-block-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 28px;
+}
+.charts-block-title h3 { margin: 0; font-size: 0.95rem; }
+.charts-select, .charts-select-label { font-size: 12px; color: var(--chrome-muted); }
+.charts-select { max-width: 12rem; }
+.charts-plot-host { position: relative; max-width: 100%; }
+.charts-plot-host .uplot { color: var(--chrome-muted); }
+.charts-empty { margin: 0.5rem 0; color: var(--chrome-muted); font-size: 13px; }
+.charts-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.charts-legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.charts-legend-swatch, .charts-tooltip-swatch { display: inline-block; width: 14px; height: 4px; border-radius: 2px; }
+.charts-tooltip {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  padding: 0.35rem 0.5rem;
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.charts-tooltip[hidden] { display: none; }
+.charts-tooltip-heading { font-weight: 600; margin-bottom: 0.15rem; }
+.charts-tooltip-line { display: flex; align-items: center; gap: 0.35rem; }
+.charts-tooltip-total { margin-top: 0.15rem; border-top: 1px solid var(--chrome-border); padding-top: 0.15rem; }
+/* One stack per side in one row, up to four. Text wraps or ends in an ellipsis so nothing overflows the dialog. */
+.charts-stack-grid { display: grid; gap: 0.75rem; }
+.charts-stack {
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--chrome-divider);
+  border-radius: 2px;
+  background: var(--chrome-bg-deep);
+}
+.charts-stack-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.35rem;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.charts-spoke-graph { display: block; width: 100%; height: auto; max-height: 220px; }
+.charts-spoke-graph line { stroke-linecap: round; }
+.charts-spoke-hub, .charts-spoke-circle { stroke: var(--chrome-text); stroke-width: 1; }
+.charts-spoke-circle-missing { stroke-dasharray: 3 2; }
+.charts-spoke-digit { fill: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }
+.charts-spoke-label, .charts-spoke-missing {
+  fill: var(--chrome-text);
+  font-size: 10px;
+  paint-order: stroke;
+  stroke: var(--chrome-bg-deep);
+  stroke-width: 3px;
+}
+.charts-spoke-missing { fill: var(--chrome-muted); font-size: 9px; }
+.charts-row-card { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.charts-row-card th { text-align: left; color: var(--chrome-muted); font-weight: 600; }
+.charts-row-card th, .charts-row-card td {
+  padding: 0.15rem 0.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.charts-row-side { display: flex; align-items: center; gap: 0.25rem; }
+.charts-stance-pill {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 8px;
+  color: #10161d;
+  font-weight: 600;
+}
+.charts-score-bar { display: inline-flex; gap: 1px; vertical-align: middle; }
+.charts-score-bar-empty { outline: 1px dashed var(--chrome-muted); outline-offset: 1px; }
+.charts-score-step { width: 5px; height: 8px; background: var(--chrome-divider); }
+.charts-score-step-on { background: var(--chrome-accent-edge); }
+.charts-score-number { margin-left: 0.25rem; }
+/* The stance strip: labels in DOM beside one canvas. */
+.charts-plot-host:has(.charts-strip-canvas) { display: flex; align-items: flex-start; }
+.charts-strip-labels { flex-shrink: 0; }
+.charts-strip-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.charts-strip-canvas { display: block; flex-shrink: 0; cursor: grab; }
+.charts-strip-canvas[hidden], .charts-strip-labels[hidden], .charts-empty[hidden] { display: none; }

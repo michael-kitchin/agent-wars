@@ -472,6 +472,18 @@ The flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather 
 
 The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
+## Charts
+
+Press **C** during a match, or at game over, to open the charts. Press **C** again, press Escape, or click outside the dialog to close it. The key does nothing while you type in a field, and the charts do not open over a dialog that needs your choice.
+
+The charts show every side and every turn, whatever fog of war is set to, so you can see credits and units you could not see on the map. No AI commander is shown them.
+
+- **Relationships:** one card for each side. The graph shows how each AI commander regards that side: the line's color is its stance, its width is trust, and a dashed line is an old report or none. The table under it gives the stance, trust, threat, the hexes that commander took from that side in the last five turns, and the turn it last reported. A commander that has never reported shows "no report".
+- **Stance over time:** one strip for the side you choose, with a row for each commander. A solid cell is a stance the commander reported that turn. A lighter cell carries an earlier stance forward. An empty outline is no report.
+- **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep per turn, units lost per turn, and model cost so far. Built units and mercenary units have a dropdown for the total or one unit type.
+
+Hover a chart for each side's value at that turn and their total. Scroll over a chart to zoom the turns, drag to move along a zoomed chart, and double-click to show every turn again. Charts begin at the first turn the game recorded, so a save from an earlier version shows "No turns have been recorded yet." until you play a turn.
+
 ## Things That May Surprise You
 
 - **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens. Each commander has its own key, entered in that commander's popover. A commander with a model and an empty key does not call the model.

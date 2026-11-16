@@ -66,6 +66,10 @@ The chat panel shows Messages and the expand control. It does not offer a text f
 
 The footer checkbox reads "Start the next turn when every commander is ready". It starts off. Watch the rest turns it on and hides the chat panel. While it is on, the panel stays hidden, and Ready presses once playback has finished and no commander is planning. While an AI-only battle is in progress, that press starts the next battle beat, and after that battle ends it starts the next strategic turn. A beat-limit ending shows its notice for 3 seconds before that start. The beat's marches, fire, melee, and dice play before that next press. If Ready fails, the checkbox turns off and the reason is logged. While it is off, Ready is manual, and the same playback plays before the next press. On either setting, a battle this turn is about to open waits until the world-map animation has finished. The chosen battle is preselected in the tactical battles list. Ok on a result returns to the world map and does not press Ready, except Ok on a beat-limit notice while this checkbox is still on, which starts the next turn. A new match turns the checkbox off and sets View as back to All sides.
 
+### Charts overlay
+
+The charts dialog opens over any mode that has a match loaded and does not change the mode. It is described in [charts-dialog.md](charts-dialog.md). While it is open, no map key acts. Closing it returns to the mode it opened over.
+
 ## Transitions
 
 ```mermaid
@@ -143,6 +147,7 @@ On the map, tactical play limits orders to the battle area and shows the battle 
 - Unchecking Offer tactical battles never opens the tactical battles list for a human who is still playing. Melee resolves as Ignore. An observed match uses AI-only battles instead. Ready offers one tactical battle only when that choice is not None.
 - Strategic draft orders are not discarded merely by entering a tactical battle. They return when the battle ends, except for units that no longer exist. A human exit then runs Ready. An AI-only Ok does not. While the observe checkbox is on, leaving an ended AI-only battle starts the next strategic turn. A beat-limit notice waits 3 seconds first, unless Ok is clicked.
 - A click outside the battle area during tactical planning never issues a strategic order.
+- The charts dialog never changes the mode, the selection, the draft orders, or the match. It closes before the melee intercept list or the knockout dialog opens.
 - Observe never selects a unit, never queues an order, and never shows a magnifier. View as changes which fog is drawn. It does not change the match.
 
 ## Open Questions
@@ -151,7 +156,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#game-over-overlay`, `#tactical-annihilation-overlay`, `#tactical-exit-btn`, `#ready-btn`)
+- `static/index.html` (`#game-over-overlay`, `#charts-overlay`, `#tactical-annihilation-overlay`, `#tactical-exit-btn`, `#ready-btn`)
 - `src/renderer/map/initCore.ts` (`wireInitCore`, which opens the loaded match and, when that match has hexes and is not over, the Commanders tab)
 - `src/renderer/gameplay/saveLoadMenu.ts` (`wireSaveLoadMenu`)
 - `src/shared/consoleTabState.ts` (`consoleTabIdForLiveMatchLaunch`)

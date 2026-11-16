@@ -51,3 +51,7 @@ The first three come from the talk reply and are stored in `side_stances`. See [
 The charts are for the human player only, and the player sees every value whatever fog of war is set to. `game:readMatchCharts` (`src/main/ipc/matchChartsIpcHandler.ts`) applies no fog filter and returns a `MatchChartsSnapshot`: the seats in side order with their `sideDisplayName` names, the recorded turns in turn order, and the current turn. With no match open it returns empty lists and turn 1.
 
 Commanders are told nothing new. No prompt contains another side's statistics or another commander's stance, trust, or threat, with fog of war on or off. A commander sees only its own stance, trust, and threat, in the Sides table of the talk prompt and the stance list of the orders prompt. Nothing under `src/main/openRouter/` calls the charts channel or reads the statistics event.
+
+## Where it is drawn
+
+The charts dialog on the C key draws this snapshot. Its rules for series, tooltips, zoom, and the relationship rows and strip are in `src/shared/matchChartSeries.ts`, and the dialog is described in [ux/charts-dialog.md](ux/charts-dialog.md).

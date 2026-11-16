@@ -65,6 +65,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
 - Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
 - Settings, Help, How to play, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Charts close control: Close the charts. You can also press C or Escape.
+- Built units and Mercenary units dropdowns, on the charts dialog: Show the total or one unit type for built units, or for mercenary units.
+- How they see dropdown, on the charts dialog: Choose the side whose standing with each commander the strip shows.
 - Chat panel expand, while the history is hidden: Show every message sent this match.
 - Chat panel expand, while the history is showing: Hide the message history.
 - Chat panel recipient: Choose the side this message goes to.
@@ -206,6 +209,8 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 
 ## Source Anchors
 
+- `static/index.html` (`#charts-dialog-close`)
+- `src/renderer/charts/chartsDialog.ts` (`buildLineChartBlock`, `buildBody`)
 - `static/index.html` (`#control-tooltip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)
 - `src/renderer/chat/chatPanel.ts` (`syncExpandControl`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
