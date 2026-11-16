@@ -2,9 +2,9 @@
 
 **Audience:** A coding agent that runs this plan from start to finish without asking questions.
 
-**Goal:** The main process knows, for every strategic turn, each side's unit counts, hexes, production, credits, upkeep, losses, and model cost, and how each AI commander privately regards every other side. It records those numbers every turn and serves them to the renderer for the human player's charts. Each commander also reports trust and threat with its stance. Commanders are told nothing new about other sides. There is no new screen.
+**Goal:** The main process knows, for every strategic turn, each side's unit counts, hexes, production, credits, upkeep, losses, and model cost, and how each AI commander privately regards every other side. It records those numbers every turn and serves them to the renderer for the human player's charts. Each commander also reports trust and threat with its stance. The match history also keeps every loss with who was responsible for it, as the commanders' loss lines show it. Commanders are told nothing new about other sides. There is no new screen.
 
-**Shape:** Phase 0 records a baseline. Phases 1 through 5 each add one piece that can be verified on its own or with earlier phases. Phase 6 runs the final verification, the doc check, and hands the user a short manual checklist.
+**Shape:** Phase 0 records a baseline. Phases 1 through 6 each add one piece that can be verified on its own or with earlier phases. Phase 7 runs the final verification, the doc check, and hands the user a short manual checklist.
 
 **Tech:** TypeScript (Electron main, sandboxed preload), `better-sqlite3`, `node:test`, ESLint with the local `orienting-comments` and `seat-id-literals` rules, `scripts/check-circular-deps.cjs`.
 
@@ -104,6 +104,7 @@ These come from `.cursor/rules/` (which `CLAUDE.md` imports for Claude Code) and
 - No screen. The charts dialog is the next plan. No renderer file changes.
 - No statistics below the strategic level. Tactical sub-units are not counted.
 - No change to combat, movement, production, or what a turn does.
+- No change to how a loss is attributed, and no change to `turn_notes_history`, Recent Turn Notes, or the side combat record. Nothing reads the recorded attribution yet: no chart, no prompt, no replay screen.
 - No change to `README.md`.
 - Do not edit anything under `.spec/completed/`.
 - Do not "improve" code next to a phase's target. Make only the edits listed.
@@ -127,9 +128,12 @@ Tell the user about these in your final message.
 - **Statistics are recorded, not re-derived.** An earlier design note said charts would be extracted from frames. Upkeep and production come from engine functions that read the live match, so the reliable way to get them right is to compute them at each turn boundary with those functions and store the result as one small event. Frames stay as they are for anything added later.
 - **A commander sees its own trust and threat** beside its own stance, in the Sides table of the talk prompt and the stance list of the orders prompt. They are its own reports, as the stance is.
 - **The talk prompt keeps calling a stance private** and says no other commander is told it, trust, or threat. It does not mention that the player's charts show them.
+- **Trust and threat share the stance's basis.** The talk prompt already tells a commander to base its stance on the loss lines and its combat record more than on what a side says. That sentence now covers all three, so trust does not become a second channel that follows a side's messages instead of its deeds.
 - **The statistics event is engine-only.** It holds every side's numbers without fog and every commander's private scores, so its visibility is `engine`, like a frame. The charts channel still serves it to the player, which is decision 1.
 - **"City cells held" is not a separate chart.** A side's production per turn is the sum of the city cells in the hexes it controls (`processProductionAfterControlResolution` adds `urbanHexCount` per controlled hex that is not on the neutral border). The two numbers are the same, so the production chart covers both.
 - **Losses and captures are null for the first turn after a load.** Both are differences from the previous turn, and the previous turn's detail is kept in memory, not in the save.
+- **Loss attribution is recorded as its own event.** `turn_notes_history` is left out of frames, and a frame difference shows only that a unit is gone, not who destroyed it or how. So each attributed loss capture writes one `losses_attributed` event with every owner's losses and their attribution. It is engine-only, like a frame, because it ignores fog of war.
+- **`unitsLost` in the statistics stays an ownership difference.** It counts a deserting mercenary as lost, which attribution does not. The two numbers can differ, and both are kept.
 
 ---
 
@@ -184,6 +188,36 @@ export interface TurnStatistics {
 - The event's format version is 1.
 - When a turn has more than one strategic frame (the state after a battle is its own frame), it has more than one `side_statistics` event. Readers use the last one for each turn.
 
+### Who destroyed what
+
+A second new event type, `losses_attributed`, written each time the engine attributes losses. That happens in three places, and each already writes the commanders' loss notes:
+
+| Source | Written by | Step of the event |
+| --- | --- | --- |
+| `strategicTurn` | `captureStrategicTurnLossNote`, through `captureTurnLossNoteFromResolution` | `strategicStep(turnNumber)`, the turn that resolved |
+| `tacticalBeat` | `captureTacticalBeatLossNote`, through `captureTurnLossNoteFromResolution` | `tacticalStep(battle.strategicTurnNumber, battle.battleId, max(1, battle.tacticalTurnNumber - 1))`, the beat that resolved |
+| `battleParents` | `writeBattleParentLossNotes`, when a battle deletes strategic parents | `tacticalStep(battle.strategicTurnNumber, battle.battleId, battle.tacticalTurnNumber)`, the beat in progress |
+
+Payload:
+
+```ts
+// src/shared/lossHistory.ts
+export const LOSS_HISTORY_SOURCES = ['strategicTurn', 'tacticalBeat', 'battleParents'] as const;
+export type LossHistorySource = (typeof LOSS_HISTORY_SOURCES)[number];
+
+export interface AttributedLossesRecord {
+  readonly source: LossHistorySource;
+  readonly byOwner: Readonly<Record<string, PlayerLossSummary>>;  // victim owner id -> six cause buckets, as attributeTurnLosses returns them
+}
+```
+
+- The step carries the turn, the battle, and the beat, so the payload does not repeat them.
+- `byOwner` holds every owner that lost a unit, the human seat and Neutral included. Each `LostUnit` keeps its `attribution` (`ownerId`, `lossH3Index`, `responsibleOwnerIds`, `killerUnits`) exactly as the notes store it. A battle parent is in its owner's `other` bucket, as in the notes.
+- `strategicTurn` and `tacticalBeat` are written once per capture, before the per-seat note loop, so a match with no active AI seat still records them. `battleParents` is written once per call with the units that call added, so a parent is recorded once.
+- No event is written when `byOwner` is empty.
+- Visibility is `engine`. The event's format version is 1.
+- The summary is the same for every seat. `captureTurnLossNoteFromResolution` passes no `isVictimVisible`, so `perspectivePlayerId` changes nothing in `buildTurnLossSummary`, and `attributeTurnLosses` does not read a perspective. Confirm both in Phase 0. If either has changed, stop and tell the user.
+
 ### Module map
 
 | File | Holds |
@@ -194,6 +228,8 @@ export interface TurnStatistics {
 | `src/main/matchStatistics/statisticsRecording.ts` | Writes the event at a strategic boundary |
 | `src/main/matchStatistics/statisticsHistory.ts` | Reads the recorded series back, one entry per turn |
 | `src/main/ipc/matchChartsIpcHandler.ts` | `game:readMatchCharts` |
+| `src/shared/lossHistory.ts` | `AttributedLossesRecord`, its sources, and `isAttributedLossesRecord`. No logging |
+| `src/main/recorder/matchRecordingEvents.ts` | `recordAttributedLosses`, beside the other event writers |
 
 ---
 
@@ -208,6 +244,9 @@ export interface TurnStatistics {
    - Economy and seats: `src/main/gameDb/mercenaryEconomyRead.ts` (`readMercenaryFunds`) and `src/main/gameDb/seatRosterStore.ts` (`readSeatRoster`).
    - Stances: `src/main/gameDb/sideMessageStore.ts` (`upsertSideStance`, `listSideStances`) and `src/main/gameDb/sideMessageTables.ts` (`SIDE_MESSAGE_TABLES_DDL`, `ensureSideMessageTables`).
    - Talk stage, all under `src/main/openRouter/talk/`: `talkReply.ts` (`parseTalkReply`, `TalkReplyStance`), `talkReplySchema.ts`, `talkPrompt.ts` (the text `No other commander is told it`), `talkPromptInput.ts`, `ordersMessagesBlock.ts`, and `talkRoundPersistence.ts`.
+   - Loss attribution: `src/main/gameActions/captureTurnLossNote.ts` (`captureTurnLossNoteFromResolution`, `CaptureTurnLossNoteArgs`), `src/main/gameActions/strategicLossNoteCapture.ts` (`captureStrategicTurnLossNote`), `src/main/gameActions/tacticalBeatPlayback.ts` (`captureTacticalBeatLossNote`), `src/main/tacticalBattle/battleParentLossNotes.ts` (`writeBattleParentLossNotes`, `battleParentLostUnit`, `BattleLossContext`), `src/main/tacticalBattle/destroyedBattleParents.ts` (`recordDestroyedBattleParents`), `src/shared/lossSummaryFromResolution.ts` (`buildTurnLossSummary`), `src/main/lossAttribution/lossAttributionCore.ts` (`attributeTurnLosses`), `src/shared/lossAttributionTypes.ts` (`LossAttribution`), `src/main/recorder/recorderStepKey.ts` (`currentStepKey`), and `src/main/recorder/matchFramePolicy.ts` (the `turn_notes_history` entry of `MATCH_TABLE_RECORDING_POLICY`).
+   - In `buildTurnLossSummary`, confirm that `perspectivePlayerId` is read only to decide visibility, and that `captureTurnLossNoteFromResolution` passes no `isVictimVisible`. Record what you found in the Phase 0 Inventory.
+   - Confirm that a battle's `strategicTurnNumber` is the `turn_state` turn number while the battle runs. `currentStepKey` builds a battle step from `turn_state`, and the loss events build theirs from the battle, so the two must agree for a loss event to share its beat's step with `tactical_resolution`. If they can differ, stop and tell the user.
 4. Record the line counts of `src/main/gameDb.ts`, `src/main/main.ts`, `src/main/preload.ts`, and `src/shared/ipc/gameApiTypes.ts`. All four were past 600 lines when this plan was written, and `preload.ts` was 940. If adding the lines a phase names would take any file past 1000, stop and tell the user.
 5. Read, and do not edit: `src/main/gameDb/seatRosterStore.ts` (`ensureSeatAddedColumns`), `src/main/gameDb/mercenaryEconomyRead.ts` (`readMercenaryFunds`, `withMercenaryEconomy`), `src/shared/topBarStats.ts` (`computeTopBarStats`, for how production capacity is counted), and `doc/match-recording.md`.
 6. Record the value of `EXPECTED_USER_VERSION`. This plan does not change it.
@@ -318,19 +357,20 @@ Each strategic turn's statistics are stored as one event.
    - A unit is lost by seat S when its id was owned by S in `previous` and is absent from `current`, or is owned there by anyone else (a mercenary that deserted counts as lost).
    - A hex is taken by seat A from seat B when B controlled it in `previous`, A controls it in `current`, and both are seats in `seatIds` and differ. Neutral is not a seat.
    - `hexesTakenBetween` returns one entry per ordered pair with a count above 0.
-3. `statisticsRecording.ts`: `export function recordTurnStatistics(step: StepKey, seats: readonly SeatForStatistics[]): void`. It never throws: it catches, logs `logError` with the error and the seat count, and returns.
+3. `statisticsRecording.ts`: `export function recordTurnStatistics(step: StepKey, seats: readonly SeatForStatistics[], record: (event: MatchEventRequest) => void): void`. It never throws: it catches, logs `logError` with the error and the seat count, and returns.
+   - **It must not import `src/main/recorder/matchRecorder.ts` at runtime.** `matchRecorder.ts` calls it, so a value import back would be a new cycle. It takes the event writer as `record` and imports `MatchEventRequest` with `import type`, which is erased.
    - It does nothing unless `step.scope` is `'strategic'`.
    - It reads `readSideStatistics`, `listAllSideStances` (mapped to `RelationshipReport`, with `reportedTurn` from the row's `updated_turn`), and `readTurnOwnership` with `getMatchGeneration()` from `src/main/matchGeneration.ts`.
    - `previous` is `rememberedTurnOwnership(step.turnNumber - 1, generation)`. It fills `unitsLost` from `unitsLostBySeat(previous, current, ...)` (null for every seat when the function returns null) and `hexesTaken` from `hexesTakenBetween`.
-   - It calls `recordMatchEvent({ type: 'side_statistics', step, visibility: 'engine', payload })`.
+   - It calls `record({ type: 'side_statistics', step, visibility: 'engine', payload })`.
    - It then calls `rememberTurnOwnership(current)`. A turn with a battle has two strategic frames and two events. Both compare against the turn before, and the next turn compares against the later one, after the battle. So no loss is counted twice or missed.
-4. Hook. `matchRecorder.ts`, `recordStepBoundary`: directly after the code that writes a frame because the step changed, and also directly after the forced final frame at match end, call `recordTurnStatistics(step, readSeatRoster(gameDbOps))`. `readSeatRoster` is in `src/main/gameDb/seatRosterStore.ts`, a leaf file that does not import the barrel. `SeatForStatistics` is `Pick<SeatRecord, 'seatId' | 'seatOrder' | 'outTurn' | 'costUsd'>`. `recordStepBoundary` must stay unable to throw.
+4. Hook. `matchRecorder.ts`, `recordStepBoundary`: directly after the code that writes a frame because the step changed, and also directly after the forced final frame at match end, call `recordTurnStatistics(step, readSeatRoster(gameDbOps), recordMatchEvent)`. `readSeatRoster` is in `src/main/gameDb/seatRosterStore.ts`, a leaf file that does not import the barrel. `SeatForStatistics` is `Pick<SeatRecord, 'seatId' | 'seatOrder' | 'outTurn' | 'costUsd'>`. `recordStepBoundary` must stay unable to throw.
 5. `doc/match-recording.md`: add the event to the event table, describe its payload by naming `TurnStatistics`, and say when `unitsLost` and `hexesTaken` are null.
 
 ### Tests
 
 - `turnDifferences.test.ts`, with hand-built ownership values: a unit that disappears is lost by its old owner; a unit that changes owner is lost by its old owner; a hex that moves from seat B to seat A is one hex taken by A from B; a hex that moves to no controller, or from neutral, is not counted; a null previous, a different generation, and a gap of two turns each return null; `rememberTurnOwnership` keeps the later of two entries for one turn and forgets a turn two back.
-- `statisticsRecording.test.ts`, on a seated temp match:
+- `statisticsRecording.test.ts`, on a seated temp match, passing `recordMatchEvent` as the writer:
   - The first call writes one `side_statistics` event whose payload has every seat, `unitsLost: null` for each, and `hexesTaken: null`.
   - After deleting one unit and moving the turn to 2, the next call's payload has `unitsLost: 1` for that unit's owner and 0 for the others, and `hexesTaken` is an empty list.
   - After deleting a second unit and calling again for turn 2 (the state after a battle), the payload has `unitsLost: 2` for that owner. After moving to turn 3 with no change, the next call has 0 for every seat.
@@ -340,7 +380,7 @@ Each strategic turn's statistics are stored as one event.
 
 ### Verification
 
-Run the Verification Bar. `check:circular` matters here: `src/main/matchStatistics/` must not import the barrel `src/main/gameDb.ts`.
+Run the Verification Bar. `check:circular` matters here: `src/main/matchStatistics/` must not import the barrel `src/main/gameDb.ts`, and nothing under it may import `src/main/recorder/matchRecorder.ts` except with `import type`.
 
 ---
 
@@ -387,32 +427,37 @@ Run the Verification Bar.
 The talk reply asks for trust and threat with each stance, and each commander sees its own scores. No prompt gains anything about another side.
 
 **Add:** nothing.
-**Edit:** `src/main/openRouter/talk/talkReplySchema.ts`, `src/main/openRouter/talk/talkReply.test.ts`, `src/main/openRouter/talk/talkPrompt.ts`, `src/main/openRouter/talk/talkPrompt.test.ts`, `src/main/openRouter/talk/talkPromptInput.ts`, `src/main/openRouter/talk/ordersMessagesBlock.ts`, `src/main/openRouter/talk/ordersMessagesBlock.test.ts`, and under `doc/ai-commander-prompts/`: `talk-prompt.md`, `strategic-prompt.md`, `tactical-prompt.md`, `example-strategic-prompt.md`, `example-tactical-prompt.md`, `crosswalk.md`, `source-inventory.md`; `doc/commander-messages.md`
+**Edit:** `src/main/openRouter/talk/talkReplySchema.ts`, `src/main/openRouter/talk/talkReply.test.ts`, `src/main/openRouter/talk/talkPrompt.ts`, `src/main/openRouter/talk/talkPrompt.test.ts`, `src/main/openRouter/talk/talkPromptInput.ts`, `src/main/openRouter/talk/ordersMessagesBlock.ts`, `src/main/openRouter/talk/ordersMessagesBlock.test.ts`, and under `doc/ai-commander-prompts/`: `talk-prompt.md`, `strategic-prompt.md`, `tactical-prompt.md`, `example-strategic-prompt.md`, `example-tactical-prompt.md`, `crosswalk.md`, `source-inventory.md`, `assembly-contract.md`; `doc/commander-messages.md`
 
 ### Steps
 
 1. `talkReplySchema.ts`: the stance item gains `trust` and `threat`, each `{ type: 'integer', enum: [...] }` with the values 0 through `RELATIONSHIP_SCALE_MAX`, built from that constant in `src/shared/matchStatistics.ts`. Add both to the item's `required` list. The schema is `strict: true`, which needs every property listed in `required`. Use `enum`, not `minimum` and `maximum`. Strict structured output does not accept those on every provider.
 2. `talkPrompt.ts`, `buildTalkSystemText`: replace the stance bullet. It currently reads (find it by `No other commander is told it`):
 
-   > - Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
+   > - Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
 
    Replace it with exactly this, where `${max}` is `RELATIONSHIP_SCALE_MAX`:
 
    ```text
-   - Set how you regard each side. A stance is your private view of one side: ${stances}. With each stance give trust, from 0 to ${max}, for how far you believe what that side tells you, and threat, from 0 to ${max}, for how dangerous that side is to you now. No other commander is told your stance, trust, or threat. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
+   - Set how you regard each side. A stance is your private view of one side: ${stances}. With each stance give trust, from 0 to ${max}, for how far you believe what that side tells you, and threat, from 0 to ${max}, for how dangerous that side is to you now. No other commander is told your stance, trust, or threat. Base all three on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
    ```
 
+   The basis sentence now covers trust and threat too, so a commander does not trust a side its losses say it should not. Keep the rest of the system text as it is.
+
    In the reply example in the same text, the stance entry becomes `{"toward":"<side code>","stance":"<${stanceEnum}>","trust":<0-${max}>,"threat":<0-${max}>,"reason":"<one sentence>"}`. This text is static, so the cached system prompt stays the same from turn to turn.
-3. `talkPromptInput.ts`: `TalkPromptSide` (in `talkPrompt.ts`) gains `readonly trust: number | null` and `readonly threat: number | null`, with full orienting comments. `sideFromRoster` fills them from this commander's own `listSideStances` rows, and leaves them null on the own row and where no stance is stored. Nothing else is read.
-4. `talkPrompt.ts`, `sidesTable`: a stored stance cell becomes `{stance} (trust {t}, threat {h}): {reason}`, with `not reported` in place of a null score. The header stays `Your stance`.
-5. `ordersMessagesBlock.ts`: each line of `Your stances:` becomes `- {label} ({code}): {stance}, trust {t}, threat {h}. {reason}`, with `not reported` for a null score.
+3. `talkPromptInput.ts`: `TalkPromptSide` (in `talkPrompt.ts`) gains `readonly trust: number | null` and `readonly threat: number | null`, with full orienting comments. `sideFromRoster` fills them from this commander's own `listSideStances` rows, which `readTalkSides` already reads into `stanceByTarget`. Add both scores to that map's values. Leave them null on the own row and where no stance is stored. Read nothing new: the combat record and the conflict sentence stay as they are.
+4. `talkPrompt.ts`, `sidesTable`: a stored stance cell becomes `{stance} (trust {t}, threat {h}): {reason}`, with `not reported` in place of a null score. The header stays `Your stance`, and the Record column is unchanged.
+5. `ordersMessagesBlock.ts` prints a stance line in two places, and both change the same way. A side with a stance becomes `- {label} ({code}): {stance}, trust {t}, threat {h}. {reason}`, with `not reported` for a null score:
+   - the `Your stances and records:` list, used when any side has a combat record. The `no stance set.` line and the indented record line are unchanged;
+   - the `Your stances:` list, used when no side has a record.
+   Build the stance line in one private helper that both lists call.
 6. Docs: update the talk prompt document and the example prompts for the new bullet, the reply shape, and the stance cell. Update the strategic and tactical prompt documents, `crosswalk.md`, and `source-inventory.md` where they describe the stance list. In `doc/commander-messages.md`, describe trust and threat, their range, that they are private to the commander exactly as the stance is, and that the player's charts show them.
 
 ### Tests
 
 - `talkReply.test.ts`: the response format's stance item requires `toward`, `stance`, `trust`, `threat`, and `reason`, and `trust` has the enum `[0, 1, 2, 3, 4]`.
-- `talkPrompt.test.ts`: the system text contains `trust, from 0 to 4`, `threat, from 0 to 4`, and `No other commander is told your stance, trust, or threat`. Change the existing digit assertion, which expects exactly `['280']`: every digit run in the system text is now `280`, `0`, or `4`, and `280` appears once. A sides table with a stance of trust 3 and a null threat shows `trust 3, threat not reported`.
-- `ordersMessagesBlock.test.ts`: an own stance with both scores prints them.
+- `talkPrompt.test.ts`: the system text contains `trust, from 0 to 4`, `threat, from 0 to 4`, and `No other commander is told your stance, trust, or threat`. Change the existing digit assertion, which expects exactly `['280']`: every digit run in the system text is now `280`, `0`, or `4`, and `280` appears once. Change the existing assertion on `Base a stance on what a side has done to you` to the new sentence, `Base all three on what a side has done to you`. A sides table with a stance of trust 3 and a null threat shows `trust 3, threat not reported`.
+- `ordersMessagesBlock.test.ts`: an own stance with both scores prints them, both in the `Your stances:` list (no losses stored) and in the `Your stances and records:` list (a loss stored on an earlier turn, as the existing record test seeds it). The existing assertions on both list headings still pass.
 - **Privacy, with fog of war off.** On a seated temp match with three AI seats, store a stance from seat B toward seat C with the reason `b-private-reason`, trust 1, and threat 2. Build seat A's talk situation text and seat A's orders Messages block. Neither contains `b-private-reason`. Seat A's sides table shows only seat A's own stances.
 - The existing `buildConsultPromptParts` tests pass: the orders system text is byte-identical to before this phase.
 
@@ -422,14 +467,70 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 
 ---
 
-## Phase 6 — Docs, Final Verification, and Hand-Off
+## Phase 6 — Loss Attribution in the History
+
+Each attributed loss capture is stored as one event, so the history keeps who destroyed what after the match database is gone.
+
+**Add:** `src/shared/lossHistory.ts`, `src/shared/lossHistory.test.ts`
+**Edit:** `src/shared/matchRecording.ts`, `src/main/recorder/matchRecordingEvents.ts`, `src/main/recorder/matchRecordingEvents.test.ts`, `src/main/recorder/matchFramePolicy.ts`, `src/main/gameActions/captureTurnLossNote.ts`, `src/main/gameActions/captureTurnLossNote.test.ts`, `src/main/gameActions/strategicLossNoteCapture.ts`, `src/main/gameActions/tacticalBeatPlayback.ts`, `src/main/tacticalBattle/battleParentLossNotes.ts`, `src/main/tacticalBattle/battleParentLossNotes.test.ts`, `src/main/tacticalBattle/destroyedBattleParents.ts`, `doc/match-recording.md`
+
+### Steps
+
+1. `src/shared/lossHistory.ts`: the constant, the type, and the interface from "Who destroyed what" in the Design section, with full orienting comments on the interface and on each field. Add `export function isAttributedLossesRecord(value: unknown): value is AttributedLossesRecord`: true when `value` is an object whose `source` is one of `LOSS_HISTORY_SOURCES` and whose `byOwner` is an object. It does not check the buckets. A later reader that needs them parses each one with `parsePlayerLossSummaryJson` from `src/shared/lossSummaryJson.ts`.
+2. `src/shared/matchRecording.ts`: add `'losses_attributed'` to `MATCH_EVENT_TYPES` after `'side_statistics'`, with format version 1. Update the count in the comments on `MATCH_EVENT_TYPES` and `MatchEventType`, and the comment on `MATCH_EVENT_FORMAT_VERSIONS` if it still says every type maps to 1.
+3. `matchRecordingEvents.ts`: add
+
+   ```ts
+   export function recordAttributedLosses(step: StepKey, record: AttributedLossesRecord): void
+   ```
+
+   It logs `logDebug` with the step text, the source, and the owner count, and nothing from the units. It returns without writing when `record.byOwner` has no owner. Otherwise it calls `recordMatchEvent({ type: 'losses_attributed', step, visibility: 'engine', payload: record })` with no display text. It cannot throw: `recordMatchEvent` catches.
+4. `captureTurnLossNote.ts`:
+   - `CaptureTurnLossNoteArgs` gains a required field `historyStep: StepKey`, with a full orienting comment: the step the history files the losses under. A required field makes the compiler find every caller.
+   - It also gains a required field `historySource: Extract<LossHistorySource, 'strategicTurn' | 'tacticalBeat'>`.
+   - In `captureTurnLossNoteFromResolution`, directly before the `for (const seatId of activeAiSeatIds(...))` loop, build one engine-wide summary with `attributeTurnLosses(buildTurnLossSummary(lossArgs), attribution)`, with no `perspectivePlayerId`, and call `recordAttributedLosses(historyStep, { source: historySource, byOwner: summary.byOwner })`. Leave the loop as it is.
+5. Callers:
+   - `strategicLossNoteCapture.ts`, `captureStrategicTurnLossNote`: pass `historyStep: strategicStep(args.turnNumber)` and `historySource: 'strategicTurn'`.
+   - `tacticalBeatPlayback.ts`, `captureTacticalBeatLossNote`: pass `historyStep: tacticalStep(battle.strategicTurnNumber, battle.battleId, Math.max(1, battle.tacticalTurnNumber - 1))` and `historySource: 'tacticalBeat'`. That is the beat the playback is for. The beat number is the one already passed as `turnNumber`, so compute it once and use it for both.
+   - Search for every other caller with `grep -rn "captureTurnLossNoteFromResolution(" src`. Each test caller passes a strategic step and `'strategicTurn'` unless it is testing a beat.
+6. `battleParentLossNotes.ts` and `destroyedBattleParents.ts`:
+   - `BattleLossContext` gains `readonly beatNumber: number`, with a full orienting comment: the battle's `tacticalTurnNumber` when the parents were deleted.
+   - `recordDestroyedBattleParents` passes `beatNumber: battle.tacticalTurnNumber`.
+   - In `writeBattleParentLossNotes`, inside the `try`, after `units` is built and the empty-list return, and before the seat loop, group `units` by `attribution.ownerId` into `PlayerLossSummary` values whose `other` bucket holds that owner's units (start each from `emptyPlayerLossSummary()`). A unit with no attribution is not recorded. Call `recordAttributedLosses(tacticalStep(context.strategicTurnNumber, context.battleId, context.beatNumber), { source: 'battleParents', byOwner })`.
+   - Update the `Expected outcome` of both comments to say the history gains one `losses_attributed` event.
+7. `matchFramePolicy.ts`: the `turn_notes_history` reason becomes exactly `A growing log. Strategies are commander_strategy events, and losses with who was responsible are losses_attributed events.`
+8. `doc/match-recording.md`:
+   - Add `losses_attributed` to the event table: when each source writes it, its step, that the payload is `AttributedLossesRecord` (`src/shared/lossHistory.ts`), that it holds every owner's losses without fog, and that its visibility is `engine`. Change the event count in the sentence above the table.
+   - The `turn_notes_history` row of the excluded-tables table gets the new reason.
+   - Add `engine` visibility for this event to "Who may be shown a row".
+   - In "What is derived, not stored", say that a unit's disappearance is found by comparing frames, and who destroyed it is the `losses_attributed` event.
+
+The recording-file layout does not change, and no fixture is needed: the event is new at version 1, and the file reader passes unknown payloads through.
+
+### Tests
+
+- `lossHistory.test.ts`: `isAttributedLossesRecord` is true for `{ source: 'battleParents', byOwner: {} }`, and false for an unknown source, a missing `byOwner`, `null`, and a string.
+- `matchRecordingEvents.test.ts`: `recordAttributedLosses` with one owner writes one `losses_attributed` row with visibility `engine`, no display text, the given step key, and the payload read back unchanged. With an empty `byOwner` it writes nothing.
+- `captureTurnLossNote.test.ts`: the existing strategic capture (one infantry destroyed by direct fire from a human armor unit) also writes one `losses_attributed` event at step `s1`, with source `strategicTurn`. In its payload, `byOwner[SEAT].ranged[0]` has `unitId` `a1-i1` and an attribution whose `ownerId` is the seat, whose `responsibleOwnerIds` is the human seat id, and whose `killerUnits` names `h1-a1`. With the recorder turned off (`AGENT_WARS_DISABLE_RECORDER=1`, restored afterwards), the note is still written and no event is.
+- `battleParentLossNotes.test.ts`: writing two parents of two owners writes one `losses_attributed` event with source `battleParents`, both owners in `byOwner`, each unit in its owner's `other` bucket, and the step key of the battle and beat given. An empty list writes no event.
+- The existing loss-note, Recent Turn Notes, and side combat record tests pass without edits, apart from the new required fields in `captureTurnLossNote.test.ts`.
+
+### Verification
+
+Run the Verification Bar. `check:circular` matters here: `src/main/tacticalBattle/battleParentLossNotes.ts` and `src/main/gameActions/captureTurnLossNote.ts` now import `src/main/recorder/matchRecordingEvents.ts`. If a new cycle appears, import `recordMatchEvent` from `src/main/recorder/matchRecorder.ts` directly and move `recordAttributedLosses` into a new leaf file `src/main/recorder/lossHistoryRecording.ts`, recording that file in the Completion Log. If the cycle stays, revert this phase and stop.
+
+If you can run the app with a key, play an Observe match with battles on until one battle ends, then run `SELECT record_type, step_key, COUNT(*) FROM match_records WHERE record_type = 'losses_attributed' GROUP BY step_key;`. Expect strategic steps and at least one battle step.
+
+---
+
+## Phase 7 — Docs, Final Verification, and Hand-Off
 
 **Add:** `doc/match-statistics.md`
 **Edit:** `doc/README.md`
 
 ### Steps
 
-1. Write `doc/match-statistics.md` in the voice of `doc/save-files.md`: what each number is and the symbol that computes it, when it is recorded, when a value is null, that no fog filter applies to the player's charts and why, that no commander is told any of it beyond its own stance, trust, and threat, the relationship metrics and their ranges, and `game:readMatchCharts`.
+1. Write `doc/match-statistics.md` in the voice of `doc/save-files.md`: what each number is and the symbol that computes it, when it is recorded, when a value is null, that no fog filter applies to the player's charts and why, that no commander is told any of it beyond its own stance, trust, and threat, the relationship metrics and their ranges, and `game:readMatchCharts`. Say that `unitsLost` is an ownership difference, and that who destroyed each unit is the `losses_attributed` event described in `doc/match-recording.md`.
 2. `doc/README.md`: add it to the index table with a role and a status.
 3. Search the whole diff for plan vocabulary and remove it: `git diff | Select-String -Pattern 'Phase \d|history-1|execution plan|locked decision' -CaseSensitive:$false`. Nothing under `src/` or `doc/` may match.
 4. Run the Verification Bar one last time.
@@ -442,6 +543,7 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 2. In an Observe match with a key, after a few turns run `SELECT * FROM side_stances;`. Expect trust and threat values between 0 and 4.
 3. With fog of war off and `AGENT_WARS_LOG_FULL_PROMPTS=1`, read one orders prompt. Expect the commander's own stances with trust and threat, and no other side's credits, stored points, stances, or scores.
 4. Load a save from before this build and play a turn. Expect it to load, and statistics to begin at that turn.
+5. Play an AI-only match with battles on until a battle destroys a unit, save, and run `SELECT step_key, COUNT(*) FROM match_records WHERE record_type = 'losses_attributed' GROUP BY step_key;`. Expect one row for each strategic turn that had a loss, and battle steps for the beats and parents a battle destroyed.
 
 ---
 
@@ -450,6 +552,8 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 - [ ] The phase's files were backed up before the first edit.
 - [ ] New modules were tested before any existing code called them.
 - [ ] `recordStepBoundary` and `recordTurnStatistics` cannot throw.
+- [ ] Recording a loss cannot throw into a turn, a beat, or a battle, and the loss notes are written whether the recorder is on or off.
+- [ ] Every `losses_attributed` event is `engine`-only, and nothing under `src/main/openRouter/` reads it.
 - [ ] The charts channel applies no fog filter, and nothing under `src/main/openRouter/` reads statistics or another commander's stance rows.
 - [ ] The talk system text gained only static text. Nothing was added to a cached system prompt that changes during a match.
 - [ ] `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` are unchanged.
@@ -466,6 +570,7 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 - Every strategic turn records one `side_statistics` event with every side's built units, mercenaries, hexes, production per turn, stored points, credits, upkeep, losses, and model cost, every stored relationship report, and the hexes taken that turn.
 - A commander's talk reply can carry trust and threat, both are stored, and a missing score is null.
 - `game:readMatchCharts` returns the whole series with no fog filter.
+- Every attributed loss capture, on the world map, in a battle beat, and for a battle's destroyed parents, records one `losses_attributed` event with every owner's losses and who was responsible for each.
 - A commander's prompts show its own trust and threat beside its own stances, and nothing about other sides that they did not show before, whatever fog of war is set to.
 - Saves from the previous build load. The Verification Bar passes. No renderer file changed.
 
@@ -482,6 +587,7 @@ Run the Verification Bar. If you can run the app with a key, run two turns of an
 | Prerequisites | |
 | Line counts of the long files | |
 | Missing symbols | |
+| Loss summary perspective check | |
 
 ## Defect Inventory
 

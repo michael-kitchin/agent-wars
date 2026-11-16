@@ -87,13 +87,13 @@ These come from `.cursor/rules/` (which `CLAUDE.md` imports for Claude Code) and
 - **Tests.** Test the contract (inputs, outputs, and observable effects) on happy paths and essential failures only. Do not test private helpers, an IPC handler that only delegates, or other boilerplate. A new test file goes beside the code it covers and copies the imports and structure of the nearest sibling test file. A renderer source-contract test asserts that a wiring call or a guard is present. It does not assert the order of internal calls.
 - **Database access in the main process.** Modules under `src/main/recorder/` and `src/main/matchStatistics/` use `gameDbOps` and `hasDbHandle` from `src/main/gameDb/dbConnection.ts` and leaf files under `src/main/gameDb/`. They never import the barrel `src/main/gameDb.ts`. IPC handlers may import the barrel.
 - **Save format.** `EXPECTED_USER_VERSION` and `GAME_DB_REQUIRED_TABLES` do not change. A new column is added on open, the way `ensureSeatAddedColumns` does it.
-- **Side names, flags, and colors.** A side's name on screen is `sideDisplayName` (`src/shared/sideNicknames.ts`). Its flag is `createSideNumberFlag` (`src/renderer/chrome/toastInlineMarks.ts`). Its color is the color the top bar and the unit tokens already use for that side. Find it before drawing anything (read `src/renderer/chrome/topBar.ts` and `src/shared/topBarSides.ts`) and reuse it. Do not invent side colors.
+- **Side names, flags, and colors.** A side's name on screen is `sideDisplayName` (`src/shared/sideNicknames.ts`). Its flag is `createMessagePartyFlag` (`src/renderer/chrome/sideNumberFlag.ts`). It gives the human seat a badge too, where `createSideNumberFlag` returns null for it. Its line and swatch color is that seat's `--seat-N-bar` variable in `static/shellChrome.css`, the form `doc/ui-style-guide.md` says reads on the dark face. Do not use `palette.map`, the top bar's dot color, for a line: it is too dark on the chrome. Read `src/renderer/chrome/topBar.ts` and `src/shared/topBarSides.ts` to map a seat to its number. Do not invent side colors.
 - **Text reaches the DOM through `textContent`.** Never build HTML from match text.
 
 ### Documents
 
 - **Keep `doc/` current.** `AGENTS.md` requires `doc/` to change in the same change as the code, and the UX suite is normative. Before changing a surface, read its `doc/ux/` document and the cross-cutting documents `doc/ux-specification.md` routes it through.
-- **New UX documents.** A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points.
+- **New UX documents.** A new element document uses the fixed heading set (copy the headings of `doc/ux/selection-panel.md` exactly, but leave out Known Deviations, which `AGENTS.md` keeps for a known, accepted bug), gets a row in the routing table of `doc/ux-specification.md`, and lists its Code Entry Points.
 - **Prompt documents.** A phase that changes what a model is told updates `doc/ai-commander-prompts/` in that phase.
 - **Other facts.** When your change makes a fact wrong in `doc/project-instructions.md` or `doc/coding-prompts-1.md` (a moved file, a renamed script), fix that fact and leave the rest of the wording alone.
 - **Markdown structure.** Every markdown file you create or change, this plan's logs included, has one `#` title, heading levels in order with none skipped, headings that name their content, and a paragraph break wherever the topic changes.
@@ -120,7 +120,7 @@ The user made these. Do not revisit them.
 1. **One dialog.** Pressing `c` opens the chart view. Pressing `c` again, or Escape, closes it. It is modal, centered over the whole window including the top bar and the console, and shows every chart in one scrollable pane, in the order below.
 2. **No fog, and for the player only.** Every chart shows every side, every turn, whatever fog of war is set to. Commanders are never shown chart values.
 3. **Line charts** are as wide as the pane allows. Each one, with its title, ticks, and labels, is at most one quarter of the dialog's height. The X axis is the strategic turn and the Y axis is the count. Hovering shows a tooltip with the nearest turn's value for each side and a total. The mouse wheel over a chart zooms the X axis.
-4. **Charts 2 and 3 have a selector:** total, or one unit type.
+4. **The built-units and mercenary-units charts have a selector** (charts 3 and 4 in the table below): total, or one unit type.
 5. **Relationship graphs:** one stack per side, up to four, in one row. Each stack is a spoke graph on top and a row card under it. Both show how the AI commanders regard that side.
 6. **Relationship timeline:** one strip, as wide as a line chart, with a selector for the subject side, zoomable and scrollable like the line charts.
 7. **Missing or old data is marked.** A commander that never reported, and a report that is several turns old, each look different from a fresh report.
@@ -180,7 +180,7 @@ export interface RelationshipRow {
   readonly stance: SideStance | null;
   readonly trust: number | null;
   readonly threat: number | null;
-  readonly hexesTaken: number | null;      // reporter took from subject, last HEXES_TAKEN_WINDOW_TURNS recorded turns
+  readonly hexesTaken: number | null;      // reporter took from subject, turns after lastTurn - HEXES_TAKEN_WINDOW_TURNS
   readonly reportedTurn: number | null;
   readonly age: ReportAge;
 }
@@ -233,7 +233,8 @@ export function spokePositions(count: number, radius: number): { readonly x: num
 2. Run the Verification Bar and `npm run ui:smoke`. Record pass or fail for each, and the exact cycle list `check:circular` prints.
 3. **Prerequisite.** Confirm the statistics plan is done: `src/shared/matchStatistics.ts` exports `MatchChartsSnapshot`, `TurnStatistics`, `STATISTIC_UNIT_TYPES`, `STATISTIC_MERCENARY_TYPES`, and `HEXES_TAKEN_WINDOW_TURNS`, and `window.gameApi.readMatchCharts` is typed in `src/shared/ipc/gameApiTypes.ts`. **If not, stop** and tell the user.
 4. Read, and do not edit: `src/renderer/map/initCore.ts` (the `window.addEventListener('keydown', ...)` handler), `src/renderer/map/mapHelpers.ts` (`shouldIgnoreGlobalKeydown`), `scripts/copy-leaflet.cjs`, the `h3-js` and Leaflet sections of `THIRD-PARTY-NOTICES.md`, `scripts/thirdPartyNotices/noticeCheck.cjs` (`dependencyRequirements`), the `files` list in `electron-builder.config.cjs`, `doc/ui-style-guide.md`, `doc/ux/input-map.md`, `doc/ux/modes-and-transitions.md`, and how one existing dialog is built and styled (`src/renderer/gameplay/knockoutDialog.ts` and its markup in `static/index.html`).
-5. Find and record how the top bar colors a side (see Conventions). Every chart uses that color for that side's line.
+5. Find and record how a seat maps to its `--seat-N-bar` variable (see Conventions). Every chart uses that color for that side's line.
+6. Confirm the two facts `relationshipStrip` depends on (Phase 1, step 6): in `src/main/gameIpcHandlers.ts`, the statistics hook runs at the step boundary after resolution and before the turn's talk round persists stances; in `src/main/gameDb/sideMessageStore.ts`, `upsertSideStance` changes `updated_turn` only when the stance or reason changes. Record what you found in the Phase 0 Inventory.
 
 **Stop if** the bar fails before any edit.
 
@@ -259,13 +260,14 @@ Write the functions from the Design section. Rules:
 2. `chartTooltip`: `heading` is `Turn {n}`. One line per series, `{name}: {value}`, with `no data` for null. `total` is `Total: {sum}`, summing the non-null values. `decimals` is 0 for counts and 2 for `model-cost`. Numbers print with `toFixed(decimals)`.
 3. `zoomedTurnRange`: scales the range's span by `factor` (below 1 zooms in) keeping `anchor` at the same relative position, never narrower than `minSpan`, never outside `full`. When the result would be wider than `full`, it is `full`.
 4. `pannedTurnRange`: shifts the range by `deltaTurns`, clamped so it stays inside `full` with its span unchanged.
-5. `relationshipRows`, for the last turn in the snapshot: one row per AI seat other than the subject, in side order. A reporter with a report on the subject fills stance, trust, threat, and `reportedTurn`. `age` is `fresh` when the report is at most `RELATIONSHIP_OLD_AFTER_TURNS` (3, exported from this file) turns older than the last turn, `old` otherwise, and `none` with no report. `hexesTaken` sums that reporter's captures from the subject over the last `HEXES_TAKEN_WINDOW_TURNS` turns whose `hexesTaken` is not null, and is null when every one of those turns is null.
-6. `relationshipStrip`: one row per AI seat other than the subject. A cell's stance is the reporter's stance toward the subject in that turn's `relationships`, or null. `reportedThisTurn` is true when that report's `reportedTurn` equals the cell's turn.
+5. `relationshipRows`, for the last turn in the snapshot: one row per AI seat other than the subject, in side order. A reporter with a report on the subject fills stance, trust, threat, and `reportedTurn`. `age` is `fresh` when `lastTurn - 1 - reportedTurn` is at most `RELATIONSHIP_OLD_AFTER_TURNS` (3, exported from this file), which allows for the one-turn lag in step 6, `old` otherwise, and `none` with no report. `hexesTaken` sums that reporter's captures from the subject over the last `HEXES_TAKEN_WINDOW_TURNS` turns whose `hexesTaken` is not null, and is null when every one of those turns is null.
+6. `relationshipStrip`: one row per AI seat other than the subject. A cell's stance is the reporter's stance toward the subject in that turn's `relationships`, or null. `reportedThisTurn` is true when that report's `reportedTurn` is later than the same pair's `reportedTurn` in the previous recorded turn, or when the previous recorded turn had no report for the pair. For the first recorded turn, it is true when `reportedTurn >= turnNumber - 1`.
+   **Why not "equals the cell's turn".** Statistics are written at the step boundary right after resolution, before that turn's talk round. A stance a commander gives in a turn's talk round therefore first appears in the next recorded turn, one turn behind. `upsertSideStance` also re-stamps `updated_turn` only when the stance or its reason changes, so `reportedTurn` moves only on a change. Phase 0 confirms both facts in `gameIpcHandlers.ts` and `sideMessageStore.ts`. If either has changed, stop and tell the user.
 7. `spokePositions(count, radius)`: `count` points evenly spaced on a circle around the origin, the first one straight up, going clockwise. `count` 0 gives an empty list.
 
 ### Tests
 
-`matchChartSeries.test.ts`, with one hand-built snapshot of three seats (one human, two AI) over four turns:
+`matchChartSeries.test.ts`, with one hand-built snapshot of three seats (one human, two AI) over turns 10 through 13, so a report from turn 5 can be `old`:
 
 - `built-units` with null sums the types, and with `'armor'` returns that type.
 - `model-cost` has two series.
@@ -274,7 +276,8 @@ Write the functions from the Design section. Rules:
 - Zoom in at the middle halves the span around the anchor. Zoom at the left edge keeps the left edge. Zoom never goes below `minSpan`. Zoom out past the full range returns the full range.
 - Pan right at the right edge does not move. Pan keeps the span.
 - `relationshipRows` for the human subject returns two rows, with `fresh`, `old`, and `none` each produced by the right data, and `hexesTaken` summed and null as specified.
-- `relationshipStrip` marks `reportedThisTurn` only on the turn of the report, and carries the stance into later turns as not reported.
+- `relationshipStrip` marks `reportedThisTurn` on the first recorded turn in which a report's `reportedTurn` moves forward, including a report one turn behind its cell, and carries the stance into later turns as not reported.
+- `hexesTaken` sums only turns after `lastTurn - HEXES_TAKEN_WINDOW_TURNS` and skips null turns.
 - `spokePositions(4, 10)` gives up, right, down, left, each within 0.001.
 
 ### Verification
@@ -288,7 +291,7 @@ Run the Verification Bar.
 uPlot is installed, its stylesheet and license ship with the app, and the notices file credits it. Nothing uses it yet.
 
 **Add:** `scripts/copy-uplot.cjs`, `static/vendor/uplot/uPlot.min.css` and uPlot's license file (both written by the script)
-**Edit:** `package.json`, `package-lock.json`, `THIRD-PARTY-NOTICES.md`, `static/index.html`
+**Edit:** `package.json`, `package-lock.json`, `THIRD-PARTY-NOTICES.md`, `static/index.html`, `scripts/thirdPartyNotices/noticeCheck.cjs`
 
 ### Steps
 
@@ -298,9 +301,10 @@ How the two existing libraries ship, so you can tell them apart: Leaflet is **no
 2. `scripts/copy-uplot.cjs`, modelled on `scripts/copy-leaflet.cjs`: copy `node_modules/uplot/dist/uPlot.min.css` and the package's license file into `static/vendor/uplot/`. When `node_modules/uplot` is missing, keep the existing copy and warn, as `copy-leaflet.cjs` does. Run it once.
 3. `package.json`: add `node scripts/copy-uplot.cjs` after `node scripts/copy-leaflet.cjs` in `build:renderer` and in `postinstall`, and add `"copy:uplot": "node scripts/copy-uplot.cjs"` beside `copy:leaflet`.
 4. The two copied files stay in the tree, like `static/vendor/leaflet/`. Do not add them to `.gitignore`. Packaging needs no change: `electron-builder.config.cjs` ships the whole `static` folder.
-5. `static/index.html`: add `<link rel="stylesheet" href="vendor/uplot/uPlot.min.css" />` after the Leaflet stylesheet link. The Content-Security-Policy already allows local styles and scripts. Do not change it.
-6. `THIRD-PARTY-NOTICES.md`: add a section directly after `## h3-js`, in the same form. Its heading must be exactly `## uplot`, the package name, because the check matches headings to package names. Its text must contain the installed version and every line of the license file that starts with `Copyright`, copied exactly. Say what it does here (it draws the line charts) and that its stylesheet is in `static/vendor/uplot/`. Run `npm run notices:check` until it passes.
-7. Read `node_modules/uplot/README.md` and `node_modules/uplot/dist/uPlot.d.ts`. Later phases name these members: the constructor `new uPlot(options, data, element)`, `setData`, `setScale`, `setSize`, `destroy`, `cursor.idx`, the `hooks` option, `scales.x.time`, `posToVal`, and the `cursor.drag` option. Confirm each exists in the installed version and record any that differs in the Completion Log, with the member that replaces it.
+5. `scripts/thirdPartyNotices/noticeCheck.cjs`: add `['static/vendor/uplot/LICENSE', '<the copyright line>']` to `vendoredLicenseRequirements`, beside Leaflet's, with the exact line from the copied file. Use the copied file's real name if it is not `LICENSE`. This keeps the vendored license from being deleted unnoticed.
+6. `static/index.html`: add `<link rel="stylesheet" href="vendor/uplot/uPlot.min.css" />` after the Leaflet stylesheet link. The Content-Security-Policy already allows local styles and scripts. Do not change it.
+7. `THIRD-PARTY-NOTICES.md`: add a section directly after `## h3-js`, in the same form. Its heading must be exactly `## uplot`, the package name, because the check matches headings to package names. Its text must contain the installed version and every line of the license file that starts with `Copyright`, copied exactly. Say what it does here (it draws the line charts) and that its stylesheet is in `static/vendor/uplot/`. Run `npm run notices:check` until it passes.
+8. Read `node_modules/uplot/README.md` and `node_modules/uplot/dist/uPlot.d.ts`. Later phases name these members: the constructor `new uPlot(options, data, element)`, `setData`, `setScale`, `setSize`, `destroy`, `cursor.idx`, the `hooks` option, `scales.x.time`, `posToVal`, and the `cursor.drag` option. Confirm each exists in the installed version and record any that differs in the Completion Log, with the member that replaces it.
 
 ### Verification
 
@@ -318,14 +322,14 @@ Run the Verification Bar. `npm run build:renderer` must leave `static/vendor/upl
 `c` opens an empty, scrollable, modal dialog, and `c` or Escape closes it.
 
 **Add:** `src/shared/chartsDialogState.ts`, `src/shared/chartsDialogState.test.ts`, `src/renderer/chrome/blockingDialogGuards.ts`, `src/renderer/charts/chartsDialog.ts`, `static/chartsChrome.css`, `src/main/rendererChartsDialogContracts.test.ts`, `doc/ux/charts-dialog.md`
-**Edit:** `static/index.html`, `src/renderer/map/initCore.ts`, `src/renderer/renderer.ts`, `doc/ux/input-map.md`, `doc/ux/modes-and-transitions.md`, `doc/ux-specification.md`
+**Edit:** `static/index.html`, `src/renderer/map/initCore.ts`, `src/renderer/renderer.ts`, `doc/ux/input-map.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/control-tooltips.md`, `doc/ux-specification.md`, `doc/ui-style-guide.md`
 
 ### Steps
 
 1. `chartsDialogState.ts`:
    - `chartsDialogMayOpen(input: { matchLoaded: boolean; otherModalOpen: boolean }): boolean`, true when a match is loaded and no other modal is open.
    - `chartBlockHeight(dialogHeight: number): number`, `Math.floor(dialogHeight / 4)`. This is the whole height one line chart may take, title included.
-   - `chartPlotHeight(dialogHeight: number, titleRowHeight: number): number`, `Math.max(60, chartBlockHeight(dialogHeight) - titleRowHeight)`, and never more than `chartBlockHeight(dialogHeight)`.
+   - `chartPlotHeight(dialogHeight: number, titleRowHeight: number): number`. Let `room = Math.max(0, chartBlockHeight(dialogHeight) - titleRowHeight)`. The result is `Math.max(60, room)` when that fits in `room`, which means `room` itself, at least 60, and otherwise `room`. The title row plus the plot is never more than `chartBlockHeight(dialogHeight)`.
 2. Markup, in `static/index.html`, inside `<body>`, directly before `<script src="vendor/leaflet/leaflet.js">`, with a stylesheet link for `chartsChrome.css` after `selectionChrome.css`:
 
    ```html
@@ -340,7 +344,7 @@ Run the Verification Bar. `npm run build:renderer` must leave `static/vendor/upl
    </div>
    ```
 
-3. `chartsChrome.css`: the overlay is `position: fixed; inset: 0`, above the top bar, the console, and every panel (read the `z-index` values in the other stylesheets and go above the highest that is not a tooltip), with a dimmed backdrop. The dialog is centered, 90% of the window's width and height, with the face, border, and header style of the existing dialogs. The body scrolls vertically and never horizontally. Use existing color variables only.
+3. `chartsChrome.css`: `.charts-overlay[hidden] { display: none; }`, because the overlay's own `display` rule would otherwise beat the `hidden` attribute and no global `[hidden]` rule exists. The overlay is `position: fixed; inset: 0`, above the top bar, the console, and every panel (read the `z-index` values in the other stylesheets and go above the highest that is not a tooltip), with a dimmed backdrop. The dialog is centered, 90% of the window's width and height, with the face, border, and header style of the existing dialogs. The body scrolls vertically and never horizontally. Use existing color variables only.
 4. `chartsDialog.ts`:
    - `export function wireChartsDialog(): void` binds the close button and a click on the backdrop (outside the dialog) to close.
    - `export function chartsDialogIsOpen(): boolean`.
@@ -348,22 +352,25 @@ Run the Verification Bar. `npm run build:renderer` must leave `static/vendor/upl
    - Opening: remove `hidden`, remember the focused element, focus the close button, then call a private `renderCharts()`. In this phase `renderCharts` fetches `window.gameApi.readMatchCharts()` and, when the snapshot has no turns, puts one paragraph in the body: `No turns have been recorded yet.` Otherwise it leaves the body empty. Later phases fill it.
    - Closing: add `hidden`, empty the body, and return focus to the remembered element.
    - `matchLoaded` is true when `S.gameState` has seats. It stays true at game over. `otherModalOpen` is `blockingDialogIsOpen()`.
+   - `renderCharts` keeps an open counter. It reads the counter before `await window.gameApi.readMatchCharts()` and fills the body only when the dialog is still open and the counter is unchanged, so a late reply cannot fill a closed or reopened dialog. A rejected read is caught, logged with `console.error` as `commanderPoolClient.ts` does, and shows `The charts could not be loaded.` in the body.
+   - The window `resize` listener (Phase 4) is added on open and removed on close.
 5. `blockingDialogGuards.ts`: `export function blockingDialogIsOpen(): boolean`, true when any of these is showing:
    - the tactical battles list: move the private `tacticalBattlesDialogIsOpen` out of `initCore.ts` into this file, export it, and import it back into `initCore.ts`. Its text does not change;
    - the melee intercept modal: an element with the class `melee-intercept-frame` is in the document (`meleeInterceptModal.ts` builds it);
    - `#knockout-dialog`, `#start-confirm-dialog`, or `#load-confirm-dialog` without the class `hidden`;
+   - `#tactical-annihilation-overlay` and `#new-game-options-popover` while showing. Read how each is shown and hidden in `static/index.html` and its script, and test that;
    - the game menu (`isGameMenuOpen()`) or the commander popover (`commanderPopoverIsOpen()`).
    **The new-game panel is not on the list.** At game over it is the panel that shows the standings, and the charts must open then. The charts overlay sits above it.
 6. `initCore.ts`, in the `keydown` handler. Add only these lines:
-   - As the first statement inside `if (e.key === 'Escape') {`: when `chartsDialogIsOpen()`, call `e.preventDefault()`, `toggleChartsDialog()`, and `return`.
+   - As the first statement inside `if (e.key === 'Escape') {`: when `chartsDialogIsOpen()`, call `e.preventDefault()`, `e.stopImmediatePropagation()`, `toggleChartsDialog()`, and `return`. Another dialog's own `window` Escape listener, such as the melee intercept modal's, must not also act on the same key.
    - Directly after the `if (shouldIgnoreGlobalKeydown(e)) return;` line: when `chartsDialogIsOpen()`, close the dialog if the key is `c` or `C` with no modifier and it is not a repeat, then `return` in every case. No map key acts while the dialog is open.
    - Directly after `const key = e.key.toLowerCase();`: when `key === 'c'`, call `e.preventDefault()`, `toggleChartsDialog()`, and `return`.
    Call `wireChartsDialog()` in `renderer.ts`, directly after `wireGameMenu();`. `renderer.ts` and `initCore.ts` are past 600 lines: add only these calls and their imports.
-7. Docs: write `doc/ux/charts-dialog.md` with the fixed heading set, covering what exists after this phase. Add `C` and Escape to `doc/ux/input-map.md`. Add the dialog to `doc/ux/modes-and-transitions.md` as an overlay that does not change the mode. Add its routing-table row and list entry in `doc/ux-specification.md`.
+7. Docs: write `doc/ux/charts-dialog.md` with the fixed heading set, covering what exists after this phase. Add `C` and Escape to `doc/ux/input-map.md`. Add the dialog to `doc/ux/modes-and-transitions.md` as an overlay that does not change the mode. Add its routing-table row, its list entry, and a Charts dialog row in the Element and Mode Matrix in `doc/ux-specification.md`. Add the close button's tip to `doc/ux/control-tooltips.md` with its Source Anchor. In `doc/ui-style-guide.md`, add `chartsChrome.css` to the paragraph that lists where chrome tokens live.
 
 ### Tests
 
-- `chartsDialogState.test.ts`: `chartsDialogMayOpen` is true only with a match and no other modal; `chartBlockHeight(800)` is 200; `chartPlotHeight(800, 32)` is 168; `chartPlotHeight(200, 32)` is 50, because the quarter rule wins over the 60 px floor.
+- `chartsDialogState.test.ts`: `chartsDialogMayOpen` is true only with a match and no other modal; `chartBlockHeight(800)` is 200; `chartPlotHeight(800, 32)` is 168; `chartPlotHeight(200, 32)` is 18, because the quarter rule (50) less the title row wins over the 60 px floor; `chartPlotHeight(100, 32)` is 0.
 - `rendererChartsDialogContracts.test.ts`: `static/index.html` contains each id above once and links `chartsChrome.css` and `vendor/uplot/uPlot.min.css`; the `keydown` handler in `initCore.ts` calls `chartsDialogIsOpen` and `toggleChartsDialog`; `chartsDialog.ts` does not contain `innerHTML`; `blockingDialogGuards.ts` names each id and function in step 5 and does not name `game-over-overlay`.
 
 ### Verification
@@ -377,7 +384,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app: `c` opens the dial
 Charts 3 through 11 draw, zoom, pan, and show tooltips.
 
 **Add:** `src/renderer/charts/lineChart.ts`
-**Edit:** `src/renderer/charts/chartsDialog.ts`, `static/chartsChrome.css`, `src/main/rendererChartsDialogContracts.test.ts`, `doc/ux/charts-dialog.md`
+**Edit:** `src/renderer/charts/chartsDialog.ts`, `static/chartsChrome.css`, `src/main/rendererChartsDialogContracts.test.ts`, `doc/ux/charts-dialog.md`, `doc/ux/control-tooltips.md`
 
 ### Steps
 
@@ -408,7 +415,7 @@ Charts 3 through 11 draw, zoom, pan, and show tooltips.
 3. Above the first line chart, one shared legend: each side's color swatch, flag, and name.
 4. On window resize while open, call `resize` on every handle with the new sizes.
 5. `chartsChrome.css`: the title row, the selector, the tooltip, and uPlot's axis and grid colors, using the chrome's text and border variables so the plots read on the dark chrome.
-6. Docs: extend `doc/ux/charts-dialog.md` with the nine charts, the selectors, the tooltip, wheel, drag, and double-click.
+6. Docs: extend `doc/ux/charts-dialog.md` with the nine charts, the selectors, the tooltip, wheel, drag, and double-click. Add the two unit-type `<select>`s to `doc/ux/control-tooltips.md`, as tips or under Controls with no tip, as that file does for other selects.
 
 ### Tests
 
@@ -434,7 +441,7 @@ Chart 1: one spoke graph and one row card per side.
 
 ### Steps
 
-1. Stance colors. In `chartsChrome.css`, on `:root`: `--stance-hostile: #E24B4A; --stance-wary: #EF9F27; --stance-neutral: #9AA5A3; --stance-cordial: #5DCAA5; --stance-friendly: #7FB93A;`. Record them in the color section of `doc/ui-style-guide.md`, with what each means. These are the only new color values in this plan.
+1. Stance colors. In `static/shellChrome.css`, beside the seat variables, where the style guide says chrome tokens live: `--stance-hostile: #E24B4A; --stance-wary: #EF9F27; --stance-neutral: #9AA5A3; --stance-cordial: #5DCAA5; --stance-friendly: #7FB93A;`. Record them in the color section of `doc/ui-style-guide.md`, with what each means. These are the only new color values in this plan.
 2. `relationshipStack.ts`: `export function buildRelationshipStack(args: { subjectSeatId: string; rows: readonly RelationshipRow[]; nameOf; flagOf; lastTurn: number }): HTMLElement`. It returns one card:
    - A heading: `How they see {flag} {name}`, or `How they see you` for the viewer's own seat.
    - With no rows: one paragraph, `No AI commander reports on this side.`, and nothing else.
@@ -446,11 +453,11 @@ Chart 1: one spoke graph and one row card per side.
      - Each node carries a `<title>` with the full sentence: `{reporter}: {stance}, trust {n}, threat {n}, reported turn {t}`, or `{reporter}: no report yet`.
    - **The row card,** a small table with the columns `Side`, `Stance`, `Trust`, `Threat`, `Taken`, `As of`:
      - `Stance`: the word, on a pill in the stance's color. `none` prints `no report`.
-     - `Trust` and `Threat`: a five-step bar (0 to 4) with the number beside it. Null draws a dashed empty bar and `–`.
-     - `Taken`: `{n} hexes`, the hexes that reporter took from the subject in the last five turns, or `–` for null.
+     - `Trust` and `Threat`: a bar of `RELATIONSHIP_SCALE_MAX + 1` steps (0 to `RELATIONSHIP_SCALE_MAX`) with the number beside it. Null draws a dashed empty bar and `–`.
+     - `Taken`: `{n} hexes`, the hexes that reporter took from the subject in the last `HEXES_TAKEN_WINDOW_TURNS` turns, or `–` for null.
      - `As of`: `turn {t}`, with ` (old)` when `age` is `old`, or `–`.
    - Build everything with `createElement`, `createElementNS`, and `textContent`.
-3. `chartsDialog.ts`: the first block in the body is a row titled `Relationships` with one stack per seat, in side order, in a grid of equal columns (`grid-template-columns: repeat(N, minmax(0, 1fr))`, N the seat count, at most four). The human seat is a subject like any other.
+3. `chartsDialog.ts`: the first block in the body is a row titled `Relationships` with one stack per seat, in side order, in a grid of equal columns (`grid-template-columns: repeat(N, minmax(0, 1fr))`, N the seat count, at most `MAX_SEATS` from `src/shared/seatIds.ts`). The human seat is a subject like any other.
 4. `chartsChrome.css`: the grid, the card, the pill, and the bars.
 5. Docs: extend `doc/ux/charts-dialog.md` with the stacks: what line color, line width, and dashes mean, the row card's columns, and how missing and old reports look.
 
@@ -469,7 +476,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app with a key on an Ob
 Chart 2: the strip, with its subject selector.
 
 **Add:** `src/renderer/charts/relationshipTimeline.ts`
-**Edit:** `src/renderer/charts/chartsDialog.ts`, `static/chartsChrome.css`, `src/main/rendererChartsDialogContracts.test.ts`, `doc/ux/charts-dialog.md`
+**Edit:** `src/renderer/charts/chartsDialog.ts`, `static/chartsChrome.css`, `src/main/rendererChartsDialogContracts.test.ts`, `doc/ux/charts-dialog.md`, `doc/ux/control-tooltips.md`
 
 ### Steps
 
@@ -481,7 +488,7 @@ Chart 2: the strip, with its subject selector.
    - **Tooltip:** `Turn {n}`, then one line per reporter: `{name}: {stance} (reported this turn)`, `{name}: {stance} (from an earlier turn)`, or `{name}: no report`.
    - Row height is 22 px. The whole block, with its title row and axis, is at most `chartBlockHeight(dialogHeight)`. If the rows would not fit, the row height shrinks to fit, to a minimum of 10 px.
 2. `chartsDialog.ts`: the second block is titled `Stance over time`, with a `<select>` labelled `How they see` listing every seat by name in side order (the first is selected). A change calls `update(relationshipStrip(snapshot, seatId), fullRange)`. A subject with no reporters shows `No AI commander reports on this side.` in place of the canvas.
-3. Docs: extend `doc/ux/charts-dialog.md`.
+3. Docs: extend `doc/ux/charts-dialog.md`. Add the `How they see` `<select>` to `doc/ux/control-tooltips.md`, as for the unit-type selects.
 
 ### Tests
 
@@ -500,7 +507,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app on the same Observe
 
 ### Steps
 
-1. **Refresh.** Export `refreshChartsDialogIfOpen(): Promise<void>` from `chartsDialog.ts`. When the dialog is open it fetches the snapshot again and calls `update` on every chart, keeping each chart's zoom range, each selector's choice, and the body's scroll position. In `readyHandler.ts`, call `void refreshChartsDialogIfOpen();` directly after the `if (!rendererMatchEpochCurrent(matchEpoch)) return;` that follows the `await deps.applyGameStateSnapshot(state, {` call after `announceKnockouts(`. That is where the resolved turn's state has arrived, after a melee choice too. One line. In practice only an Observe match resolves turns while the dialog is open.
+1. **Refresh.** Export `refreshChartsDialogIfOpen(): Promise<void>` from `chartsDialog.ts`. When the dialog is open it fetches the snapshot again and calls `update` on every chart, keeping each chart's zoom range, each selector's choice, and the body's scroll position. In `readyHandler.ts`, call `void refreshChartsDialogIfOpen();` directly after the `if (!rendererMatchEpochCurrent(matchEpoch)) return;` that follows the `await deps.applyGameStateSnapshot(state, {` call after `announceKnockouts(`. That is where the resolved turn's state has arrived, after a melee choice too. One line. A player can also press Ready and then `c` while the turn resolves, so the melee intercept list or the knockout dialog could open under the overlay, which sits above every panel. In `readyHandler.ts`, call `closeChartsDialogIfOpen()` (export it from `chartsDialog.ts`) directly before the `deps.openMeleeInterceptModal({` call and directly before `announceKnockouts(`. Two more lines.
 2. **A new match or a loaded save** while the dialog is open: close the dialog. Use the match epoch (`currentRendererMatchEpoch`) captured at open, and compare it before each refresh.
 3. **Focus.** Tab stays inside the dialog while it is open: from the last focusable element it returns to the close button, and Shift+Tab from the close button goes to the last.
 4. **Small windows.** At the smallest window the app allows, the four stacks stay in one row and their text wraps or ends in an ellipsis. Nothing overflows the dialog horizontally.
@@ -510,24 +517,24 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app on the same Observe
 
 ### Tests
 
-`rendererChartsDialogContracts.test.ts`: `readyHandler.ts` calls `refreshChartsDialogIfOpen`; `chartsDialog.ts` calls `currentRendererMatchEpoch`.
+`rendererChartsDialogContracts.test.ts`: `readyHandler.ts` calls `refreshChartsDialogIfOpen` and `closeChartsDialogIfOpen`; `chartsDialog.ts` calls `currentRendererMatchEpoch`; the Escape branch in `initCore.ts` calls `stopImmediatePropagation`.
 
 ### Verification
 
-Run the Verification Bar and `npm run ui:smoke`. Run the app: open the dialog in an Observe match, zoom one chart, and let a turn pass. The charts gain a point and the zoom is kept. Start a new match with the dialog open. It closes.
+Run the Verification Bar and `npm run ui:smoke`. Run the app: open the dialog in an Observe match, zoom one chart, and let a turn pass. The charts gain a point and the zoom is kept. Press Ready in a turn with a melee choice and then `c` at once: the charts close when the intercept list opens. The new-match rule in step 2 is checked by its test, because the dialog covers the game menu while it is open.
 
 ---
 
 ## Phase 8 — Docs, Final Verification, and Hand-Off
 
 **Add:** nothing.
-**Edit:** `doc/how-to-play.md`, `doc/match-statistics.md`, `doc/ux-specification.md`
+**Edit:** `doc/how-to-play.md`, `doc/match-statistics.md`, `doc/ux-specification.md`, `doc/README.md`
 
 ### Steps
 
 1. `doc/how-to-play.md`: a short section on the charts, in that document's voice: the key, what each chart shows, that they ignore fog of war, and that no AI commander is shown them.
 2. `doc/match-statistics.md`: one paragraph pointing at the dialog and at `src/shared/matchChartSeries.ts`.
-3. Confirm `doc/ux-specification.md` routes to `charts-dialog.md`.
+3. Confirm `doc/ux-specification.md` routes to `charts-dialog.md`. In `doc/README.md`, the `how-to-play.md` row lists that document's sections: add the new one.
 4. Run `node scripts/check-doc-links.cjs` and fix what it reports in the documents you changed.
 5. Search the whole diff for plan vocabulary and remove it: `git diff | Select-String -Pattern 'Phase \d|history-2|execution plan|locked decision' -CaseSensitive:$false`. Nothing under `src/`, `static/`, `scripts/`, or `doc/` may match.
 6. Run the Verification Bar and `npm run ui:smoke` one last time.
@@ -537,7 +544,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app: open the dialog in
 ### Manual checklist for the user
 
 1. Press `c` during a match, at game over, and while typing in the chat field. Expect the dialog in the first two cases and the letter `c` in the third.
-2. Read each of the eleven charts against the top bar and the map for the current turn. Expect the same numbers.
+2. Read the nine line charts for the current turn against what the screen shows: credits, production, stored points, and upkeep against the top bar; hexes against the map; built units against the side's units on the map, leaving out mercenaries; model cost against the cost label. Expect the same numbers.
 3. With fog of war on, expect every side's credits and units on the charts.
 4. Hover, wheel, drag, and double-click on a line chart and on the strip.
 5. Resize the window while the dialog is open. Expect every chart to resize and no chart taller than a quarter of the dialog.

@@ -142,6 +142,9 @@ Tell the user about these in your final message.
 - **An observer replays with everything visible,** whichever side the observer was viewing as.
 - **Last-seen enemy markers are not drawn in replay.** The live markers are put back, unchanged, when replay ends.
 - **The slider jumps when it is released,** not while it is dragged, and a jump shows that turn's dialogs like a step does.
+- **A turn with a battle is shown as it began.** Such a turn has a second picture after the battle. Stepping shows the first, beside the update dialog that opened the turn. The current turn is shown as it is now.
+- **The message dialog in replay shows every message,** as the live dialog does, whatever the fog setting.
+- **The recording file is written and read one line at a time,** so a long match with these snapshots can still be exported.
 - **Opening the game menu leaves replay.**
 - **`p` does nothing** while a turn is resolving, while resolution playback is running, while another dialog is open, and while typing in a text field.
 
@@ -156,11 +159,12 @@ Two new event types.
 | `record_type` | Written when | Step | Visibility | Payload |
 | --- | --- | --- | --- | --- |
 | `view_snapshot` | Directly after each frame | the frame's step | `engine` for the `all` view, `seats:{seat}` for the `player` view | `{ view: 'all' \| 'player', seatId: string \| null, snapshot }` |
-| `resolution_view` | A strategic resolution or a tactical beat commit returned success to the renderer | the step that was resolved | `engine` | `{ kind: 'strategic' \| 'tactical', result }` |
+| `resolution_view` | A strategic resolution or a tactical beat commit succeeded, inside the handler's work, so the automatic save and the export include it | the step that was resolved | `engine` | `{ kind: 'strategic' \| 'tactical', result }` |
 
 - `snapshot` is the `GameStateSnapshot` the renderer would be given for that view, **without its `hexes` list** and with `hexWeather` in its place: one `[h3Index, weather]` pair for each hex in that view's `hexes` list that has a `weather` field. Weather changes during a match and depends on what the view has explored. Every other field of a hex is fixed for the match, so the reader takes those from the open match and puts the stored weather back. For the `all` view the three lists `visibleHexes`, `exploredHexes`, and `staleHexes` are also left out, and the reader rebuilds them with the same function `omniscientSnapshot` in `src/main/ipc/matchViewSnapshot.ts` uses.
 - The `all` view is always recorded. The `player` view is recorded when a human seat is still in the match.
-- `result` is the object the IPC handler returned to the renderer: the Ready result, the melee-intercept resolve result, or the tactical commit result.
+- `result` is the object the IPC handler returned to the renderer: the Ready result, the melee-intercept resolve result, or the tactical commit result. `strategic_resolution` already stores the mirror fields and the playback moves, and `tactical_resolution` stores the beat's playback. Neither holds the whole result the renderer's update dialog reads, so `resolution_view` stores it whole. The overlap is accepted, so replay reads one record per step.
+- **The recording file.** `writeMatchRecordingFile` builds the whole file as one string, and `readRecordingFile` decodes the whole file into one. The 917-turn AI-only match recorded on v3.0.0 already decodes to about 379 MB of JSON, without view snapshots. V8's longest string is about 537 MB. These two events roughly double that, so a long match would fail to export. Phase 2 makes both functions work one line at a time, with no single string for the whole file.
 
 ### What replay reads
 
@@ -232,12 +236,11 @@ collapsed:                                          expanded:
 2. Run the Verification Bar and `npm run ui:smoke`. Record pass or fail for each, and the exact cycle list `check:circular` prints.
 3. **Prerequisite.** Confirm each of these. **If any is missing, stop** and tell the user.
    - Main process: `src/main/recorder/matchRecorder.ts` (`recordStepBoundary`, `recordMatchEvent`, `isRecorderEnabled`), `src/main/recorder/matchRecordStore.ts` (`listMatchRecords`), `src/shared/matchRecording.ts` (`MATCH_EVENT_TYPES`), and `src/main/ipc/matchViewSnapshot.ts` (`readMatchSnapshot`, `omniscientSnapshot`).
-   - Shared: `src/shared/sideMessages.ts` (`sideMessageVisibleTo`), `src/shared/commanderStatus.ts` (`CommanderDispatch` with `messages`), `src/shared/chatPanelState.ts` (`chatPanelShouldShow`), and `src/shared/observeModeControls.ts` (`activeHumanSeatId`).
+   - Shared: `src/shared/commanderStatus.ts` (`CommanderDispatch` with `messages`), `src/shared/chatPanelState.ts` (`chatPanelShouldShow`), and `src/shared/observeModeControls.ts` (`activeHumanSeatId`).
    - Renderer: `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot`), `src/renderer/gameplay/readyResolutionAnnouncements.ts` (`announceResolutionTurnUpdate`), `src/renderer/openRouter/commanderMessageTabsUi.ts` (`showCommanderMessageTabs`), `src/renderer/map/mapClickSelectionPolicy.ts` (`clearSelectionLikeRightClick`), and `src/renderer/wiredEntryCallbacks.ts` (`createReadyHandlerDeps`).
 
    Phases 4 through 8 also need the charts dialog plan: `src/renderer/charts/chartsDialog.ts` exports `chartsDialogIsOpen`, and `src/renderer/chrome/blockingDialogGuards.ts` exports `blockingDialogIsOpen`. If those are missing, run Phases 0 through 3 only, then stop and tell the user. Phases 0 through 3 need nothing from the chart plans.
 
-   `listMatchEventsOfType` in `matchRecordStore.ts` comes from the match statistics plan. If that plan has not run and the function is missing, add it in Phase 3 with its test: it returns the records of one type in `record_id` order with payloads decoded.
 4. Record the line counts of the files past 600 lines that this plan edits: `src/main/main.ts`, `src/main/preload.ts`, `src/shared/ipc/gameApiTypes.ts`, `src/renderer/renderer.ts`, `src/renderer/map/initCore.ts`, and `src/renderer/map/mainMapInteractions.ts`. When this plan was checked, `preload.ts` was 940 lines and `mainMapInteractions.ts` 955. If adding the lines a phase names would take any file past 1000, stop and tell the user.
 5. Find every call of `recordStepBoundary(` outside `src/main/recorder/` and record the list. When this plan was written there were five: one in `src/main/gameIpcHandlers.ts`, one in `src/main/ipc/meleeInterceptResolveIpc.ts`, one in `src/main/ipc/endMatchIpcHandler.ts`, and two in `src/main/ipc/saveLoadIpcHandler.ts`. Phase 2 adds one line after each.
 6. Read, and do not edit: `doc/ux/selection-panel.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/input-map.md`, `doc/ux/resolution-playback.md`, `doc/ui-style-guide.md` section 2.10 (Replay Controls), `src/renderer/gameplay/selectionPanelExpand.ts`, `static/selectionChrome.css`, `src/renderer/gameplay/observeChrome.ts`, `src/renderer/core/stateSnapshot.ts` (`applyGameStateSnapshot` and `updateClientStaleEnemyIntel`), and `handleReadyButtonClick` in `src/renderer/gameplay/readyHandler.ts`, from the call to `deps.callReadyWithTimeout` to the end.
@@ -253,7 +256,7 @@ collapsed:                                          expanded:
 
 ### Steps
 
-1. `src/shared/matchRecording.ts`: add `'view_snapshot'` and `'resolution_view'` to `MATCH_EVENT_TYPES`, each with format version 1.
+1. `src/shared/matchRecording.ts`: add `'view_snapshot'` and `'resolution_view'` to the end of `MATCH_EVENT_TYPES` (after `losses_attributed` when the statistics plan has run), each with format version 1.
 2. `replayTypes.ts`: the types from the Design section.
 3. `replayNavigation.ts`, pure:
 
@@ -263,6 +266,7 @@ collapsed:                                          expanded:
 
    export function replayMayEnter(input: {
      matchLoaded: boolean; inBattle: boolean; readyInFlight: boolean; playbackRunning: boolean; otherModalOpen: boolean;
+     newGameOpenMidMatch: boolean;
    }): { ok: true } | { ok: false; reason: string | null }
    // A reason is a sentence to show the player. null means do nothing silently.
 
@@ -279,7 +283,7 @@ collapsed:                                          expanded:
    // 'Replay · Turn 12 of 30', where 30 is the last step's turn number.
    ```
 
-   `replayMayEnter` reasons, checked in this order: no match loaded gives null; `otherModalOpen` gives null; `readyInFlight` or `playbackRunning` gives `Replay is available once this turn finishes resolving.`; `inBattle` gives `Replay inside a battle is not available yet. Leave the battle to replay the match.` Put both sentences in exported constants.
+   `replayMayEnter` reasons, checked in this order: no match loaded gives null; `otherModalOpen` gives null; `newGameOpenMidMatch` gives null; `readyInFlight` or `playbackRunning` gives `Replay is available once this turn finishes resolving.`; `inBattle` gives `Replay inside a battle is not available yet. Leave the battle to replay the match.` Put both sentences in exported constants.
 
 ### Tests
 
@@ -295,8 +299,8 @@ Run the Verification Bar.
 
 Every step boundary stores the snapshots, and every resolution stores the result the renderer received. Nothing reads them yet.
 
-**Add:** `src/main/replay/replayRecording.ts`, `src/main/replay/replayRecording.test.ts`, and the results file named in step 5
-**Edit:** `src/main/ipc/matchViewSnapshot.ts`, `src/main/recorder/matchRecordStore.ts`, `src/main/recorder/matchRecordStore.test.ts`, `src/main/gameIpcHandlers.ts`, `src/main/ipc/meleeInterceptResolveIpc.ts`, `src/main/ipc/endMatchIpcHandler.ts`, `src/main/ipc/saveLoadIpcHandler.ts`, `src/main/main.ts`, `doc/match-recording.md`
+**Add:** `src/main/replay/replayRecording.ts`, `src/main/replay/replayRecording.test.ts`, and the results file named in step 6
+**Edit:** `src/shared/matchRecording.ts`, `src/main/ipc/matchViewSnapshot.ts`, `src/main/recorder/matchRecordStore.ts`, `src/main/recorder/matchRecordStore.test.ts`, `src/main/recorder/matchRecordingExport.ts`, `src/main/recorder/matchRecordingFile.ts`, and the existing tests of both, `src/main/gameIpcHandlers.ts`, `src/main/ipc/meleeInterceptResolveIpc.ts`, `src/main/ipc/endMatchIpcHandler.ts`, `src/main/ipc/saveLoadIpcHandler.ts`, `src/main/main.ts`, `doc/match-recording.md`
 
 ### Steps
 
@@ -305,21 +309,34 @@ Every step boundary stores the snapshots, and every resolution stores the result
    - Move the four fields it sets from the hex list (`visibleHexes`, `exploredHexes`, `staleHexes`, and the `allHexes` list they are built from) into `export function withEveryHexVisible(snapshot: GameStateSnapshot, hexIds: readonly string[]): GameStateSnapshot`, and have `omniscientSnapshot` call it. The reader in Phase 3 calls the same function.
    - Add `export function playerViewSnapshot(seatId: SeatId): GameStateSnapshot`, which returns exactly what `readMatchSnapshot` returns for that seat. Move the statements after `if (decision.view === 'all') return omniscientSnapshot();` into it, and have `readMatchSnapshot` call it.
    - `readMatchSnapshot` must return the same values as before.
-2. `matchRecordStore.ts`: add `lastRecordIdOfType(ops, recordType: string): number | null` and `lastFrameRecordId(ops): number | null`.
+2. `matchRecordStore.ts`. `match_records` has no index besides its key, and a step must not decode every record of a type. Add, each with a test:
+   - `lastRecordIdOfType(ops, recordType: MatchEventType): number | null`;
+   - `lastFrameHeader(ops): { recordId: number; stepKey: string } | null`, the latest frame's id and step key, read without its payload;
+   - `readMatchRecord(ops, recordId: number)`: one record with its payload decoded, or null;
+   - `listMatchEventsAtStep(ops, recordType: MatchEventType, stepKey: string)`: the events of one type at one step key, in `record_id` order, payloads decoded.
+   Use `MatchEventType` for every record-type parameter, as the statistics plan does.
 3. `replayRecording.ts`. Every exported function catches everything, logs `logError` with the error and the record ids and counts, and returns. **Recording must never break a turn.**
-   - `export function recordReplayViewsIfNeeded(): void`. It does nothing when the recorder is off or the database is not ready. It reads `lastFrameRecordId` and `lastRecordIdOfType(..., 'view_snapshot')`. When there is a frame and no view snapshot newer than it, it writes:
+   - `export function recordReplayViewsIfNeeded(): void`. It does nothing when the recorder is off or the database is not ready. It reads `lastFrameHeader` and `lastRecordIdOfType(..., 'view_snapshot')`. When there is a frame and no view snapshot newer than it, it writes:
      - one `view_snapshot` for the `all` view, payload `{ view: 'all', seatId: null, snapshot }`, where `snapshot` is `omniscientSnapshot()` stored with a private helper `storedSnapshot(snapshot, dropFogLists)`: it removes `hexes` and adds `hexWeather` (see Design), and with `dropFogLists` true it also removes `visibleHexes`, `exploredHexes`, and `staleHexes`. Visibility `engine`;
      - and, when `activeHumanSeatId(getSeatRoster())` is not null, one for the `player` view, payload `{ view: 'player', seatId, snapshot }`, where `snapshot` is `storedSnapshot(playerViewSnapshot(seatId), false)`, visibility `{ seats: [seatId] }`.
      - Before writing the helper, read the comment on each field of `hexes` in `src/shared/ipc/gameStateTypes.ts`. When this plan was written only `weather` could change during a match. If another field is documented as changing, carry it the same way and record it in the Completion Log.
-     Both use the step of the latest frame. Read that step from the frame's row, not from the live turn, so the two always agree.
+     Both use the step of the latest frame. Read that step from `lastFrameHeader`, not from the live turn, so the two always agree.
    - `export function recordResolutionView(step: StepKey | null, kind: 'strategic' | 'tactical', result: unknown): void`. It does nothing for a null step. It writes one `resolution_view` with payload `{ kind, result }`, visibility `engine`.
 4. Hooks. One line each:
    - Directly after **each** `recordStepBoundary(...)` call found in Phase 0: `recordReplayViewsIfNeeded();`.
-   - `main.ts`, the `IPC_GAME.ready` handler: capture `const stepBefore = currentStepKey();` before the handler runs, await the result, and when `result.success` is true and `result.awaitingMeleeDecision` is not true, call `recordResolutionView(stepBefore, 'strategic', result)` before returning it. Do the same in the `IPC_GAME.resolveMeleeIntercept` handler. Keep `withAutoSaveAfter` and `runWithReadyInFlight` wrapped exactly as they are.
-   - `main.ts`, the `IPC_GAME.commitHumanTacticalDraftOrders` handler: it already captures `beatStep` and records a tactical beat on success. Directly after that, call `recordResolutionView(beatStep, 'tactical', result)`. This is the value the handler goes on to return. If the handler adds fields to it afterwards (such as `tacticalPostBeatConsultDeferred`), record the object without them. Replay does not need them.
-   `main.ts` is past 600 lines. Add only these lines.
-5. Results file. Write `.spec/todo/v3.1.0/YYYY-MM-DD-replay-stepping-results.md`, beside this plan, where `YYYY-MM-DD` is the local date on which you create it. Give it the compressed byte length of one `all` snapshot and one `player` snapshot for a fresh global match and for one regional match (add a temporary test case that prints `encodeRecordPayload(payload).length`, run it, then remove it), and an estimate for 150 turns. These numbers are reported, not gated.
-6. `doc/match-recording.md`: add both event types to the event table, say what is left out of a stored snapshot and why, and say that these two exist so a past turn can be shown again exactly as it was.
+   - `gameIpcHandlers.ts`, `handleGameReady`, and `meleeInterceptResolveIpc.ts`: directly after each `recordStrategicResolution(resolvedStep, ...)` call, call `recordResolutionView(resolvedStep, 'strategic', readyResult)` with the result that call is built from. Both calls sit inside the work `withAutoSaveAfter` runs, so the automatic save and the export that follow include the row. Recording in the `main.ts` handler after the wrapped call returns would miss both. Phase 0 records which local in each file holds the result the handler returns. If fields are added to it after that point, they are consult details the update dialog does not read. Record the object as it is at that point.
+   - `main.ts`, the `IPC_GAME.commitHumanTacticalDraftOrders` handler: it already captures `beatStep` and records a tactical beat on success, inside the wrapped work. Directly after the `recordTacticalBeat(...)` call, call `recordResolutionView(beatStep, 'tactical', result)`. Fields the handler adds afterwards (such as `tacticalPostBeatConsultDeferred`) are not in the row. Replay does not need them.
+   `main.ts` is past 600 lines. Add only that line and its import.
+5. **The recording file, one line at a time.**
+   - `matchRecordingExport.ts`, `writeMatchRecordingFile`: encode each line with `Buffer.from(JSON.stringify(line) + '\n', 'utf8')` as it is built, and gzip the joined buffers with `gzipSync(Buffer.concat(parts))`. No string holds the whole file. Records are still read with `listMatchRecords`, in `record_id` order. The bytes written are the same as before except that the file now ends with a newline. Check that `parseRecordingLines` ignores an empty last line (the existing fixture tests show it). If it does not, leave the last newline out.
+   - `matchRecordingFile.ts`, `readRecordingFile`: split the gunzipped `Buffer` on byte `0x0A` and decode each line on its own, then parse the lines as `parseRecordingLines` does today. Move the per-line parsing into a private function both use, so the fixture path and the file path keep one parser.
+   - Tests: the existing export and file tests pass unchanged, and a new test writes a recording whose records contain multi-byte text and reads it back equal.
+6. Results file. Write `.spec/todo/v3.1.0/YYYY-MM-DD-replay-stepping-results.md`, beside this plan, where `YYYY-MM-DD` is the local date on which you create it. Give it:
+   - the compressed byte length of one `all` snapshot and one `player` snapshot for a fresh global match and for one regional match (add a temporary test case that prints `encodeRecordPayload(payload).length`, run it, then remove it);
+   - the same two lengths, and the time `recordReplayViewsIfNeeded` takes, on a late save with battles: ask the user for one, copy it to a temp folder, and open the copy, never the original;
+   - an estimate for 150 turns and for 900 turns, and the decoded size of the 900-turn history against the about 537 MB string limit that step 5 removed.
+   These numbers are reported, not gated.
+7. `doc/match-recording.md`: add both event types to the event table after the ones before them, change "ten event types" to the new count, add `view_snapshot` and `resolution_view` to the visibility paragraph, say what is left out of a stored snapshot and why, say that these two exist so a past turn can be shown again exactly as it was, and say that the recording file is written and read one line at a time. `src/shared/matchRecording.ts`: update the two comments that count the event types.
 
 ### Tests
 
@@ -330,6 +347,7 @@ Every step boundary stores the snapshots, and every resolution stores the result
   - On a match with no human seat, only the `all` view is written.
   - **Secrets:** with a sentinel in every `MACHINE_LOCAL_CONFIG_KEYS` row, neither payload's JSON contains it. Use an obviously fake value with a comment saying it is a test value.
   - `recordResolutionView` writes one row with the given step and kind, and nothing for a null step.
+  - After `handleGameReady` succeeds on the seated match, the `resolution_view` row exists before the closing boundary's frame, so a save taken by `withAutoSaveAfter` holds it.
   - With `AGENT_WARS_DISABLE_RECORDER=1`, nothing is written.
 - The existing tests for `readMatchSnapshot` pass unchanged.
 
@@ -346,18 +364,18 @@ Run the Verification Bar. Run the app, play two turns and one battle beat, save,
 ## Phase 3 — Reading a Timeline and a Step
 
 **Add:** `src/main/replay/replayReading.ts`, `src/main/replay/replayReading.test.ts`, `src/main/ipc/replayIpcHandler.ts`
-**Edit:** `src/shared/ipc/channels.ts`, `src/main/preload.ts`, `src/shared/ipc/gameApiTypes.ts`, `src/main/main.ts`, `src/main/openRouter/commanderPoolSettle.ts` (only to export its model-label function)
+**Edit:** `src/shared/ipc/channels.ts`, `src/main/preload.ts`, `src/shared/ipc/gameApiTypes.ts`, `src/main/main.ts`, `src/main/recorder/matchRecordStore.ts`, `src/main/recorder/matchRecordStore.test.ts`, `src/main/openRouter/commanderPoolSettle.ts` (to export its model-label function, which then logs a `logTrace` line as rule 02 requires of an exported function that only reads)
 
 ### Steps
 
 1. `replayReading.ts`:
    - `export function currentReplayView(): ReplayView`, from `replayViewFor` with the roster and the `game_over` row.
-   - `export function readReplayTimeline(): ReplayTimeline`. In this build the scope is always `'strategic'`. It lists `view_snapshot` events **without decoding their payloads**: add `listMatchRecordHeadersOfType(ops, recordType)` to `matchRecordStore.ts`, which returns every column except `payload`, in `record_id` order (add `src/main/recorder/matchRecordStore.ts` and its test to this phase's edits). The view is read from the `visibility` column: `engine` is the `all` view, and `seats:…` is the `player` view. It keeps the events of the current view whose scope is `strategic`, and for each `turn_number` keeps the last one. `steps` is those, in turn order. With the recorder off or no events, `steps` is empty.
-   - `export function readReplayStep(recordId: number): ReplayStepView | null`. It returns null when the record is missing, is not a `view_snapshot`, or is not of the current view. Otherwise:
+   - `export function readReplayTimeline(): ReplayTimeline`. In this build the scope is always `'strategic'`. It lists `view_snapshot` events **without decoding their payloads**: add `listMatchRecordHeadersOfType(ops, recordType)` to `matchRecordStore.ts`, which returns every column except `payload`, in `record_id` order The view is read from the `visibility` column: `engine` is the `all` view, and `seats:…` is the `player` view. It keeps the events of the current view whose scope is `strategic`. A turn with a battle has a second strategic frame after the battle, so it can have two snapshots. For each `turn_number` it keeps the **first** one, the picture when the turn began (Locked Decision 4), except for the last turn, where it keeps the last one, so entering replay shows the screen as it is now. `steps` is those, in turn order. With the recorder off or no events, `steps` is empty.
+   - `export function readReplayStep(recordId: number): ReplayStepView | null`. It reads with `readMatchRecord` and `listMatchEventsAtStep` from Phase 2, never by decoding every record of a type. It returns null when the record is missing, is not a `view_snapshot`, or is not of the current view. Otherwise:
      - `snapshot`: the stored one with `hexes` rebuilt from the open match (`getGameState().hexes`, each entry without its `weather`), then the stored `hexWeather` applied, and `hexWeather` removed. For the `all` view, pass the result through `withEveryHexVisible`.
-     - `resolution`: the `result` of the last `resolution_view` of kind `strategic` whose `turn_number` is this step's turn minus one. Null when there is none, and null when this is the first step of the timeline.
+     - `resolution`: the `result` of the last `resolution_view` of kind `strategic` at step `strategicStep(turn - 1)`. Null when there is none, and null when this is the first step of the timeline.
      - `visibleHexesBefore`: the `visibleHexes` of the step before in the timeline (for the `all` view, every hex). Null on the first step.
-     - `dispatches`: one `CommanderDispatch` per AI seat that has a `commander_strategy` or a `message_sent` event with this step's key, in side order. `strategy` is the last strategy text for that seat at this step, or null. `messages` is that seat's sent messages at this step, filtered with `sideMessageVisibleTo` (viewer `player` with the human seat for the `player` view, `observer` for the `all` view, and the match's fog setting). `modelLabel` comes from the same function the pool uses when it pushes a dispatch (`modelLabel` in `commanderPoolSettle.ts`: export it), given the `modelId` of that seat's last `consultation` event at this step, or the seat's current model when there is none. `turnNumber` is the step's turn. A seat with neither a strategy nor a visible message has no dispatch.
+     - `dispatches`: one `CommanderDispatch` per AI seat that has a `commander_strategy` or a `message_sent` event with this step's key, in side order. `strategy` is the last strategy text for that seat at this step, or null. `messages` is every message that seat sent at this step, with no filter. The live dialog shows every message, including those addressed to another commander, whatever the fog setting (`CommanderDispatch.messages` in `commanderStatus.ts`, and the comment on `sideMessageVisibleTo`). Replay shows the same. `modelLabel` comes from the same function the pool uses when it pushes a dispatch (`modelLabel` in `commanderPoolSettle.ts`: export it), given the `modelId` of that seat's last `consultation` event at this step, or the seat's current model when there is none. `turnNumber` is the step's turn. A seat with neither a strategy nor a visible message has no dispatch.
 2. `replayIpcHandler.ts`: registers `game:readReplayTimeline` and `game:readReplayStep`. The second validates that the payload is an object with a whole-number `recordId`, and returns null otherwise.
 3. Add both channels to `IPC_GAME` in `channels.ts`, to the preload's channel list and exposed API, and to `gameApiTypes.ts`, following `readMatchCharts`. Register the handler in `main.ts` beside the others.
 
@@ -365,10 +383,10 @@ Run the Verification Bar. Run the app, play two turns and one battle beat, save,
 
 `replayReading.test.ts`, on a seated temp match with a human seat, fog of war on, driving the recorder by hand (boundary call, `recordReplayViewsIfNeeded`, then move the turn and repeat, with a `resolution_view`, a `commander_strategy`, and two `message_sent` events written between):
 
-- The timeline has one step per turn, in order, in the `player` view. Two snapshots for one turn give one step, the later one.
+- The timeline has one step per turn, in order, in the `player` view. Two snapshots for one turn give one step: the earlier one, and on the last turn the later one.
 - A step's snapshot has a `hexes` list as long as the match's, and the turn number of that step. A hex whose weather was stored has that weather, even after the live weather changes. A hex with no stored weather has none.
 - The first step has `resolution: null` and `visibleHexesBefore: null`. The second has the recorded result and a list.
-- `dispatches` for a step holds the strategy and only the message addressed to the human. With `game_over` set, the view is `all` and both messages are there.
+- `dispatches` for a step holds the strategy and both messages, the one addressed to the human and the one addressed to another commander. With `game_over` set, the view is `all`, and the dispatches are the same.
 - `readReplayStep` returns null for a frame's record id and for an unknown id.
 - `listMatchRecordHeadersOfType` returns the rows in order with no payload field.
 - The channel parity tests pass.
@@ -384,7 +402,7 @@ Run the Verification Bar.
 `p` shows a past picture of the match and `p` or Escape brings the present back. There is no panel yet: in this phase replay enters at the current step and can only be left.
 
 **Add:** `src/renderer/replay/replayState.ts`, `src/renderer/replay/replayMode.ts`, `static/replayChrome.css`, `src/main/rendererReplayContracts.test.ts`
-**Edit:** `src/renderer/core/stateSnapshot.ts`, `src/renderer/map/initCore.ts`, `src/renderer/map/mainMapInteractions.ts`, `src/renderer/map/mapDoubleClickHandler.ts`, `src/renderer/map/tacticalEntryLayer.ts`, `src/renderer/chrome/consoleFrame.ts`, `src/shared/chatPanelState.ts`, `src/shared/chatPanelState.test.ts`, `src/renderer/chat/chatPanelVisibility.ts`, `src/renderer/gameplay/readyHandler.ts`, `src/renderer/openRouter/openRouterUiHelpers.ts`, `src/renderer/renderer.ts`, `static/index.html`
+**Edit:** `src/renderer/core/stateSnapshot.ts`, `src/renderer/entryCallbacks.ts`, `src/renderer/gameplay/readyHandlerTypes.ts`, `src/renderer/rendering/canvasPreviewPolicy.ts`, `src/renderer/map/initCore.ts`, `src/renderer/map/mainMapInteractions.ts`, `src/renderer/map/mapDoubleClickHandler.ts`, `src/renderer/map/tacticalEntryLayer.ts`, `src/renderer/chrome/consoleFrame.ts`, `src/shared/chatPanelState.ts`, `src/shared/chatPanelState.test.ts`, `src/renderer/chat/chatPanelVisibility.ts`, `src/renderer/gameplay/readyHandler.ts`, `src/renderer/openRouter/openRouterUiHelpers.ts`, `src/renderer/renderer.ts`, `static/index.html`
 
 ### Steps
 
@@ -414,27 +432,29 @@ Run the Verification Bar.
    - As the first statement: when `replayActive()` is true and `options.replay` is not `'step'`, return without doing anything. Background work (a commander finishing, an Observe refresh) asks for the live state to be applied. During replay that must not replace the picture. Leaving replay fetches the live state itself.
    - When `options.replay` is set (either value), skip the `deps.updateClientStaleEnemyIntel(previousState, nextState)` call. That function keeps last-seen enemy markers by comparing each snapshot with the one before. Past snapshots in any order would corrupt it.
    Nothing else in the function changes.
+   - **The option has to reach it.** Every caller goes through a wrapper whose options type is closed: `applyGameStateSnapshot` in `src/renderer/entryCallbacks.ts` (past 900 lines), the `applyGameStateSnapshot` member of `ReadyHandlerDeps` in `src/renderer/gameplay/readyHandlerTypes.ts`, and the member type in `stateSnapshot.ts` near the deps interface. Add `replay?: 'step' | 'leave'` to each of those three option types, and have the `entryCallbacks.ts` wrapper pass it through. Change only those lines. `replayMode.ts` applies snapshots through `readyDeps().applyGameStateSnapshot`. `check:renderer-types` fails on an object literal with `replay` until all three are done.
 4. **Last-seen markers.** On entering, `replayMode.ts` copies `S.lastObservedEnemyByUnitId`, `S.clientStaleEnemyIntelByUnitId`, and `S.lastRenderedVisibleEnemyByUnitId` (new `Map`s with the same entries), then clears all three, so no live marker is drawn over a past turn. On leaving, it puts the copies back before applying the live state.
 5. `replayMode.ts`:
    - `export async function toggleReplay(): Promise<void>`: leaves when active, otherwise tries to enter.
-   - **Entering, the check.** Evaluate `replayMayEnter` with `matchLoaded` (`S.gameState` has seats), `inBattle` (`S.tacticalBattleSnapshot != null`), `readyInFlight` (`S.readyRequestInFlight`), `playbackRunning` (`S.resolutionMoveAnimation != null`), and `otherModalOpen` (`blockingDialogIsOpen() || chartsDialogIsOpen()`). On a refusal with a sentence, show it with `showMapToast(sentence, { isError: false, skipReport: true })` and stop.
+   - **Entering, the check.** Evaluate `replayMayEnter` with `matchLoaded` (`S.gameState` has seats), `inBattle` (`S.tacticalBattleSnapshot != null`), `readyInFlight` (`S.readyRequestInFlight`), `playbackRunning` (`S.resolutionMoveAnimation != null`), `otherModalOpen` (`blockingDialogIsOpen() || chartsDialogIsOpen()`), and `newGameOpenMidMatch` (`newGameOverlayIsOpen()` while `S.gameState.gameOver` is not true). At game over the new-game panel shows the standings and replay is allowed over it, which is why the panel's z-index is above it (Phase 5). On a refusal with a sentence, show it with `showMapToast(sentence, { isError: false, skipReport: true })` and stop.
    - **Entering, the timeline.** Fetch the timeline. With no steps, show `This match has no recorded turns to replay yet.` the same way and stop.
    - **Entering, the screen.** Close the build popup and the stack callout, clear the selection with `clearSelectionLikeRightClick(selectionDeps)`, and save and clear the last-seen markers. Then call `setReplay` with `index` at the last step, set `document.body.dataset.replay = 'on'`, call `refreshConsoleHeader()` from `src/renderer/chrome/consoleFrame.ts`, and show that step (below).
    - **Showing a step** (`export async function showReplayStep(index: number): Promise<void>`): do nothing while busy. Set `busy`, fetch `readReplayStep(steps[index].recordId)`, and drop the reply if replay ended or the match epoch changed while waiting. Apply `view.snapshot` with `{ refreshStandingOrders: false, updateGameStateSidebarUi: true, updateSelectionUi: false, updateGameOverUi: false, updateReadyButton: true, refreshBuildPopup: false, redraw: true, replay: 'step' }`, so the top bar and the map show that turn. Then set the index and clear `busy`. A null reply shows `That turn could not be loaded.` and leaves the index where it was. Phase 6 adds the dialogs here.
    - **Leaving** (`export async function leaveReplay(): Promise<void>`): show the last step (so the screen and, from Phase 6, the dialogs are the current turn's). Then call `setReplay(null)`, delete `document.body.dataset.replay`, put the last-seen markers back, fetch the live state with `fetchMatchSnapshot()`, and apply it with `{ refreshStandingOrders: true, updateGameStateSidebarUi: true, updateSelectionUi: true, updateGameOverUi: false, updateReadyButton: true, refreshBuildPopup: false, redraw: true, replay: 'leave' }`. Then call `refreshConsoleHeader()` and `syncChatPanelVisibility()`.
-6. **Map input.** Each of these gets `replayActive()` added to a guard that is already there. Change only that line and add the import:
+6. **Order lines.** `src/renderer/rendering/canvasPreviewPolicy.ts`, `shouldDrawCommittedOrderPaths`: return false while `replayActive()`. `drawGameScene` draws `S.humanStandingOrders` against the units of the snapshot it is given, so without this a present-day order line would be drawn from a past turn's unit positions. The same gate covers the march arrows held until movement ends. The hovered path preview needs a selection, and replay clears it.
+7. **Map input.** Each of these gets `replayActive()` added to a guard that is already there. Change only that line and add the import:
    - `mainMapInteractions.ts`: the `pointerdown`, `click`, `dblclick`, and `contextmenu` listeners on the map each begin with `if (newGameOverlayIsOpen()) return;` (in `contextmenu`, after `e.preventDefault();`). Make each `if (newGameOverlayIsOpen() || replayActive()) return;`. The file is past 950 lines, so change only those four lines and add one import. A fifth copy of that line, in `scheduleHexDetailsTooltip`, stays as it is: hex tooltips keep working in replay.
    - `mapDoubleClickHandler.ts`, `handleMainMapDoubleClick`: after the `observeModeControls(...).observing` line, add `if (replayActive()) return;`.
    - `initCore.ts`: in the `buildEntryLayer?.addEventListener('click', ...)` listener, add `if (replayActive()) return;` as the first statement.
    - `tacticalEntryLayer.ts`: in the condition that reads `S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot || !observeModeControls(S.gameState.seats ?? []).magnifierEnabled`, add `|| replayActive()`, so the layer is hidden.
    - `consoleFrame.ts`: both `observeModeControls(S.gameState?.seats ?? []).observing` tests (in `refreshConsoleHeader` and in the tab click listener) become `(observeModeControls(S.gameState?.seats ?? []).observing || replayActive())`. The Orders tab lists the live orders. It is disabled in replay.
    Do not change any other `observeModeControls` call.
-7. **Panels that must not appear.** `replayChrome.css` (link it in `static/index.html` after `chatChrome.css`): `body[data-replay="on"] #selection-panel, body[data-replay="on"] #chat-panel { display: none; }`. Also add `replayActive: boolean` to `chatPanelShouldShow`'s input (false when it is true) and pass it from `chatPanelVisibility.ts`, so the script and the stylesheet agree.
-8. **Ready.** `readyHandler.ts`, `handleReadyButtonClick`: add `if (replayActive()) return;` beside the other early returns at the top. `openRouterUiHelpers.ts`, `updateReadyButtonState`: the button is disabled while replay is active.
-9. **Keys.** `initCore.ts`, in the `keydown` handler:
+8. **Panels that must not appear.** `replayChrome.css` (link it in `static/index.html` after `chatChrome.css`): `body[data-replay="on"] #selection-panel, body[data-replay="on"] #chat-panel, body[data-replay="on"] #build-entry-layer { display: none; }`. Hiding the build buttons this way matches the decision above. The click guard in step 7 stays as a second line of defense. Also add `replayActive: boolean` to `chatPanelShouldShow`'s input (false when it is true) and pass it from `chatPanelVisibility.ts`, so the script and the stylesheet agree.
+9. **Ready.** `readyHandler.ts`, `handleReadyButtonClick`: add `if (replayActive()) return;` beside the other early returns at the top. `openRouterUiHelpers.ts`, `updateReadyButtonState`: the button is disabled while replay is active.
+10. **Keys.** `initCore.ts`, in the `keydown` handler:
    - Inside `if (e.key === 'Escape') {`, directly after the charts-dialog branch the charts plan added: when `replayActive()`, call `e.preventDefault()`, `void leaveReplay()`, and `return`.
    - Directly after the `c` branch: when `key === 'p'`, call `e.preventDefault()`, `void toggleReplay()`, and `return`.
-   The charts dialog swallows keys while it is open, so `p` does nothing there.
+   The charts dialog swallows keys while it is open, so `p` does nothing there. While a text field or the replay slider has focus, `shouldIgnoreGlobalKeydown` drops `p` and Escape before this handler. Phase 5 blurs the slider after a jump, so `p` works again at once.
 
 ### Tests
 
@@ -443,8 +463,9 @@ Run the Verification Bar.
   - `applyGameStateSnapshot` calls `replayActive()`, and its `updateClientStaleEnemyIntel` call sits inside a branch that tests `options.replay`.
   - The `keydown` handler calls `toggleReplay` and `leaveReplay`.
   - `handleReadyButtonClick` returns when `replayActive()`.
-  - Each of the four map listeners in `mainMapInteractions.ts`, `handleMainMapDoubleClick`, the build-entry click listener, the tactical entry layer, and `refreshConsoleHeader` calls `replayActive()`.
-  - `static/replayChrome.css` hides both panels under `body[data-replay="on"]`.
+  - Each of the four map listeners in `mainMapInteractions.ts`, `handleMainMapDoubleClick`, the build-entry click listener, the tactical entry layer, `refreshConsoleHeader`, and `shouldDrawCommittedOrderPaths` calls `replayActive()`.
+  - The options types in `entryCallbacks.ts`, `readyHandlerTypes.ts`, and `stateSnapshot.ts` each name `replay`.
+  - `static/replayChrome.css` hides both panels and `#build-entry-layer` under `body[data-replay="on"]`.
 
 ### Verification
 
@@ -453,7 +474,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app in a match with a f
 - During a turn's playback, `p` shows the sentence.
 - With a commander planning in the background, enter replay and wait for it to finish: the picture does not change, and after leaving, the commander's plan is there.
 - With fog of war on, note an enemy's last-seen marker, enter and leave replay, and confirm the marker is still there.
-- Queue an order, enter and leave replay, and confirm the order is still queued.
+- Queue an order, enter and leave replay, and confirm the order is still queued. While in replay, step to an earlier turn and confirm no order line is drawn.
 
 ---
 
@@ -489,7 +510,7 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app in a match with a f
    - `export function renderReplayPanel(): void` shows the panel when `currentReplay()` is not null and hides it otherwise. It sets the label from `replayLabel`, the slider's `max` and `value`, the turn field's value (unless the field has focus), and each button's `disabled` from `canStepBack`, `canStepForward`, and `canPlay`. It clears `aria-invalid` when it sets the field.
    - **Expand:** toggles `data-state`, `aria-expanded`, and the button's `aria-label` between `Show the turn slider` and `Hide the turn slider`, with the same slide the selection panel uses. The state lasts until the app closes.
    - **Step back and step forward:** call `showReplayStep(index - 1)` and `showReplayStep(index + 1)`. A click while `busy` does nothing.
-   - **Slider:** on `input`, write the turn number of the step under the thumb into the turn field, and nothing else. On `change`, call `showReplayStep` with that index.
+   - **Slider:** on `input`, write the turn number of the step under the thumb into the turn field, and nothing else. On `change`, call `showReplayStep` with that index, then `blur()` the slider, so `p` and Escape reach the map again.
    - **Turn field:** on every `input`, run `parseTurnEntry`. Set `aria-invalid="true"` on an error and remove it otherwise. On Enter or on blur, when the entry is valid and is not the current step, call `showReplayStep`. When it is invalid, leave the field as typed with its red border and do not move. Escape in the field restores the current turn's number and removes the border, and does not leave replay (stop that one key there).
    - Typing in the field must not reach the map. `shouldIgnoreGlobalKeydown` already ignores text inputs. Confirm that `p` typed in the field does not leave replay.
 4. `replayMode.ts` does not call the panel. Every change goes through `setReplay`, which calls `renderReplayPanel` through `onReplayChange`.
@@ -531,24 +552,25 @@ Each step shows the message dialog and the update dialog that were shown when th
    - In `handleReadyButtonClick`, put `const plan = planResolutionPlayback({ ... });` where the stretch began, then the two effects, unchanged and in their order, then `const { ... } = plan;` with every name the rest of the function reads. The rest of the function is not edited.
    - **This is a move, not a rewrite.** Before moving, confirm that each moved statement only computes a value: it assigns no `S` field, calls nothing named `show…`, `update…`, `notify…`, `refresh…`, `append…`, or `window.gameApi…`, and awaits nothing. If one does not, stop this step, leave `readyHandler.ts` untouched, and take the fallback in step 2.
 2. **Fallback only.** When step 1 could not be done, `replayDialogs.ts` builds the two values the dialog needs, `visibility` and the visible missile launches, by calling `deriveCombatVisibilityClassification` and `missileLaunchVisibleToViewer` the way `handleReadyButtonClick` does, and shows the update dialog whenever `announceResolutionTurnUpdate` would produce text. Record this in the Completion Log and in your final message.
-3. `replayDialogs.ts`: `export async function showReplayStepDialogs(view: ReplayStepView, deps: ReadyHandlerDeps): Promise<void>`.
+3. `replayDialogs.ts`: `export async function showReplayStepDialogs(view: ReplayStepView, replayView: ReplayView, deps: ReadyHandlerDeps): Promise<void>`, where `replayView` is `currentReplay().timeline.view`.
    - It first hides both dialogs (`hideMapToast()` and `hideAiStrategyToast()`), so a step never shows the dialogs of the step before.
    - **Update dialog.** When `view.resolution` is not null, treat it as a `ReadyResult` (`result`) and build `plan = planResolutionPlayback({ readyResult: result, state: view.snapshot, humanMoves: result.humanMoves ?? [], visibleHexesBeforeTurn: new Set(view.visibleHexesBefore ?? []), deps })`. The live turn showed the update when `needsCombatOrMovementAnimation || holdForBattle || hasPendingDestroyedBattleParents()`. For a past turn use `plan.needsCombatOrMovementAnimation || Boolean(result.tacticalAutoStartH3Index)`. The third test reads live memory and does not apply. When it is true, call `announceResolutionTurnUpdate` with:
      - `readySlice: result`, `visibility: plan.visibility`, `missileLaunches: plan.visibleMissileLaunches`, `visibleHexes: plan.visibleHexes`;
      - `killToastFormatter: deps.buildKillToastFormatterBundle(view.snapshot, result.removedUnits, undefined, result.killLabelUnits)`, the same call the live turn makes;
      - `reportTag: currentConsoleReportTag()`, `holdForBattle: false`, and `destroyedParents: []`. An empty list keeps it from taking the live battle parents that `usePendingBattleParents` would take;
+     - the past viewer and fog, because each of these falls back to the present when left out: `viewerSeatId` is the human seat for the `player` view and null for the `all` view (`replayView`), `seats: view.snapshot.seats`, and `exploredHexes: new Set(view.snapshot.exploredHexes ?? [])`. Read the exact parameter names and types in `announceResolutionTurnUpdate` before writing the call;
      - and, as its second argument, `{ showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }), appendOpenRouterLog: () => {}, formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement }`. `skipReport` keeps a replayed dialog out of the Reports tab, and the empty log function keeps it out of the activity log. `announceResolutionTurnUpdate` itself is not edited.
    - **Message dialog:** when `view.dispatches` is not empty, call `showCommanderMessageTabs(view.dispatches, [], { fromReplay: true })`.
    - With a null resolution and no dispatches (the first recorded turn), nothing shows.
 4. `commanderMessageTabsUi.ts`, `showCommanderMessageTabs`: add a third parameter `options?: { readonly fromReplay?: boolean }`. As the first statement, when `replayActive()` is true and `options?.fromReplay` is not true, return. A commander that finishes in the background must not open its dialog over a past turn. Its messages are still filed in the Reports tab by `messageLines` in `commanderPoolClient.ts`. Confirm that by reading, and change nothing there.
-5. `replayMode.ts`: `showReplayStep` calls `showReplayStepDialogs(view, readyDeps())` after applying the snapshot. Leaving replay already shows the last step first (Phase 4), so the current turn's dialogs are showing when the live state comes back. Do not hide them on leaving.
+5. `replayMode.ts`: `showReplayStep` calls `showReplayStepDialogs(view, timeline.view, readyDeps())` after applying the snapshot. Leaving replay already shows the last step first (Phase 4), so the current turn's dialogs are showing when the live state comes back. Do not hide them on leaving.
 
 ### Tests
 
 - `rendererReplayContracts.test.ts`:
   - `handleReadyButtonClick` calls `planResolutionPlayback` (skip this assertion, with a comment, if step 1 took the fallback).
   - `resolutionPlaybackPlan.ts` contains no `S.` assignment, no `await`, and no `window.gameApi`.
-  - `replayDialogs.ts` calls `announceResolutionTurnUpdate` with `skipReport: true` and `destroyedParents: []`, and calls `showCommanderMessageTabs`.
+  - `replayDialogs.ts` calls `announceResolutionTurnUpdate` with `skipReport: true`, `destroyedParents: []`, `viewerSeatId`, `seats`, and `exploredHexes`, and calls `showCommanderMessageTabs`.
   - `showCommanderMessageTabs` calls `replayActive()`.
 
 ### Verification
@@ -589,14 +611,15 @@ Run the Verification Bar and `npm run ui:smoke`. Run an Observe match: `p` stops
 ## Phase 8 — Docs, Final Verification, and Hand-Off
 
 **Add:** `doc/ux/replay-panel.md`
-**Edit:** `doc/ux-specification.md`, `doc/ux/input-map.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/selection-panel.md`, `doc/ux/selection-model.md`, `doc/ux/chat-panel.md`, `doc/ux/console.md`, `doc/ux/map-surface.md`, `doc/ux/tactical-entry-markers.md`, `doc/ux/notifications-and-feedback.md`, `doc/ux/control-tooltips.md`, `doc/ui-style-guide.md`, `doc/how-to-play.md`, `doc/match-recording.md`
+**Edit:** `doc/ux-specification.md`, `doc/ux/input-map.md`, `doc/ux/modes-and-transitions.md`, `doc/ux/selection-panel.md`, `doc/ux/selection-model.md`, `doc/ux/chat-panel.md`, `doc/ux/console.md`, `doc/ux/console-command-bar.md`, `doc/ux/map-surface.md`, `doc/ux/map-overlays.md`, `doc/ux/tactical-entry-markers.md`, `doc/ux/notifications-and-feedback.md`, `doc/ux/resolution-playback.md`, `doc/ux/control-tooltips.md`, `doc/ui-style-guide.md`, `doc/how-to-play.md`, `doc/match-recording.md`
 
 ### Steps
 
 1. Write `doc/ux/replay-panel.md` with the fixed heading set: what replay is, when `p` works and the two sentences shown when it does not, the panel's two states, each control and when it is enabled, the slider and the turn field with the validation rule, what follows the replay turn (everything drawn from the match state) and what does not (the Reports tab, the Commanders tab, destroyed-city overlays at battle-detail zoom), the fog rule, that commanders keep planning and their dialogs are held back, and how leaving works. Under Open Questions, list anything you found that the plan did not decide.
 2. Add Replay to `doc/ux/modes-and-transitions.md` as a mode entered from Strategic planning and from Game over, with what is disabled in it. Add `P` and its Escape to `doc/ux/input-map.md`. Add the panel's control tips to `doc/ux/control-tooltips.md` with their Source Anchors. Add the replay rule each of these needs: `selection-panel.md` and `chat-panel.md` (hidden in replay), `selection-model.md` and `map-surface.md` (the selection is cleared on entering; map clicks do nothing in replay; pan and zoom work), `tactical-entry-markers.md` (hidden in replay), `console.md` (the Orders tab is disabled in replay and the console moves to Commanders), and `notifications-and-feedback.md` (both dialogs are shown again for each step and are not filed in the Reports tab again; an update that waited for a battle is shown without its battle lines; last-seen enemy markers are not drawn in replay).
-3. `doc/ui-style-guide.md` section 2.10: replace "Not shipped" with what shipped, and keep what is still a target.
-4. `doc/ux-specification.md`: the routing-table row and the list entry.
+   Also: `console-command-bar.md` adds replay to the cases in which Ready is disabled; `map-overlays.md` says committed order lines are not drawn in replay; `resolution-playback.md` adds `resolutionPlaybackPlan.ts` to Code Entry Points; `input-map.md` says `p` and Escape do nothing while the turn field or the slider has focus, and that the slider gives focus back after a jump.
+3. `doc/ui-style-guide.md` section 2.10: replace "Not shipped" with what shipped, and keep what is still a target. Update the implementation-status note near the top that lists the replay strip as unbuilt, and the checklist item that names it.
+4. `doc/ux-specification.md`: the routing-table row, the list entry, and an entry under Open Questions by Document when `replay-panel.md` has open questions.
 5. `doc/how-to-play.md`: a short section on replay.
 6. Run `node scripts/check-doc-links.cjs` and fix what it reports in the documents you changed.
 7. Search the whole diff for plan vocabulary and remove it: `git diff | Select-String -Pattern 'Phase \d|history-3|execution plan|locked decision' -CaseSensitive:$false`. Nothing under `src/`, `static/`, `scripts/`, or `doc/` may match.
