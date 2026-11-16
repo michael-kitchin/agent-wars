@@ -4,6 +4,7 @@
 
 import { rendererSharedState as S } from '../core/state';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
+import { replayActive } from '../replay/replayState';
 
 /**
  * Updates `#tactical-exit-btn` visibility and disabled state from tactical session flags.
@@ -13,7 +14,7 @@ import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
  * Expected outcome: Hidden and disabled while no battle snapshot is active, and while
  *   `S.tacticalAnnihilationOutcomeDialog` is set. Hiding it with the snapshot keeps it off screen when a battle ends
  *   before `renderBattleHeader` leaves battle form. Otherwise it stays shown and is disabled when
- *   `S.tacticalPhasePlanning` is false or while beat playback is running. A control tip whose control no longer has an
+ *   `S.tacticalPhasePlanning` is false, while beat playback is running, or while replay is on, because leaving a battle changes the match. A control tip whose control no longer has an
  *   on-screen area is hidden.
  * Exceptions: None when nodes are missing (no-op for absent elements).
  */
@@ -22,7 +23,7 @@ export function syncTacticalExitButtonElementVisibility(): void {
   const active = !!S.tacticalBattleSnapshot;
   const annihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null;
   const playbackDisablesExit = S.tacticalBattleSnapshot != null && S.resolutionMoveAnimation != null;
-  const disabled = !S.tacticalPhasePlanning || playbackDisablesExit;
+  const disabled = !S.tacticalPhasePlanning || playbackDisablesExit || replayActive();
   if (exitBtn) {
     if (annihilationDialogOpen || !active) {
       exitBtn.classList.add('hidden');

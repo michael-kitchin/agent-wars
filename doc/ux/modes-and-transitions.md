@@ -68,7 +68,7 @@ The footer checkbox reads "Start the next turn when every commander is ready". I
 
 ### Replay
 
-Replay opens over Strategic planning, and over Game over, with a match loaded and does not change the mode. It does not open while a turn resolves, during playback, or inside a battle. While it is on, the map shows a recorded turn, Ready and the Orders tab are disabled, and map clicks do nothing. Leaving it, from P, Escape, or the game menu, shows the present. It is described in [replay-panel.md](replay-panel.md).
+Replay opens over Strategic planning, over Tactical planning, and over Game over, with a match loaded and does not change the mode. It does not open while a turn resolves or during playback. Over the strategic game it covers the strategic turns and never shows a battle. Over a battle it covers that battle's beats. While it is on, the map shows a recorded turn or beat, Ready and the Orders tab are disabled, Exit Battle is disabled, and map clicks do nothing. Play runs the recorded animations forward. Leaving it, from P, Escape, or the game menu, shows the present. It is described in [replay-panel.md](replay-panel.md).
 
 ### Charts overlay
 

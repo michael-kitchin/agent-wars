@@ -167,8 +167,8 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 2.10 Replay Controls
 
-- **Live app:** The P key opens the replay panel at the map's bottom-left, in the selection panel's place, with the same width, face, and 50 px bar (`static/replayChrome.css`). The bar holds an expand control, the label "Replay · Turn N of M", and Step back, Step forward, and Play buttons in the ordinary button teal. Play is disabled. Expanded, a turn field and a slider sit above the bar, and a rejected turn number turns the field's border `var(--chrome-error)`. The panel draws at z-index 7040, and the selection and chat panels are hidden while it shows. See [ux/replay-panel.md](ux/replay-panel.md).
-- **Not shipped:** Play, which would run a turn's resolution animation, and viewing the AI's tool log for a past turn.
+- **Live app:** The P key opens the replay panel at the map's bottom-left, in the selection panel's place, with the same width, face, and 50 px bar (`static/replayChrome.css`). The bar holds an expand control, the label "Replay · Turn N of M", and Step back, Step forward, and Play buttons in the ordinary button teal. While playback runs, Play shows a pause glyph and the other controls are dimmed. Inside a battle the label reads "Replay · Beat N of M". Expanded, a turn field and a slider sit above the bar, and a rejected turn number turns the field's border `var(--chrome-error)`. The panel draws at z-index 7040, and the selection and chat panels are hidden while it shows. See [ux/replay-panel.md](ux/replay-panel.md).
+- **Not shipped:** viewing the AI's tool log for a past turn.
 
 ### 2.11 Async Multiplayer (Turn File Exchange)
 
@@ -236,7 +236,7 @@ When this guide and the running app disagree, the app wins until this file is up
 - [ ] Typography documented as a single named family (live app uses system UI fonts).
 - [ ] Full keyboard-shortcut overlay and in-app manual.
 - [ ] AI observatory of last briefing (the console's Commanders tab shows Start, commander cards, and the activity log, not a briefing viewer).
-- [x] Replay panel (stepping only; Play is disabled).
+- [x] Replay panel (stepping and Play, over the strategic turns and over a battle's beats).
 - [ ] Async multiplayer turn files.
 - [x] Save/load UI.
 - [ ] Dark theme.

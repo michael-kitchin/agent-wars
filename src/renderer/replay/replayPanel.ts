@@ -9,15 +9,18 @@
 
 import {
   canPlay,
+  canSeek,
   canStepBack,
   canStepForward,
   parseTurnEntry,
   replayLabel,
+  stepNumber,
   type ReplayPosition,
 } from '../../shared/replayNavigation';
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
 import { showReplayStep } from './replayMode';
-import { currentReplay, onReplayChange } from './replayState';
+import { requestReplayPlaybackStop, startReplayPlayback } from './replayPlayback';
+import { currentReplay, onReplayChange, type ReplayState } from './replayState';
 
 /**
  * Tip and name of the expand control while the seek row is hidden.
@@ -58,6 +61,86 @@ const HIDE_SEEK_TIP = 'Hide the slider and the turn field.';
  * Exceptions: None.
  */
 const SHOW_SEEK_TIP = 'Show the slider and the turn field.';
+
+/**
+ * Name of the Play button while playback is stopped.
+ *
+ * Purpose: The button says what its click does.
+ * When to use: `syncPlayButton`.
+ * Expected outcome: The exact word.
+ * Exceptions: None.
+ */
+const PLAY_LABEL = 'Play';
+
+/**
+ * Tip of the Play button while playback is stopped.
+ *
+ * Purpose: The tip says what the click does.
+ * When to use: `syncPlayButton`.
+ * Expected outcome: The exact sentence.
+ * Exceptions: None.
+ */
+const PLAY_TIP = 'Play the turns forward with their animations.';
+
+/**
+ * Name of the Play button while playback runs.
+ *
+ * Purpose: The button becomes Pause, and its name says so.
+ * When to use: `syncPlayButton`.
+ * Expected outcome: The exact word.
+ * Exceptions: None.
+ */
+const PAUSE_LABEL = 'Pause';
+
+/**
+ * Tip of the Play button while playback runs.
+ *
+ * Purpose: The tip says that Pause waits for the turn in progress.
+ * When to use: `syncPlayButton`.
+ * Expected outcome: The exact sentence.
+ * Exceptions: None.
+ */
+const PAUSE_TIP = 'Stop after this turn.';
+
+/**
+ * Outline of the play glyph.
+ *
+ * Purpose: The icon path shown while playback is stopped.
+ * When to use: `syncPlayButton`.
+ * Expected outcome: An SVG path in the 16 by 16 icon box.
+ * Exceptions: None.
+ */
+const PLAY_GLYPH_PATH = 'M4 3l9 5-9 5z';
+
+/**
+ * Outline of the pause glyph.
+ *
+ * Purpose: The icon path shown while playback runs.
+ * When to use: `syncPlayButton`.
+ * Expected outcome: An SVG path in the 16 by 16 icon box.
+ * Exceptions: None.
+ */
+const PAUSE_GLYPH_PATH = 'M4 3h3v10H4zM9 3h3v10H9z';
+
+/**
+ * Accessible name of the turn field and the slider in the strategic game.
+ *
+ * Purpose: Assistive technology names the controls by what they pick.
+ * When to use: `renderReplayPanel`.
+ * Expected outcome: The exact word.
+ * Exceptions: None.
+ */
+const TURN_NOUN = 'Turn';
+
+/**
+ * Accessible name of the turn field and the slider inside a battle.
+ *
+ * Purpose: Inside a battle the controls pick a beat, not a turn.
+ * When to use: `renderReplayPanel`.
+ * Expected outcome: The exact word.
+ * Exceptions: None.
+ */
+const BEAT_NOUN = 'Beat';
 
 /**
  * Whether the player last chose the expanded state.
@@ -168,7 +251,25 @@ function toggleExpanded(panel: HTMLElement, bar: HTMLElement, button: HTMLElemen
  */
 function currentPosition(): ReplayPosition | null {
   const state = currentReplay();
-  return state ? { stepCount: state.timeline.steps.length, index: state.index, busy: state.busy } : null;
+  return state
+    ? { stepCount: state.timeline.steps.length, index: state.index, busy: state.busy, playing: state.playing }
+    : null;
+}
+
+/**
+ * Shows the Play button as Play or as Pause.
+ *
+ * Purpose: While playback runs the same button stops it, so its icon, name, and tip change.
+ * When to use: Each time the panel is drawn.
+ * Expected outcome: The glyph, `aria-label`, and `data-control-tooltip` match `playing`, and the button is enabled by `canPlay`.
+ * Exceptions: None.
+ */
+function syncPlayButton(play: HTMLButtonElement, position: ReplayPosition): void {
+  const playing = position.playing;
+  play.setAttribute('aria-label', playing ? PAUSE_LABEL : PLAY_LABEL);
+  play.setAttribute('data-control-tooltip', playing ? PAUSE_TIP : PLAY_TIP);
+  play.querySelector('path')?.setAttribute('d', playing ? PAUSE_GLYPH_PATH : PLAY_GLYPH_PATH);
+  play.disabled = !canPlay(position);
 }
 
 /**
@@ -190,23 +291,41 @@ export function renderReplayPanel(): void {
   }
   panel.removeAttribute('hidden');
   const label = byId('replay-panel-label');
-  if (label) label.textContent = replayLabel(state.timeline.steps, state.index);
+  if (label) label.textContent = replayLabel(state.timeline.steps, state.index, state.timeline.scope);
+  const unit = state.timeline.scope === 'tactical' ? BEAT_NOUN : TURN_NOUN;
   const slider = byId<HTMLInputElement>('replay-slider');
   if (slider) {
+    slider.setAttribute('aria-label', unit);
     slider.max = String(Math.max(0, position.stepCount - 1));
     slider.value = String(state.index);
+    slider.disabled = !canSeek(position);
   }
   const field = byId<HTMLInputElement>('replay-turn-input');
+  field?.setAttribute('aria-label', unit);
   if (field && document.activeElement !== field) {
-    field.value = String(state.timeline.steps[state.index]?.turnNumber ?? '');
+    field.value = shownNumberText(state);
     field.removeAttribute('aria-invalid');
   }
+  if (field) field.disabled = !canSeek(position);
   const back = byId<HTMLButtonElement>('replay-step-back');
   const forward = byId<HTMLButtonElement>('replay-step-forward');
   const play = byId<HTMLButtonElement>('replay-play');
   if (back) back.disabled = !canStepBack(position);
   if (forward) forward.disabled = !canStepForward(position);
-  if (play) play.disabled = !canPlay(position);
+  if (play) syncPlayButton(play, position);
+}
+
+/**
+ * The number the turn field shows for the step on screen.
+ *
+ * Purpose: The field holds the turn in the strategic game and the beat inside a battle.
+ * When to use: Drawing the panel and restoring the field.
+ * Expected outcome: The shown step's number as text, or an empty string.
+ * Exceptions: None.
+ */
+function shownNumberText(state: ReplayState): string {
+  const step = state.timeline.steps[state.index];
+  return step ? String(stepNumber(step, state.timeline.scope)) : '';
 }
 
 /**
@@ -219,7 +338,7 @@ export function renderReplayPanel(): void {
  */
 function restoreTurnField(field: HTMLInputElement): void {
   const state = currentReplay();
-  field.value = String(state?.timeline.steps[state.index]?.turnNumber ?? '');
+  field.value = state ? shownNumberText(state) : '';
   field.removeAttribute('aria-invalid');
 }
 
@@ -234,7 +353,7 @@ function restoreTurnField(field: HTMLInputElement): void {
 function validateTurnField(field: HTMLInputElement): number | null {
   const state = currentReplay();
   if (!state) return null;
-  const parsed = parseTurnEntry(field.value, state.timeline.steps);
+  const parsed = parseTurnEntry(field.value, state.timeline.steps, state.timeline.scope);
   if ('error' in parsed) {
     field.setAttribute('aria-invalid', 'true');
     return null;
@@ -293,7 +412,9 @@ function wireTurnField(field: HTMLInputElement): void {
  */
 function wireSlider(slider: HTMLInputElement): void {
   slider.addEventListener('input', () => {
-    const turn = currentReplay()?.timeline.steps[Number(slider.value)]?.turnNumber;
+    const state = currentReplay();
+    const step = state?.timeline.steps[Number(slider.value)];
+    const turn = state && step ? stepNumber(step, state.timeline.scope) : undefined;
     const field = byId<HTMLInputElement>('replay-turn-input');
     if (turn === undefined || !field) return;
     field.value = String(turn);
@@ -332,6 +453,10 @@ export function wireReplayPanel(): void {
   byId('replay-step-forward')?.addEventListener('click', () => {
     const state = currentReplay();
     if (state) void showReplayStep(state.index + 1);
+  });
+  byId('replay-play')?.addEventListener('click', () => {
+    if (currentReplay()?.playing) requestReplayPlaybackStop();
+    else void startReplayPlayback();
   });
   wireTurnField(field);
   wireSlider(slider);

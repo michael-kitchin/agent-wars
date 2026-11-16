@@ -486,9 +486,13 @@ Hover a chart for each side's value at that turn and their total. Scroll over a 
 
 ## Replay
 
-Press **P** during a match to look back at the turns already played. A panel opens at the map's bottom-left with a label such as "Replay · Turn 3 of 7", Step back and Step forward buttons, and a Play button that is disabled for now. The arrow at its left shows a slider and a turn field, so you can jump to a turn. Press **P** again or Escape to return to the present.
+Press **P** during a match to look back at the turns already played. A panel opens at the map's bottom-left with a label such as "Replay · Turn 3 of 7", Step back and Step forward buttons, and a Play button. The arrow at its left shows a slider and a turn field, so you can jump to a turn. Press **P** again or Escape to return to the present.
 
-Each step shows the map as you saw it when that turn began, with the update and commander messages that turn showed. In a match you are watching, or after the match ends, replay shows every side. Replay changes nothing in the match. Ready, the Orders tab, and map clicks do nothing while it is on. It does not start while a turn is resolving or inside a battle.
+Each step shows the map as you saw it when that turn began, with the update and commander messages that turn showed. In a match you are watching, or after the match ends, replay shows every side. Replay changes nothing in the match. Ready, the Orders tab, and map clicks do nothing while it is on. It does not start while a turn is resolving.
+
+Play shows each turn with its messages for a second, then runs the movement and combat that led into the next turn, and keeps going until the present. Play turns into Pause while it runs, and Pause stops after the turn that is moving. The step buttons, the slider, and the turn field wait until it stops. **P** or Escape stops it at once and returns to the present.
+
+Inside a battle, **P** replays that battle's beats instead. The label reads "Replay · Beat 3 of 7", the turn field takes a beat number, and Exit Battle is disabled until you leave replay. Leaving returns to the current beat. From the strategic map, replay never shows a battle.
 
 ## Things That May Surprise You
 

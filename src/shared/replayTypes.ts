@@ -9,6 +9,7 @@
 
 import type { CommanderDispatch } from './commanderStatus';
 import type { GameStateSnapshot } from './ipcTypes';
+import type { TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 
 /**
  * Which picture of the match replay shows.
@@ -41,7 +42,7 @@ export interface ReplayStepRef {
   /**
    * The level of the step.
    *
-   * Contract: `strategic` or `tactical`. Only strategic steps are listed in this build.
+   * Contract: `strategic` or `tactical`. A timeline holds one level only.
    * When to use: Keeping a timeline to one level.
    * Expected outcome: The recorded scope.
    * Exceptions: None.
@@ -60,7 +61,7 @@ export interface ReplayStepRef {
    * The beat inside a battle.
    *
    * Contract: 0 for a strategic step.
-   * When to use: A later tactical timeline.
+   * When to use: A tactical timeline's slider, label, and turn field.
    * Expected outcome: The recorded beat number.
    * Exceptions: None.
    */
@@ -88,7 +89,7 @@ export interface ReplayTimeline {
   /**
    * The level every step belongs to.
    *
-   * Contract: Always `strategic` in this build.
+   * Contract: `strategic` in the strategic game, or `tactical` while a battle is open.
    * When to use: Keeping a timeline to one level.
    * Expected outcome: The scope.
    * Exceptions: None.
@@ -150,6 +151,15 @@ export interface ReplayStepView {
    * Exceptions: None.
    */
   readonly visibleHexesBefore: readonly string[] | null;
+  /**
+   * The battle's sub-units before this beat resolved.
+   *
+   * Contract: For a tactical step, the `subUnits` of the previous tactical step's battle session. Null for the first beat and for every strategic step.
+   * When to use: A beat's kill labels and march playback read the sub-units from before the commit. After a slider jump the live state belongs to another beat, so replay carries its own.
+   * Expected outcome: A list of sub-units, or null.
+   * Exceptions: None.
+   */
+  readonly subUnitsBefore: readonly TacticalSubUnitSnapshot[] | null;
   /**
    * What the message dialog showed when this step began.
    *

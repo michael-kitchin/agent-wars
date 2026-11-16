@@ -299,7 +299,7 @@ export async function refreshGameStateAfterMercenaryDismiss(deps: RefreshBuildQu
  * Makes a match snapshot the screen's state and redraws the parts the options name.
  *
  * Purpose: Every path that receives a snapshot applies it here, so the screen, the selection, and the last-seen enemy markers stay in step. During replay, an application that is not a replay step is ignored, so a background refresh cannot replace a past picture.
- * When to use: After a handler returns a new snapshot, and for each replay step with `replay` set. `replay: 'step'` or `'leave'` also skips the last-seen enemy marker update, because past snapshots in any order would corrupt it.
+ * When to use: After a handler returns a new snapshot, and for each replay step with `replay` set. `replay: 'step'` or `'leave'` also skips the last-seen enemy marker update, because past snapshots in any order would corrupt it. A `'step'` snapshot that carries a battle session sets `S.tacticalBattleSnapshot` to it and does not run the battle's full activation.
  * Expected outcome: `S.gameState` is `nextState` and each requested part is refreshed. Nothing happens while replay is active unless `options.replay` is `'step'`.
  * Exceptions: Propagates a failure from a dependency, such as the standing-order refresh.
  */
@@ -332,7 +332,10 @@ export async function applyGameStateSnapshot(
     tacticalReleaseRendererSessionForNewStrategicMatch(nextState);
   }
   const restored = nextState.tacticalBattleSession;
-  if (restored && deps.applyRestoredTacticalBattleFromMain) {
+  if (restored && options.replay === 'step') {
+    // A recorded beat only replaces the battle data the screen reads. Full activation would re-frame the battle view on every step.
+    S.tacticalBattleSnapshot = restored;
+  } else if (restored && deps.applyRestoredTacticalBattleFromMain) {
     const cur = S.tacticalBattleSnapshot;
     // Re-run tactical activation when the snapshot matches but `enterTacticalMapView` never finalized (e.g. map not
     // ready on first paint, or a second `getGameState` arrived before `finalizeTacticalViewZoomAndPan` captured zoom).

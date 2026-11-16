@@ -109,6 +109,9 @@ None.
 
 - `src/renderer/rendering/resolutionPlayback.ts`
 - `src/renderer/gameplay/resolutionPlaybackPlan.ts` (`planResolutionPlayback`: the values the animation and the update dialog read, shared with replay)
+- `src/renderer/gameplay/resolutionAnimationStart.ts` (`buildStrategicResolutionAnimation`, `startResolutionAnimationFrames`: the strategic animation, shared with replay)
+- `src/renderer/gameplay/tacticalAnimationStart.ts` (`tacticalPlaybackNeeded`, `buildTacticalResolutionAnimation`: the tactical beat's animation, shared with replay)
+- `src/renderer/replay/replayPlayback.ts` (`startReplayPlayback`: runs this playback from a recorded result)
 - `src/main/sightCues/sightCueReadyStage.ts`
 - `src/main/sightCues/sightCueBeams.ts`
 - `src/shared/sightCueDrawModel.ts`

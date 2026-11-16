@@ -122,3 +122,9 @@ body[data-replay="on"] #build-entry-layer {
 .replay-panel-btn:disabled {
   color: var(--chrome-disabled);
 }
+.replay-turn-input:disabled {
+  color: var(--chrome-disabled);
+}
+.replay-slider:disabled {
+  opacity: 0.5;
+}

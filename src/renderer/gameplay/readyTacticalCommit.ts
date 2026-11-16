@@ -9,10 +9,8 @@
  * Exceptions: None. A failed refresh of the strategic snapshot is logged and the beat commit still finishes.
  */
 
-import type { CommitHumanTacticalDraftOrdersIpcResult, GameStateSnapshot } from '../../shared/ipcTypes';
-import { buildAirDropOutboundPlaybackMoves, buildAirDropReturnPlaybackMoves } from '../rendering/orderDrawing';
+import type { CommitHumanTacticalDraftOrdersIpcResult } from '../../shared/ipcTypes';
 import { currentConsoleReportTag } from '../chrome/consoleReports';
-import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';
 import { getExploredHexSet, reconcileSelectionToCurrentState } from '../core/selection';
@@ -36,6 +34,7 @@ import {
 } from './readyResolutionAnnouncements';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
+import { buildTacticalResolutionAnimation, tacticalPlaybackNeeded } from './tacticalAnimationStart';
 
 /**
  * Values captured at the start of a Ready click that the tactical commit still needs.
@@ -114,33 +113,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   void refreshChatThread();
   const tacticalSubUnitsBeforeCommit = S.tacticalBattleSnapshot?.subUnits;
   const playback = commitResult.tacticalResolutionPlayback;
-  const hasMoves =
-    (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
-  const hasRangedPlayback =
-    (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
-    (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
-    (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-  const hasMeleePlayback =
-    (playback?.meleeCombatHexes?.length ?? 0) > 0 ||
-    (playback?.meleeCasualtyHexes?.length ?? 0) > 0 ||
-    (playback?.meleeRemovedUnits?.length ?? 0) > 0 ||
-    (playback?.killsByMelee?.length ?? 0) > 0;
-  const hasKillPlayback =
-    (playback?.killsByDirectFire?.length ?? 0) > 0 ||
-    (playback?.killsByAirStrike?.length ?? 0) > 0 ||
-    (playback?.killsByReturnFire?.length ?? 0) > 0 ||
-    (playback?.killsByMelee?.length ?? 0) > 0;
-  const hasAirStrikePlaybackAnim =
-    (playback?.airStrikeAttemptCount ?? 0) > 0 ||
-    (playback?.airStrikeMoves?.length ?? 0) > 0 ||
-    (playback?.airStrikeHexes?.length ?? 0) > 0 ||
-    (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
-  const hasDicePlayback =
-    (playback?.airStrikeDiceRolls?.length ?? 0) > 0 ||
-    (playback?.rangedDiceRolls?.length ?? 0) > 0 ||
-    (playback?.meleeDiceRolls?.length ?? 0) > 0;
-  const needsResolutionPlayback =
-    hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
+  const needsResolutionPlayback = tacticalPlaybackNeeded(playback);
   // Start resolution playback before updating the tactical snapshot so no redraw can paint post-commit cells
   // while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
   // Defer the playback clock and the first rAF until after post-commit `getGameState` / terrain refresh so the
@@ -148,45 +121,11 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   if (playback && needsResolutionPlayback) {
     if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
     S.resolutionMoveAnimationFrameId = null;
-    const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length
-      ? (tacticalSubUnitsBeforeCommit.map((u) => ({
-          id: u.id,
-          player: u.player,
-          unitType: u.unitType,
-          h3Index: u.h3Index,
-        })) as GameStateSnapshot['units'])
-      : undefined;
-    const airStrikeOutboundMoves = [
-      ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
-      ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves),
-    ];
-    const airStrikeReturnMoves = [
-      ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
-      ...buildAirDropReturnPlaybackMoves(playback.airDropMoves),
-    ];
-    S.resolutionMoveAnimation = {
-      moves: [...playback.humanMoves, ...(playback.opponentMoves ?? [])],
-      startTime: Date.now(),
-      tacticalDeferResolutionClock: true,
-      ...(tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {}),
-      ...(airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {}),
-      ...(airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {}),
-      ...(playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {}),
-      ...(playback.airStrikeCasualtyHexes?.length
-        ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes }
-        : {}),
-      ...(playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {}),
-      rangedCombatHexes: playback.rangedCombatHexes,
-      rangedCasualtyHexes: playback.rangedCasualtyHexes,
-      rangedRemovedUnits: playback.rangedRemovedUnits,
-      ...(playback.rangedResolutionShotLines?.length
-        ? { rangedResolutionShotLines: playback.rangedResolutionShotLines }
-        : {}),
-      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
-      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
-      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
-      ...pickPlaybackDiceRolls(playback),
-    };
+    S.resolutionMoveAnimation = buildTacticalResolutionAnimation({
+      playback,
+      subUnitsBefore: tacticalSubUnitsBeforeCommit,
+      deps,
+    });
     syncChatPanelVisibility();
   }
   if (commitResult.tacticalBattle) {

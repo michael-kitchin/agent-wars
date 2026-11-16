@@ -4,7 +4,6 @@ import type { MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
-import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { deferTacticalEntryUntilStrategicPlayback, observeModeControls } from '../../shared/observeModeControls';
 import { refreshChatThread } from '../chat/chatPanelClient';
 import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
@@ -32,6 +31,7 @@ import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObse
 import { frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
 import { waitForNextResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
 import { replayActive } from '../replay/replayState';
+import { buildStrategicResolutionAnimation, startResolutionAnimationFrames } from './resolutionAnimationStart';
 import { planResolutionPlayback } from './resolutionPlaybackPlan';
 export type { ReadyHandlerDeps } from './readyHandlerTypes';
 
@@ -256,22 +256,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       });
     }
 
-    const {
-      resolutionMoves,
-      visibleHexes,
-      visibleMissileLaunches,
-      sightCuesForPlayback,
-      airStrikeOutboundMoves,
-      airStrikeReturnMoves,
-      visibility,
-      unknownCombatHexes,
-      unknownCasualtyHexes,
-      airStrikeRemovedForPlayback,
-      airStrikeCasualtyHexesForPlayback,
-      airStrikeCombatHexesForPlayback,
-      needsCombatOrMovementAnimation,
-      needsAnimation,
-    } = plan;
+    const { visibleHexes, visibleMissileLaunches, visibility, needsCombatOrMovementAnimation, needsAnimation } = plan;
     const watching = observeModeControls(state.seats ?? []).observing;
     const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
       watching,
@@ -321,47 +306,18 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
       const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(S.humanStandingOrders, state.units, humanMoves);
       const ferryArrowsUntilMovementEnds = ferriesHeldUntilMovementEnds(submittedFerryOrders, humanMoves);
-      S.resolutionMoveAnimation = {
-        moves: resolutionMoves,
-        ...(sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {}),
-        airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined,
-        airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined,
-        airStrikeCombatHexes: airStrikeCombatHexesForPlayback.length > 0 ? airStrikeCombatHexesForPlayback : undefined,
-        airStrikeCasualtyHexes: airStrikeCasualtyHexesForPlayback.length > 0 ? airStrikeCasualtyHexesForPlayback : undefined,
-        ...(airStrikeRemovedForPlayback.length > 0 ? { airStrikeRemovedUnits: airStrikeRemovedForPlayback } : {}),
-        startTime: Date.now(),
-        tacticalDeferResolutionClock: true,
-        combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : undefined,
-        casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : undefined,
-        rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : undefined,
-        rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : undefined,
-        rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : undefined,
-        ...(readyResult.rangedResolutionShotLines?.length
-          ? { rangedResolutionShotLines: readyResult.rangedResolutionShotLines }
-          : {}),
-        meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : undefined,
-        controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : undefined,
-        meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : undefined,
-        meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
-        unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
-        unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
-        ...(marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {}),
-        ...(ferryArrowsUntilMovementEnds.length > 0 ? { ferryArrowsUntilMovementEnds } : {}),
-        ...pickPlaybackDiceRolls(readyResult, {
-          visibleHexesBeforeTurn,
-          visibleHexesAfterTurn: visibleHexes,
-          unknownHexes: new Set([...unknownCombatHexes, ...unknownCasualtyHexes]),
-        }),
-      };
+      S.resolutionMoveAnimation = buildStrategicResolutionAnimation({
+        plan,
+        readyResult,
+        visibleHexesBeforeTurn,
+        marchArrowsUntilMovementEnds,
+        ferryArrowsUntilMovementEnds,
+      });
       syncChatPanelVisibility();
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
       if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
-      if (S.resolutionMoveAnimation) {
-        S.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
-        S.resolutionMoveAnimation.startTime = Date.now();
-      }
-      S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+      startResolutionAnimationFrames(deps.tickResolutionMoveAnimation);
     }
     S.hoverRoutePreview = null;
     S.hideCommittedOrderLinesAfterReady = false;

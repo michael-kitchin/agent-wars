@@ -7,9 +7,8 @@
  * Exceptions: None. A failed read is shown as a sentence and replay stays where it was.
  */
 
-import {
-  replayMayEnter,
-} from '../../shared/replayNavigation';
+import { replayMayEnter } from '../../shared/replayNavigation';
+import type { ReplayStepView } from '../../shared/replayTypes';
 import { chartsDialogIsOpen } from '../charts/chartsDialog';
 import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
@@ -20,10 +19,12 @@ import { rendererSharedState as S } from '../core/state';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import type { ReadyHandlerDeps } from '../gameplay/readyHandlerTypes';
 import { clearSelectionLikeRightClick, type SelectionClearRefreshDeps } from '../map/mapClickSelectionPolicy';
+import { syncTacticalExitButtonElementVisibility } from '../tactical/tacticalExitButtonDom';
+import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrchestration';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
 import { showReplayStepDialogs } from './replayDialogs';
-import { currentReplay, registerReplayLeaver, replayActive, setReplay } from './replayState';
+import { currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, waitForReplayIdle } from './replayState';
 
 /**
  * Sentence shown when the match has no recorded turns.
@@ -117,6 +118,25 @@ let savedMarkers: {
 } | null = null;
 
 /**
+ * The battle's own state kept aside while replay steps through its beats.
+ *
+ * Purpose: Replay replaces the battle view with recorded beats, and the queued sub-unit marches and the pending order lists belong to the present.
+ * When to use: Set on entering replay inside a battle, read on leaving.
+ * Expected outcome: Copies of the battle view, the queued marches, and the six pending order lists, or null when replay is not over a battle.
+ * Exceptions: None.
+ */
+let savedBattle: {
+  readonly snapshot: typeof S.tacticalBattleSnapshot;
+  readonly marches: typeof S.tacticalPendingMarches;
+  readonly rangedAttacks: typeof S.pendingRangedAttacks;
+  readonly airStrikes: typeof S.pendingAirStrikes;
+  readonly airDrops: typeof S.pendingAirDrops;
+  readonly missileLaunches: typeof S.pendingMissileLaunches;
+  readonly ferryOrders: typeof S.pendingFerryOrders;
+  readonly embarkOrders: typeof S.pendingEmbarkOrders;
+} | null = null;
+
+/**
  * Binds the dependencies and registers the leaver.
  *
  * Purpose: Replay is wired once, from the renderer entry file.
@@ -153,7 +173,6 @@ function requireDeps(): ReplayDeps {
 function entryDecision(): ReturnType<typeof replayMayEnter> {
   return replayMayEnter({
     matchLoaded: (S.gameState?.seats?.length ?? 0) > 0,
-    inBattle: S.tacticalBattleSnapshot != null,
     readyInFlight: S.readyRequestInFlight,
     playbackRunning: S.resolutionMoveAnimation != null,
     otherModalOpen: blockingDialogIsOpen() || chartsDialogIsOpen(),
@@ -189,6 +208,7 @@ export async function toggleReplay(): Promise<void> {
     return;
   }
   if (!rendererMatchEpochCurrent(epoch) || replayActive() || !entryDecision().ok) return;
+  if ((timeline.scope === 'tactical') !== (S.tacticalBattleSnapshot != null)) return;
   if (timeline.steps.length === 0) {
     showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
     return;
@@ -198,11 +218,13 @@ export async function toggleReplay(): Promise<void> {
   deps.hideStackCallout();
   clearSelectionLikeRightClick(deps.selectionDeps);
   setAsideLastSeenMarkers();
+  if (timeline.scope === 'tactical') setAsideBattleState();
   ordersTabWasSelected = document.getElementById(ORDERS_TAB_ID)?.getAttribute('aria-selected') === 'true';
   const last = timeline.steps.length - 1;
-  setReplay({ timeline, index: last, busy: false, matchEpoch: epoch });
+  setReplay({ timeline, index: last, busy: false, matchEpoch: epoch, playing: false, stopRequested: false, session: nextReplaySession() });
   document.body.dataset.replay = 'on';
   refreshConsoleHeader();
+  syncTacticalExitButtonElementVisibility();
   await showReplayStep(last);
 }
 
@@ -226,6 +248,48 @@ function setAsideLastSeenMarkers(): void {
 }
 
 /**
+ * Copies the battle's own state and keeps it aside.
+ *
+ * Purpose: Replaying a battle's beats must leave the queued marches and the pending orders as they were.
+ * When to use: On entering replay while a battle is open.
+ * Expected outcome: The battle view, the queued marches, and the pending order lists are copied. The live values stay where they are.
+ * Exceptions: None.
+ */
+function setAsideBattleState(): void {
+  savedBattle = {
+    snapshot: S.tacticalBattleSnapshot,
+    marches: S.tacticalPendingMarches.map((row) => ({ ...row })),
+    rangedAttacks: [...S.pendingRangedAttacks],
+    airStrikes: [...S.pendingAirStrikes],
+    airDrops: [...S.pendingAirDrops],
+    missileLaunches: [...S.pendingMissileLaunches],
+    ferryOrders: [...S.pendingFerryOrders],
+    embarkOrders: [...S.pendingEmbarkOrders],
+  };
+}
+
+/**
+ * Puts the battle's own state back.
+ *
+ * Purpose: Leaving replay shows the current beat with its queued marches and pending orders.
+ * When to use: On leaving replay, before the live state is applied.
+ * Expected outcome: The battle view, the queued marches, and the pending order lists hold the copies. Nothing changes when none were kept.
+ * Exceptions: None.
+ */
+function restoreBattleState(): void {
+  if (savedBattle === null) return;
+  S.tacticalBattleSnapshot = savedBattle.snapshot;
+  S.tacticalPendingMarches = savedBattle.marches;
+  S.pendingRangedAttacks = savedBattle.rangedAttacks;
+  S.pendingAirStrikes = savedBattle.airStrikes;
+  S.pendingAirDrops = savedBattle.airDrops;
+  S.pendingMissileLaunches = savedBattle.missileLaunches;
+  S.pendingFerryOrders = savedBattle.ferryOrders;
+  S.pendingEmbarkOrders = savedBattle.embarkOrders;
+  savedBattle = null;
+}
+
+/**
  * Puts the kept last-seen enemy markers back.
  *
  * Purpose: Replay must leave the live markers exactly as they were.
@@ -245,17 +309,29 @@ function restoreLastSeenMarkers(): void {
 }
 
 /**
- * Shows one recorded step.
+ * Builds the Ready dependencies from the bound replay dependencies.
  *
- * Purpose: Stepping, the slider, and the turn field all move through here.
- * When to use: With an index into the timeline. Does nothing while a step is loading.
- * Expected outcome: The top bar and the map show that turn, both dialogs for it are shown, and the step becomes the current one once they are. A failed read shows a sentence and keeps the old step.
- * Exceptions: None. A reply that arrives after replay ended or the match changed is dropped.
+ * Purpose: The play loop needs the animation frame tick and the visibility helpers the live turn uses.
+ * When to use: From the play loop, once replay is bound.
+ * Expected outcome: A fresh dependency bundle.
+ * Exceptions: Throws when `bindReplayDeps` has not run.
  */
-export async function showReplayStep(index: number): Promise<void> {
+export function replayReadyDeps(): ReadyHandlerDeps {
+  return requireDeps().readyDeps();
+}
+
+/**
+ * Reads one recorded step from the main process.
+ *
+ * Purpose: Stepping and playback load a step the same way, and a reply for a replay that ended is dropped.
+ * When to use: With an index into the timeline, while no other step is loading.
+ * Expected outcome: The view, with the busy flag cleared again. Null when the step is unknown, replay is off, another step is loading, or the match or replay changed while waiting. A failed read shows a sentence and keeps the old step.
+ * Exceptions: None. A rejected read is logged.
+ */
+export async function loadReplayStep(index: number): Promise<ReplayStepView | null> {
   const state = currentReplay();
   const ref = state?.timeline.steps[index];
-  if (!state || state.busy || !ref) return;
+  if (!state || state.busy || !ref) return null;
   setReplay({ ...state, busy: true });
   let view = null;
   try {
@@ -264,12 +340,44 @@ export async function showReplayStep(index: number): Promise<void> {
     console.error('readReplayStep failed', error);
   }
   const waiting = currentReplay();
-  if (!waiting || waiting.matchEpoch !== state.matchEpoch || !rendererMatchEpochCurrent(state.matchEpoch)) return;
-  if (!view) {
-    setReplay({ ...waiting, busy: false });
-    showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
-    return;
-  }
+  if (!waiting || waiting.session !== state.session || !rendererMatchEpochCurrent(state.matchEpoch)) return null;
+  setReplay({ ...waiting, busy: false });
+  if (!view) showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+  return view;
+}
+
+/**
+ * What presenting a loaded step needs besides the step.
+ *
+ * Purpose: Stepping and playback present a step the same way except for when the map is redrawn.
+ * When to use: The third argument of `presentReplayStep`.
+ * Expected outcome: One flag.
+ * Exceptions: None.
+ */
+export interface PresentReplayStepOptions {
+  /**
+   * Whether the step is applied under an animation that is about to start.
+   *
+   * Contract: True applies the snapshot without redrawing, as the live turn does before its animation, so the end positions do not flash before the units move. False redraws.
+   * When to use: Playback passes true for a step whose resolution it animates. Stepping passes false.
+   * Expected outcome: The map draws the snapshot at once when false.
+   * Exceptions: None.
+   */
+  readonly forPlayback: boolean;
+}
+
+/**
+ * Puts a loaded step on screen with both of its dialogs.
+ *
+ * Purpose: Stepping, the slider, the turn field, and playback all show a step through here.
+ * When to use: With the view `loadReplayStep` returned for `index`.
+ * Expected outcome: The snapshot is applied, the dialogs are shown, and the step becomes the current one. The busy flag is set until then.
+ * Exceptions: None. Nothing is shown when replay was left while the view was loading.
+ */
+export async function presentReplayStep(index: number, view: ReplayStepView, options: PresentReplayStepOptions): Promise<void> {
+  const state = currentReplay();
+  if (!state) return;
+  setReplay({ ...state, busy: true });
   await requireDeps().readyDeps().applyGameStateSnapshot(view.snapshot, {
     refreshStandingOrders: false,
     updateGameStateSidebarUi: true,
@@ -277,12 +385,26 @@ export async function showReplayStep(index: number): Promise<void> {
     updateGameOverUi: false,
     updateReadyButton: true,
     refreshBuildPopup: false,
-    redraw: true,
+    redraw: !options.forPlayback,
     replay: 'step',
   });
   await showReplayStepDialogs(view, state.timeline.view, requireDeps().readyDeps());
   const applied = currentReplay();
-  if (applied) setReplay({ ...applied, index, busy: false });
+  if (applied && applied.session === state.session) setReplay({ ...applied, index, busy: false });
+}
+
+/**
+ * Shows one recorded step.
+ *
+ * Purpose: Stepping, the slider, and the turn field all move through here.
+ * When to use: With an index into the timeline. Does nothing while a step is loading or Play is running.
+ * Expected outcome: The top bar and the map show that turn, both dialogs for it are shown, and the step becomes the current one once they are. A failed read shows a sentence and keeps the old step.
+ * Exceptions: None. A reply that arrives after replay ended or the match changed is dropped.
+ */
+export async function showReplayStep(index: number): Promise<void> {
+  if (currentReplay()?.playing) return;
+  const view = await loadReplayStep(index);
+  if (view) await presentReplayStep(index, view, { forPlayback: false });
 }
 
 /**
@@ -308,19 +430,26 @@ let ordersTabWasSelected = false;
 /**
  * Leaves replay and brings the present back.
  *
- * Purpose: Leaving shows the current turn as if the player had stepped forward to it, then applies the live state.
+ * Purpose: Leaving shows the current turn as if the player had stepped forward to it, then applies the live state. Playback that is running is stopped and its animation cancelled first.
  * When to use: `p`, Escape, the game menu, and a new match.
- * Expected outcome: Replay is off, the last-seen markers are back, the console shows the Orders tab again when it was selected on entry, the live snapshot is on screen, and a watch that was waiting presses Ready.
+ * Expected outcome: Replay is off, the last-seen markers and, over a battle, the battle's own state are back, the console shows the Orders tab again when it was selected on entry, the live snapshot is on screen, and a watch that was waiting presses Ready.
  * Exceptions: None. A failed live read is logged and the last recorded step stays on screen.
  */
 export async function leaveReplay(): Promise<void> {
-  const state = currentReplay();
+  let state = currentReplay();
+  if (state?.playing) {
+    setReplay({ ...state, playing: false, stopRequested: true });
+    clearResolutionPlaybackAnimationState();
+    await waitForReplayIdle();
+    state = currentReplay();
+  }
   if (!state || state.busy) return;
   await showReplayStep(state.timeline.steps.length - 1);
   if (!replayActive()) return;
   setReplay(null);
   delete document.body.dataset.replay;
   restoreLastSeenMarkers();
+  restoreBattleState();
   try {
     const live = await fetchMatchSnapshot();
     await requireDeps().readyDeps().applyGameStateSnapshot(live, {
@@ -337,6 +466,7 @@ export async function leaveReplay(): Promise<void> {
     console.error('leaving replay could not read the live match', error);
   }
   refreshConsoleHeader();
+  syncTacticalExitButtonElementVisibility();
   if (ordersTabWasSelected) showConsoleTab(ORDERS_TAB_ID);
   ordersTabWasSelected = false;
   syncChatPanelVisibility();

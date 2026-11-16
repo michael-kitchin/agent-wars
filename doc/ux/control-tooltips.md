@@ -79,7 +79,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Replay panel expand control, while the panel is expanded: Hide the slider and the turn field.
 - Replay panel Step back: Go back one turn.
 - Replay panel Step forward: Go forward one turn.
-- Replay panel Play, disabled: Play the turns forward with their animations.
+- Replay panel Play: Play the turns forward with their animations.
+- Replay panel Pause, while playback runs: Stop after this turn.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
@@ -217,7 +218,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#charts-dialog-close`)
 - `src/renderer/charts/chartsDialog.ts` (`buildLineChartBlock`, `buildBody`)
 - `static/index.html` (`#replay-panel-expand`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`)
-- `src/renderer/replay/replayPanel.ts` (`SHOW_SEEK_TIP`, `HIDE_SEEK_TIP`)
+- `src/renderer/replay/replayPanel.ts` (`SHOW_SEEK_TIP`, `HIDE_SEEK_TIP`, `PLAY_TIP`, `PAUSE_TIP`)
 - `static/index.html` (`#control-tooltip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)
 - `src/renderer/chat/chatPanel.ts` (`syncExpandControl`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)

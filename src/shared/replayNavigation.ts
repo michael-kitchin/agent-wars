@@ -10,6 +10,16 @@
 import type { ReplayStepRef, ReplayView } from './replayTypes';
 
 /**
+ * The level a replay timeline covers.
+ *
+ * Purpose: A timeline holds the strategic turns or one battle's beats, never both.
+ * When to use: The label, the turn field, and the button rules that depend on the level.
+ * Expected outcome: One of the two names.
+ * Exceptions: None.
+ */
+export type ReplayScope = 'strategic' | 'tactical';
+
+/**
  * Sentence shown when replay is asked for while a turn is resolving.
  *
  * Purpose: The player learns why `p` did nothing.
@@ -18,16 +28,6 @@ import type { ReplayStepRef, ReplayView } from './replayTypes';
  * Exceptions: None.
  */
 export const REPLAY_BUSY_REASON = 'Replay is available once this turn finishes resolving.';
-
-/**
- * Sentence shown when replay is asked for during a battle.
- *
- * Purpose: Replay covers the strategic game only.
- * When to use: `replayMayEnter` and the toast.
- * Expected outcome: The exact sentence.
- * Exceptions: None.
- */
-export const REPLAY_IN_BATTLE_REASON = 'Replay inside a battle is not available yet. Leave the battle to replay the match.';
 
 /**
  * Chooses which recorded picture replay shows.
@@ -46,7 +46,7 @@ export function replayViewFor(input: { readonly humanSeatActive: boolean; readon
  *
  * Purpose: One object keeps the entry check readable.
  * When to use: `replayMayEnter`.
- * Expected outcome: Six flags read from the screen.
+ * Expected outcome: Five flags read from the screen.
  * Exceptions: None.
  */
 export interface ReplayEntryState {
@@ -59,15 +59,6 @@ export interface ReplayEntryState {
    * Exceptions: None.
    */
   readonly matchLoaded: boolean;
-  /**
-   * Whether a tactical battle is on screen.
-   *
-   * Contract: True while a battle snapshot is open.
-   * When to use: Refusing with a sentence.
-   * Expected outcome: True refuses with the battle sentence.
-   * Exceptions: None.
-   */
-  readonly inBattle: boolean;
   /**
    * Whether a Ready request is in flight.
    *
@@ -109,7 +100,7 @@ export interface ReplayEntryState {
 /**
  * Decides whether replay may start.
  *
- * Purpose: Replay must not start over a turn in progress or another dialog.
+ * Purpose: Replay must not start over a turn in progress or another dialog. It may start in a battle, where it covers that battle's beats.
  * When to use: Pressing `p` while not in replay.
  * Expected outcome: `ok`, or a refusal with the sentence to show, or null to do nothing silently.
  * Exceptions: None.
@@ -119,7 +110,6 @@ export function replayMayEnter(input: ReplayEntryState): { ok: true } | { ok: fa
   if (input.otherModalOpen) return { ok: false, reason: null };
   if (input.newGameOpenMidMatch) return { ok: false, reason: null };
   if (input.readyInFlight || input.playbackRunning) return { ok: false, reason: REPLAY_BUSY_REASON };
-  if (input.inBattle) return { ok: false, reason: REPLAY_IN_BATTLE_REASON };
   return { ok: true };
 }
 
@@ -159,18 +149,37 @@ export interface ReplayPosition {
    * Exceptions: None.
    */
   readonly busy: boolean;
+  /**
+   * Whether Play is running.
+   *
+   * Contract: True from the start of playback until it stops or replay is left.
+   * When to use: Disabling the step buttons, the slider, and the turn field, and turning Play into Pause.
+   * Expected outcome: True disables every control except Pause.
+   * Exceptions: None.
+   */
+  readonly playing: boolean;
 }
+
+/**
+ * How long Play holds each step before the animations into the next one start.
+ *
+ * Purpose: Each step is shown with its dialogs for a moment before the units move, so the player can read it.
+ * When to use: The play loop's hold between steps.
+ * Expected outcome: 1000 milliseconds.
+ * Exceptions: None.
+ */
+export const REPLAY_PLAYBACK_DWELL_MS = 1000;
 
 /**
  * Whether step back is possible.
  *
  * Purpose: A button is enabled only when its action can happen.
  * When to use: Drawing the panel.
- * Expected outcome: True when an earlier step exists and nothing is loading.
+ * Expected outcome: True when an earlier step exists and nothing is loading or playing.
  * Exceptions: None.
  */
 export function canStepBack(position: ReplayPosition): boolean {
-  return position.index > 0 && !position.busy;
+  return position.index > 0 && !position.busy && !position.playing;
 }
 
 /**
@@ -178,53 +187,95 @@ export function canStepBack(position: ReplayPosition): boolean {
  *
  * Purpose: A button is enabled only when its action can happen.
  * When to use: Drawing the panel.
- * Expected outcome: True when a later step exists and nothing is loading.
+ * Expected outcome: True when a later step exists and nothing is loading or playing.
  * Exceptions: None.
  */
 export function canStepForward(position: ReplayPosition): boolean {
+  return position.index < position.stepCount - 1 && !position.busy && !position.playing;
+}
+
+/**
+ * Whether the Play button can be pressed.
+ *
+ * Purpose: While playing, the button is Pause and stays enabled. Otherwise it needs a step after the one showing.
+ * When to use: Drawing the panel.
+ * Expected outcome: True while playing, or when a later step exists and nothing is loading.
+ * Exceptions: None.
+ */
+export function canPlay(position: ReplayPosition): boolean {
+  if (position.playing) return true;
   return position.index < position.stepCount - 1 && !position.busy;
 }
 
 /**
- * Whether Play is possible.
+ * Whether the slider and the turn field can be used.
  *
- * Purpose: Animated playback is not built yet, so the button stays disabled.
+ * Purpose: Jumping to a step while playback runs would fight the play loop.
  * When to use: Drawing the panel.
- * Expected outcome: Always false in this build.
+ * Expected outcome: True when nothing is loading and playback is not running.
  * Exceptions: None.
  */
-export function canPlay(position: ReplayPosition): boolean {
-  void position;
-  return false;
+export function canSeek(position: ReplayPosition): boolean {
+  return !position.busy && !position.playing;
 }
 
 /**
- * Reads a typed turn number.
+ * Chooses the step Play shows next.
  *
- * Purpose: Only positive whole numbers that were recorded are accepted.
- * When to use: Every input event in the turn field, and on Enter or blur.
- * Expected outcome: The index of the step with that turn, or an error.
+ * Purpose: The play loop's one decision: continue to the next step, or end.
+ * When to use: At the top of each pass of the play loop.
+ * Expected outcome: The next index, or null when a stop was requested or the last step is showing.
  * Exceptions: None.
  */
-export function parseTurnEntry(text: string, steps: readonly ReplayStepRef[]): { index: number } | { error: true } {
+export function nextPlaybackIndex(position: ReplayPosition, stopRequested: boolean): number | null {
+  if (stopRequested) return null;
+  return position.index < position.stepCount - 1 ? position.index + 1 : null;
+}
+
+/**
+ * Reads a typed turn or beat number.
+ *
+ * Purpose: Only positive whole numbers that were recorded are accepted. A strategic timeline matches turn numbers and a tactical one matches beat numbers.
+ * When to use: Every input event in the turn field, and on Enter or blur.
+ * Expected outcome: The index of the step with that number, or an error.
+ * Exceptions: None.
+ */
+export function parseTurnEntry(
+  text: string,
+  steps: readonly ReplayStepRef[],
+  scope: ReplayScope = 'strategic'
+): { index: number } | { error: true } {
   const trimmed = text.trim();
   if (!/^\d+$/.test(trimmed)) return { error: true };
-  const turn = Number(trimmed);
-  if (!Number.isSafeInteger(turn) || turn < 1) return { error: true };
-  const index = steps.findIndex((step) => step.turnNumber === turn);
+  const entered = Number(trimmed);
+  if (!Number.isSafeInteger(entered) || entered < 1) return { error: true };
+  const index = steps.findIndex((step) => stepNumber(step, scope) === entered);
   return index < 0 ? { error: true } : { index };
 }
 
 /**
  * The panel label for a step.
  *
- * Purpose: The label says which turn is shown out of how many.
+ * Purpose: The label says which turn, or which beat inside a battle, is shown out of how many.
  * When to use: Drawing the panel.
- * Expected outcome: `Replay · Turn 12 of 30`, where 30 is the last step's turn.
+ * Expected outcome: `Replay · Turn 12 of 30`, or `Replay · Beat 3 of 7` for a tactical timeline, where the last number is the last step's.
  * Exceptions: None.
  */
-export function replayLabel(steps: readonly ReplayStepRef[], index: number): string {
-  const current = steps[index]?.turnNumber ?? 0;
-  const last = steps[steps.length - 1]?.turnNumber ?? 0;
-  return `Replay · Turn ${current} of ${last}`;
+export function replayLabel(steps: readonly ReplayStepRef[], index: number, scope: ReplayScope = 'strategic'): string {
+  const current = steps[index] ? stepNumber(steps[index], scope) : 0;
+  const lastStep = steps[steps.length - 1];
+  const last = lastStep ? stepNumber(lastStep, scope) : 0;
+  return `Replay · ${scope === 'tactical' ? 'Beat' : 'Turn'} ${current} of ${last}`;
+}
+
+/**
+ * The number the panel shows for a step.
+ *
+ * Purpose: A strategic step is numbered by its turn and a tactical step by its beat.
+ * When to use: The label, the slider's turn field, and parsing a typed number.
+ * Expected outcome: The turn number or the beat number.
+ * Exceptions: None.
+ */
+export function stepNumber(step: ReplayStepRef, scope: ReplayScope): number {
+  return scope === 'tactical' ? step.beatNumber : step.turnNumber;
 }

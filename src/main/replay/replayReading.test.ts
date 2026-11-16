@@ -9,14 +9,16 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { strategicStep } from '../../shared/matchRecording';
+import { strategicStep, tacticalStep } from '../../shared/matchRecording';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getGameState, getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { setGameOutcomeWithOps } from '../gameDb/gameConfigKv';
 import { forgetTurnOwnershipForTests } from '../matchStatistics/turnDifferences';
 import { recordMatchEvent, recordStepBoundary } from '../recorder/matchRecorder';
 import { listMatchEventsOfType, listMatchRecords } from '../recorder/matchRecordStore';
+import { setActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 import { readReplayStep, readReplayTimeline } from './replayReading';
 import { recordReplayViewsIfNeeded, recordResolutionView } from './replayRecording';
@@ -188,5 +190,71 @@ test('a frame, an unknown id, and a snapshot of the other view are refused', () 
     assert.equal(readReplayStep(frame!.recordId), null);
     assert.equal(readReplayStep(99999), null);
     assert.equal(readReplayStep(allSnapshot!.recordId), null);
+  });
+});
+
+/**
+ * Opens a battle in memory and records the boundary and view snapshots of one of its beats.
+ *
+ * Purpose: The battle cases drive the recorder by hand, one beat at a time, with sub-units the snapshot carries.
+ * When to use: Each beat in a battle case.
+ * Expected outcome: A frame and the view snapshots at that beat, whose battle session lists `subUnitIds`.
+ * Exceptions: None.
+ */
+function playBeat(battleId: string, beat: number, subUnitIds: readonly string[]): void {
+  setActiveTacticalBattleSnapshotRef({
+    battleId,
+    tacticalTurnNumber: beat,
+    subUnits: subUnitIds.map((id) => ({ id })),
+  } as unknown as TacticalBattleSnapshot);
+  recordStepBoundary(tacticalStep(1, battleId, beat), '1.0.0');
+  recordReplayViewsIfNeeded();
+}
+
+test('with a battle open the timeline holds only that battle, each beat carries the beat before it, and a strategic turn is refused', () => {
+  withHumanMatch(() => {
+    try {
+      playTurn(1);
+      playBeat('tb-old', 1, ['old-a']);
+      playBeat('tb-old', 2, ['old-a']);
+      playBeat('tb-new', 1, ['a-s1', 'b-s1']);
+      recordResolutionView(tacticalStep(1, 'tb-new', 1), 'tactical', { success: true, marker: 'beat-1-result' });
+      playBeat('tb-new', 2, ['a-s1']);
+      recordResolutionView(tacticalStep(1, 'tb-new', 2), 'tactical', { success: true, marker: 'beat-2-result' });
+      playBeat('tb-new', 3, ['a-s1']);
+      const timeline = readReplayTimeline();
+      assert.equal(timeline.scope, 'tactical');
+      assert.deepEqual(timeline.steps.map((step) => [step.scope, step.beatNumber]), [['tactical', 1], ['tactical', 2], ['tactical', 3]]);
+      const [first, second, third] = timeline.steps.map((step) => readReplayStep(step.recordId));
+      assert.equal(first?.resolution, null);
+      assert.deepEqual(second?.resolution, { success: true, marker: 'beat-1-result' });
+      assert.deepEqual(third?.resolution, { success: true, marker: 'beat-2-result' });
+      assert.equal(first?.subUnitsBefore, null);
+      assert.deepEqual(second?.subUnitsBefore?.map((unit) => unit.id), ['a-s1', 'b-s1']);
+      assert.deepEqual(third?.subUnitsBefore?.map((unit) => unit.id), ['a-s1']);
+      const strategicRecord = listMatchEventsOfType(gameDbOps, 'view_snapshot').find((row) => row.scope === 'strategic' && row.visibility !== 'engine');
+      assert.equal(readReplayStep(strategicRecord!.recordId), null);
+      const oldBeat = listMatchEventsOfType(gameDbOps, 'view_snapshot').find((row) => row.battleId === 'tb-old' && row.visibility !== 'engine');
+      assert.equal(readReplayStep(oldBeat!.recordId), null);
+    } finally {
+      setActiveTacticalBattleSnapshotRef(null);
+    }
+  });
+});
+
+test('with no battle open the timeline is strategic and holds no beat', () => {
+  withHumanMatch(() => {
+    try {
+      playTurn(1);
+      playBeat('tb-closed', 1, ['x-s1']);
+    } finally {
+      setActiveTacticalBattleSnapshotRef(null);
+    }
+    playTurn(2);
+    const timeline = readReplayTimeline();
+    assert.equal(timeline.scope, 'strategic');
+    assert.deepEqual(timeline.steps.map((step) => [step.scope, step.turnNumber]), [['strategic', 1], ['strategic', 2]]);
+    const beat = listMatchEventsOfType(gameDbOps, 'view_snapshot').find((row) => row.scope === 'tactical' && row.visibility !== 'engine');
+    assert.equal(readReplayStep(beat!.recordId), null);
   });
 });

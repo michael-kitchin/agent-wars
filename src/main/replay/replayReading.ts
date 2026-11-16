@@ -3,7 +3,7 @@
  *
  * Purpose: Replay hands back the pictures and results that were recorded, and recomputes nothing.
  * When to use: The replay IPC channels, and tests.
- * Expected outcome: A timeline of strategic turns for the current view, and one step's snapshot with its hexes put back and what its two dialogs showed.
+ * Expected outcome: A timeline for the current view, strategic turns or, while a battle is open, that battle's beats, and one step's snapshot with its hexes put back and what its two dialogs showed.
  * Exceptions: None. A failed read is logged and returns an empty timeline or null.
  */
 
@@ -22,11 +22,13 @@ import {
 } from '../recorder/matchRecordStore';
 import type { CommanderDispatch, CommanderDispatchMessage } from '../../shared/commanderStatus';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { stepKeyText, strategicStep } from '../../shared/matchRecording';
+import { stepKeyText, strategicStep, tacticalStep, type StepKey } from '../../shared/matchRecording';
 import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { replayViewFor } from '../../shared/replayNavigation';
 import type { ReplayStepRef, ReplayStepView, ReplayTimeline, ReplayView } from '../../shared/replayTypes';
 import { isAiSeatId } from '../../shared/seatIds';
+import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { getActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
 
 /**
  * The view replay shows for the open match.
@@ -57,28 +59,43 @@ function headerIsInView(header: Pick<MatchRecordHeader, 'visibility'>, view: Rep
 }
 
 /**
+ * The id of the battle replay is scoped to.
+ *
+ * Purpose: Replay covers one level. While a battle is open it steps through that battle's beats and nothing else.
+ * When to use: Building the timeline and checking a requested step.
+ * Expected outcome: The open battle's id, or null in the strategic game.
+ * Exceptions: None.
+ */
+function openBattleId(): string | null {
+  return getActiveTacticalBattleSnapshotRef()?.battleId ?? null;
+}
+
+/**
  * Lists the step refs of one view.
  *
- * Purpose: A turn with a battle has two strategic snapshots. The first is the picture when the turn began, and the last turn keeps its latest so replay opens on the screen as it is now.
+ * Purpose: A strategic turn with a battle has two snapshots. The first is the picture when the turn began, and the last turn keeps its latest so replay opens on the screen as it is now. A battle's beat keeps its latest snapshot.
  * When to use: From `readReplayTimeline` and `readReplayStep`.
- * Expected outcome: One ref per turn in turn order.
+ * Expected outcome: One ref per turn in turn order, or with a battle id one ref per beat of that battle in beat order.
  * Exceptions: Propagates a SQLite error.
  */
-function stepRefsForView(view: ReplayView): ReplayStepRef[] {
+function stepRefsForView(view: ReplayView, battleId: string | null): ReplayStepRef[] {
+  const scope = battleId === null ? 'strategic' : 'tactical';
   const headers = listMatchRecordHeadersOfType(gameDbOps, 'view_snapshot').filter(
-    (header) => header.scope === 'strategic' && headerIsInView(header, view)
+    (header) =>
+      header.scope === scope && (battleId === null || header.battleId === battleId) && headerIsInView(header, view)
   );
   const lastTurn = headers.reduce((max, header) => Math.max(max, header.turnNumber), 0);
-  const byTurn = new Map<number, MatchRecordHeader>();
+  const keyOf = (header: MatchRecordHeader): number => (battleId === null ? header.turnNumber : header.beatNumber);
+  const byKey = new Map<number, MatchRecordHeader>();
   for (const header of headers) {
-    const kept = byTurn.get(header.turnNumber);
-    if (kept === undefined || header.turnNumber === lastTurn) byTurn.set(header.turnNumber, header);
+    const kept = byKey.get(keyOf(header));
+    if (kept === undefined || battleId !== null || header.turnNumber === lastTurn) byKey.set(keyOf(header), header);
   }
-  return [...byTurn.values()]
-    .sort((left, right) => left.turnNumber - right.turnNumber)
+  return [...byKey.values()]
+    .sort((left, right) => keyOf(left) - keyOf(right))
     .map((header) => ({
       recordId: header.recordId,
-      scope: 'strategic',
+      scope,
       turnNumber: header.turnNumber,
       beatNumber: header.beatNumber,
     }));
@@ -89,18 +106,20 @@ function stepRefsForView(view: ReplayView): ReplayStepRef[] {
  *
  * Purpose: The panel knows how far it can step before loading any snapshot.
  * When to use: When replay is entered.
- * Expected outcome: Strategic steps of the current view, oldest first. Empty with the recorder off or no recorded turns.
+ * Expected outcome: Strategic steps of the current view, oldest first, or the open battle's beats when a battle is open. Empty with the recorder off or nothing recorded.
  * Exceptions: None. A failed read is logged and returns an empty list.
  */
 export function readReplayTimeline(): ReplayTimeline {
   const view = hasDbHandle() ? currentReplayView() : 'all';
+  const battleId = openBattleId();
+  const scope = battleId === null ? 'strategic' : 'tactical';
   try {
-    const steps = hasDbHandle() ? stepRefsForView(view) : [];
-    logDebug('replayReading readReplayTimeline', { view, stepCount: steps.length });
-    return { view, scope: 'strategic', steps };
+    const steps = hasDbHandle() ? stepRefsForView(view, battleId) : [];
+    logDebug('replayReading readReplayTimeline', { view, scope, battleId, stepCount: steps.length });
+    return { view, scope, steps };
   } catch (err) {
-    logError('replayReading readReplayTimeline failed', { view, err });
-    return { view, scope: 'strategic', steps: [] };
+    logError('replayReading readReplayTimeline failed', { view, scope, battleId, err });
+    return { view, scope, steps: [] };
   }
 }
 
@@ -126,30 +145,66 @@ function restoreSnapshot(stored: Record<string, unknown>, view: ReplayView): Gam
 }
 
 /**
- * Reads the hexes the viewer could see in an earlier step.
+ * What a step takes from the step before it.
  *
- * Purpose: The update dialog describes only the moves the viewer could see.
+ * Purpose: The update dialog and the battle's kill labels describe the turn from where it started.
+ * When to use: The return value of `readBeforeStep`.
+ * Expected outcome: The hexes the viewer could see, and the sub-units of the battle, both before the step.
+ * Exceptions: None.
+ */
+interface StepBefore {
+  /**
+   * The hexes the viewer could see before the step.
+   *
+   * Contract: The earlier snapshot's `visibleHexes`, or every hex for the all-sides view.
+   * When to use: Deciding which moves the update dialog describes.
+   * Expected outcome: A list of hex ids.
+   * Exceptions: None.
+   */
+  readonly visibleHexes: readonly string[];
+  /**
+   * The battle's sub-units before the step.
+   *
+   * Contract: The earlier snapshot's battle session sub-units, or null when it holds no battle.
+   * When to use: Kill labels and march playback for a battle beat.
+   * Expected outcome: A list of sub-units, or null.
+   * Exceptions: None.
+   */
+  readonly subUnits: readonly TacticalSubUnitSnapshot[] | null;
+}
+
+/**
+ * Reads what the viewer had before an earlier step.
+ *
+ * Purpose: The update dialog describes only the moves the viewer could see, and a battle beat needs its sub-units from before the commit.
  * When to use: For a step that has an earlier step in the timeline.
- * Expected outcome: The earlier snapshot's `visibleHexes`, or every hex for the all-sides view.
+ * Expected outcome: The earlier snapshot's `visibleHexes` (every hex for the all-sides view) and its battle session's sub-units.
  * Exceptions: Propagates a database error.
  */
-function readVisibleHexesBefore(previous: ReplayStepRef, view: ReplayView): readonly string[] {
-  if (view === 'all') return getGameState().hexes.map((hex) => hex.h3Index);
+function readBeforeStep(previous: ReplayStepRef, view: ReplayView): StepBefore {
   const record = readMatchRecord(gameDbOps, previous.recordId);
-  const snapshot = (record?.payload as { snapshot?: { visibleHexes?: string[] } } | undefined)?.snapshot;
-  return snapshot?.visibleHexes ?? [];
+  const snapshot = (
+    record?.payload as
+      | { snapshot?: { visibleHexes?: string[]; tacticalBattleSession?: { subUnits?: TacticalSubUnitSnapshot[] } } }
+      | undefined
+  )?.snapshot;
+  return {
+    visibleHexes: view === 'all' ? getGameState().hexes.map((hex) => hex.h3Index) : (snapshot?.visibleHexes ?? []),
+    subUnits: previous.scope === 'tactical' ? (snapshot?.tacticalBattleSession?.subUnits ?? null) : null,
+  };
 }
 
 /**
  * Rebuilds what the message dialog showed when a turn began.
  *
  * Purpose: One dispatch per AI seat that stored a strategy or sent a message at the step. The messages are not filtered, as in the live dialog.
- * When to use: From `readReplayStep`.
+ * When to use: From `readReplayStep`, with the step's key and the strategic turn it belongs to.
  * Expected outcome: Dispatches in side order. A seat with neither a strategy nor a message has none.
  * Exceptions: Propagates a database error.
  */
-function readDispatches(turnNumber: number): CommanderDispatch[] {
-  const stepKey = stepKeyText(strategicStep(turnNumber));
+function readDispatches(step: StepKey): CommanderDispatch[] {
+  const { turnNumber } = step;
+  const stepKey = stepKeyText(step);
   const strategies = listMatchEventsAtStep(gameDbOps, 'commander_strategy', stepKey);
   const messages = listMatchEventsAtStep(gameDbOps, 'message_sent', stepKey);
   const consultations = listMatchEventsAtStep(gameDbOps, 'consultation', stepKey);
@@ -182,18 +237,18 @@ function readDispatches(turnNumber: number): CommanderDispatch[] {
 }
 
 /**
- * Reads the last strategic result recorded at a step.
+ * Reads the last result recorded at a step.
  *
- * Purpose: The update dialog reads the result that led into the step.
- * When to use: From `readReplayStep`, for the turn before the shown one.
- * Expected outcome: The `result` of the last strategic `resolution_view` at that turn, or null.
+ * Purpose: The update dialog reads the result that led into the step that follows it.
+ * When to use: From `readReplayStep`, for the turn or the beat before the shown one.
+ * Expected outcome: The `result` of the last `resolution_view` of that kind at the step, or null.
  * Exceptions: Propagates a database error.
  */
-function readResolutionResult(turnNumber: number): unknown | null {
-  const rows = listMatchEventsAtStep(gameDbOps, 'resolution_view', stepKeyText(strategicStep(turnNumber)));
+function readResolutionResult(step: StepKey): unknown | null {
+  const rows = listMatchEventsAtStep(gameDbOps, 'resolution_view', stepKeyText(step));
   const last = rows
     .map((row) => row.payload as { kind?: string; result?: unknown })
-    .filter((payload) => payload.kind === 'strategic')
+    .filter((payload) => payload.kind === step.scope)
     .at(-1);
   return last?.result ?? null;
 }
@@ -201,9 +256,9 @@ function readResolutionResult(turnNumber: number): unknown | null {
 /**
  * Reads one step for the screen.
  *
- * Purpose: Replay shows the recorded snapshot and the dialogs that were shown when the turn began.
+ * Purpose: Replay shows the recorded snapshot and the dialogs that were shown when the turn or beat began.
  * When to use: When replay shows a step the timeline lists.
- * Expected outcome: The view, or null when the record is missing, is not a view snapshot, or belongs to the other view.
+ * Expected outcome: The view, or null when the record is missing, is not a view snapshot, belongs to the other view, or belongs to another level than the timeline's (a battle's beat while no battle is open, a strategic turn while one is, or another battle's beat).
  * Exceptions: None. A failed read is logged and returns null.
  */
 export function readReplayStep(recordId: number): ReplayStepView | null {
@@ -211,19 +266,29 @@ export function readReplayStep(recordId: number): ReplayStepView | null {
     logDebug('replayReading readReplayStep', { recordId });
     if (!hasDbHandle()) return null;
     const record = readMatchRecord(gameDbOps, recordId);
-    if (!record || record.kind !== 'event' || record.recordType !== 'view_snapshot' || record.scope !== 'strategic') return null;
+    if (!record || record.kind !== 'event' || record.recordType !== 'view_snapshot') return null;
+    const battleId = openBattleId();
+    if (record.scope !== (battleId === null ? 'strategic' : 'tactical')) return null;
+    if (battleId !== null && record.battleId !== battleId) return null;
     const view = currentReplayView();
     if (!headerIsInView(record, view)) return null;
     const payload = record.payload as { view?: string; snapshot?: Record<string, unknown> };
     if (payload.view !== view || !payload.snapshot) return null;
-    const steps = stepRefsForView(view);
-    const previous = steps.filter((step) => step.turnNumber < record.turnNumber).at(-1) ?? null;
+    const steps = stepRefsForView(view, battleId);
+    const isBeat = battleId !== null;
+    const previous = steps.filter((step) => (isBeat ? step.beatNumber < record.beatNumber : step.turnNumber < record.turnNumber)).at(-1) ?? null;
+    const before = previous === null ? null : readBeforeStep(previous, view);
+    const stepKey = isBeat ? tacticalStep(record.turnNumber, battleId, record.beatNumber) : strategicStep(record.turnNumber);
+    const resolutionStep = isBeat
+      ? tacticalStep(record.turnNumber, battleId, record.beatNumber - 1)
+      : strategicStep(record.turnNumber - 1);
     return {
-      ref: { recordId, scope: 'strategic', turnNumber: record.turnNumber, beatNumber: record.beatNumber },
+      ref: { recordId, scope: record.scope, turnNumber: record.turnNumber, beatNumber: record.beatNumber },
       snapshot: restoreSnapshot(payload.snapshot, view),
-      resolution: previous === null ? null : readResolutionResult(record.turnNumber - 1),
-      visibleHexesBefore: previous === null ? null : readVisibleHexesBefore(previous, view),
-      dispatches: readDispatches(record.turnNumber),
+      resolution: previous === null ? null : readResolutionResult(resolutionStep),
+      visibleHexesBefore: before === null ? null : before.visibleHexes,
+      subUnitsBefore: before === null ? null : before.subUnits,
+      dispatches: readDispatches(stepKey),
     };
   } catch (err) {
     logError('replayReading readReplayStep failed', { recordId, err });

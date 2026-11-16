@@ -144,3 +144,72 @@ test('a watch waits during replay, the menu and a new match leave it, and the sm
   assertMatches(readRendererSource('gameplay', 'newGame.ts'), /abandonReplay\(\);/, 'a new match drops replay');
   assert.equal(readRepoFile('scripts', 'ui-smoke', 'ui-smoke-checks.cjs').includes('#replay-panel'), true);
 });
+
+test('the live turn builds and starts its strategic animation through the shared functions', () => {
+  const ready = getFunctionSource(readRendererSource('gameplay', 'readyHandler.ts'), 'handleReadyButtonClick');
+  assertMatches(ready, /buildStrategicResolutionAnimation\(/, 'handleReadyButtonClick builds the animation with the shared function');
+  assertMatches(ready, /startResolutionAnimationFrames\(deps\.tickResolutionMoveAnimation\)/, 'handleReadyButtonClick starts the frames with the shared function');
+});
+
+test('Play runs the recorded steps through the shared animation and never notifies the main process', () => {
+  const play = readRendererSource('replay', 'replayPlayback.ts');
+  for (const call of [
+    'planResolutionPlayback(',
+    'buildStrategicResolutionAnimation(',
+    'startResolutionAnimationFrames(',
+    'waitForNextResolutionPlaybackFinished(',
+    'nextPlaybackIndex(',
+    'hasQueuedResolutionPlaybackCompleteNotify(',
+    'REPLAY_PLAYBACK_DWELL_MS',
+  ]) {
+    assert.equal(play.includes(call), true, `${call} is used`);
+  }
+  assertMatches(play, /\} finally \{/, 'playback ends its flags in a finally');
+  assert.equal(play.split('setTimeout(').length - 1, 1, 'the hold is the only timer');
+  assertMatches(getFunctionSource(play, 'holdReplayStep'), /setTimeout\(/, 'the timer is inside holdReplayStep');
+  for (const banned of ['setInterval', 'scheduleResolutionPlaybackCompleteNotify', 'notifyResolutionPlaybackComplete']) {
+    assert.equal(play.includes(banned), false, `${banned} is not used`);
+  }
+  assert.equal(readRendererSource('replay', 'replayMode.ts').includes("from './replayPlayback'"), false, 'replayMode does not import the play loop');
+});
+
+test('leaving replay stops playback before showing the last step, and a played step applies without a redraw', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  const leave = getFunctionSource(mode, 'leaveReplay');
+  const cleared = leave.indexOf('playing: false');
+  const cancelled = leave.indexOf('clearResolutionPlaybackAnimationState()');
+  assert.ok(cleared >= 0 && cancelled > cleared, 'playing is cleared before the animation is cancelled');
+  assertMatches(getFunctionSource(mode, 'presentReplayStep'), /redraw: !options\.forPlayback/, 'a played step applies with redraw off');
+  assertMatches(getFunctionSource(mode, 'showReplayStep'), /playing/, 'stepping does nothing while Play runs');
+});
+
+test('inside a battle replay keeps the battle view out of full activation and Exit Battle off', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  assertMatches(getFunctionSource(mode, 'leaveReplay'), /restoreBattleState\(\)/, 'leaveReplay puts the battle state back');
+  assertMatches(getFunctionSource(mode, 'restoreBattleState'), /S\.tacticalPendingMarches = savedBattle\.marches/, 'queued marches are restored');
+  assertMatches(
+    getFunctionSource(readRendererSource('tactical', 'tacticalExitButtonDom.ts'), 'syncTacticalExitButtonElementVisibility'),
+    /replayActive\(\)/,
+    'Exit Battle reads replayActive'
+  );
+  const snapshot = readRendererSource('core', 'stateSnapshot.ts');
+  assertMatches(
+    snapshot,
+    /if \(restored && options\.replay === 'step'\) \{[\s\S]*?S\.tacticalBattleSnapshot = restored;[\s\S]*?\} else if \(restored && deps\.applyRestoredTacticalBattleFromMain\)/,
+    'a replay step stores the recorded battle without activating it'
+  );
+});
+
+test('the live beat and the replay update dialog share the beat playback test', () => {
+  assertMatches(getFunctionSource(readRendererSource('gameplay', 'readyTacticalCommit.ts'), 'runTacticalReadyCommit'), /tacticalPlaybackNeeded\(playback\)/, 'the live beat calls tacticalPlaybackNeeded');
+  assertMatches(readRendererSource('replay', 'replayDialogs.ts'), /tacticalPlaybackNeeded\(playback\)/, 'replay calls tacticalPlaybackNeeded');
+});
+
+test('the live beat and replay build a beat animation through the same function', () => {
+  const live = getFunctionSource(readRendererSource('gameplay', 'readyTacticalCommit.ts'), 'runTacticalReadyCommit');
+  assertMatches(live, /tacticalPlaybackNeeded\(playback\)/, 'the live beat tests its playback with the shared function');
+  assertMatches(live, /buildTacticalResolutionAnimation\(/, 'the live beat builds its animation with the shared function');
+  const play = readRendererSource('replay', 'replayPlayback.ts');
+  assertMatches(play, /tacticalPlaybackNeeded\(/, 'replay tests the recorded playback with the shared function');
+  assertMatches(play, /buildTacticalResolutionAnimation\(\{[^}]*subUnitsBefore: view\.subUnitsBefore/, 'replay builds the beat animation from the recorded sub-units');
+});

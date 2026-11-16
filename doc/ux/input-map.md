@@ -38,8 +38,8 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Escape | Stack callout open, build popup closed | Closes the stack callout, including one that is scheduled but not open yet. | [stack-callout.md](stack-callout.md) |
 | Escape | Tactical battles list open | Chooses Ignore and does nothing else. | [tactical-battles-list.md](tactical-battles-list.md) |
 | C | Same as pan, with a match loaded and no dialog open that needs the player's choice | Opens the [charts dialog](charts-dialog.md). While the dialog is open, C closes it. | [charts-dialog.md](charts-dialog.md) |
-| P | Same as pan, with a match loaded and no dialog open that needs the player's choice | Turns [replay](replay-panel.md) on, or off when it is on. Replay does not start while a turn is resolving or inside a battle. | [replay-panel.md](replay-panel.md) |
-| Escape | Replay on, no dialog open | Leaves replay and shows the present. In the replay turn field, Escape puts the last shown turn back and does not leave. | [replay-panel.md](replay-panel.md) |
+| P | Same as pan, with a match loaded and no dialog open that needs the player's choice | Turns [replay](replay-panel.md) on, or off when it is on. In a battle it replays that battle's beats. Replay does not start while a turn is resolving or its playback is running. | [replay-panel.md](replay-panel.md) |
+| Escape | Replay on, no dialog open | Leaves replay and shows the present. During playback it stops the playback and cancels its animation first. P does the same. In the replay turn field, Escape puts the last shown turn back and does not leave. | [replay-panel.md](replay-panel.md) |
 | Escape | Charts dialog open | Closes the dialog. No other dialog also acts on that Escape, and no map key acts while the dialog is open. | [charts-dialog.md](charts-dialog.md) |
 | Escape | AI-only battle result open | Does not close the Ok dialog. | [tactical-battle-controls.md](tactical-battle-controls.md) |
 

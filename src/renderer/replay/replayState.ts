@@ -54,6 +54,56 @@ export interface ReplayState {
    * Exceptions: None.
    */
   readonly matchEpoch: number;
+  /**
+   * Whether Play is running.
+   *
+   * Contract: False when replay is entered. Set by the play loop and cleared when it stops or replay is left.
+   * When to use: Disabling the step controls and turning Play into Pause.
+   * Expected outcome: True from the start of playback until it ends.
+   * Exceptions: None.
+   */
+  readonly playing: boolean;
+  /**
+   * Whether the player asked playback to stop.
+   *
+   * Contract: False when replay is entered and when playback starts. Set by Pause and by leaving replay.
+   * When to use: The play loop reads it after the turn in progress.
+   * Expected outcome: True makes the loop end after the turn that is animating.
+   * Exceptions: None.
+   */
+  readonly stopRequested: boolean;
+  /**
+   * Which entry into replay this state belongs to.
+   *
+   * Contract: A number raised by `nextReplaySession` each time replay is entered.
+   * When to use: A loop that outlives its replay compares it with the one it started in.
+   * Expected outcome: A different number for every entry.
+   * Exceptions: None.
+   */
+  readonly session: number;
+}
+
+/**
+ * The last session number handed out.
+ *
+ * Purpose: Each entry into replay gets its own number, so work left over from an earlier entry can tell it is stale.
+ * When to use: Read and raised only by `nextReplaySession`.
+ * Expected outcome: 0 until replay is first entered.
+ * Exceptions: None.
+ */
+let lastReplaySession = 0;
+
+/**
+ * Hands out the session number for a new entry into replay.
+ *
+ * Purpose: Playback that outlives its replay must not act on a later one.
+ * When to use: Once, when replay is entered.
+ * Expected outcome: A number larger than every earlier one.
+ * Exceptions: None.
+ */
+export function nextReplaySession(): number {
+  lastReplaySession += 1;
+  return lastReplaySession;
 }
 
 /**
@@ -120,7 +170,7 @@ export function currentReplay(): ReplayState | null {
  */
 export function setReplay(next: ReplayState | null): void {
   replayState = next;
-  for (const listener of replayListeners) {
+  for (const listener of [...replayListeners]) {
     try {
       listener();
     } catch (error) {
@@ -178,4 +228,28 @@ export function abandonReplay(): void {
   if (replayState === null) return;
   setReplay(null);
   delete document.body.dataset.replay;
+}
+
+/**
+ * Resolves once no replay step is loading.
+ *
+ * Purpose: Leaving replay while a step is loading must wait for that step to settle before it shows the last one.
+ * When to use: From `leaveReplay`, after playback was told to stop.
+ * Expected outcome: Resolves at once when replay is off or idle, and otherwise after the change that clears the busy flag or ends replay.
+ * Exceptions: None.
+ */
+export function waitForReplayIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    const settled = (): boolean => replayState === null || !replayState.busy;
+    if (settled()) {
+      resolve();
+      return;
+    }
+    const listener = (): void => {
+      if (!settled()) return;
+      replayListeners.splice(replayListeners.indexOf(listener), 1);
+      resolve();
+    };
+    replayListeners.push(listener);
+  });
 }

@@ -37,7 +37,7 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 
 - Hidden: no battle.
 - Exit enabled: Tactical planning, with the annihilation dialog closed.
-- Exit disabled: a tactical beat is resolving or playing back.
+- Exit disabled: a tactical beat is resolving or playing back, or replay is on over the battle.
 - Annihilation open: the in-battle Exit Battle control is hidden and the dialog is the only exit.
 
 ## Invariants
@@ -46,11 +46,11 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 - A failed exit never restores strategic drafts and never clears the battle.
 - A human exit continues into Ready, so that strategic turn resumes. An AI-only Ok returns to strategic planning and does not press Ready, except Ok on the beat-limit notice while the observe checkbox is on, which starts the next strategic turn. While that checkbox is on, an ended AI-only battle leaves without the dialog and starts the next strategic turn, except a beat limit, which shows its notice first.
 - Exit Battle is never shown together with the annihilation dialog.
-- Exit Battle never leaves the battle while a beat is resolving or playing back.
+- Exit Battle never leaves the battle while a beat is resolving or playing back, or while replay is on. Leaving a battle changes the match, and replay does not.
 
 ## Strategic and Tactical Differences
 
-These controls exist only in a tactical battle. During a strategic Resolution playback they are hidden. During a tactical Resolution playback, Exit Battle stays shown and is disabled until the playback ends. After a human exit the player is in Strategic planning, with strategic drafts restored except for units that no longer exist, and Ready runs. An AI-only Ok does not press Ready, except Ok on the beat-limit notice while the observe checkbox is on. See the state carried across transitions in [modes-and-transitions.md](modes-and-transitions.md).
+These controls exist only in a tactical battle. During a strategic Resolution playback they are hidden. During a tactical Resolution playback, Exit Battle stays shown and is disabled until the playback ends. Replay can be entered from Tactical planning with P, and then covers the battle's beats ([replay-panel.md](replay-panel.md)). Exit Battle stays shown and is disabled while it is on, and Ready and the map clicks do nothing. After a human exit the player is in Strategic planning, with strategic drafts restored except for units that no longer exist, and Ready runs. An AI-only Ok does not press Ready, except Ok on the beat-limit notice while the observe checkbox is on. See the state carried across transitions in [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Related Documents
 

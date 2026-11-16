@@ -420,19 +420,30 @@ Run the Verification Bar and `npm run ui:smoke`. Fight a live battle beat and co
 
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `check:circular` cycle list | |
-| Prerequisites | |
-| Missing symbols | |
+| `git status --short` | Only the user's own uncommitted work (release notes, `doc/match-video.md`, `scripts/match_video/*`, `scripts/compose_match_comparison.py`) and the tracked build artifact `static/renderer.js`. Plans 1 to 3 and the naval plan are committed (HEAD `a761ade`). |
+| `npm test` | Not run before the edits, by the user's instruction. Run once at the end (see the Completion Log). |
+| `npm run build:renderer` | Succeeded after Phases 1 and 2. Final run below. |
+| `check:circular` cycle list | The three baseline cycles: `orderlessUnitSuggestions` through `standingOrders`, `openRouterUiHelpers` through `basemapLayer`, and `openRouterUiHelpers` through `selection`. |
+| Prerequisites | Present: `showReplayStep`, `leaveReplay`, `toggleReplay`, `currentReplay`, `setReplay`, `showReplayStepDialogs`, `planResolutionPlayback`, `canPlay`, `readReplayTimeline`, `readReplayStep`. The stepping plan did not take its fallback for `planResolutionPlayback`. Tactical beats do record `view_snapshot` rows, because the tactical commit runs inside `withAutoSaveAfter`. |
+| Missing symbols | None. |
+
+Inventory notes. The strategic animation literal and the five frame lines were as the plan described. The live turn applies the new state with `redraw: false` before the animation. A live tactical beat builds its animation before it updates `S.tacticalBattleSnapshot`, and starts its frames much later, after the update announcement and the terrain refresh, with the clock flipped and a frame requested only when no frame id is set. The two facts about the end-of-animation flush hold: only `scheduleResolutionPlaybackCompleteNotify` fills the queue, and the one `onResolutionPlaybackFinished` listener is in `observeChrome.ts`. `clearResolutionPlaybackAnimationState` cancels the frame, clears the animation, drops the queued notifies, and releases waiters. In `applyGameStateSnapshot`, `reconcileTacticalBattleAfterStrategicSnapshot` tears the battle down only when the phase is not planning or the strategic turn differs from the battle's, so recorded beats of one battle do not trigger it.
 
 ## Defect Inventory
 
 | Phase | Command | First error | Action taken |
 |-------|---------|-------------|--------------|
+| 3 | `node dist/main/replay/replayReading.test.js` | `better_sqlite3.node` built for Electron | `npm run rebuild:native:node`, then the tests passed. |
+| 3 | `node dist/shared/replayNavigation.test.js` | A regex escape was lost in a script-written edit | Fixed the escape in `parseTurnEntry`. |
 
 ## Completion Log
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
+| 1 | Done. The strategic animation literal and the frame start moved to `resolutionAnimationStart.ts`, in the same order and text. The unused destructured names in `handleReadyButtonClick` and the `pickPlaybackDiceRolls` import were removed. | None | None | None | Not run in a window: no display was available to the run. Covered by `ui:smoke`. |
+| 2 | Done. Play, Pause, the stop flag, the session counter, and the hold are in `replayPlayback.ts`. | `showReplayStep` is `loadReplayStep` plus `presentReplayStep`, and `loadReplayStep` clears the busy flag itself so a stop can land between load and present. `presentReplayStep` gets `forPlayback: true` only for a step that has an animation, so a step with nothing to animate is redrawn at once. `leaveReplay` waits for a loading step to settle (`waitForReplayIdle`) after stopping playback, so a key press during a load still leaves. `replayState` also gained `nextReplaySession`. The slider and field get disabled styles. | None | `doc/ux/replay-panel.md`, `doc/ux/input-map.md` | Not run in a window. |
+| 3 | Done, no stop rule hit in code. Tactical timeline and steps, `subUnitsBefore`, battle state set aside and restored, the step path in `applyGameStateSnapshot`, Exit Battle disabled in replay, and the beat update dialog. The stop rule was checked by reading the code paths, not in a window. The player's unit selection is cleared on entering replay, as in the strategic game, and is not restored. | `inBattle` was removed from `ReplayEntryState` together with its sentence. `parseTurnEntry` and `replayLabel` take an optional scope, and `stepNumber` is exported. The beat's visibility uses `reportViewerSeatId()`, as the live beat does. | None | `doc/ux/replay-panel.md`, `doc/ux/input-map.md`, `doc/ux/tactical-battle-controls.md`, `doc/ux-specification.md`, `doc/ux/modes-and-transitions.md` | Not run in a window. |
+| 4 | Done, no fallback. `buildTacticalResolutionAnimation` was moved out of `runTacticalReadyCommit` in the same order and text, and replay builds beats with it. | The live beat's later frame start was not moved. Replay uses `startResolutionAnimationFrames`, which sets the same clock fields and requests a frame. | None | `doc/ux/replay-panel.md` | Not run in a window. |
+| 5 | Docs finished: `doc/ux/resolution-playback.md`, `doc/ux/control-tooltips.md`, `doc/ui-style-guide.md`, `doc/how-to-play.md`, `doc/README.md`. `node scripts/check-doc-links.cjs` printed nothing. No plan vocabulary was found in the diff. | None | `doc/README.md` | See Phase 5 list | See the final verification note below. |
+
+Final verification: `npm test` passed end to end (exit 0). `npm run build:renderer` succeeded. `npm run check:circular` printed only the three baseline cycles. `npm run ui:smoke` reported 798 passed and 0 failed, then stopped at the beat-limit scene, whose header expectation mismatch is the pre-existing one from the stepping plan. The windowed checks and the manual checklist were not done by hand.
