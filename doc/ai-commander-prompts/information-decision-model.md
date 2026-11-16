@@ -10,7 +10,7 @@ The model is a weak model. Each job below must be answerable from information th
 
 ### 1.1 Strategic turn jobs
 
-1. **Judge win progress.** Decide whether this turn should push enemy home hexes, protect own home production, or fight in the field. Needs `WIN_CONDITIONS`, `HOME_REGION_HEXES`, `HOME_CONTROL_PROGRESS`, `SCENARIO_ID`.
+1. **Judge win progress.** Decide whether this turn should push enemy home hexes, protect own home production, or fight in the field. Needs `WIN_CONDITIONS`, `HOME_REGION_HEXES`, `HOME_CONTROL_PROGRESS`, `SCENARIO_ID`, `SIDE_COMBAT_RECORD`.
 2. **Read the resolution order.** Know that this period's attacks resolve from turn-start positions, before movement, so a unit can shoot and move. Needs `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 3. **Choose this turn's shots and their targets.** Decide, per armed unit, whether to fire and at what. Needs `RANGED_LEGAL_TARGETS`, `BEST_OPTIONS_ROWS`, `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER`, `ACTION_NEEDED_FLAG`.
 4. **Decide when a unit should not fire.** Recognise the one case where withholding is a real choice, and that it is expressed as an order rather than as silence. Needs `HOLD_FIRE_SEMANTICS`.
@@ -186,6 +186,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `CALLBACK_REPLACE_SEMANTICS` | Each response replaces the whole list; omitting the field clears it | `replaceSubscriptions` | n/a | 11 | both | required |
 | `CALLBACK_TACTICAL_SCOPE` | In battle, unit-scoped callbacks use sub-unit ids and the list is cleared when the battle ends | `filterCallbackSubscriptionsForTacticalBattleRoster`, battle-end restore | n/a | 22 | tactical | required |
 | `RECENT_TURN_NOTES` | Own previous strategies, plus losses on every side with the responsible side, cause, hex, and killer types, for up to ten prior periods | `buildRecentTurnNotesSection` | full record (no fog filter) | 1, 13 | both | conditional — at least one prior period qualifies |
+| `SIDE_COMBAT_RECORD` | For each other active side, how many of your units it destroyed and how many of its units you destroyed over the Recent Turn Notes window, split by who attacked, with the latest turn it destroyed one of yours | `readSideCombatRecords` | full record (no fog filter) | 1 | both | conditional — at least one prior strategic period |
 | `CONSULT_POLICY` | Whether the model is asked every period or only on an event | event-driven consult entry points | n/a | 28 | both | required |
 
 ### 3.9 Scenario and victory

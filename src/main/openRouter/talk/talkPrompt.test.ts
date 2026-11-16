@@ -20,6 +20,7 @@ const own: TalkPromptSide = {
   outTurn: null,
   stance: null,
   stanceReason: null,
+  record: null,
 };
 
 const other: TalkPromptSide = {
@@ -29,6 +30,7 @@ const other: TalkPromptSide = {
   outTurn: null,
   stance: 'wary',
   stanceReason: 'Massing',
+  record: null,
 };
 
 const quiet: TalkPromptSide = {
@@ -38,6 +40,7 @@ const quiet: TalkPromptSide = {
   outTurn: null,
   stance: null,
   stanceReason: null,
+  record: null,
 };
 
 function input(extra: Partial<TalkPromptInput> = {}): TalkPromptInput {
@@ -73,7 +76,7 @@ test('the system text names the side, the limit, the trust rules, and the stance
   assert.match(text, /may or may not have your interests in mind/);
   assert.match(text, /written by the commander of one of the other sides/);
   assert.match(text, /A loss line in Recent Turn Notes is a fact reported by the game/);
-  assert.match(text, /Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes record/);
+  assert.match(text, /Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says/);
 });
 
 test('the situation text nests, marks one new line, and quotes safely', () => {
@@ -84,6 +87,17 @@ test('the situation text nests, marks one new line, and quotes safely', () => {
   assert.match(text, /Leave 'Iberia' alone/);
   assert.equal(text.includes('"Iberia"'), false);
   assertHeadingsNest(headingOutline(text));
+});
+
+test('the Sides table has a Record column only when a side has a record', () => {
+  const plain = buildTalkSituationText(input());
+  assert.ok(plain.includes('| Side | Code | Status | Your stance |'));
+  assert.equal(plain.includes('Record'), false);
+  const withRecord = buildTalkSituationText(input({ sides: [own, { ...other, record: 'Record, turn 3: no losses either way.' }, quiet] }));
+  assert.ok(withRecord.includes('| Side | Code | Status | Your stance | Record |'));
+  assert.ok(withRecord.includes('| France | h1 | Active | wary: Massing | Record, turn 3: no losses either way. |'));
+  assert.ok(withRecord.includes('| Britain | a2 | Active | not set | - |'));
+  assert.ok(withRecord.includes('| Iberia (you) | a1 | Active | - | - |'));
 });
 
 test('a battle input names the beat and the opponent', () => {

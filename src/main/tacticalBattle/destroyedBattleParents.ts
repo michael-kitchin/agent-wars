@@ -4,6 +4,8 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { dbGetOne } from '../gameDb';
 import { logDebug } from '../logger';
+import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
+import { writeBattleParentLossNotes } from './battleParentLossNotes';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
@@ -48,20 +50,28 @@ export function clearDestroyedBattleParents(): void {
 /**
  * Appends units a delete actually removed.
  *
- * Purpose: Both tactical delete sites share one list.
+ * Purpose: Both tactical delete sites share one list, and the same units go into every commander's strategic loss notes for the battle's turn.
  * When to use: With the array returned by `deleteStrategicParentUnitAndApplyTransportOutcome`.
- * Expected outcome: New ids are kept in order. An id already recorded is skipped. An empty array changes nothing.
+ * Expected outcome: New ids are kept in order. An id already recorded is skipped. An empty array changes nothing. While a battle is active, the new units are also written by `writeBattleParentLossNotes`; with no active battle nothing is written.
  * Exceptions: None.
  */
 export function recordDestroyedBattleParents(units: readonly DestroyedBattleParent[]): void {
-  const added: string[] = [];
+  const addedUnits: DestroyedBattleParent[] = [];
   for (const unit of units) {
     if (recordedIds.has(unit.id)) continue;
     recordedIds.add(unit.id);
     recorded.push(unit);
-    added.push(unit.id);
+    addedUnits.push(unit);
   }
-  logDebug('recordDestroyedBattleParents', { count: added.length, ids: added });
+  logDebug('recordDestroyedBattleParents', { count: addedUnits.length, ids: addedUnits.map((unit) => unit.id) });
+  const battle = getActiveTacticalBattleSnapshotRef();
+  if (!battle || addedUnits.length === 0) return;
+  writeBattleParentLossNotes(addedUnits, {
+    battleId: battle.battleId,
+    strategicTurnNumber: battle.strategicTurnNumber,
+    leadPartyId: battle.leadPartyId,
+    opposingPartyId: battle.opposingPartyId,
+  });
 }
 
 /**

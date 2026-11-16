@@ -98,7 +98,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 
 #### `## Recent Turn Notes`
 
-Include when at least one of the previous ten periods in this battle has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Each block is the strategy and the attributed loss lines, with the same sections, legend, and cap as the strategic section.
+Include when at least one of the previous ten periods in this battle has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Each block is the strategy and the attributed loss lines, with the same sections and cap as the strategic section. The legend stays `RECENT_TURN_LOSS_LEGEND`. This scope does not list strategic battle losses and does not add the Battle sentence.
 
 Hex codes are this battle's codes. A lost striker or drop carrier is placed at its target cell. An air-strike victim is credited to the one striker. Anti-air credits the sub-unit that shot the striker down. A striker lost with no shooter recorded is credited to the other sides in the battle, and that line has no counts. An air unit lost on a failed ferry prints `no side responsible`. Ranged and melee counts are still every unit of the side that fought. The strategic air-strike and anti-air limits do not apply here.
 
@@ -139,9 +139,9 @@ Tactical variant, bullets in this order:
 2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add `buildDoctrineBlock` immediately after the strategy list. A strategic prompt then adds one production-denial line for balanced and one for cautious. A battle prints `buildDoctrineBlock` only, and it does not name the campaign target.
 3. **Message rules**, identical to strategic: `sideMessageRuleBlock`.
 
-`# Messages` is the same situation section as on the strategic prompt, immediately before the status sections. A battle has no Scenario Progress block, so the section still precedes Air Operations Status, Missile Forces, Mercenaries, Naval Transport Status, and Unit Roster. The history, the line limit, the visibility rule, the stance list, and the caution are the same.
+`# Messages` is the same situation section as on the strategic prompt, immediately before the status sections. A battle has no Scenario Progress block, so the section still precedes Air Operations Status, Missile Forces, Mercenaries, Naval Transport Status, and Unit Roster. The history, the line limit, the visibility rule, the stance list, the record lines, and the caution are the same. The record is the world-map record over the strategic window before the stored turn. It does not count the battle in progress.
 
-**Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing.
+**Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing. A combat record is not such a claim: it counts what the game recorded in the past, and the section says so.
 
 ### 2.9 `# Air Operations Status`
 

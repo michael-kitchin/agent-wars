@@ -6,7 +6,11 @@ import { AI_SEAT_IDS, HUMAN_SEAT_ID, isAiSeatId, type SeatId } from '../../share
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dbGetOne, dbRun } from '../gameDb';
+import { dbGetOne, dbRun, getSeatRoster } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { getTurnLossNoteColumns } from '../gameDb/turnNotesHistory';
+import { parsePlayerLossSummaryJson } from '../../shared/lossSummaryJson';
+import { activeAiSeatIds } from '../../shared/seatRoster';
 import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
 import { recordDestroyedBattleParents, takeDestroyedBattleParents } from './destroyedBattleParents';
 import { syncStrategicUnitsDbWhenTacticalParentsEliminated } from './tacticalStrategicOrderPhases';
@@ -343,5 +347,65 @@ test('deleting a parent that is already gone does not record it again', () => {
     recordDestroyedBattleParents(deleteStrategicParentUnitAndApplyTransportOutcome(picked.parentUnitId));
     const listed = takeDestroyedBattleParents();
     assert.equal(listed.filter((unit) => unit.id === picked.parentUnitId).length, 1);
+  });
+});
+
+/**
+ * Reads the units one seat's battle row lists, with who was credited.
+ *
+ * Purpose: The cases below check that a battle's destroyed parents reach the loss notes.
+ * When to use: After a battle removed a strategic parent.
+ * Expected outcome: Every listed unit of the first active AI seat's battle row, from both columns.
+ * Exceptions: None.
+ */
+function battleRowUnits(snap: TacticalBattleSnapshot): { unitId?: string; responsible: readonly string[] | null | undefined }[] {
+  const seats = activeAiSeatIds(getSeatRoster());
+  assert.ok(seats.length > 0);
+  const columns = getTurnLossNoteColumns(gameDbOps, {
+    seatId: seats[0],
+    scope: 'strategic',
+    battleId: snap.battleId,
+    turnNumber: snap.strategicTurnNumber,
+  });
+  assert.ok(columns, 'the battle wrote a strategic row for the battle id and turn');
+  return [columns.ownLossJson, columns.otherLossJson].flatMap((json) =>
+    parsePlayerLossSummaryJson(json).other.map((unit) => ({ unitId: unit.unitId, responsible: unit.attribution?.responsibleOwnerIds })),
+  );
+}
+
+test('a parent eliminated during a beat is written to the loss notes under the other party', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-loss-note-sync-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
+    assert.equal(started.success, true, started.reason);
+    const snap = getActiveTacticalBattleSnapshot();
+    assert.ok(snap?.opposingPartyId);
+    const eliminated = pickParentForTest(HUMAN_SEAT_ID, 1);
+    syncStrategicUnitsDbWhenTacticalParentsEliminated(
+      snap.subUnits,
+      snap.subUnits.filter((unit) => unit.parentUnitId !== eliminated.parentUnitId),
+    );
+    const row = battleRowUnits(snap).find((unit) => unit.unitId === eliminated.parentUnitId);
+    assert.ok(row);
+    assert.deepEqual(row.responsible, [snap.opposingPartyId]);
+  });
+});
+
+test('a parent removed by the two-party exit is written to the loss notes under the other party', () => {
+  withTwoAiSession('aw-tactical-loss-note-exit-', () => {
+    const snap = getActiveTacticalBattleSnapshot();
+    assert.ok(snap?.leadPartyId && isAiSeatId(snap.leadPartyId) && snap.opposingPartyId);
+    const picked = pickParentForTest(snap.leadPartyId, 3);
+    const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
+    const keepCount = Math.max(1, Math.floor((baseline - 1) / 2));
+    const target = snap.subUnits.filter((unit) => unit.parentUnitId === picked.parentUnitId);
+    const keep = new Set(target.slice(0, keepCount).map((unit) => unit.id));
+    setActiveTacticalBattleSnapshotRef({
+      ...snap,
+      subUnits: snap.subUnits.filter((unit) => unit.parentUnitId !== picked.parentUnitId || keep.has(unit.id)),
+    });
+    endTacticalBattleSessionForTwoPartyVoluntaryExit();
+    const row = battleRowUnits(snap).find((unit) => unit.unitId === picked.parentUnitId);
+    assert.ok(row);
+    assert.deepEqual(row.responsible, [snap.opposingPartyId]);
   });
 });

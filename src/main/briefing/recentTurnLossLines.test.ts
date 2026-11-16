@@ -149,3 +149,40 @@ test('victims without ids print as type counts, never as display names', () => {
   assert.equal(lines[1], '  - by h1, Ranged attack: 1 Infantry');
   assert.equal(lines.join('\n').includes('IX Fleet'), false);
 });
+
+test('a battle loss prints under its owner with the Battle cause and no killer counts', () => {
+  const lines = buildRecentTurnLossLines({
+    ...input({}, {}),
+    battleLosses: [
+      unit('a1-t1', 'armor', 'opponent', 'hA', ['opponent2']),
+      unit('h1-t1', 'armor', 'human', 'hA', ['opponent']),
+    ],
+  });
+  assert.deepEqual(lines, [
+    '- Your Losses:',
+    '  - by a2, Battle at QX: a1-t1',
+    '- Losses of h1:',
+    '  - by you, Battle at QX: h1-t1',
+  ]);
+});
+
+test('a battle loss and a ranged loss by the same side at one hex are two lines, ranged first', () => {
+  const lines = buildRecentTurnLossLines({
+    ...input({ ranged: [unit('a1-i3', 'infantry', 'opponent', 'hA', ['human'])] }, {}),
+    battleLosses: [unit('a1-t1', 'armor', 'opponent', 'hA', ['human'])],
+  });
+  assert.deepEqual(lines, [
+    '- Your Losses:',
+    '  - by h1, Ranged attack at QX: a1-i3',
+    '  - by h1, Battle at QX: a1-t1',
+  ]);
+});
+
+test('a cap counts a battle group like any other group', () => {
+  const lines = buildRecentTurnLossLines({
+    ...input({ ranged: [unit('a1-i3', 'infantry', 'opponent', 'hA', ['human'])] }, {}, 1),
+    battleLosses: [unit('a1-t1', 'armor', 'opponent', 'hB', ['opponent2'])],
+  });
+  assert.equal(lines[lines.length - 1], '- 1 more loss group on this turn is not listed.');
+  assert.equal(lines.some((line) => line.includes('Battle')), false);
+});

@@ -198,6 +198,185 @@ export function getRecentTurnNotes(
 }
 
 /**
+ * Names one `turn_notes_history` row.
+ *
+ * Purpose: Four values make the primary key, and callers read or write by them together.
+ * When to use: The argument of `getTurnLossNoteColumns`.
+ * Expected outcome: Matches the primary key of the table.
+ * Exceptions: None.
+ */
+export interface TurnNoteKey {
+  /**
+   * The commander the row belongs to.
+   *
+   * Contract: An AI seat id.
+   * When to use: The `seat_id` column.
+   * Expected outcome: One commander's notes only.
+   * Exceptions: None.
+   */
+  readonly seatId: AiSeatId;
+  /**
+   * Whether the row is a strategic turn or a tactical beat.
+   *
+   * Contract: A member of `TurnNotesScope`.
+   * When to use: The `scope` column.
+   * Expected outcome: Strategic rows and tactical rows stay apart.
+   * Exceptions: None.
+   */
+  readonly scope: TurnNotesScope;
+  /**
+   * The battle the row belongs to.
+   *
+   * Contract: Empty for a strategic turn's own row; a battle id for a tactical row or a strategic battle-loss row.
+   * When to use: The `battle_id` column.
+   * Expected outcome: A battle-loss row never collides with the turn's own row.
+   * Exceptions: None.
+   */
+  readonly battleId: string;
+  /**
+   * The strategic turn or tactical beat.
+   *
+   * Contract: A positive integer.
+   * When to use: The `turn_number` column.
+   * Expected outcome: Matches the key used when the row was written.
+   * Exceptions: None.
+   */
+  readonly turnNumber: number;
+}
+
+/**
+ * The two loss columns of one row.
+ *
+ * Purpose: Lets a writer merge new losses into a row without touching its strategy text.
+ * When to use: The result of `getTurnLossNoteColumns`.
+ * Expected outcome: Each field holds stored JSON, or null when the column is empty.
+ * Exceptions: None.
+ */
+export interface TurnLossNoteColumns {
+  /**
+   * The commander's own losses.
+   *
+   * Contract: JSON written by `serializePlayerLossSummary`, or null.
+   * When to use: The `own_loss_json` column.
+   * Expected outcome: Parse with `parsePlayerLossSummaryJson`.
+   * Exceptions: None.
+   */
+  readonly ownLossJson: string | null;
+  /**
+   * The losses of every other owner.
+   *
+   * Contract: JSON written by `serializePlayerLossSummary`, or null.
+   * When to use: The `enemy_loss_json` column.
+   * Expected outcome: Parse with `parsePlayerLossSummaryJson`.
+   * Exceptions: None.
+   */
+  readonly otherLossJson: string | null;
+}
+
+/**
+ * Reads the loss columns of one row.
+ *
+ * Purpose: The battle-loss writer merges new units into what is already stored.
+ * When to use: Before `upsertTurnLossNote` rewrites a row that may already hold units.
+ * Expected outcome: The stored columns, or null when the row does not exist or the database is unavailable.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function getTurnLossNoteColumns(ops: TurnNotesDbOps, key: TurnNoteKey): TurnLossNoteColumns | null {
+  logTrace('turnNotesHistory getTurnLossNoteColumns', { ...key });
+  if (!ops.hasDb()) return null;
+  const row = ops.getOne<{ own_loss_json: string | null; enemy_loss_json: string | null }>(
+    `SELECT own_loss_json, enemy_loss_json FROM turn_notes_history
+     WHERE seat_id = ? AND scope = ? AND battle_id = ? AND turn_number = ?`,
+    [key.seatId, key.scope, key.battleId, key.turnNumber]
+  );
+  if (!row) return null;
+  return { ownLossJson: row.own_loss_json, otherLossJson: row.enemy_loss_json };
+}
+
+/**
+ * One strategic row that holds units destroyed in a tactical battle.
+ *
+ * Purpose: Carries a battle's losses to the Recent Turn Notes window and the combat record.
+ * When to use: The result of `listStrategicBattleLossRows`.
+ * Expected outcome: One row per battle and turn, with the loss columns as stored.
+ * Exceptions: None.
+ */
+export interface StrategicBattleLossRow {
+  /**
+   * The strategic turn the battle was fought in.
+   *
+   * Contract: A positive integer.
+   * When to use: Matches the battle's losses to that turn's block.
+   * Expected outcome: One of the turns asked for.
+   * Exceptions: None.
+   */
+  readonly turnNumber: number;
+  /**
+   * The battle the losses belong to.
+   *
+   * Contract: A non-empty battle id.
+   * When to use: Tells two battles in one turn apart.
+   * Expected outcome: Rows are ordered by this after the turn.
+   * Exceptions: None.
+   */
+  readonly battleId: string;
+  /**
+   * The commander's own battle losses.
+   *
+   * Contract: JSON written by `serializePlayerLossSummary`, or null.
+   * When to use: Parsed with `parsePlayerLossSummaryJson`.
+   * Expected outcome: Holds this commander's destroyed parents in the `other` bucket.
+   * Exceptions: None.
+   */
+  readonly ownLossJson: string | null;
+  /**
+   * Every other owner's battle losses.
+   *
+   * Contract: JSON written by `serializePlayerLossSummary`, or null.
+   * When to use: Parsed with `parsePlayerLossSummaryJson`.
+   * Expected outcome: Holds the other party's destroyed parents in the `other` bucket.
+   * Exceptions: None.
+   */
+  readonly otherLossJson: string | null;
+}
+
+/**
+ * Lists the battle-loss rows of one commander for some turns.
+ *
+ * Purpose: The strategic loss window reads the units each battle destroyed, which the turn's own row does not hold.
+ * When to use: `readStrategicBattleLossesByTurn`, with the turn numbers of the Recent Turn Notes window.
+ * Expected outcome: Strategic rows with a non-empty battle id, ordered by turn and then battle id. Empty when no turn is asked for or the database is unavailable.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function listStrategicBattleLossRows(
+  ops: TurnNotesDbOps,
+  seatId: AiSeatId,
+  turnNumbers: readonly number[]
+): StrategicBattleLossRow[] {
+  logTrace('turnNotesHistory listStrategicBattleLossRows', { seatId, turnCount: turnNumbers.length });
+  if (!ops.hasDb() || turnNumbers.length === 0) return [];
+  const placeholders = turnNumbers.map(() => '?').join(', ');
+  const rows = ops.getAll<{
+    turn_number: number;
+    battle_id: string;
+    own_loss_json: string | null;
+    enemy_loss_json: string | null;
+  }>(
+    `SELECT turn_number, battle_id, own_loss_json, enemy_loss_json
+     FROM turn_notes_history
+     WHERE seat_id = ? AND scope = 'strategic' AND battle_id <> '' AND turn_number IN (${placeholders})
+     ORDER BY turn_number ASC, battle_id ASC`,
+    [seatId, ...turnNumbers]
+  );
+  return rows.map((row) => ({
+    turnNumber: row.turn_number,
+    battleId: row.battle_id,
+    ownLossJson: row.own_loss_json,
+    otherLossJson: row.enemy_loss_json,
+  }));
+}
+
+/**
  * Deletes tactical turn-note rows, optionally scoped to one battle id.
  *
  * Purpose: Resets tactical history when a new battle starts.

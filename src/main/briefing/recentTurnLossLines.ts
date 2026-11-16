@@ -37,6 +37,27 @@ export const RECENT_TURN_LOSS_LEGEND =
   'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "you" is your own side, "Neutral" is the Neutral side, and every other side is named by its code from the Sides table and message threads. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
 
 /**
+ * Cause label of a unit a tactical battle destroyed.
+ *
+ * Purpose: A battle loss has no ranged, melee, or air cause, so it prints under its own word.
+ * When to use: `lineFor`, for a group whose cause index is past the six standard causes.
+ * Expected outcome: `Battle`.
+ * Exceptions: None.
+ */
+export const BATTLE_LOSS_CAUSE_LABEL = 'Battle';
+
+/**
+ * Sentence that explains a Battle line to the model.
+ *
+ * Purpose: The legend says a closing `(by ...)` counts the units that fought, and a Battle line has none.
+ * When to use: Appended to `RECENT_TURN_LOSS_LEGEND` when any printed block has a Battle line.
+ * Expected outcome: Says what a Battle line lists and who it is credited to.
+ * Exceptions: None.
+ */
+export const BATTLE_LOSS_LEGEND_SENTENCE =
+  'A "Battle" line lists units destroyed in a tactical battle fought that turn, credited to the other side in that battle. It has no closing count.';
+
+/**
  * Owner key for a loss with no known owner.
  *
  * Purpose: An older row in the other-sides column has no attribution, so its owner is not known.
@@ -113,11 +134,11 @@ interface LossGroup {
    */
   readonly responsible: ResponsibleKey;
   /**
-   * Index into `LOSS_CAUSE_KEYS` and `LOSS_CAUSE_LABELS`.
+   * Index into `LOSS_CAUSE_KEYS` and `LOSS_CAUSE_LABELS`, or `LOSS_CAUSE_KEYS.length` for a battle loss.
    *
-   * Contract: A valid index.
+   * Contract: A valid index, or the one past the last for a battle loss.
    * When to use: The cause label and the sort order.
-   * Expected outcome: Zero for ranged, up to five for other.
+   * Expected outcome: Zero for ranged, up to five for other, six for a battle loss, which sorts last.
    * Exceptions: None.
    */
   readonly causeIndex: number;
@@ -204,6 +225,15 @@ export interface RecentTurnLossLinesInput {
    * Exceptions: None.
    */
   readonly maxGroupLines: number | null;
+  /**
+   * Units of any owner a tactical battle destroyed this turn.
+   *
+   * Contract: Each unit carries its owner in its attribution. Omitted means none.
+   * When to use: Printed under the cause `Battle`, after the six standard causes.
+   * Expected outcome: Each unit lands under its own owner's header.
+   * Exceptions: None.
+   */
+  readonly battleLosses?: readonly LostUnit[];
 }
 
 /**
@@ -289,7 +319,7 @@ function responsibleText(responsible: ResponsibleKey, input: RecentTurnLossLines
  *
  * Purpose: Units that share a victim owner, responsibility, cause, and hex code are one line.
  * When to use: `buildRecentTurnLossLines`, before sorting.
- * Expected outcome: One group per distinct key, with victims in bucket order.
+ * Expected outcome: One group per distinct key, with victims in bucket order. Battle losses follow the six standard causes.
  * Exceptions: None.
  */
 function groupLosses(input: RecentTurnLossLinesInput): LossGroup[] {
@@ -307,6 +337,7 @@ function groupLosses(input: RecentTurnLossLinesInput): LossGroup[] {
     for (const unit of input.ownLosses[causeKey]) add(unit, input.ownSeatId, causeIndex);
     for (const unit of input.otherLosses[causeKey]) add(unit, unit.attribution?.ownerId ?? UNKNOWN_OWNER_KEY, causeIndex);
   });
+  for (const unit of input.battleLosses ?? []) add(unit, unit.attribution?.ownerId ?? UNKNOWN_OWNER_KEY, LOSS_CAUSE_KEYS.length);
   return [...groups.values()];
 }
 
@@ -394,7 +425,7 @@ function lineFor(group: LossGroup, input: RecentTurnLossLinesInput): string {
   }
   const hex = group.hexCode.length > 0 ? ` at ${group.hexCode}` : '';
   const by = killers.size > 0 ? ` (by ${formatGroupedTypeTotals([...killers.values()])})` : '';
-  const cause = LOSS_CAUSE_LABELS[group.causeIndex];
+  const cause = group.causeIndex < LOSS_CAUSE_LABELS.length ? LOSS_CAUSE_LABELS[group.causeIndex] : BATTLE_LOSS_CAUSE_LABEL;
   return `  - ${responsibleText(group.responsible, input)}, ${cause}${hex}: ${formatLossEntriesForPrompt(group.units)}${by}`;
 }
 

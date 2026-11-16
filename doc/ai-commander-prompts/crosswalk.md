@@ -83,6 +83,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `CALLBACK_REPLACE_SEMANTICS` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
 | `CALLBACK_TACTICAL_SCOPE` | [`tactical-prompt.md`](tactical-prompt.md) | Active callbacks; required coaching |
 | `RECENT_TURN_NOTES` | both mode files | Recent turn notes |
+| `SIDE_COMBAT_RECORD` | both mode files | Messages |
 | `CONSULT_POLICY` | [`variants.md`](variants.md) | Consultation policy |
 | `SCENARIO_ID` | [`variants.md`](variants.md) | Scenarios |
 | `WIN_CONDITIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Goal statement; scenario objective |
@@ -121,7 +122,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
-| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Omitted when this commander has no visible message and no stance. |
+| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Omitted when this commander has no visible message, no stance, and no combat record. |
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
 | `### Production Priorities` | Under Production Status, after Paused Queues and before Controlled Hex Queues, when `buildProductionPriorityLines` returns a line. |

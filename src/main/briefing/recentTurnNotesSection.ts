@@ -3,7 +3,7 @@
  */
 
 import { isValidCell } from 'h3-js';
-import { playerHasAnyLoss } from '../../shared/lossSummary';
+import { playerHasAnyLoss, type LostUnit } from '../../shared/lossSummary';
 import { parsePlayerLossSummaryJson } from '../../shared/lossSummaryJson';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import { sortSeatsByOrder } from '../../shared/seatRoster';
@@ -17,7 +17,13 @@ import {
   hasTacticalCoordinateRegistry,
   initTacticalCoordinateRegistry,
 } from './map/hexCoordinates';
-import { buildRecentTurnLossLines, RECENT_TURN_LOSS_GROUP_LINES_MAX, RECENT_TURN_LOSS_LEGEND } from './recentTurnLossLines';
+import {
+  BATTLE_LOSS_LEGEND_SENTENCE,
+  buildRecentTurnLossLines,
+  RECENT_TURN_LOSS_GROUP_LINES_MAX,
+  RECENT_TURN_LOSS_LEGEND,
+} from './recentTurnLossLines';
+import { readStrategicBattleLossesByTurn } from './strategicLossWindow';
 
 /**
  * Arguments for assembling a recent turn notes prompt section.
@@ -181,6 +187,15 @@ interface FormattedTurnBlock {
    * Exceptions: None.
    */
   readonly hasLossLines: boolean;
+  /**
+   * Whether the block prints at least one Battle line.
+   *
+   * Contract: True when the turn had battle losses.
+   * When to use: Adding the Battle sentence to the legend.
+   * Expected outcome: False for a tactical scope.
+   * Exceptions: None.
+   */
+  readonly hasBattleLines: boolean;
 }
 
 /**
@@ -228,12 +243,12 @@ function lossHexCodeResolver(args: BuildRecentTurnNotesSectionArgs): (h3Index: s
 /**
  * Formats one turn block with the strategy and the attributed loss lines.
  *
- * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes. A stored message from an older save is not printed.
- * When to use: For each qualifying row returned from the DB query.
+ * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes. A stored message from an older save is not printed. Units a tactical battle destroyed that turn print under the cause Battle.
+ * When to use: For each qualifying row returned from the DB query, with that turn's battle losses (empty for a tactical scope).
  * Expected outcome: Multiline block starting with `Turn N:`, then the strategy bullet, then the loss lines.
  * Exceptions: None.
  */
-function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext): FormattedTurnBlock {
+function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext, battleLosses: readonly LostUnit[]): FormattedTurnBlock {
   const lines: string[] = [`Turn ${row.turnNumber}:`, `- Strategy: ${noteDisplayText(row.strategyText)}`];
   const lossLines = buildRecentTurnLossLines({
     ownSeatId: context.ownSeatId,
@@ -243,9 +258,10 @@ function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext): Formatted
     seatOrder: context.seatOrder,
     hexCodeFor: context.hexCodeFor,
     maxGroupLines: context.maxGroupLines,
+    battleLosses,
   });
   lines.push(...lossLines);
-  return { text: lines.join('\n'), hasLossLines: lossLines.length > 0 };
+  return { text: lines.join('\n'), hasLossLines: lossLines.length > 0, hasBattleLines: battleLosses.length > 0 };
 }
 
 /**
@@ -253,7 +269,7 @@ function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext): Formatted
  *
  * Purpose: Replaces the legacy losses-since-consultation table with rolling ten-entry history, each loss naming who was responsible.
  * When to use: Strategic `formatBriefing`, the tactical briefing, and the talk stage (all use `Turn N:` labels).
- * Expected outcome: Empty string when no qualifying prior turns; otherwise `## heading`, the loss legend when any block has a loss line, and per-turn bullets. The newest block lists every loss group and older blocks are capped.
+ * Expected outcome: Empty string when no qualifying prior turns; otherwise `## heading`, the loss legend when any block has a loss line, and per-turn bullets. The newest block lists every loss group and older blocks are capped. A strategic window also prints the units tactical battles destroyed, under the cause Battle, and adds the Battle sentence to the legend; a turn with only battle losses still prints.
  * Exceptions: None.
  */
 export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArgs): string {
@@ -263,24 +279,35 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
     currentTurnNumber: args.currentTurnNumber,
   });
   const ownSeatId = args.seatId ?? AI_SEAT_IDS[0];
-  const rows = getRecentTurnNotes(
+  const windowRows = getRecentTurnNotes(
     ownSeatId,
     args.scope,
     args.battleId,
     args.currentTurnNumber,
     RECENT_TURN_NOTES_LIMIT
-  ).filter(rowHasPromptContent);
+  );
+  // Units a tactical battle destroyed are stored apart from the turn's own row, and only a strategic window holds them.
+  const battleByTurn =
+    args.scope === 'strategic' ? readStrategicBattleLossesByTurn(ownSeatId, windowRows) : new Map<number, readonly LostUnit[]>();
+  const rows = windowRows.filter((row) => rowHasPromptContent(row) || battleByTurn.has(row.turnNumber));
   if (rows.length === 0) return '';
   const seatOrder = sortSeatsByOrder(getSeatRoster()).map((seat) => seat.seatId);
   const hexCodeFor = lossHexCodeResolver(args);
   const blocks = rows.map((row, index) =>
-    formatTurnBlock(row, {
-      ownSeatId,
-      seatOrder,
-      hexCodeFor,
-      maxGroupLines: index === rows.length - 1 ? null : RECENT_TURN_LOSS_GROUP_LINES_MAX,
-    })
+    formatTurnBlock(
+      row,
+      {
+        ownSeatId,
+        seatOrder,
+        hexCodeFor,
+        maxGroupLines: index === rows.length - 1 ? null : RECENT_TURN_LOSS_GROUP_LINES_MAX,
+      },
+      battleByTurn.get(row.turnNumber) ?? []
+    )
   );
-  const legend = blocks.some((block) => block.hasLossLines) ? `${RECENT_TURN_LOSS_LEGEND}\n\n` : '';
+  const legendText = blocks.some((block) => block.hasBattleLines)
+    ? `${RECENT_TURN_LOSS_LEGEND} ${BATTLE_LOSS_LEGEND_SENTENCE}`
+    : RECENT_TURN_LOSS_LEGEND;
+  const legend = blocks.some((block) => block.hasLossLines) ? `${legendText}\n\n` : '';
   return `${subHeading(args.heading)}\n\n${legend}${blocks.map((block) => block.text).join('\n\n')}`;
 }

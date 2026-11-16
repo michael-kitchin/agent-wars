@@ -241,6 +241,26 @@ export function playerHasAnyLoss(summary: PlayerLossSummary): boolean {
 }
 
 /**
+ * Collects the unit ids that appear in some loss summaries.
+ *
+ * Purpose: A unit must be listed once, so a writer or a printer asks which ids a summary already holds.
+ * When to use: `writeBattleParentLossNotes` before it appends a destroyed parent, and `readStrategicBattleLossesByTurn` before it keeps a battle loss.
+ * Expected outcome: The `unitId` of every unit in every bucket of every summary. A unit with no id, or an empty one, adds nothing.
+ * Exceptions: None.
+ */
+export function lostUnitIdsOf(summaries: readonly PlayerLossSummary[]): Set<string> {
+  const ids = new Set<string>();
+  for (const summary of summaries) {
+    for (const key of LOSS_CAUSE_KEYS) {
+      for (const unit of summary[key]) {
+        if (typeof unit.unitId === 'string' && unit.unitId.length > 0) ids.add(unit.unitId);
+      }
+    }
+  }
+  return ids;
+}
+
+/**
  * Whether a victim type is one of the four that can collapse on a popup line.
  *
  * Purpose: An unexpected type stays a name so a loss is not dropped.

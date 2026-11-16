@@ -335,6 +335,42 @@ async function testBadLossHexDoesNotFailThePrompt(): Promise<void> {
   }
 }
 
+/**
+ * Verifies a strategic block lists the turn's battle losses and the legend explains them.
+ *
+ * Purpose: Guards the merge of a battle's strategic row into its turn's block.
+ * When to use: After changing how the section reads battle rows.
+ * Expected outcome: One `Turn 1:` block holds the ranged line and the Battle line, and the legend ends with the Battle sentence. A turn with an empty own row still prints. A tactical section ignores the battle row.
+ * Exceptions: None.
+ */
+async function testBattleLossesPrint(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const { BATTLE_LOSS_LEGEND_SENTENCE } = await import('./briefing/recentTurnLossLines');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recent-notes-battle-'));
+  try {
+    gameDb.openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
+    const empty = JSON.stringify({ ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] });
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 1, lossJson('ranged', 'a1-i1', 'opponent', ['human']), empty);
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 2, empty, empty);
+    gameDb.upsertTurnLossNote('opponent', 'strategic', 'tb-1', 1, lossJson('other', 'a1-t1', 'opponent', ['opponent2']), empty);
+    gameDb.upsertTurnLossNote('opponent', 'strategic', 'tb-2', 2, empty, lossJson('other', 'h1-t2', 'human', ['opponent']));
+    const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 3, heading: 'Recent Turn Notes' });
+    const turnOne = out.slice(out.indexOf('Turn 1:'), out.indexOf('Turn 2:'));
+    assert.ok(turnOne.includes('  - by h1, Ranged attack: a1-i1'), out);
+    assert.ok(turnOne.includes('  - by a2, Battle: a1-t1'), out);
+    assert.ok(out.slice(out.indexOf('Turn 2:')).includes('- Losses of h1:\n  - by you, Battle: h1-t2'), out);
+    assert.ok(out.includes(BATTLE_LOSS_LEGEND_SENTENCE), 'the legend carries the Battle sentence');
+    gameDb.upsertTurnStrategyNote('opponent', 'tactical', 'tb-1', 1, { strategyText: 'Hold' });
+    const tactical = buildRecentTurnNotesSection({ scope: 'tactical', battleId: 'tb-1', currentTurnNumber: 2, heading: 'Recent Turn Notes' });
+    assert.equal(tactical.includes('Battle:'), false);
+    assert.equal(tactical.includes(BATTLE_LOSS_LEGEND_SENTENCE), false);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 async function run(): Promise<void> {
 
   await testRecentTurnNotesFormatting();
@@ -343,6 +379,7 @@ async function run(): Promise<void> {
   await testAttributedLossLines();
   await testOlderTurnsAreCapped();
   await testBadLossHexDoesNotFailThePrompt();
+  await testBattleLossesPrint();
 
   console.log('recentTurnNotesSection.test.ts passed');
 

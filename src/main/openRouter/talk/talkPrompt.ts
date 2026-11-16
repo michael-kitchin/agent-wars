@@ -74,6 +74,15 @@ export interface TalkPromptSide {
    * Exceptions: None.
    */
   readonly stanceReason: string | null;
+  /**
+   * This commander's combat record with the side, or null when there is none.
+   *
+   * Contract: Null for the commander's own row, a side that is out, and a window with no stored turns. Otherwise the text from `formatSideCombatRecord`, which is a count the game made from the loss lines, not a claim by any side.
+   * When to use: The Record column of the Sides table, and the orders prompt's record line.
+   * Expected outcome: One line that begins `Record, turn`.
+   * Exceptions: None.
+   */
+  readonly record: string | null;
 }
 
 /**
@@ -291,7 +300,7 @@ What you may do in this step:
 - Send one short message to each other side. A message is one or two sentences, at most ${SIDE_MESSAGE_MAX_CHARS} characters. Longer text is cut off.
 - You may threaten, bargain, propose, bluff, or lie. Nothing you say binds you, and nothing another commander says binds them.
 - Send nothing when you have nothing worth saying. Silence costs nothing.
-- Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes record, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
+- Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
 
 Reply with one JSON object and nothing else:
 {"messages":[{"to":"<side code>","text":"<message>"}],"stances":[{"toward":"<side code>","stance":"<${stanceEnum}>","reason":"<one sentence>"}]}
@@ -336,16 +345,19 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
  *
  * Purpose: The model answers with the codes in this table.
  * When to use: The Sides section.
- * Expected outcome: A markdown table. The own row is labelled `(you)` and has `-` for stance.
+ * Expected outcome: A markdown table. The own row is labelled `(you)` and has `-` for stance. A Record column is added when any side has a record, with `-` for a side that has none.
  * Exceptions: None.
  */
 function sidesTable(sides: readonly TalkPromptSide[]): string {
   const ordered = [...sides.filter((side) => side.isOwn), ...sides.filter((side) => !side.isOwn)];
+  const showRecord = sides.some((side) => side.record !== null);
   const rows = ordered.map((side) => {
     const name = side.isOwn ? `${side.label} (you)` : side.label;
     const status = side.outTurn == null ? 'Active' : `Out since turn ${side.outTurn}`;
     const stance = side.stance == null ? (side.isOwn ? '-' : 'not set') : `${side.stance}: ${side.stanceReason ?? ''}`;
-    return `| ${name} | ${side.code} | ${status} | ${stance} |`;
+    return `| ${name} | ${side.code} | ${status} | ${stance} |${showRecord ? ` ${side.record ?? '-'} |` : ''}`;
   });
-  return ['| Side | Code | Status | Your stance |', '| --- | --- | --- | --- |', ...rows].join('\n');
+  const header = showRecord ? '| Side | Code | Status | Your stance | Record |' : '| Side | Code | Status | Your stance |';
+  const divider = showRecord ? '| --- | --- | --- | --- | --- |' : '| --- | --- | --- | --- |';
+  return [header, divider, ...rows].join('\n');
 }

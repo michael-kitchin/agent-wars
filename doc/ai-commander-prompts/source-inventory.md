@@ -57,8 +57,8 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Active Operations` | `buildOperationsSection` (`briefingSectionsOperations.ts`), then `shiftMarkdownHeadings` inside the briefing | standing orders on, not a battle, and the seat has a campaign plan, a stored operation, a candidate, or a refusal note from the previous turn | omitted when it has none of those. A campaign plan alone prints the section, and that bullet comes first. The other bullets are present only when an operation is stored. The note line is present only on the following turn |
 | `## Operation Options` | `buildOperationOptionsSection` (`briefingSectionsOperations.ts`), fed by `operationCandidatesForSeat` with land included | standing orders on, not a battle, and the seat has a candidate | omitted. The section still prints when no operation is stored |
 | `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
-| `## Recent Turn Notes` | `buildRecentTurnNotesSection`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 turns has a strategy or a loss | omitted |
-| `# Messages` | `buildOrdersMessagesBlock` (`talk/ordersMessagesBlock.ts`). Shifted to H2 when a briefing is attached | a visible message or a stored stance for this commander | omitted |
+| `## Recent Turn Notes` | `buildRecentTurnNotesSection`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 turns has a strategy, a loss, or units a tactical battle destroyed | omitted |
+| `# Messages` | `buildOrdersMessagesBlock` (`talk/ordersMessagesBlock.ts`). Shifted to H2 when a briefing is attached | a visible message, a stored stance, or a combat record (`readSideCombatRecords`) for this commander | omitted |
 | `## Production Status` | `buildProductionBriefingBlock`, then `shiftMarkdownHeadings` inside the briefing. `Production Priorities` is `buildProductionPriorityLines` | `flags.productionEnabled` | omitted |
 | `# Mercenaries` | `buildMercenariesBriefingBlock` | strategic, `mercenaryEconomy` present, and production on or the seat has a mercenary | omitted. Production off uses `buildMercenaryUpkeepRule` and skips hire tables. Production on, 0 credits, no mercenary, no rehire, and no raise row is `Treasury: 0 credits. No one to rehire.` |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
@@ -128,7 +128,7 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | `## Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
 | `### Best Options This Turn` | same as strategic | at least one aggregated row | omitted |
 | `## Recent Turn Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 periods has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
-| `# Messages` | `buildOrdersMessagesBlock` | a visible message or a stored stance for this commander | omitted |
+| `# Messages` | `buildOrdersMessagesBlock` | a visible message, a stored stance, or a combat record (`readSideCombatRecords`) for this commander | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
 
 Tactical unit status uses the same six columns and has **no** standing-order column. Best Options actions in battle: `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`.

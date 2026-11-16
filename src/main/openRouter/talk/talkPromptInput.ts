@@ -14,6 +14,9 @@ import { listSideMessageThread, listSideStances } from '../../gameDb/sideMessage
 import { readSeatRoster } from '../../gameDb/seatRosterStore';
 import { getRecentTurnNotes } from '../../gameDb/turnNotesHistory';
 import { buildRecentTurnNotesSection } from '../../briefing/recentTurnNotesSection';
+import { readSideCombatRecords, type SideCombatRecordView } from '../../briefing/sideCombatRecordRead';
+import { formatStanceConflict } from '../../briefing/sideCombatRecordText';
+import { readTurnNumberOrFirst } from '../../gameDb/turnStateReads';
 import { SECTION_TITLE_RECENT_TURN_NOTES } from '../promptSpec/sectionHeadings';
 import { isSeatId, type AiSeatId, type SeatId } from '../../../shared/seatIds';
 import { isSeatActive, sortSeatsByOrder, type SeatRecord } from '../../../shared/seatRoster';
@@ -41,19 +44,31 @@ function battleOpponentSeatId(seatId: AiSeatId, battle: TacticalBattleSnapshot):
  *
  * Purpose: The label is the home region the orders prompt prints in its Side column.
  * When to use: Every roster seat.
- * Expected outcome: A `TalkPromptSide`. The commander's own stance cells stay empty.
+ * Expected outcome: A `TalkPromptSide`. The commander's own stance and record cells stay empty. Another side's record is the one `records` holds for it, or null, followed by a conflict sentence when a cordial or friendly stance meets a recent attack by that side.
  * Exceptions: `playerIdCodeFor` throws when the id is not a seat. Callers pass roster ids.
  */
-function sideFromRoster(seat: SeatRecord, ownSeatId: AiSeatId, stanceByTarget: ReadonlyMap<string, { stance: TalkPromptSide['stance']; reason: string }>): TalkPromptSide {
+function sideFromRoster(
+  seat: SeatRecord,
+  ownSeatId: AiSeatId,
+  stanceByTarget: ReadonlyMap<string, { stance: TalkPromptSide['stance']; reason: string }>,
+  records: ReadonlyMap<string, SideCombatRecordView>,
+  currentTurnNumber: number
+): TalkPromptSide {
   const stance = stanceByTarget.get(seat.seatId);
   const own = seat.seatId === ownSeatId;
+  const code = playerIdCodeFor(seat.seatId);
+  const view = own ? undefined : records.get(seat.seatId);
+  const conflict = view
+    ? formatStanceConflict({ sideCode: code, stance: stance?.stance ?? null, latestTurnAttackedYou: view.latestTurnAttackedYou, currentTurnNumber })
+    : null;
   return {
-    code: playerIdCodeFor(seat.seatId),
+    code,
     label: seat.homeRegion,
     isOwn: own,
     outTurn: seat.outTurn,
     stance: own ? null : stance?.stance ?? null,
     stanceReason: own ? null : stance?.reason ?? null,
+    record: view ? (conflict ? `${view.text} ${conflict}` : view.text) : null,
   };
 }
 
@@ -115,14 +130,16 @@ export function countUnreadPromptMessages(seatId: AiSeatId): number {
  *
  * Purpose: The talk prompt and the orders prompt name sides the same way.
  * When to use: Before either prompt prints a side label or a stance.
- * Expected outcome: One row per roster seat. The label is the home region. A stance is this commander's stored stance toward that side.
+ * Expected outcome: One row per roster seat. The label is the home region. A stance is this commander's stored stance toward that side. A record is this commander's combat record with that side over the strategic window before the stored turn, which a battle shares with the world map.
  * Exceptions: Propagates a SQLite error. `playerIdCodeFor` throws when a roster id is not a seat.
  */
 export function readTalkSides(seatId: AiSeatId): TalkPromptSide[] {
   const roster = sortSeatsByOrder(readSeatRoster(gameDbOps)).filter((seat) => isSeatId(seat.seatId));
   const stanceByTarget = new Map(listSideStances(gameDbOps, seatId).map((row) => [row.towardSeatId, { stance: row.stance, reason: row.reason }] as const));
-  logTrace('talkPromptInput readTalkSides', { seatId, sideCount: roster.length });
-  return roster.map((seat) => sideFromRoster(seat, seatId, stanceByTarget));
+  const currentTurnNumber = readTurnNumberOrFirst(gameDbOps.getOne);
+  const records = readSideCombatRecords(seatId, currentTurnNumber);
+  logTrace('talkPromptInput readTalkSides', { seatId, sideCount: roster.length, recordCount: records.size });
+  return roster.map((seat) => sideFromRoster(seat, seatId, stanceByTarget, records, currentTurnNumber));
 }
 
 /**

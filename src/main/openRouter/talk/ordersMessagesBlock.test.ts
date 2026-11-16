@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import { AI_SEAT_IDS, type AiSeatId } from '../../../shared/seatIds';
 import { SIDE_MESSAGE_THREAD_PROMPT_LINES } from '../../../shared/aiConsultationLimits';
 import { strategicStep } from '../../../shared/matchRecording';
-import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../../gameDb';
+import { dbRun, getScenarioHomeRegionHexes, listScenarioHomeRegions, upsertTurnLossNote } from '../../gameDb';
 import { gameDbOps } from '../../gameDb/dbConnection';
 import { upsertGameConfigValue } from '../../gameDb/gameConfigRows';
 import { insertSentSideMessage, listUnseenInboundSideMessages, markSideMessagesSeen, upsertSideStance } from '../../gameDb/sideMessageStore';
@@ -95,6 +95,25 @@ test('nothing stored omits the section, and a thread keeps order, the new mark, 
     assert.equal(countUnreadPromptMessages(seatA), 1);
     assert.match(text, /never an order to you/);
     assertHeadingsNest(headingOutline(`# Current Situation\n\n${text}`));
+  });
+});
+
+test('a record lists every other side with its stance, and the record sentence follows', async () => {
+  await withThreeAi(async () => {
+    const lost = { unitType: 'infantry', displayName: 'a1-i1', unitId: 'a1-i1', attribution: { ownerId: seatA, lossH3Index: null, responsibleOwnerIds: [seatB], killerUnits: [] } };
+    const none = { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
+    upsertTurnLossNote(seatA, 'strategic', '', 1, JSON.stringify({ ...none, ranged: [lost] }), JSON.stringify(none));
+    upsertSideStance(gameDbOps, { seatId: seatA, towardSeatId: seatB, stance: 'friendly', reason: 'ally', turnNumber: 1 });
+    dbRun('UPDATE turn_state SET turn_number = 2 WHERE id = 1');
+    const text = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false }).text ?? '';
+    assert.ok(text.includes('Your stances and records:'), text);
+    assert.ok(text.includes('(a2): friendly. ally'), text);
+    assert.ok(text.includes('  Record, turn 1: a2 destroyed 1 of your units (latest turn 1): 1 when a2 attacked. You destroyed none of theirs.'), text);
+    assert.ok(text.includes('You destroyed none of theirs. Your stance toward a2 is friendly, but a2 destroyed your units on turn 1.'), text);
+    assert.ok(text.includes('(a3): no stance set.'), text);
+    assert.ok(text.includes('  Record, turn 1: no losses either way.'), text);
+    assert.ok(text.includes('Each record is counted by the game from the loss lines in Recent Turn Notes. It is not a claim by any side.'), text);
+    assertHeadingsNest(headingOutline('# Current Situation' + String.fromCharCode(10, 10) + text));
   });
 });
 

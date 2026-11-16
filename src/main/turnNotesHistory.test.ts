@@ -65,9 +65,67 @@ async function testTacticalClearIsolation(): Promise<void> {
   }
 }
 
+/**
+ * Verifies the single-row loss read returns the stored columns or null.
+ *
+ * Purpose: Guards `getTurnLossNoteColumns`, which the battle-loss writer merges into.
+ * When to use: After changing `getTurnLossNoteColumns` SQL.
+ * Expected outcome: Null for a missing key; the exact stored strings for an existing key.
+ * Exceptions: None.
+ */
+async function testLossColumnsRead(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { gameDbOps } = await import('./gameDb/dbConnection');
+  const { getTurnLossNoteColumns } = await import('./gameDb/turnNotesHistory');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-turn-notes-'));
+  try {
+    gameDb.openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
+    const key = { seatId: 'opponent', scope: 'strategic', battleId: 'tb-x', turnNumber: 3 } as const;
+    assert.strictEqual(getTurnLossNoteColumns(gameDbOps, key), null);
+    gameDb.upsertTurnLossNote('opponent', 'strategic', 'tb-x', 3, '{"a":1}', '{"b":2}');
+    assert.deepStrictEqual(getTurnLossNoteColumns(gameDbOps, key), { ownLossJson: '{"a":1}', otherLossJson: '{"b":2}' });
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Verifies the battle-loss list returns only strategic battle rows for the seat and turns asked.
+ *
+ * Purpose: Guards `listStrategicBattleLossRows` filtering and order.
+ * When to use: After changing `listStrategicBattleLossRows` SQL.
+ * Expected outcome: Battle rows of turn 3 in battle-id order; no turn-own row, tactical row, other seat, or unasked turn; an empty turn list gives an empty list.
+ * Exceptions: None.
+ */
+async function testStrategicBattleLossRows(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { gameDbOps } = await import('./gameDb/dbConnection');
+  const { listStrategicBattleLossRows } = await import('./gameDb/turnNotesHistory');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-turn-notes-'));
+  try {
+    gameDb.openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 3, '{"own":0}', '{"other":0}');
+    gameDb.upsertTurnLossNote('opponent', 'strategic', 'tb-y', 3, '{"y":3}', '{"y":3}');
+    gameDb.upsertTurnLossNote('opponent', 'strategic', 'tb-x', 3, '{"x":3}', '{"x":3}');
+    gameDb.upsertTurnLossNote('opponent', 'strategic', 'tb-y', 5, '{"y":5}', '{"y":5}');
+    gameDb.upsertTurnLossNote('opponent', 'tactical', 'tb-x', 3, '{"t":3}', '{"t":3}');
+    gameDb.upsertTurnLossNote('opponent2', 'strategic', 'tb-x', 3, '{"z":3}', '{"z":3}');
+    const rows = listStrategicBattleLossRows(gameDbOps, 'opponent', [3, 4]);
+    assert.deepStrictEqual(rows.map((row) => [row.turnNumber, row.battleId]), [[3, 'tb-x'], [3, 'tb-y']]);
+    assert.strictEqual(rows[0]?.ownLossJson, '{"x":3}');
+    assert.deepStrictEqual(listStrategicBattleLossRows(gameDbOps, 'opponent', []), []);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 async function run(): Promise<void> {
   await testUpsertMergeAndRecentWindow();
   await testTacticalClearIsolation();
+  await testLossColumnsRead();
+  await testStrategicBattleLossRows();
   console.log('turnNotesHistory.test.ts passed');
 }
 
