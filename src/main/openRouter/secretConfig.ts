@@ -7,7 +7,6 @@
  * Exceptions: None.
  */
 
-import { safeStorage } from 'electron';
 import { logDebug, logError, logTrace } from '../logger';
 import { getOne, run } from '../gameDb/dbConnection';
 import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
@@ -55,6 +54,31 @@ function readConfigRow(configKey: string): string | null {
 }
 
 /**
+ * Electron's secret store, loaded when a secret is sealed or opened.
+ *
+ * Purpose: Importing this module must not require the Electron binary. A missing row never opens the store.
+ * When to use: `envelopeJson`, and `readStoredSecret` when the envelope is encrypted.
+ * Expected outcome: `safeStorage`, or null when Electron is absent or does not expose it. A missing install is logged.
+ * Exceptions: None. A failed load is logged and returns null.
+ */
+function platformSafeStorage(): typeof import('electron').safeStorage | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded on use so Node tests can import this module without the Electron binary
+    const electron = require('electron') as { safeStorage?: typeof import('electron').safeStorage } | undefined;
+    const storage = electron?.safeStorage;
+    if (!storage || typeof storage.isEncryptionAvailable !== 'function') {
+      logTrace('secretConfig platformSafeStorage', { available: false });
+      return null;
+    }
+    logTrace('secretConfig platformSafeStorage', { available: true });
+    return storage;
+  } catch (err) {
+    logError('secretConfig platformSafeStorage: failed', err);
+    return null;
+  }
+}
+
+/**
  * Builds the JSON envelope for a non-empty secret.
  *
  * Purpose: Encryption and the plaintext fallback stay in one function.
@@ -63,8 +87,9 @@ function readConfigRow(configKey: string): string | null {
  * Exceptions: None.
  */
 function envelopeJson(value: string): string {
-  const data: SecretEnvelope = safeStorage.isEncryptionAvailable()
-    ? { encrypted: Buffer.from(safeStorage.encryptString(value)).toString('base64') }
+  const storage = platformSafeStorage();
+  const data: SecretEnvelope = storage?.isEncryptionAvailable()
+    ? { encrypted: Buffer.from(storage.encryptString(value)).toString('base64') }
     : { key: value };
   return JSON.stringify(data);
 }
@@ -100,11 +125,12 @@ export function readStoredSecret(configKey: string): StoredSecret {
   try {
     const parsed = JSON.parse(stored) as SecretEnvelope;
     if (typeof parsed.encrypted === 'string') {
-      if (!safeStorage.isEncryptionAvailable()) {
+      const storage = platformSafeStorage();
+      if (!storage?.isEncryptionAvailable()) {
         logError('secretConfig readStoredSecret: encryption is unavailable', { configKey });
         return { status: 'unreadable', raw: null };
       }
-      const value = safeStorage.decryptString(Buffer.from(parsed.encrypted, 'base64'));
+      const value = storage.decryptString(Buffer.from(parsed.encrypted, 'base64'));
       logTrace('secretConfig readStoredSecret', { configKey, status: 'ready', hasValue: value.length > 0 });
       return { status: 'ready', value };
     }
