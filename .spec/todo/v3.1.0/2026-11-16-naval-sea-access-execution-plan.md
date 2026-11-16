@@ -570,26 +570,37 @@ Run the Verification Bar and `npm run ui:smoke`. In the app, hover a seaport fro
 
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `check:circular` cycle list | |
-| Prerequisites | |
-| Build-function callers | |
-| Sealift-function callers | |
-| Queued rows skip `availableTypes` | |
-| Land seaports with no sea access (seeded map) | |
-| Land seaport with sea access (seeded map) | |
-| Line counts | |
-| Fog masking and renderer terrain facts | |
-| Tests without a database | |
+| `git status --short` | Clean at start (worktree branch from 8ce4ba6). |
+| `npm test` | Not run at baseline by instruction. Run once at the end (see Completion Log, Phase 8). |
+| `npm run build:renderer` | Passes. |
+| `check:circular` cycle list | Three cycles already exist at HEAD. The import-graph scanner run on `git archive HEAD src` finds them: orderlessUnitSuggestions through promptText, productionTools, gameActions, and standingOrders; openRouterUiHelpers through mapToastBody and basemapLayer; openRouterUiHelpers through aiPlanningState and terrainTooltipStrategicState. The baseline file is empty, so the script exits 1 at HEAD too. After the change the list is identical. |
+| Prerequisites | All present. |
+| Build-function callers | productionRules.ts, buildQueue.ts, controlAndProduction.ts, airStrikeResolution.ts, mercenaryHireRules.ts, openRouter/seatBuildCapabilities.ts; tests productionRules.test.ts and missileProduction.test.ts. |
+| Sealift-function callers | gameActions/sealift.ts, openRouter/briefingSectionsSealift.ts, openRouter/promptText.ts (debark only), operations/liftTerrain.ts, tacticalBattle/tacticalOpponentOrderValidation.ts; sealiftEmbarkEligibility.test.ts. |
+| Queued rows skip `availableTypes` | Confirmed: `availableTypes` is read only for the Keep building refill. |
+| Land seaports with no sea access (seeded map) | 81113ffffffffff, 811f7ffffffffff, 81267ffffffffff, 81277ffffffffff, 81433ffffffffff, 81537ffffffffff, 8153bffffffffff. |
+| Land seaport with sea access (seeded map) | 48 of them. The first is 8108bffffffffff. |
+| Line counts | buildQueue.ts 718, sealift.ts 911, airStrikeResolution.ts 716 before. None passes 1000 after. |
+| Fog masking and renderer terrain facts | Both confirmed. `getGameStateForPlayer` masks unexplored terrain unless `maskUnexploredTerrain` is false, and every call under `src/main/ipc/` passes false. |
+| Tests without a database | None of the four opens `withTempGameDb`. |
 
 ## Defect Inventory
 
 | Phase | Command | First error | Action taken |
 |-------|---------|-------------|--------------|
+| 4 | node dist/main/openRouter/seatBuildCapabilities.test.js | canBuildNaval false for a hand-built port | Passed `() => true` with the plan's comment. |
+| 6 | node dist/main/openRouter/briefingSectionsSealift.test.js | Nearest embark hex missing for a hand-built land seaport | Injected the check, with a true case and a false case. |
 
 ## Completion Log
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
+| 0 | Done | The baseline full bar was skipped by instruction. | None | None | Not run |
+| 1 | Pass | None | None | None | Not run |
+| 2 | Pass | None | Added src/main/testSupport/seaAccessFixtures.ts, a shared fixture that lists dry and wet land seaports | None | Not run |
+| 3 | Merged into 4 | Callers got their final values directly instead of a temporary `true`. | None | None | Not run |
+| 4 | Pass | New test file src/main/gameActions/navalSeaAccessProduction.test.ts instead of editing gameActionsProduction.test.ts, which is already past 1000 lines. | None | combat-rules-v3, how-to-play, ux/build-popup, region-summary-1 | Not run |
+| 5 | Pass | None. A refused count change shows the main-process reason as the existing error toast from the mutation helper. | None | ux/build-popup | Not run |
+| 6 | Pass | sealift.ts and tacticalOpponentOrderValidation.ts guard the lookup with a seaport test so coastal hexes never query. | None | combat-rules-v3, how-to-play | Not run |
+| 7 | Pass | None | None | ux/hex-tooltips, ai-commander-prompts example-strategic-prompt, information-decision-model, source-inventory | Not run |
+| 8 | See the final report | Backups were not taken: the work is one uncommitted-then-committed diff. ui:smoke is logged in the final report. | None | None | Not run |
