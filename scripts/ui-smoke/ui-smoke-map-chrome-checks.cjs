@@ -1,6 +1,6 @@
 /**
  * Checks of the chrome on the map for the UI smoke run: the minimap panel and its map-mode tabs, the terrain legend, and
- * Leaflet's scale. The map does not show an attribution control.
+ * Leaflet's scale at the map's bottom center, and the chat panel's bottom edge. The map does not show an attribution control.
  *
  * Purpose: Keeps the map chrome checks apart from the frame, console, and scenario checks, so each table stays readable.
  * When to use: Required by `ui-smoke-checks.cjs`, which runs these rows after the scenario checks.
@@ -232,20 +232,19 @@ const MAP_CHROME_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'scale-and-attribution-bottom-right',
+    name: 'scale-bottom-center',
     scenes: PLACEMENT_SCENES,
     needs: ['#canvas-container', LEAFLET.scale],
     run: (p, el) => {
       const c = el('#canvas-container');
       const scale = el(LEAFLET.scale);
       if (!scale.shown) return 'the scale is not shown';
-      const right = c.x + c.w - PANEL.inset;
       const bottom = c.y + c.h - PANEL.inset;
       if (!near(scale.y + scale.h, bottom)) {
         return `the scale is at ${fmt(scale)}, expected its bottom ${PANEL.inset} px in from the map ${fmt(c)}`;
       }
-      if (!near(scale.x + scale.w, right)) {
-        return `the scale is at ${fmt(scale)}, expected its right ${PANEL.inset} px in from the map ${fmt(c)}`;
+      if (Math.abs(scale.x + scale.w / 2 - (c.x + c.w / 2)) > 1) {
+        return `the scale is at ${fmt(scale)}, expected its horizontal center on the map's center ${fmt(c)}`;
       }
       return null;
     },
@@ -257,20 +256,24 @@ const MAP_CHROME_CHECKS = Object.freeze([
     run: (p) => (p.minimapHasZoom ? 'the minimap has zoom buttons' : null),
   },
   {
-    name: 'chat-panel-bottom-right',
+    name: 'chat-panel-bottom-aligned',
     scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', '#chat-panel', LEAFLET.scale],
+    needs: ['#canvas-container', '#chat-panel', '#selection-panel'],
     run: (p, el) => {
       const panel = el('#chat-panel');
       if (!panel.shown) return null;
       const c = el('#canvas-container');
-      const scale = el(LEAFLET.scale);
+      const selection = el('#selection-panel');
       const right = c.x + c.w - PANEL.inset;
+      const bottom = c.y + c.h - PANEL.inset;
       if (!near(panel.x + panel.w, right)) {
         return `the chat panel is at ${fmt(panel)}, expected its right ${PANEL.inset} px in from the map ${fmt(c)}`;
       }
-      if (scale.shown && panel.y + panel.h > scale.y + 1) {
-        return `the chat panel is at ${fmt(panel)}, expected above the scale ${fmt(scale)}`;
+      if (!near(panel.y + panel.h, bottom)) {
+        return `the chat panel is at ${fmt(panel)}, expected its bottom ${PANEL.inset} px in from the map ${fmt(c)}`;
+      }
+      if (selection.shown && Math.abs(selection.y + selection.h - (panel.y + panel.h)) > 1) {
+        return `the chat panel is at ${fmt(panel)}, expected its bottom level with the selection panel ${fmt(selection)}`;
       }
       return null;
     },

@@ -1,10 +1,10 @@
 # Charts and Replay: Meta-Plan
 
-**Audience:** The user, and any coding agent about to run one of the five execution plans below.
+**Audience:** The user, and any coding agent about to run one of the six execution plans below.
 
 **Purpose:** Say which plan runs when, what each one leaves behind, what has to be true before the next one starts, and what was decided along the way.
 
-This file is not an execution plan. A coding agent does not edit code from it. All six files live in `.spec/todo/v3.1.0/`.
+This file is not an execution plan. A coding agent does not edit code from it. All seven files live in `.spec/todo/v3.1.0/`.
 
 ---
 
@@ -17,6 +17,7 @@ This file is not an execution plan. A coding agent does not edit code from it. A
 | 3 | `2026-11-15-history-3-replay-stepping-execution-plan.md` | Recording of what the screen was given, then replay on `p`: the panel, step back and forward, the slider, the turn field, and both dialogs per step | the replay panel |
 | 4 | `2026-11-15-history-4-replay-playback-execution-plan.md` | Play with animations, and replay inside a battle | none new |
 | any | `2026-11-16-naval-sea-access-execution-plan.md` | Ships can be built, raised as mercenaries, or boarded only at a seaport with water or coast in or next to its hex | the build popup and the hex tooltip |
+| after 4 | `2026-11-16-map-chrome-alignment-execution-plan.md` | The map scale moves to the horizontal center of the bottom edge, and the chat panel's bottom edge lines up with the selection panel's | the map corners |
 
 ```text
 statistics ──► charts dialog ──► replay stepping, Phases 4–8 ──► replay playback
@@ -37,6 +38,8 @@ If you would rather run plan 3 whole, that works too. The only wrong order is pl
 
 Plan 1's Phase 6 is the same kind of recording. A match keeps who destroyed what only from the first turn played with it, so run plan 1 before the first Cup match too. Phase 6 needs only plan 1's Phase 3, which adds the event before it in the event list. If you want the attribution sooner than the rest of plan 1, run Phases 0, 3, and 6 first.
 
+The map chrome alignment plan runs after plan 4. It needs nothing from it, but both change renderer and stylesheet files and full test runs must not overlap.
+
 The naval sea-access plan can run at any point. It edits `buildQueue.ts`, `sealift.ts`, and the AI rule text, which the four history plans do not touch, so the order does not matter for merging. Run it before the first Cup match if you want Cup commanders to stop building ships that cannot leave port.
 
 ### What each plan leaves usable on its own
@@ -46,6 +49,7 @@ The naval sea-access plan can run at any point. It edits `buildQueue.ts`, `seali
 - **After plan 3, Phases 0 to 3:** matches record what replay needs. Nothing on screen changes. This can ship.
 - **After plan 3:** replay by stepping, in the strategic game. The Play button is visible and disabled. This can ship.
 - **After plan 4:** replay is complete.
+- **After the map chrome alignment plan:** the scale is centered at the bottom edge and the two bottom panels share a bottom edge. This can ship.
 - **After the naval sea-access plan:** no new ship is built, raised, or boarded at a port it cannot sail out of. This can ship.
 
 ---
@@ -54,7 +58,7 @@ The naval sea-access plan can run at any point. It edits `buildQueue.ts`, `seali
 
 1. **Commit the current edits.** Messaging, loss attribution, battle loss rows, and the side combat record are committed (through `8ce4ba6`). These plans were re-checked against that commit on 2026-11-16. Plan 1 changes the talk reply, the talk prompt, the orders Messages block, the loss-note capture, and `side_stances`, so commit any later edits to those first.
 2. **Commit before each plan.** The plans never commit, and they back up files to a temp folder instead.
-3. **Saves keep working.** `EXPECTED_USER_VERSION` does not change in any of the five. Plan 1 adds two columns on open, the way seat columns are added today. You said a version bump would be acceptable if needed. It was not needed.
+3. **Saves keep working.** `EXPECTED_USER_VERSION` does not change in any of the six. Plan 1 adds two columns on open, the way seat columns are added today. You said a version bump would be acceptable if needed. It was not needed.
 
 ## Running Each Plan
 

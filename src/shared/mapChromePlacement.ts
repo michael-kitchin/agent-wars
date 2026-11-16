@@ -1,7 +1,7 @@
 /**
  * How far map chrome stays from the map's edges, in CSS pixels. This module holds the placement rules for the chrome
  * that shares the top of the map: the minimap panel at the top-left, the terrain legend beside or under it, the toast
- * band against the map's right edge, the chat panel at the bottom-right, and the new-game setup panel that floats over the map.
+ * band against the map's right edge, the chat panel at the bottom-right (its bottom edge level with the selection panel's), and the new-game setup panel that floats over the map.
  *
  * Purpose: The minimap panel, the legend, and the toast band keep the same inset.
  * When to use: Through `legendPopoverPosition`, `toastBandSpan`, `messageToastBandWidth`, `chatPanelPlacement`, and `floatingPanelOffset`.
@@ -101,24 +101,22 @@ export function messageToastBandWidth(input: {
 }
 
 /**
- * Places the chat panel in the map's bottom-right corner, above the scale.
+ * Places the chat panel in the map's bottom-right corner, level with the selection panel's bottom edge.
  *
- * Purpose: The panel uses the message dialog's band width and stays clear of the scale.
- * When to use: `layoutMapChrome`, after the band width is final. Pass 0 for `scaleHeight` when the scale is missing.
- * Expected outcome: `width` is `bandWidth`. `right` is `MAP_CHROME_INSET`. `bottom` is that inset, plus the scale height and `MAP_CHROME_GAP` when the scale is showing. `maxHistoryHeight` is half of `mapHeight`, rounded down.
+ * Purpose: The panel uses the message dialog's band width, and its bottom edge sits at the same inset as the selection panel's.
+ * When to use: `layoutMapChrome`, after the band width is final.
+ * Expected outcome: `width` is `bandWidth`. `right` and `bottom` are `MAP_CHROME_INSET`. `maxHistoryHeight` is half of `mapHeight`, rounded down.
  * Exceptions: None.
  */
 export function chatPanelPlacement(input: {
   readonly mapWidth: number;
   readonly mapHeight: number;
   readonly bandWidth: number;
-  readonly scaleHeight: number;
 }): { readonly width: number; readonly right: number; readonly bottom: number; readonly maxHistoryHeight: number } {
-  const scaleHeight = input.scaleHeight > 0 ? input.scaleHeight : 0;
   return {
     width: input.bandWidth,
     right: MAP_CHROME_INSET,
-    bottom: MAP_CHROME_INSET + scaleHeight + (scaleHeight > 0 ? MAP_CHROME_GAP : 0),
+    bottom: MAP_CHROME_INSET,
     maxHistoryHeight: Math.floor(input.mapHeight / 2),
   };
 }

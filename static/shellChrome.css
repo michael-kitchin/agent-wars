@@ -283,14 +283,15 @@ body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
 body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Leaflet's bottom-right corner keeps the map's 12px inset. The scale is the only control there. */
+/* Leaflet has no bottom-center corner. The scale sits in the bottom-right corner, and this centers that corner's container. It keeps the map's 12px bottom inset. The scale is the only control there. */
 #main-map .leaflet-bottom.leaflet-right {
   bottom: 12px;
-  right: 12px;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: row-reverse;
+  justify-content: center;
   align-items: flex-end;
-  gap: 6px;
 }
 #main-map .leaflet-right .leaflet-control {
   margin: 0;

@@ -239,7 +239,7 @@ export function initWorldLeafletMaps(
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
   try {
-    // Show real-world distance on the scale, below the chat panel.
+    // Show real-world distance on the scale. Leaflet places it in the bottom-right corner, and shellChrome.css centers that corner.
     leafletRef.control
       .scale({
         position: 'bottomright',

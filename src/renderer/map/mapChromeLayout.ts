@@ -74,23 +74,20 @@ export function layoutMapChrome(): void {
 }
 
 /**
- * Sets the chat panel's box from the band width and the scale.
+ * Sets the chat panel's box from the band width.
  *
- * Purpose: The panel matches the message dialog's width and sits above the scale.
+ * Purpose: The panel matches the message dialog's width, and its bottom edge matches the selection panel's.
  * When to use: At the end of `layoutMapChrome`, after the band width is final.
- * Expected outcome: `#chat-panel` gets `width`, `right`, and `bottom`. `#chat-panel-history` gets `max-height`. A missing scale counts as height 0.
+ * Expected outcome: `#chat-panel` gets `width`, `right`, and `bottom`. `#chat-panel-history` gets `max-height`.
  * Exceptions: None. A missing panel is skipped.
  */
 function placeChatPanel(mapBox: DOMRect, bandWidth: number): void {
   const panel = document.getElementById('chat-panel');
   if (!(panel instanceof HTMLElement)) return;
-  const scale = document.querySelector('#main-map .leaflet-control-scale');
-  const scaleHeight = scale instanceof HTMLElement ? scale.getBoundingClientRect().height : 0;
   const place = chatPanelPlacement({
     mapWidth: mapBox.width,
     mapHeight: mapBox.height,
     bandWidth,
-    scaleHeight,
   });
   panel.style.width = `${place.width}px`;
   panel.style.right = `${place.right}px`;

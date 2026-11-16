@@ -1,4 +1,4 @@
-/* The chat panel at the map's bottom-right. chatPanel.ts sets data-state and slides the height. mapChromeLayout.ts sets width, right, bottom, and the history's max-height. */
+/* The chat panel at the map's bottom-right. Its bottom edge matches the selection panel's. chatPanel.ts sets data-state and slides the height. mapChromeLayout.ts sets width, right, bottom, and the history's max-height. */
 
 .chat-panel {
   position: absolute;
