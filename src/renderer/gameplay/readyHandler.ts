@@ -1,12 +1,10 @@
 import type { GameReadyIpcPayload, GameStateSnapshot } from '../../shared/ipcTypes';
-import { buildMissilePlaybackMoves, missileLaunchVisibleToViewer } from '../../shared/missileStrikeReport';
 import { currentConsoleReportTag } from '../chrome/consoleReports';
 import type { MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
-import { sightCueBeamsForViewer } from '../../shared/sightCueDrawModel';
 import { deferTacticalEntryUntilStrategicPlayback, observeModeControls } from '../../shared/observeModeControls';
 import { refreshChatThread } from '../chat/chatPanelClient';
 import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
@@ -23,19 +21,18 @@ import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { runTacticalReadyCommit } from './readyTacticalCommit';
 import {
   announceResolutionTurnUpdate,
-  deriveCombatVisibilityClassification,
-  reportViewerSeatId,
   scheduleResolutionPlaybackCompleteNotify,
 } from './readyResolutionAnnouncements';
 import { dropHeldBattleTurnUpdate, hasPendingDestroyedBattleParents } from './heldBattleTurnUpdate';
 import { announceKnockouts } from './knockoutNotices';
 import { closeChartsDialogIfOpen, refreshChartsDialogIfOpen } from '../charts/chartsDialog';
 import { isHumanSeatId } from '../../shared/seatIds';
-import { buildAirDropOutboundPlaybackMoves, buildAirDropReturnPlaybackMoves } from '../rendering/orderDrawing';
 import { offerHumanKnockoutChoice } from './knockoutDialog';
 import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
 import { frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
 import { waitForNextResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
+import { replayActive } from '../replay/replayState';
+import { planResolutionPlayback } from './resolutionPlaybackPlan';
 export type { ReadyHandlerDeps } from './readyHandlerTypes';
 
 /**
@@ -112,6 +109,7 @@ function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;
+  if (replayActive()) return;
   if (S.readyRequestInFlight) return;
   if (S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null) return;
   if (isDeferredResolutionPlaybackConsultPending()) {
@@ -242,27 +240,13 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     });
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
     void refreshChartsDialogIfOpen();
-    const aiMoves = readyResult.aiMoves ?? [];
-    const resolutionMoves = [...humanMoves, ...aiMoves];
-    const visibleHexes = deps.getVisibleHexSet(state);
-    const visibleMissileLaunches = (readyResult.missileLaunches ?? []).filter((record) =>
-      missileLaunchVisibleToViewer(
-        record,
-        reportViewerSeatId(),
-        new Set([...visibleHexesBeforeTurn, ...visibleHexes])
-      )
-    );
-    const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
-    const strikeMoves = [...(readyResult.airStrikeMoves ?? []), ...buildMissilePlaybackMoves(visibleMissileLaunches)];
-    const airStrikeOutboundMoves = [
-      ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
-      ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves),
-    ];
-    const airStrikeReturnMoves = [
-      ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
-      ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves),
-    ];
-
+    const plan = planResolutionPlayback({
+      readyResult,
+      state,
+      humanMoves,
+      visibleHexesBeforeTurn,
+      deps,
+    });
     deps.updateOpenRouterCostLabel();
     if (readyResult.aiConsulted === false) {
       deps.appendOpenRouterLog('AI executing standing orders (no event fired).');
@@ -272,48 +256,22 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       });
     }
 
-    const hasRanged =
-      (readyResult.rangedCombatHexes?.length ?? 0) > 0 ||
-      (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 ||
-      (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
-    const hasMelee =
-      (readyResult.meleeCombatHexes?.length ?? 0) > 0 ||
-      (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 ||
-      (readyResult.meleeRemovedUnits?.length ?? 0) > 0 ||
-      (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
-    const hasAirStrikeResolution =
-      visibleMissileLaunches.length > 0 ||
-      (readyResult.airStrikeAttemptCount ?? 0) > 0 ||
-      (readyResult.airStrikeHexes?.length ?? 0) > 0 ||
-      (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 ||
-      (readyResult.baseInvalidAirLossCount ?? 0) > 0;
-    const hasDiceRolls =
-      (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 ||
-      (readyResult.rangedDiceRolls?.length ?? 0) > 0 ||
-      (readyResult.meleeDiceRolls?.length ?? 0) > 0;
-    const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
-    const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
-    const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
-    const visibleMissileVictims = (readyResult.missileStrikeRemovedUnits ?? []).filter((unit) =>
-      visibleMissileVictimIds.has(unit.id)
-    );
-    const airStrikeRemovedForPlayback = [...(readyResult.airStrikeRemovedUnits ?? []), ...visibleMissileVictims];
-    const airStrikeCasualtyHexesForPlayback = [
-      ...(readyResult.airStrikeCasualtyHexes ?? []),
-      ...visibleMissileVictims
-        .map((unit) => unit.h3Index)
-        .filter((hex) => !(readyResult.airStrikeCasualtyHexes ?? []).includes(hex)),
-    ];
-    const airStrikeCombatHexesForPlayback = [
-      ...(readyResult.airStrikeHexes ?? []),
-      ...visibleMissileLaunches
-        .map((record) => record.targetH3Index)
-        .filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex)),
-    ];
-    const needsCombatOrMovementAnimation =
-      resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
-    const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
+    const {
+      resolutionMoves,
+      visibleHexes,
+      visibleMissileLaunches,
+      sightCuesForPlayback,
+      airStrikeOutboundMoves,
+      airStrikeReturnMoves,
+      visibility,
+      unknownCombatHexes,
+      unknownCasualtyHexes,
+      airStrikeRemovedForPlayback,
+      airStrikeCasualtyHexesForPlayback,
+      airStrikeCombatHexesForPlayback,
+      needsCombatOrMovementAnimation,
+      needsAnimation,
+    } = plan;
     const watching = observeModeControls(state.seats ?? []).observing;
     const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
       watching,

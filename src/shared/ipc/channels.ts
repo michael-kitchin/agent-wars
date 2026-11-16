@@ -34,6 +34,8 @@ export const IPC_GAME = {
   readCommanderPool: 'game:readCommanderPool',
   readSideMessages: 'game:readSideMessages',
   readMatchCharts: 'game:readMatchCharts',
+  readReplayTimeline: 'game:readReplayTimeline',
+  readReplayStep: 'game:readReplayStep',
   stageSideMessage: 'game:stageSideMessage',
   cancelStagedSideMessage: 'game:cancelStagedSideMessage',
   submitOrders: 'game:submitOrders',

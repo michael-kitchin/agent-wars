@@ -25,6 +25,7 @@ import {
 import type { CommanderDispatch, CommanderStatusRow } from '../../shared/commanderStatus';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
+import { replayActive } from '../replay/replayState';
 import { createMessagePartyFlag } from '../chrome/sideNumberFlag';
 import { createSideNumberFlag } from '../chrome/toastInlineMarks';
 import { appendMapToastSectionHeader, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
@@ -57,14 +58,16 @@ export function bindCommanderMessageTabs(): void {
  * Applies drained dispatches and shows the dialog when one tab is enabled.
  *
  * Purpose: The pool's screen callback. This function does not file Reports.
- * When to use: `readCommanderPoolAndApply` when messages should show.
+ * When to use: `readCommanderPoolAndApply` when messages should show, and replay with `fromReplay` to show a past turn's dialog. During replay a call without `fromReplay` returns at once, so a commander that finishes in the background cannot open its dialog over a past turn. Its messages are still filed in the Reports tab by the pool client.
  * Expected outcome: The selected panel is that dispatch's Messages, then Strategy, when the consult sent them. A skip enables its tab with one line and does not change the selection. An appearance with no prose does not open the dialog.
  * Exceptions: None.
  */
 export function showCommanderMessageTabs(
   dispatches: readonly CommanderDispatch[],
-  statuses: readonly CommanderStatusRow[] = []
+  statuses: readonly CommanderStatusRow[] = [],
+  options?: { readonly fromReplay?: boolean }
 ): void {
+  if (replayActive() && options?.fromReplay !== true) return;
   const opening = strategyToastHidden() || tabState === null;
   if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
   if (opening) {

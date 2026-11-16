@@ -10,6 +10,7 @@
 import { chatPanelShouldShow } from '../../shared/chatPanelState';
 import { rendererSharedState as S } from '../core/state';
 import { layoutMapChrome } from '../map/mapChromeLayout';
+import { replayActive } from '../replay/replayState';
 
 /**
  * Sets the panel's `hidden` attribute from the match, playback, the map toast, and automatic turns.
@@ -28,6 +29,7 @@ export function syncChatPanelVisibility(): void {
     playbackRunning: S.resolutionMoveAnimation != null,
     mapToastShowing: toast != null && !toast.classList.contains('hidden'),
     autoAdvance: S.autoAdvance,
+    replayActive: replayActive(),
   });
   const field = document.getElementById('chat-panel-input');
   if (!show && field instanceof HTMLElement && document.activeElement === field) field.blur();

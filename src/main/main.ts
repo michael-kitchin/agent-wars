@@ -51,6 +51,7 @@ import { restorePersistedTacticalBattleSession } from './tacticalBattle/tactical
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 import { exportFinishedMatchRecordingIfNeeded } from './recorder/matchRecordingExport';
 import { recordTacticalBeat } from './recorder/matchRecordingEvents';
+import { recordResolutionView } from './replay/replayRecording';
 import { gameDbOps } from './gameDb/dbConnection';
 import { readSeatRoster } from './gameDb/seatRosterStore';
 import { sendStagedHumanSideMessages } from './sideMessages/humanSideMessages';
@@ -70,6 +71,7 @@ import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
 import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
 import { registerMatchChartsIpcHandler } from './ipc/matchChartsIpcHandler';
+import { registerReplayIpcHandler } from './ipc/replayIpcHandler';
 import { registerSideMessageIpcHandler } from './ipc/sideMessageIpcHandler';
 import { registerHumanNicknameIpcHandler } from './ipc/humanNicknameIpcHandler';
 import { registerSeatCommanderIpcHandler } from './ipc/seatCommanderIpcHandler';
@@ -491,6 +493,7 @@ function registerIpcHandlers(): void {
         },
         playback: result.tacticalResolutionPlayback,
       });
+      recordResolutionView(beatStep, 'tactical', result);
       const humanSeatId = activeHumanSeatId(readSeatRoster(gameDbOps));
       // An AI-only beat commits through this channel too. The player's drafts wait for their own commit.
       if (preBattle && humanSeatId && battleHasPartySeat(preBattle, humanSeatId)) {
@@ -620,6 +623,7 @@ function registerIpcHandlers(): void {
   registerEndMatchIpcHandler(ipcMain, { isDeferredConsultPending: hasDeferredPlaybackConsultPending });
   registerSideMessageIpcHandler(ipcMain);
   registerMatchChartsIpcHandler(ipcMain);
+  registerReplayIpcHandler(ipcMain);
   registerHumanNicknameIpcHandler(ipcMain);
   registerSeatCommanderIpcHandler(ipcMain);
   registerMissileLaunchIpcHandler(ipcMain);

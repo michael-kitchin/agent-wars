@@ -155,7 +155,7 @@ export const MATCH_FRAME_FORMAT_VERSION = 1;
  *
  * Purpose: The format-version map and the database share one list.
  * When to use: A new event type is added to this list and to `MATCH_EVENT_FORMAT_VERSIONS` together.
- * Expected outcome: The twelve event names, in record order.
+ * Expected outcome: The fourteen event names, in record order.
  * Exceptions: None.
  */
 export const MATCH_EVENT_TYPES = [
@@ -171,6 +171,8 @@ export const MATCH_EVENT_TYPES = [
   'stance_declared',
   'side_statistics',
   'losses_attributed',
+  'view_snapshot',
+  'resolution_view',
 ] as const;
 
 /**
@@ -178,7 +180,7 @@ export const MATCH_EVENT_TYPES = [
  *
  * Contract: A member of that list.
  * When to use: The `type` of a recorded event.
- * Expected outcome: One of the twelve names.
+ * Expected outcome: One of the fourteen names.
  * Exceptions: None.
  */
 export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
@@ -204,6 +206,8 @@ export const MATCH_EVENT_FORMAT_VERSIONS: Readonly<Record<MatchEventType, number
   stance_declared: 2,
   side_statistics: 1,
   losses_attributed: 1,
+  view_snapshot: 1,
+  resolution_view: 1,
 };
 
 /**

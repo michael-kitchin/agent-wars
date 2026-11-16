@@ -91,6 +91,7 @@ applyGameStateSnapshot: (
       updateReadyButton?: boolean;
       refreshBuildPopup?: boolean;
       redraw?: boolean;
+      replay?: 'step' | 'leave';
     }
   ) => Promise<void>;
     /**

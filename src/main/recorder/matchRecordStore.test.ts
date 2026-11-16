@@ -14,11 +14,16 @@ import { strategicStep } from '../../shared/matchRecording';
 import {
   countMatchRecords,
   insertMatchRecord,
+  lastFrameHeader,
   lastFrameStepKeyText,
   lastMatchRecordId,
+  lastRecordIdOfType,
+  listMatchEventsAtStep,
   listMatchEventsOfType,
+  listMatchRecordHeadersOfType,
   listMatchRecords,
   matchHasEventOfType,
+  readMatchRecord,
 } from './matchRecordStore';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
@@ -67,5 +72,39 @@ test('a frame and two events round-trip in record order', () => {
     assert.equal(lastMatchRecordId(gameDbOps), 3);
     assert.deepEqual(listMatchEventsOfType(gameDbOps, 'orders_committed').map((row) => row.recordId), [2]);
     assert.deepEqual(listMatchEventsOfType(gameDbOps, 'consultation'), []);
+  });
+});
+
+test('the targeted readers find one record, one step, and the newest of a type', () => {
+  withTempGameDb('aw-match-store-targeted-', () => {
+    assert.equal(lastFrameHeader(gameDbOps), null);
+    assert.equal(lastRecordIdOfType(gameDbOps, 'view_snapshot'), null);
+    const add = (kind: 'frame' | 'event', recordType: string, turn: number, payload: unknown): void => {
+      insertMatchRecord(gameDbOps, {
+        kind,
+        recordType,
+        formatVersion: 1,
+        step: strategicStep(turn),
+        visibility: 'engine',
+        displayText: null,
+        recordedAt: '2026-01-01T00:00:00.000Z',
+        payload,
+      });
+    };
+    add('frame', 'state', 1, { f: 1 });
+    add('event', 'view_snapshot', 1, { v: 1 });
+    add('frame', 'state', 2, { f: 2 });
+    add('event', 'view_snapshot', 2, { v: 2 });
+    add('event', 'view_snapshot', 2, { v: 3 });
+    assert.deepEqual(lastFrameHeader(gameDbOps), { recordId: 3, stepKey: 's2', step: strategicStep(2) });
+    assert.equal(lastRecordIdOfType(gameDbOps, 'view_snapshot'), 5);
+    assert.deepEqual(readMatchRecord(gameDbOps, 2)?.payload, { v: 1 });
+    assert.equal(readMatchRecord(gameDbOps, 99), null);
+    assert.deepEqual(listMatchEventsAtStep(gameDbOps, 'view_snapshot', 's2').map((row) => row.payload), [{ v: 2 }, { v: 3 }]);
+    assert.deepEqual(listMatchEventsAtStep(gameDbOps, 'view_snapshot', 's9'), []);
+    const headers = listMatchRecordHeadersOfType(gameDbOps, 'view_snapshot');
+    assert.deepEqual(headers.map((row) => row.recordId), [2, 4, 5]);
+    assert.equal(headers.every((row) => !('payload' in row)), true);
+    assert.deepEqual(headers.map((row) => row.turnNumber), [1, 2, 2]);
   });
 });

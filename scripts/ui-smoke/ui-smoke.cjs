@@ -232,6 +232,14 @@ async function runFirstSession(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.chartsClosed);
 
+  // The replay key shows a past turn with its own panel in place of the selection and chat panels, and Escape leaves.
+  await page.keyboard.press('p');
+  await page.waitForTimeout(SETTLE_MS.click * 3);
+  await recordScene(page, report, outDir, SCENES.replayOpen);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(SETTLE_MS.click * 3);
+  await recordScene(page, report, outDir, SCENES.replayClosed);
+
   // Show the map-mode tabs from the toggle on the overview's corner; they start hidden and stay shown until the toggle
   // hides them in the small window below. Turn Tech on and record it with the weather icons still on, then turn it
   // off. Turn Weather off and record the map without weather icons, then turn it back on. Turn Control off and

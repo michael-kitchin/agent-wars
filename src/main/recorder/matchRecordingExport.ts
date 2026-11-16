@@ -109,32 +109,50 @@ export function writeMatchRecordingFile(args: {
   };
   const hexes = readMatchTable(args.ops, 'hexes');
   const staticLine = { line: 'static', hexes };
-  const records = listMatchRecords(args.ops).map((record) => ({
-    line: 'record',
-    recordId: record.recordId,
-    kind: record.kind,
-    recordType: record.recordType,
-    formatVersion: record.formatVersion,
-    stepKey: record.stepKey,
-    scope: record.scope,
-    turnNumber: record.turnNumber,
-    battleId: record.battleId,
-    beatNumber: record.beatNumber,
-    visibility: record.visibility,
-    displayText: record.displayText,
-    recordedAt: record.recordedAt,
-    payload: record.payload,
-  }));
-  const text = [header, staticLine, ...records].map((line) => JSON.stringify(line)).join('\n');
+  // Each line is encoded on its own so that no single string holds the whole file.
+  const parts: Buffer[] = [header, staticLine].map(encodeLine);
+  for (const record of listMatchRecords(args.ops)) {
+    parts.push(
+      encodeLine({
+        line: 'record',
+        recordId: record.recordId,
+        kind: record.kind,
+        recordType: record.recordType,
+        formatVersion: record.formatVersion,
+        stepKey: record.stepKey,
+        scope: record.scope,
+        turnNumber: record.turnNumber,
+        battleId: record.battleId,
+        beatNumber: record.beatNumber,
+        visibility: record.visibility,
+        displayText: record.displayText,
+        recordedAt: record.recordedAt,
+        payload: record.payload,
+      })
+    );
+  }
   const tmp = `${args.targetPath}.tmp`;
   fs.mkdirSync(path.dirname(args.targetPath), { recursive: true });
-  fs.writeFileSync(tmp, gzipSync(Buffer.from(text, 'utf8')));
+  fs.writeFileSync(tmp, gzipSync(Buffer.concat(parts)));
   try {
     fs.renameSync(tmp, args.targetPath);
   } catch (err) {
     fs.rmSync(tmp, { force: true });
     throw err;
   }
+}
+
+/**
+ * Encodes one recording line.
+ *
+ * Purpose: The file is built from one buffer per line, so a long match never needs a single string for the whole file.
+ * When to use: Each header, hex grid, and record line while writing.
+ * Expected outcome: The line as UTF-8 JSON followed by a newline.
+ * Exceptions: Throws when the value cannot be turned into JSON.
+ */
+function encodeLine(line: unknown): Buffer {
+  return Buffer.from(`${JSON.stringify(line)}
+`, 'utf8');
 }
 
 /**

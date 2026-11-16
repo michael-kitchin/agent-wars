@@ -9,6 +9,7 @@ import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { staleIntelViewer } from '../../shared/observeModeControls';
 import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { repaintChatThread } from '../chat/chatPanelClient';
+import { replayActive } from '../replay/replayState';
 
 /**
  * Documents the `ApplySnapshotDeps` interface as a named contract surface (interface ApplySnapshotDeps).
@@ -183,6 +184,7 @@ applyGameStateSnapshot: (
       updateReadyButton?: boolean;
       refreshBuildPopup?: boolean;
       redraw?: boolean;
+      replay?: 'step' | 'leave';
     }
   ) => Promise<void>;
 }
@@ -294,12 +296,12 @@ export async function refreshGameStateAfterMercenaryDismiss(deps: RefreshBuildQu
 }
 
 /**
- * Defines the `applyGameStateSnapshot` function shape (export async function applyGameStateSnapshot( deps: ApplySnapshotDeps, nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean;).
-
- * Purpose: Supports maintainability by documenting why `applyGameStateSnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Makes a match snapshot the screen's state and redraws the parts the options name.
+ *
+ * Purpose: Every path that receives a snapshot applies it here, so the screen, the selection, and the last-seen enemy markers stay in step. During replay, an application that is not a replay step is ignored, so a background refresh cannot replace a past picture.
+ * When to use: After a handler returns a new snapshot, and for each replay step with `replay` set. `replay: 'step'` or `'leave'` also skips the last-seen enemy marker update, because past snapshots in any order would corrupt it.
+ * Expected outcome: `S.gameState` is `nextState` and each requested part is refreshed. Nothing happens while replay is active unless `options.replay` is `'step'`.
+ * Exceptions: Propagates a failure from a dependency, such as the standing-order refresh.
  */
 export async function applyGameStateSnapshot(
   deps: ApplySnapshotDeps,
@@ -312,8 +314,10 @@ export async function applyGameStateSnapshot(
     updateReadyButton?: boolean;
     refreshBuildPopup?: boolean;
     redraw?: boolean;
+    replay?: 'step' | 'leave';
   } = {}
 ): Promise<void> {
+  if (replayActive() && options.replay !== 'step') return;
   installRendererGameMap(nextState);
   syncMapExtentToSnapshot(nextState);
   const previousState = S.gameState;
@@ -346,7 +350,7 @@ export async function applyGameStateSnapshot(
   }
   deps.rebuildUnitDisplayNameLookup(nextState);
   deps.reconcileSelectionToCurrentState();
-  deps.updateClientStaleEnemyIntel(previousState, nextState);
+  if (options.replay === undefined) deps.updateClientStaleEnemyIntel(previousState, nextState);
   if (!S.initialCameraApplied && nextState.hexes.length > 0) {
     if (nextState.tacticalBattleSession) {
       // Skip strategic initial camera so restored tactical `enterTacticalMapView` framing is not overwritten.

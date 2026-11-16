@@ -21,6 +21,7 @@ import type { DismissMercenaryResult } from '../mercenaryDismiss';
 import type { HexHireView, HireMutationResult, HireOrderRequest } from './mercenaryTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
 import type { MatchChartsSnapshot } from '../matchStatistics';
+import type { ReplayStepView, ReplayTimeline } from '../replayTypes';
 import type { SideMessageThreadSnapshot } from '../sideMessageView';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
@@ -408,6 +409,24 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    * Exceptions: Rejects when the IPC channel fails.
    */
   readMatchCharts: () => Promise<MatchChartsSnapshot>;
+  /**
+   * Lists the recorded turns replay can show.
+   *
+   * Contract: Steps are for the current view, oldest first. Empty when nothing was recorded.
+   * When to use: When replay is entered.
+   * Expected outcome: A timeline whose last step is the current turn.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readReplayTimeline: () => Promise<ReplayTimeline>;
+  /**
+   * Reads one recorded turn.
+   *
+   * Contract: Changes nothing in the match. Returns null for an unknown record or one of another view.
+   * When to use: When replay shows a step.
+   * Expected outcome: The snapshot the screen was given, the result that led into it, and what its dialogs showed.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readReplayStep: (payload: { recordId: number }) => Promise<ReplayStepView | null>;
   /**
    * Stores one draft from the player to one side.
    *

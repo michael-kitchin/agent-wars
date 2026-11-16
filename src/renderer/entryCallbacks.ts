@@ -332,6 +332,7 @@ export async function applyGameStateSnapshot(
     updateReadyButton?: boolean;
     refreshBuildPopup?: boolean;
     redraw?: boolean;
+    replay?: 'step' | 'leave';
   } = {}
 ): Promise<void> {
   const previousMapId = S.gameState?.gameMap?.id;

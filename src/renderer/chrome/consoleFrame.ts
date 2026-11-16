@@ -13,6 +13,7 @@ import {
   type ConsoleTabState,
 } from '../../shared/consoleTabState';
 import { isObservingRoster, observeModeControls } from '../../shared/observeModeControls';
+import { replayActive } from '../replay/replayState';
 import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
 import { onQueuedOrdersChanged, queuedOrderCount } from '../gameplay/queuedOrderRows';
@@ -149,7 +150,7 @@ function setRailBadge(badgeId: string, count: number): void {
  */
 export function refreshConsoleHeader(): void {
   const orders = document.getElementById('console-tab-orders');
-  const observing = observeModeControls(S.gameState?.seats ?? []).observing;
+  const observing = observeModeControls(S.gameState?.seats ?? []).observing || replayActive();
   if (orders instanceof HTMLButtonElement) orders.disabled = observing;
   const redirected = consoleTabWhenOrdersDisabled(consoleState, observing);
   if (redirected !== consoleState) {
@@ -263,7 +264,7 @@ export function wireConsoleFrame(): void {
   onConsoleReportsChanged(refreshConsoleHeader);
   for (const tab of CONSOLE_TABS) {
     document.getElementById(tab.tabId)?.addEventListener('click', () => {
-      if (tab.tabId === 'console-tab-orders' && observeModeControls(S.gameState?.seats ?? []).observing) return;
+      if (tab.tabId === 'console-tab-orders' && (observeModeControls(S.gameState?.seats ?? []).observing || replayActive())) return;
       consoleState = nextConsoleTabState(consoleState, tab.tabId);
       applyConsoleState();
     });

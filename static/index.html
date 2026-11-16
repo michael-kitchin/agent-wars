@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="selectionChrome.css" />
   <link rel="stylesheet" href="chartsChrome.css" />
   <link rel="stylesheet" href="chatChrome.css" />
+  <link rel="stylesheet" href="replayChrome.css" />
   <link rel="stylesheet" href="feedbackChrome.css" />
   <link rel="stylesheet" href="newGameChrome.css" />
   <link rel="stylesheet" href="overlayChrome.css" />
@@ -310,6 +311,19 @@
       </div>
       <div id="chat-panel-staged" class="chat-panel-staged" hidden></div>
       <div id="chat-panel-history" class="chat-panel-history" role="log" aria-live="polite"></div>
+    </section>
+    <section id="replay-panel" class="replay-panel" aria-label="Replay" data-state="compact" hidden>
+      <div id="replay-panel-seek" class="replay-panel-seek">
+        <input type="text" id="replay-turn-input" class="replay-turn-input" inputmode="numeric" autocomplete="off" aria-label="Turn" data-control-tooltip="Type a turn number and press Enter to go to that turn." />
+        <input type="range" id="replay-slider" class="replay-slider" min="0" max="0" step="1" value="0" aria-label="Turn" data-control-tooltip="Drag to a turn. The map changes when you let go." />
+      </div>
+      <div id="replay-panel-bar" class="replay-panel-bar">
+        <button type="button" id="replay-panel-expand" class="replay-panel-expand" aria-expanded="false" aria-controls="replay-panel-seek" aria-label="Show the turn slider" data-control-tooltip="Show the slider and the turn field."><svg class="chrome-icon replay-panel-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"></path></svg></button>
+        <p id="replay-panel-label" class="replay-panel-label"></p>
+        <button type="button" id="replay-step-back" class="replay-panel-btn" aria-label="Step back one turn" data-control-tooltip="Go back one turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3v10M13 3L6 8l7 5z"></path></svg></button>
+        <button type="button" id="replay-step-forward" class="replay-panel-btn" aria-label="Step forward one turn" data-control-tooltip="Go forward one turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3v10M3 3l7 5-7 5z"></path></svg></button>
+        <button type="button" id="replay-play" class="replay-panel-btn" aria-label="Play" data-control-tooltip="Play the turns forward with their animations." disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3l9 5-9 5z"></path></svg></button>
+      </div>
     </section>
   </div>
   <aside id="sidebar" class="console" aria-label="Console" data-collapsed="false">

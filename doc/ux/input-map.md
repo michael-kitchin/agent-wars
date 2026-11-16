@@ -38,6 +38,8 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Escape | Stack callout open, build popup closed | Closes the stack callout, including one that is scheduled but not open yet. | [stack-callout.md](stack-callout.md) |
 | Escape | Tactical battles list open | Chooses Ignore and does nothing else. | [tactical-battles-list.md](tactical-battles-list.md) |
 | C | Same as pan, with a match loaded and no dialog open that needs the player's choice | Opens the [charts dialog](charts-dialog.md). While the dialog is open, C closes it. | [charts-dialog.md](charts-dialog.md) |
+| P | Same as pan, with a match loaded and no dialog open that needs the player's choice | Turns [replay](replay-panel.md) on, or off when it is on. Replay does not start while a turn is resolving or inside a battle. | [replay-panel.md](replay-panel.md) |
+| Escape | Replay on, no dialog open | Leaves replay and shows the present. In the replay turn field, Escape puts the last shown turn back and does not leave. | [replay-panel.md](replay-panel.md) |
 | Escape | Charts dialog open | Closes the dialog. No other dialog also acts on that Escape, and no map key acts while the dialog is open. | [charts-dialog.md](charts-dialog.md) |
 | Escape | AI-only battle result open | Does not close the Ok dialog. | [tactical-battle-controls.md](tactical-battle-controls.md) |
 
@@ -53,6 +55,8 @@ Keys other than these do not pan, toggle terrain, or close popups.
 - Hiding the window stops keyboard pan.
 - Holding Shift, Control, Alt, or Meta stops keyboard pan and does not start a new pan.
 - Key repeat does not start another pan or another terrain hold.
+- P does nothing while a text field, a drop-down, or the replay turn field has focus. Escape in the replay turn field puts the last shown turn back and does not leave replay. After the slider jumps to a turn, focus leaves the slider so the map keys work again.
+- While replay is on, click, double-click, and right-click on the map do nothing, and Ready does nothing. Dragging and the wheel still pan and zoom. See [replay-panel.md](replay-panel.md).
 - Escape closes the charts dialog before anything else, and stops there. Otherwise it closes the game menu first, then the build popup, then the stack callout. While the tactical battles list is open, Escape only chooses Ignore. A build popup or stack callout under the dialog stays as it is.
 - Holding T is a deliberate inspection gesture. Tech and Production do not replace it: while the key is down, terrain fill stays hidden, and on the strategic map, outside battle-detail zoom, the hex codes stay up, production labels show on every hex and move to the lower band, and the tech icon is shown when [map-surface.md](map-surface.md) says it applies, beside the weather icon while Weather is on. Releasing the key restores the fill and removes the codes, the labels Production did not choose, and the tech icons Tech did not choose. The tech icons stay while Tech is on, and the production labels on other hexes stay while Production is on. `isMapInspectionModeHeld` is true only while T is held. In a battle, or while the new-game or game-over overlay is open, Tech and Production have no effect and T works as below. Window blur releases the key and does the same as release. While the new-game overlay is open, that hold follows [new-game-dialog.md](new-game-dialog.md): it draws the global preview's hex grid, and it does not show hex codes or production labels. A regional preview keeps its hex grid.
 - The map's own keyboard handling is off, so the pan keys above are the only keyboard pan.
@@ -77,6 +81,7 @@ None.
 - `src/renderer/map/initCore.ts`
 - `src/renderer/chrome/blockingDialogGuards.ts`
 - `src/renderer/charts/chartsDialog.ts`
+- `src/renderer/replay/replayMode.ts` (`toggleReplay`, `leaveReplay`)
 - `src/renderer/map/mapKeyboardPan.ts`
 - `src/renderer/map/mapHelpers.ts`
 - `src/renderer/map/mainMapInteractions.ts`

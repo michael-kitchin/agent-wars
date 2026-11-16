@@ -8,7 +8,7 @@ Give the player the buttons that end the turn or start a targeted order.
 
 ## Availability
 
-Ready shows whenever the console does. The reticle and the air-strike target list show in the selection panel, which shows while units are selected. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the console and the selection panel are absent, so these controls are absent with them. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
+Ready shows whenever the console does. The reticle and the air-strike target list show in the selection panel, which shows while units are selected. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the console and the selection panel are absent, so these controls are absent with them. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md). While [replay](replay-panel.md) is on, Ready is disabled and does nothing, and the selection panel's controls are hidden with it.
 
 ## Information Displayed
 

@@ -22,7 +22,7 @@ Keep errors, turn summaries, and the opponent's consultation text on the surface
 
 ## Availability
 
-The map toast and the AI strategy toast can appear in Strategic planning, Resolution playback, and Tactical planning. They do not require a mode change. While the new-game overlay is open, those toasts stay without pointer input, though the map under the setup panel can be dragged. The message toast sits in the map's band. It stays to the right of the setup panel unless the opponent tab row is wider than that gap, and then the band overlaps the panel so the tabs stay on one line. The map toast sits at the lower right. A tall setup panel is stacked above it.
+The map toast and the AI strategy toast can appear in Strategic planning, Resolution playback, and Tactical planning. They do not require a mode change. While the new-game overlay is open, those toasts stay without pointer input, though the map under the setup panel can be dragged. The message toast sits in the map's band. It stays to the right of the setup panel unless the opponent tab row is wider than that gap, and then the band overlaps the panel so the tabs stay on one line. The map toast sits at the lower right. A tall setup panel is stacked above it. While [replay](replay-panel.md) is on, each step shows its own turn's update and message dialogs. Those are not filed in the Reports tab or the activity log again, and a commander that finishes during replay does not open its message dialog. An update that waited for a battle is shown at the start of its turn without the battle lines the live game added when the battle ended. Last-seen enemy markers are not drawn in replay.
 
 ## Information Displayed
 

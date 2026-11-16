@@ -8,17 +8,18 @@
  */
 
 import { rendererSharedState as S } from '../core/state';
+import { replayActive } from '../replay/replayState';
 
 /**
  * Whether standing-order / committed paths should be drawn on the overlay canvas.
  *
- * Purpose: Hides committed paths while Shift is held so stack-selection mode stays readable.
+ * Purpose: Hides committed paths while Shift is held so stack-selection mode stays readable, and during replay, because the queued orders belong to the present and would be drawn from a past turn's unit positions.
  * When to use: Inside `drawGameScene` before `drawStandingOrderLines`.
- * Expected outcome: `false` when Shift is held; otherwise `true`.
+ * Expected outcome: `false` when Shift is held or replay is on; otherwise `true`.
  * Exceptions: None.
  */
 export function shouldDrawCommittedOrderPaths(): boolean {
-  return !S.shiftKeyActive;
+  return !S.shiftKeyActive && !replayActive();
 }
 
 /**

@@ -6,6 +6,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
 import type { MatchChartsSnapshot } from '../shared/matchStatistics';
+import type { ReplayStepView, ReplayTimeline } from '../shared/replayTypes';
 import type { SideMessageThreadSnapshot } from '../shared/sideMessageView';
 import type { BasemapVectorName } from '../shared/vectorPackTypes';
 import type { DismissMercenaryResult } from '../shared/mercenaryDismiss';
@@ -97,6 +98,8 @@ const IPC_GAME = {
   readCommanderPool: 'game:readCommanderPool',
   readSideMessages: 'game:readSideMessages',
   readMatchCharts: 'game:readMatchCharts',
+  readReplayTimeline: 'game:readReplayTimeline',
+  readReplayStep: 'game:readReplayStep',
   stageSideMessage: 'game:stageSideMessage',
   cancelStagedSideMessage: 'game:cancelStagedSideMessage',
   submitOrders: 'game:submitOrders',
@@ -468,6 +471,16 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    */
   readMatchCharts: (): Promise<MatchChartsSnapshot> =>
     ipcRenderer.invoke(IPC_GAME.readMatchCharts),
+  /**
+   * Lists the recorded turns replay can show.
+   */
+  readReplayTimeline: (): Promise<ReplayTimeline> =>
+    ipcRenderer.invoke(IPC_GAME.readReplayTimeline),
+  /**
+   * Reads one recorded turn with its snapshot and what its dialogs showed.
+   */
+  readReplayStep: (payload: { recordId: number }): Promise<ReplayStepView | null> =>
+    ipcRenderer.invoke(IPC_GAME.readReplayStep, payload),
   /**
    * Stores one draft from the player to one side.
    *

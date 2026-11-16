@@ -21,6 +21,7 @@ import { layoutMapChrome } from '../map/mapChromeLayout';
 import { isObservingRoster } from '../../shared/observeModeControls';
 import { activeAiSeats } from '../../shared/seatRoster';
 import { sideDisplayName } from '../../shared/sideNicknames';
+import { replayActive } from '../replay/replayState';
 import { commanderFooterLabel, commanderPlanningSentence, modelNameFromOptionLabel, commanderPlanningStatus } from '../../shared/commanderPlanningStatus';
 export { updateOpenRouterToolCountLabels } from './openRouterToolCountLabels';
 
@@ -44,7 +45,7 @@ export function updateReadyButtonState(): void {
   const waitingOnAi = isWaitingForPrecomputedAiOrders();
   const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null;
   readyBtn.disabled =
-    gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
+    gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen || replayActive();
   const deferredClock = S.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;
 
   if (waitingOnAi) {

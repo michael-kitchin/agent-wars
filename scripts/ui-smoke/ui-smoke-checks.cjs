@@ -408,6 +408,22 @@ const FRAME_CHECKS = Object.freeze([
     needs: ['#charts-overlay'],
     run: (p, el) => (el('#charts-overlay').shown ? 'Escape left the charts dialog open' : null),
   },
+  {
+    name: 'replay-key-shows-the-replay-panel-in-place-of-the-live-panels',
+    scenes: [SCENES.replayOpen],
+    needs: ['#replay-panel', '#selection-panel', '#chat-panel'],
+    run: (p, el) => {
+      if (!el('#replay-panel').shown) return 'the replay panel is not shown after p';
+      if (el('#selection-panel').shown) return 'the selection panel is still shown in replay';
+      return el('#chat-panel').shown ? 'the chat panel is still shown in replay' : null;
+    },
+  },
+  {
+    name: 'replay-escape-hides-the-replay-panel',
+    scenes: [SCENES.replayClosed],
+    needs: ['#replay-panel'],
+    run: (p, el) => (el('#replay-panel').shown ? 'Escape left the replay panel shown' : null),
+  },
 ]);
 
 /**

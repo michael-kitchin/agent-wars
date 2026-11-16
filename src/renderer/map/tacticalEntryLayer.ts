@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { observeModeControls } from '../../shared/observeModeControls';
+import { replayActive } from '../replay/replayState';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { TACTICAL_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
@@ -55,7 +56,7 @@ export function syncTacticalEntryButton(deps: {
     if (layer) hideTacticalEntryLayer(layer, false);
     return;
   }
-  if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot || !observeModeControls(S.gameState.seats ?? []).magnifierEnabled) {
+  if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot || !observeModeControls(S.gameState.seats ?? []).magnifierEnabled || replayActive()) {
     hideTacticalEntryLayer(layer);
     return;
   }

@@ -14,27 +14,58 @@ import { HUMAN_SEAT_ID, type SeatId } from '../../shared/seatIds';
 import { getGameState, getGameStateForPlayer, getSeatRoster } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { withHireHexes } from '../gameDb/mercenaryEconomyRead';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
+
+/**
+ * Marks every listed hex visible and explored, with no stale intel.
+ *
+ * Purpose: The all-sides snapshot and the replay reader build their hex lists with the same rule.
+ * When to use: When a snapshot should show every hex, with `hexIds` the ids of the snapshot's hexes.
+ * Expected outcome: A copy whose `visibleHexes` and `exploredHexes` are `hexIds` and whose `staleHexes` is empty.
+ * Exceptions: None.
+ */
+export function withEveryHexVisible(snapshot: GameStateSnapshot, hexIds: readonly string[]): GameStateSnapshot {
+  logTrace('matchViewSnapshot withEveryHexVisible', { hexCount: hexIds.length });
+  return {
+    ...snapshot,
+    visibleHexes: [...hexIds],
+    exploredHexes: [...hexIds],
+    staleHexes: [],
+  };
+}
 
 /**
  * Builds the all-sides snapshot from the unfiltered match.
  *
  * Purpose: All sides, no fog, shows every hex and every unit and no stale ghost.
- * When to use: When `resolveMatchView` returns `'all'`.
+ * When to use: When `resolveMatchView` returns `'all'`, and when the replay recorder stores the all-sides picture.
  * Expected outcome: `playerPerspective` is `'all'`, `enemyIntel` is empty, and every hex is visible and explored.
  * Exceptions: Propagates a database error from `getGameState`.
  */
-function omniscientSnapshot(): GameStateSnapshot {
+export function omniscientSnapshot(): GameStateSnapshot {
+  logTrace('matchViewSnapshot omniscientSnapshot');
   const state = getGameState();
   const allHexes = state.hexes.map((hex) => hex.h3Index);
   return withBuildPausedFlags({
-    ...state,
-    visibleHexes: allHexes,
-    exploredHexes: allHexes,
-    staleHexes: [],
+    ...withEveryHexVisible(state, allHexes),
     enemyIntel: [],
     playerPerspective: 'all',
   }, null);
+}
+
+/**
+ * Reads the snapshot one seat's player is given.
+ *
+ * Purpose: The renderer's fogged view of a seat, built in one place for the IPC reader and the replay recorder.
+ * When to use: When a seat, not the all-sides view, is being shown. The human seat also gets its hire hexes.
+ * Expected outcome: What `readMatchSnapshot` returns for that seat.
+ * Exceptions: Propagates a database error from the snapshot readers.
+ */
+export function playerViewSnapshot(seatId: SeatId): GameStateSnapshot {
+  logTrace('matchViewSnapshot playerViewSnapshot', { seatId });
+  const snapshot = getGameStateForPlayer(seatId, { maskUnexploredTerrain: false });
+  if (seatId !== HUMAN_SEAT_ID) return snapshot;
+  return withHireHexes(gameDbOps, snapshot, seatId);
 }
 
 /**
@@ -57,7 +88,5 @@ export function readMatchSnapshot(requested: unknown): GameStateSnapshot {
   logDebug('readMatchSnapshot', { view: decision.view });
   if (decision.view === 'all') return omniscientSnapshot();
   const seatId: SeatId = decision.view === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : decision.view;
-  const snapshot = getGameStateForPlayer(seatId, { maskUnexploredTerrain: false });
-  if (seatId !== HUMAN_SEAT_ID) return snapshot;
-  return withHireHexes(gameDbOps, snapshot, seatId);
+  return playerViewSnapshot(seatId);
 }

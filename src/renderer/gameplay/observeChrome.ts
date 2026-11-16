@@ -15,6 +15,7 @@ import { paletteForOwner } from '../../shared/seatPalette';
 import { isSeatId, type SeatId } from '../../shared/seatIds';
 import { sortSeatsByOrder } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
+import { replayActive } from '../replay/replayState';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { newGameOverlayIsOpen } from './newGameDialogCollapse';
 import { isDeferredResolutionPlaybackConsultPending } from '../openRouter/aiPlanningState';
@@ -111,11 +112,11 @@ function autoAdvanceReady(): boolean {
  *
  * Purpose: The checkbox and Watch the rest share this press.
  * When to use: After playback, after the commander pool changes, and when the checkbox is turned on.
- * Expected outcome: One Ready press. A later failure clears the checkbox.
+ * Expected outcome: One Ready press. A later failure clears the checkbox. Nothing is pressed while replay is on; leaving replay asks again.
  * Exceptions: A missing press handler does nothing.
  */
 export async function maybeObserveAutoAdvance(): Promise<void> {
-  if (!autoAdvanceReady() || !pressReady) return;
+  if (replayActive() || !autoAdvanceReady() || !pressReady) return;
   pressing = true;
   try {
     await pressReady();

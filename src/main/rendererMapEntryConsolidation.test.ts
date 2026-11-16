@@ -23,8 +23,8 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
     'syncTacticalEntryButton should not reference removed optional magnifier-hide flag'
   );
   assert.ok(
-    /if\s*\(\s*S\.gameState\.phase\s*!==\s*'planning'\s*\|\|\s*S\.tacticalBattleSnapshot\s*\|\|\s*!observeModeControls\(S\.gameState\.seats \?\? \[\]\)\.magnifierEnabled\s*\)/.test(source),
-    'syncTacticalEntryButton should hide magnifiers outside planning, during a battle, and while watching'
+    /if\s*\(\s*S\.gameState\.phase\s*!==\s*'planning'\s*\|\|\s*S\.tacticalBattleSnapshot\s*\|\|\s*!observeModeControls\(S\.gameState\.seats \?\? \[\]\)\.magnifierEnabled\s*\|\|\s*replayActive\(\)\s*\)/.test(source),
+    'syncTacticalEntryButton should hide magnifiers outside planning, during a battle, while watching, and in replay'
   );
   assert.ok(
     source.includes('if (areResolutionDiceChipsShowing(S.resolutionMoveAnimation)) {'),

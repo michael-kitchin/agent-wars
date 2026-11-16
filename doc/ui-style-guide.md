@@ -6,7 +6,7 @@
 
 This document defines UI aesthetics, control patterns, and application-specific guidelines for the grand strategy wargame. Use it for all UI and map chrome so the product reads as a coherent, serious strategy wargame.
 
-**Implementation status (3.0.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, top bar, docked console with the Orders, Reports, and Commanders tabs, selection panel, minimap panel with map-mode tabs, hex tooltips, control tips, stack callout, build-queue popup, a message toast at the top of the map and an update toast at the lower right, both 12 px in from the map's right edge, the update toast 12 px above the bottom edge, the chat panel at the map's bottom-right above the scale, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. The map stays the light cartographic theme (no dark-mode switch). Panels, popups, tooltips, and the message and update toasts use navy chrome `#1b2838` with off-white text so flags and weather icons separate from the pale terrain. Every button uses the Ready button's teal, except a hire-only map button, whose resting face is the light border color and whose label is dark teal, and the message-popup tabs, whose face is `--chrome-bg`, the same dark slate as the expand control. The chat panel uses that same navy face. A selected message tab stays bold and is underlined in `--chrome-accent-edge`. Text fields and dropdowns use a lighter teal so they read as editable. Seat colors follow seat order: teal `#115E59`, rose `#9D174D`, orange `#C2410C`, and blue `#2563EB`, with Neutral tokens `#141414`, on map background `#e0dcd4`. Matches of two to four sides, including Observe, are built. Unbuilt in this guide: replay strip, async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
+**Implementation status (3.0.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, top bar, docked console with the Orders, Reports, and Commanders tabs, selection panel, minimap panel with map-mode tabs, hex tooltips, control tips, stack callout, build-queue popup, a message toast at the top of the map and an update toast at the lower right, both 12 px in from the map's right edge, the update toast 12 px above the bottom edge, the chat panel at the map's bottom-right above the scale, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. The map stays the light cartographic theme (no dark-mode switch). Panels, popups, tooltips, and the message and update toasts use navy chrome `#1b2838` with off-white text so flags and weather icons separate from the pale terrain. Every button uses the Ready button's teal, except a hire-only map button, whose resting face is the light border color and whose label is dark teal, and the message-popup tabs, whose face is `--chrome-bg`, the same dark slate as the expand control. The chat panel uses that same navy face. A selected message tab stays bold and is underlined in `--chrome-accent-edge`. Text fields and dropdowns use a lighter teal so they read as editable. Seat colors follow seat order: teal `#115E59`, rose `#9D174D`, orange `#C2410C`, and blue `#2563EB`, with Neutral tokens `#141414`, on map background `#e0dcd4`. Matches of two to four sides, including Observe, are built. Unbuilt in this guide: async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
 
 When this guide and the running app disagree, the app wins until this file is updated.
 
@@ -167,7 +167,8 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 2.10 Replay Controls
 
-**Not shipped.** Target: available when viewing a past turn. Allow stepping through the resolution sequence and, when enabled, viewing the AI’s tool log for that turn. Keep controls in a bar or strip so the map remains dominant.
+- **Live app:** The P key opens the replay panel at the map's bottom-left, in the selection panel's place, with the same width, face, and 50 px bar (`static/replayChrome.css`). The bar holds an expand control, the label "Replay · Turn N of M", and Step back, Step forward, and Play buttons in the ordinary button teal. Play is disabled. Expanded, a turn field and a slider sit above the bar, and a rejected turn number turns the field's border `var(--chrome-error)`. The panel draws at z-index 7040, and the selection and chat panels are hidden while it shows. See [ux/replay-panel.md](ux/replay-panel.md).
+- **Not shipped:** Play, which would run a turn's resolution animation, and viewing the AI's tool log for a past turn.
 
 ### 2.11 Async Multiplayer (Turn File Exchange)
 
@@ -235,7 +236,7 @@ When this guide and the running app disagree, the app wins until this file is up
 - [ ] Typography documented as a single named family (live app uses system UI fonts).
 - [ ] Full keyboard-shortcut overlay and in-app manual.
 - [ ] AI observatory of last briefing (the console's Commanders tab shows Start, commander cards, and the activity log, not a briefing viewer).
-- [ ] Replay strip.
+- [x] Replay panel (stepping only; Play is disabled).
 - [ ] Async multiplayer turn files.
 - [x] Save/load UI.
 - [ ] Dark theme.

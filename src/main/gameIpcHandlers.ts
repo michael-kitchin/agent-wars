@@ -26,6 +26,7 @@ import { readHumanOrderTables } from './recorder/matchFrameCapture';
 import { recordStepBoundary } from './recorder/matchRecorder';
 import { currentStepKey } from './recorder/recorderStepKey';
 import { recordStrategicOrders, recordStrategicResolution } from './recorder/matchRecordingEvents';
+import { readyResultForReplay, recordReplayViewsIfNeeded, recordResolutionView } from './replay/replayRecording';
 import { sendStagedHumanSideMessages } from './sideMessages/humanSideMessages';
 import { strategicStep } from '../shared/matchRecording';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
@@ -289,7 +290,9 @@ export async function handleGameReady(
     aiMoves: playbackMoves.aiMoves,
     humanMoves: playbackMoves.humanMoves,
   });
+  recordResolutionView(resolvedStep, 'strategic', readyResultForReplay(readyResult, playbackMoves));
   recordStepBoundary(currentStepKey(), deps.appVersion);
+  recordReplayViewsIfNeeded();
 
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;

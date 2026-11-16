@@ -8,7 +8,7 @@ Show movement and combat that just resolved, including battles the player cannot
 
 ## Availability
 
-Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, dice, or sight cues to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The strategic update for the turn that opened the battle is not shown then. It waits until the battle ends and the Ready that follows has returned, and that popup is the one left on the map. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md).
+Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, dice, or sight cues to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The strategic update for the turn that opened the battle is not shown then. It waits until the battle ends and the Ready that follows has returned, and that popup is the one left on the map. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md). [Replay](replay-panel.md) does not run this animation. It does not start while playback is running.
 
 ## Information Displayed
 
@@ -108,6 +108,7 @@ None.
 ## Code Entry Points
 
 - `src/renderer/rendering/resolutionPlayback.ts`
+- `src/renderer/gameplay/resolutionPlaybackPlan.ts` (`planResolutionPlayback`: the values the animation and the update dialog read, shared with replay)
 - `src/main/sightCues/sightCueReadyStage.ts`
 - `src/main/sightCues/sightCueBeams.ts`
 - `src/shared/sightCueDrawModel.ts`

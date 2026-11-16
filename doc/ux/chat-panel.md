@@ -8,7 +8,7 @@ Show every message sent between sides, and let a player stage a message to one c
 
 ## Availability
 
-Shown in Strategic planning and Tactical planning while a match is loaded, playback is not running, the map toast is hidden, and the checkbox "Start the next turn when every commander is ready" is off (`S.autoAdvance`). Hidden while that checkbox is on, while resolution playback is running, and while the map toast is showing, including an error toast. Hidden for the whole New game and Game over overlay (`body:has(#game-over-overlay:not(.hidden)) #chat-panel` in `static/chatChrome.css`). Clearing the checkbox shows the panel again, unless playback or the map toast is using that corner. An observer with the checkbox off sees the panel and cannot write. See [modes-and-transitions.md](modes-and-transitions.md) and [resolution-playback.md](resolution-playback.md).
+Shown in Strategic planning and Tactical planning while a match is loaded, playback is not running, the map toast is hidden, and the checkbox "Start the next turn when every commander is ready" is off (`S.autoAdvance`). Hidden while that checkbox is on, while resolution playback is running, and while the map toast is showing, including an error toast. Hidden for the whole New game and Game over overlay (`body:has(#game-over-overlay:not(.hidden)) #chat-panel` in `static/chatChrome.css`). Clearing the checkbox shows the panel again, unless playback or the map toast is using that corner. An observer with the checkbox off sees the panel and cannot write. See [modes-and-transitions.md](modes-and-transitions.md) and [resolution-playback.md](resolution-playback.md). While [replay](replay-panel.md) is on, the panel is hidden.
 
 ## Information Displayed
 

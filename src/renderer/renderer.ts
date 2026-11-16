@@ -206,6 +206,8 @@ import {
 } from './gameplay/sidebarSupport';
 import { renderSelectionPanel, wireSelectionPanel } from './gameplay/selectionPanel';
 import { HUMAN_SEAT_ID } from '../shared/seatIds';
+import { bindReplayDeps } from './replay/replayMode';
+import { wireReplayPanel } from './replay/replayPanel';
 
 /**
  * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
@@ -731,6 +733,7 @@ function init(): void {
   });
   wireGameMenu();
   wireChartsDialog();
+  wireReplayPanel();
   wireSaveLoadMenu();
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('shift_pressed');
@@ -820,6 +823,12 @@ function init(): void {
     replacePendingFerryOrdersForSelected,
     clearCommittedOrderDraftState,
     refreshHumanStandingOrders,
+  });
+  bindReplayDeps({
+    readyDeps: createReadyHandlerDeps,
+    selectionDeps: { updateSidebar, updateRangedSidebar, redraw },
+    hideBuildPopup,
+    hideStackCallout,
   });
   const tacticalEntryLayer = document.getElementById('tactical-entry-layer');
   tacticalEntryLayer?.addEventListener('click', (e) => {

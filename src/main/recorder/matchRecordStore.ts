@@ -326,6 +326,128 @@ export function listMatchEventsOfType(ops: BasicDbOps, recordType: MatchEventTyp
 }
 
 /**
+ * A history row without its payload.
+ *
+ * Contract: Every `MatchRecord` field except `payload`.
+ * When to use: Listing a long series by step without decoding it, as the replay timeline does.
+ * Expected outcome: The stored columns in camel case.
+ * Exceptions: None.
+ */
+export type MatchRecordHeader = Omit<MatchRecord, 'payload'>;
+
+/**
+ * Lists the events of one type in write order without their payloads.
+ *
+ * Purpose: A timeline needs each snapshot's id, step, and visibility, and decoding every snapshot to get them would cost far too much.
+ * When to use: When only the columns matter, such as building the replay timeline.
+ * Expected outcome: Only rows with that `record_type`, ordered by `record_id`, with no payload field.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function listMatchRecordHeadersOfType(ops: BasicDbOps, recordType: MatchEventType): MatchRecordHeader[] {
+  const rows = ops.getAll<Omit<StoredMatchRecordRow, 'payload'>>(
+    `SELECT record_id, kind, record_type, format_version, step_key, scope, turn_number,
+      battle_id, beat_number, visibility, display_text, recorded_at
+     FROM match_records WHERE kind = 'event' AND record_type = ? ORDER BY record_id ASC`,
+    [recordType]
+  );
+  logTrace('matchRecordStore listMatchRecordHeadersOfType', { recordType, count: rows.length });
+  return rows.map((row) => ({
+    recordId: row.record_id,
+    kind: row.kind,
+    recordType: row.record_type,
+    formatVersion: row.format_version,
+    stepKey: row.step_key,
+    scope: row.scope,
+    turnNumber: row.turn_number,
+    battleId: row.battle_id,
+    beatNumber: row.beat_number,
+    visibility: row.visibility,
+    displayText: row.display_text,
+    recordedAt: row.recorded_at,
+  }));
+}
+
+/**
+ * The id of the newest event of one type.
+ *
+ * Purpose: A step needs to know whether an event of this type already follows the latest frame, without decoding any payload.
+ * When to use: The replay recorder, before it writes a view snapshot.
+ * Expected outcome: The highest `record_id` with that `record_type`, or null when there is none.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function lastRecordIdOfType(ops: BasicDbOps, recordType: MatchEventType): number | null {
+  const row = ops.getOne<{ id: number | null }>(
+    "SELECT MAX(record_id) AS id FROM match_records WHERE kind = 'event' AND record_type = ?",
+    [recordType]
+  );
+  const id = row?.id ?? null;
+  logTrace('matchRecordStore lastRecordIdOfType', { recordType, recordId: id });
+  return id;
+}
+
+/**
+ * The id and step of the newest frame.
+ *
+ * Purpose: The replay recorder pairs its snapshots with the latest frame's step, read without the frame's payload.
+ * When to use: After a step boundary.
+ * Expected outcome: The newest frame's `record_id`, its `step_key` text, and the same step as a `StepKey`, or null when no frame exists.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function lastFrameHeader(ops: BasicDbOps): { recordId: number; stepKey: string; step: StepKey } | null {
+  const row = ops.getOne<{
+    record_id: number;
+    step_key: string;
+    scope: 'strategic' | 'tactical';
+    turn_number: number;
+    battle_id: string;
+    beat_number: number;
+  }>(
+    'SELECT record_id, step_key, scope, turn_number, battle_id, beat_number FROM match_records WHERE kind = ? ORDER BY record_id DESC LIMIT 1',
+    ['frame']
+  );
+  logTrace('matchRecordStore lastFrameHeader', { found: row !== undefined });
+  if (!row) return null;
+  const step: StepKey = {
+    scope: row.scope,
+    turnNumber: row.turn_number,
+    battleId: row.battle_id,
+    beatNumber: row.beat_number,
+  };
+  return { recordId: row.record_id, stepKey: row.step_key, step };
+}
+
+/**
+ * Reads one history row with its payload decoded.
+ *
+ * Purpose: Replay loads one snapshot without decoding every record of its type.
+ * When to use: When the caller has a record id.
+ * Expected outcome: The row, or null when the id is not in the table.
+ * Exceptions: Throws when the payload cannot be decoded.
+ */
+export function readMatchRecord(ops: BasicDbOps, recordId: number): MatchRecord | null {
+  const row = ops.getOne<StoredMatchRecordRow>(`SELECT ${RECORD_COLUMNS} FROM match_records WHERE record_id = ?`, [recordId]);
+  logTrace('matchRecordStore readMatchRecord', { recordId, found: row !== undefined });
+  return row ? toMatchRecord(row) : null;
+}
+
+/**
+ * Lists the events of one type at one step, in write order.
+ *
+ * Purpose: Replay reads the strategy, messages, and result of a single step.
+ * When to use: When the caller has a step key text.
+ * Expected outcome: Only events with that `record_type` and `step_key`, ordered by `record_id`, payloads decoded.
+ * Exceptions: Throws when a payload cannot be decoded.
+ */
+export function listMatchEventsAtStep(ops: BasicDbOps, recordType: MatchEventType, stepKey: string): MatchRecord[] {
+  const rows = ops.getAll<StoredMatchRecordRow>(
+    `SELECT ${RECORD_COLUMNS} FROM match_records WHERE kind = 'event' AND record_type = ? AND step_key = ? ORDER BY record_id ASC`,
+    [recordType, stepKey]
+  );
+  logTrace('matchRecordStore listMatchEventsAtStep', { recordType, stepKey, count: rows.length });
+  return rows.map(toMatchRecord);
+}
+
+/**
  * The step text of the newest frame.
  *
  * Purpose: A boundary writes a frame only when the step has changed.

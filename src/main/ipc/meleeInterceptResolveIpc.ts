@@ -15,6 +15,7 @@ import { logHybridPipelineBoundary } from '../hybridTurnPipeline';
 import { buildReadyPlaybackMoves } from './readyPlaybackMoves';
 import { recordStepBoundary } from '../recorder/matchRecorder';
 import { recordStrategicResolution } from '../recorder/matchRecordingEvents';
+import { readyResultForReplay, recordReplayViewsIfNeeded, recordResolutionView } from '../replay/replayRecording';
 import { currentStepKey } from '../recorder/recorderStepKey';
 import { strategicStep } from '../../shared/matchRecording';
 import { logDebug } from '../logger';
@@ -101,7 +102,9 @@ export async function handleResolveMeleeIntercept(
     humanMoves: playbackMoves.humanMoves,
     aiMoves: playbackMoves.aiMoves,
   });
+  recordResolutionView(resolvedStep, 'strategic', readyResultForReplay(resolveResult, playbackMoves));
   recordStepBoundary(currentStepKey(), deps.appVersion);
+  recordReplayViewsIfNeeded();
 
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;

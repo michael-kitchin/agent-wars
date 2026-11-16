@@ -8,7 +8,7 @@ Show what the player has selected, where it stands, and what it has been told to
 
 ## Availability
 
-Shown in Strategic planning, Resolution playback, and Tactical planning while at least one of the player's units is selected. Hidden while nothing is selected, and hidden for the whole New game and Game over overlay. While the tactical battles list is open, and in Tactical annihilation, the panel stays as it was and does not receive pointer input. See [modes-and-transitions.md](modes-and-transitions.md).
+Shown in Strategic planning, Resolution playback, and Tactical planning while at least one of the player's units is selected. Hidden while nothing is selected, and hidden for the whole New game and Game over overlay. While the tactical battles list is open, and in Tactical annihilation, the panel stays as it was and does not receive pointer input. See [modes-and-transitions.md](modes-and-transitions.md). While [replay](replay-panel.md) is on, the panel is hidden and the replay panel takes its place.
 
 ## Information Displayed
 

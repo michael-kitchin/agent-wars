@@ -27,26 +27,44 @@ import {
  * Exceptions: Throws when the first line is not a header of this format, when the file version is newer than this build, or when a line is not JSON. The message names the line number.
  */
 export function parseRecordingLines(text: string): ParsedRecording {
-  const lines = text.split('\n').filter((line) => line.length > 0);
-  if (lines.length === 0) throw new Error('The recording is empty.');
-  const header = parseHeader(lines[0]!, 1);
-  const staticData = parseStatic(lines[1], 2);
-  const records = lines.slice(2).map((line, index) => parseRecord(line, index + 3));
-  return { header, staticData, records };
+  return parseLineList(text.split('\n').filter((line) => line.length > 0));
 }
 
 /**
  * Reads a gzip-compressed recording file.
  *
- * Purpose: Recordings on disk are compressed. The fixture is not, and is parsed with `parseRecordingLines`.
+ * Purpose: Recordings on disk are compressed. The fixture is not, and is parsed with `parseRecordingLines`. The bytes are split on newlines and each line is decoded alone, so a long match never becomes one string.
  * When to use: A path from the export or from the summary command.
  * Expected outcome: The parsed recording.
  * Exceptions: Throws when the file cannot be read, is not gzip, or is not a recording this build can read.
  */
 export function readRecordingFile(filePath: string): ParsedRecording {
-  const bytes = fs.readFileSync(filePath);
-  const text = gunzipSync(bytes).toString('utf8');
-  return parseRecordingLines(text);
+  const bytes = gunzipSync(fs.readFileSync(filePath));
+  const lines: string[] = [];
+  let start = 0;
+  while (start < bytes.length) {
+    const newline = bytes.indexOf(0x0a, start);
+    const end = newline < 0 ? bytes.length : newline;
+    if (end > start) lines.push(bytes.toString('utf8', start, end));
+    start = end + 1;
+  }
+  return parseLineList(lines);
+}
+
+/**
+ * Parses the non-empty lines of a recording.
+ *
+ * Purpose: The fixture path and the file path share one parser.
+ * When to use: From `parseRecordingLines` and `readRecordingFile`.
+ * Expected outcome: The header, the static hex line, and every record line in order.
+ * Exceptions: Throws when the first line is not a header of this format, when the file version is newer than this build, or when a line is not JSON.
+ */
+function parseLineList(lines: readonly string[]): ParsedRecording {
+  if (lines.length === 0) throw new Error('The recording is empty.');
+  const header = parseHeader(lines[0]!, 1);
+  const staticData = parseStatic(lines[1], 2);
+  const records = lines.slice(2).map((line, index) => parseRecord(line, index + 3));
+  return { header, staticData, records };
 }
 
 /**

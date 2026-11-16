@@ -86,9 +86,9 @@ export function chatNamedSeatKey(seatIds: readonly string[], nameOf: (seatId: st
 /**
  * Whether the chat panel may be on screen.
  *
- * Purpose: Playback, the map toast, an unloaded match, and automatic turns each hide the panel on their own.
+ * Purpose: Playback, the map toast, an unloaded match, automatic turns, and replay each hide the panel on their own.
  * When to use: `syncChatPanelVisibility`.
- * Expected outcome: True only when a match is loaded, playback is idle, the map toast is hidden, and the auto-advance checkbox is off.
+ * Expected outcome: True only when a match is loaded, playback is idle, the map toast is hidden, the auto-advance checkbox is off, and replay is off.
  * Exceptions: None.
  */
 export function chatPanelShouldShow(input: {
@@ -96,6 +96,7 @@ export function chatPanelShouldShow(input: {
   readonly playbackRunning: boolean;
   readonly mapToastShowing: boolean;
   readonly autoAdvance: boolean;
+  readonly replayActive: boolean;
 }): boolean {
-  return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance;
+  return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance && !input.replayActive;
 }

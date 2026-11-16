@@ -6,6 +6,7 @@
  * closes the menu, disables New game while the new-game screen is open or a Ready is resolving, and handles Quit.
  */
 import { rendererSharedState as S } from '../core/state';
+import { requestReplayLeave } from '../replay/replayState';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { syncSaveLoadItems } from '../gameplay/saveLoadMenu';
 import { dismissStaleControlTooltip } from './controlTooltip';
@@ -87,6 +88,7 @@ export function openGameMenu(): void {
   const menu = document.getElementById(GAME_MENU_ID);
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
+  void requestReplayLeave();
   syncGameMenuNewGameItem();
   syncSaveLoadItems();
   menu.hidden = false;

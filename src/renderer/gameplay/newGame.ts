@@ -50,6 +50,7 @@ import {
 } from './newGameMapPreviewUi';
 import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
+import { abandonReplay } from '../replay/replayState';
 
 /**
  * Wires the new-game randomize buttons.
@@ -346,6 +347,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         ...(humanNickname === undefined ? {} : { humanNickname }),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      abandonReplay();
       installRendererGameMap(state);
       await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;

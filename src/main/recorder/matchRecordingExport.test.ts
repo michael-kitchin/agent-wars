@@ -187,3 +187,21 @@ test('writing twice leaves the second file and a directory target keeps the dire
     }
   });
 });
+
+test('multi-byte text in records survives the line-by-line write and read', () => {
+  withTempGameDb('aw-match-export-utf8-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    const text = '雪の戦い ⚔ Ünïcödé 🌍'.repeat(200);
+    recordMatchEvent({ type: 'commander_strategy', step: strategicStep(1), visibility: 'engine', payload: { text } });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recording-utf8-'));
+    const target = path.join(dir, 'utf8.agentwars-recording');
+    try {
+      writeMatchRecordingFile({ ops: gameDbOps, targetPath: target, appVersion: '1.0.0', exportedAt: '2026-01-01T00:00:00.000Z' });
+      const recording = readRecordingFile(target);
+      assert.deepEqual(recording.records.map((row) => row.payload), listMatchRecords(gameDbOps).map((row) => row.payload));
+      assert.equal((recording.records.at(-1)?.payload as { text: string }).text, text);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

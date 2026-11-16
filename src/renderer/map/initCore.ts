@@ -33,6 +33,8 @@ import { wireMapModeTabs } from './mapModeTabs';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { tacticalBattlesDialogIsOpen } from '../chrome/blockingDialogGuards';
 import { chartsDialogIsOpen, toggleChartsDialog } from '../charts/chartsDialog';
+import { leaveReplay, toggleReplay } from '../replay/replayMode';
+import { replayActive } from '../replay/replayState';
 
 /**
  * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
@@ -487,6 +489,11 @@ export function wireInitCore(deps: InitCoreDeps): void {
         toggleChartsDialog();
         return;
       }
+      if (replayActive() && !shouldIgnoreGlobalKeydown(e)) {
+        e.preventDefault();
+        void leaveReplay();
+        return;
+      }
       if (tacticalBattlesDialogIsOpen()) return;
       const buildPopup = document.getElementById('build-popup');
       if (buildPopup && !buildPopup.classList.contains('hidden')) {
@@ -541,6 +548,11 @@ export function wireInitCore(deps: InitCoreDeps): void {
     if (key === 'c') {
       e.preventDefault();
       toggleChartsDialog();
+      return;
+    }
+    if (key === 'p') {
+      e.preventDefault();
+      void toggleReplay();
       return;
     }
     if (key === 't') {
@@ -641,6 +653,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     S.buildEntryButtonPointerInside = false;
   });
   buildEntryLayer?.addEventListener('click', (e) => {
+    if (replayActive()) return;
     const target = e.target as Element | null;
     const btn = target?.closest('.build-entry-btn') as HTMLButtonElement | null;
     if (!btn) return;
@@ -679,7 +692,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
    * Expected outcome: Tooltip timer cleared, `#hex-tooltip` hidden, and map hover preview state cleared.
    * Exceptions: None.
    */
-  for (const chromeId of ['sidebar', 'app-topbar', 'game-menu', 'selection-panel', 'chat-panel']) {
+  for (const chromeId of ['sidebar', 'app-topbar', 'game-menu', 'selection-panel', 'chat-panel', 'replay-panel']) {
     document.getElementById(chromeId)?.addEventListener('pointerenter', () => {
       dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     });

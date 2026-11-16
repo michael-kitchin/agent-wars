@@ -13,7 +13,7 @@ import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationP
 import { clearAiPendingOrders, setAiPendingOrders } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { recordSeatConsultation, recordSeatThinkTime } from '../gameDb/seatRosterStore';
-import { logDebug, logError, logInfo } from '../logger';
+import { logDebug, logError, logInfo, logTrace } from '../logger';
 import { recordCommanderToolCounts } from './commanderToolCounts';
 import type { PoolSeat } from './commanderPool';
 import { enqueueCommanderPoolWrite, tacticalDraftKey, type CommanderConsultOutcome } from './commanderPoolSupport';
@@ -281,11 +281,12 @@ function sameLaunch(
  * Display label for the model that answered.
  *
  * Purpose: The dispatch uses the same label as the model list.
- * When to use: A successful consult.
+ * When to use: A successful consult, and the replay reader when it rebuilds a dispatch.
  * Expected outcome: `formatModelOptionLabel` when the model is cached. Otherwise the id. Empty when the id is missing.
  * Exceptions: None.
  */
-function modelLabel(modelId: string | null): string {
+export function modelLabel(modelId: string | null): string {
+  logTrace('commanderPoolSettle modelLabel', { hasModelId: Boolean(modelId) });
   if (!modelId) return '';
   const model = getOpenRouterModelCapabilities(modelId);
   return model ? formatModelOptionLabel(model) : modelId;

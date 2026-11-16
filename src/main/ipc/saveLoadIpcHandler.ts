@@ -18,6 +18,7 @@ import { hasDeferredPlaybackConsultPending } from './deferredResolutionPlaybackC
 import { exportFinishedMatchRecordingIfNeeded } from '../recorder/matchRecordingExport';
 import { recordStepBoundary } from '../recorder/matchRecorder';
 import { currentStepKey } from '../recorder/recorderStepKey';
+import { recordReplayViewsIfNeeded } from '../replay/replayRecording';
 import { runLoadGame, runSaveGame, SAVE_FAILED_MESSAGE, LOAD_FAILED_MESSAGE, type SaveLoadDeps } from '../saveGame/saveLoadPipeline';
 import { SAVE_FILE_EXTENSION, SAVE_FILE_FILTER_NAME } from '../saveGame/saveFileFormat';
 
@@ -35,8 +36,10 @@ export { runWithReadyInFlight } from './readyInFlight';
 export async function withAutoSaveAfter<T>(work: () => T | Promise<T>): Promise<T> {
   const appVersion = app.getVersion();
   recordStepBoundary(currentStepKey(), appVersion);
+  recordReplayViewsIfNeeded();
   const result = await work();
   recordStepBoundary(currentStepKey(), appVersion);
+  recordReplayViewsIfNeeded();
   const exportDeps = {
     userDataDir: app.getPath('userData'),
     appVersion,

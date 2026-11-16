@@ -677,20 +677,40 @@ Run the Verification Bar and `npm run ui:smoke`. Run an Observe match: `p` stops
 
 | Item | Value |
 |------|-------|
-| `git status --short` | |
-| `npm test` | |
-| `npm run build:renderer` | |
-| `check:circular` cycle list | |
-| Prerequisites | |
-| Line counts of the long files | |
-| Missing symbols | |
+| `git status --short` | 60 tracked files modified and about 25 untracked at the start, among them the user's own edits in `doc/match-video.md`, `scripts/match_video/__init__.py`, `scripts/match_video/titles/*`, and `.claude/`. Those were never staged or touched. |
+| `npm test` | Not run at the start, by the run's instruction. The full bar ran once, at the end. |
+| `npm run build:renderer` | Succeeds. |
+| `check:circular` cycle list | The three existing baseline cycles, unchanged after every phase. |
+| Prerequisites | Plans 1 and 2 and the naval sea-access plan are committed. The recorder, `match_records`, and the charts dialog exist. |
+| Line counts of the long files | `src/main/preload.ts` 965, `src/renderer/renderer.ts` 868, `src/renderer/map/initCore.ts` 713, `src/main/main.ts` 691 at the end. `preload.ts` stays under 1000. |
+| Missing symbols | None. |
 
 ## Defect Inventory
 
 | Phase | Command | First error | Action taken |
 |-------|---------|-------------|--------------|
+| 1 to 3 | `node dist/main/<file>.test.js` | Native module ABI mismatch for better-sqlite3 | Ran `npm run rebuild:native:node`. |
+| 2 | `npm run build:main` | A multi-line replace left a literal newline in a string (TS1002) in `matchRecordingFile.ts` | Fixed by hand. |
+| 3 | `node dist/main/replay/replayReading.test.js` | A weather test assumed fog hides weather | Rewrote the test with an injected snapshot. |
+| 4 | `node dist/main/rendererReplayContracts.test.js` | Regex escapes and CRLF in source matches | Switched to `includes`, `indexOf`, and `?
+`. |
+| 6 | `npm run lint` | Imports left unused after the move into `resolutionPlaybackPlan.ts` | Removed them. |
+| 7 | `npm run ui:smoke` | Orders tab click not visible after the replay scene: entering replay moves the console to Commanders | Leaving replay now puts the console back on the Orders tab when it was selected on entry. |
+| 8 | `npm test` | Two source-contract tests pinned the old guards: `rendererDrawConsolidation` (`return !S.shiftKeyActive;`) and `rendererMapEntryConsolidation` (the magnifier hide condition) | Updated both tests to the guards that now include replay. |
+| 8 | `npm run ui:smoke` | The beat-limit scene (`ui-smoke-beat-limit.cjs`) expects the header to start with "Beat 1 · Tactical planning", and the app shows "Beat 1 (29 left) · Tactical planning" | Not caused by replay: that file is unchanged from the last commit. Left for the user. |
 
 ## Completion Log
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
+| 0 | Done | None | None | None | Not applicable |
+| 1 | Done. 6 tests pass. | None | None | None | Not applicable |
+| 2 | Done. Recorder, hooks, and recording-file tests pass. | `lastFrameHeader` also returns `step`. `readyResultForReplay` is a new helper that rebuilds the result the renderer received. The recording file is gzipped from `Buffer` parts and read by splitting bytes on newline. | None | `doc/match-recording.md` (fourteen event types, two rows, a visibility paragraph) | Not applicable |
+| 3 | Done. Reading, IPC, and parity tests pass. | None | `src/main/openRouter/commanderPoolSettle.ts` exports `modelLabel`. | None | Not applicable |
+| 4 | Done. Renderer-types ok, circular unchanged, contract tests pass. | `'replay-panel'` was added to the chrome pointerenter list in `initCore.ts`. | `src/renderer/map/initCore.ts` also has the Escape and `p` branches and the build-entry guard. | None | Not applicable |
+| 5 | Done. Contract tests pass. | None | None | None | The panel appears at the bottom-left with the label, three buttons, and the expand control. |
+| 6 | Done without the fallback. Each moved statement only computed a value, so `planResolutionPlayback` was moved out of `handleReadyButtonClick`. | The plan's return object names only the values the live turn and replay read. | None | None | Replay screenshot shows the current turn with the panel in place of the selection and chat panels. |
+| 7 | Done. Contract tests pass. | Leaving replay also returns the console to the Orders tab when it was selected on entry. The plan left the console on Commanders. | `scripts/ui-smoke/ui-smoke.cjs`, `ui-smoke-scenes.cjs`, `ui-smoke-checks.cjs` | None | `ui:smoke` replay scene: panel shown after `p`, selection and chat panels hidden, panel hidden after Escape. |
+| 8 | Docs done. | None | None | `doc/ux/replay-panel.md` (new), `doc/ux-specification.md`, `doc/README.md`, `doc/ux/input-map.md`, `modes-and-transitions.md`, `selection-panel.md`, `selection-model.md`, `chat-panel.md`, `console.md`, `console-command-bar.md`, `map-surface.md`, `map-overlays.md`, `tactical-entry-markers.md`, `notifications-and-feedback.md`, `resolution-playback.md`, `control-tooltips.md`, `doc/ui-style-guide.md`, `doc/how-to-play.md`, `doc/match-recording.md` | See the final verification note below. |
+
+Final verification: `npm test` passes (the full suite, after the two test updates above), `npm run build:renderer` succeeds, and `npm run check:circular` prints only the three baseline cycles. `npm run ui:smoke` reports 798 passed and 0 failed, including the replay scenes, and then stops at the beat-limit scene for the reason in the Defect Inventory. Some runs stopped earlier on an 8 second wait for a unit selection in `ui-smoke-map.cjs`. The late-save size measurement was not made, because it needs a save file from the user.

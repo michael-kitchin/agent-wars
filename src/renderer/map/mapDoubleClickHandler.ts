@@ -13,6 +13,7 @@ import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTyp
 import { MISSILE_MIXED_MOVE_MESSAGE } from '../../shared/missileRules';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { observeModeControls } from '../../shared/observeModeControls';
+import { replayActive } from '../replay/replayState';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import {
   mapSelectionComposition,
@@ -151,6 +152,7 @@ export async function handleMainMapDoubleClick(
 ): Promise<void> {
   if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return;
   if (observeModeControls(S.gameState?.seats ?? []).observing) return;
+  if (replayActive()) return;
   clearDeferredHumanUnitSingleSelectTimer();
   S.gestureSelectionSnapshotAtMs = 0;
 

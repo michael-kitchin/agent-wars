@@ -13,6 +13,7 @@ import { getGameState } from '../gameDb';
 import { exportFinishedMatchRecordingIfNeeded } from '../recorder/matchRecordingExport';
 import { recordStepBoundary } from '../recorder/matchRecorder';
 import { currentStepKey } from '../recorder/recorderStepKey';
+import { recordReplayViewsIfNeeded } from '../replay/replayRecording';
 import { readMatchSnapshot } from './matchViewSnapshot';
 import { IPC_GAME } from '../../shared/ipc/channels';
 import { logDebug, logError } from '../logger';
@@ -45,6 +46,7 @@ export function registerEndMatchIpcHandler(
     logDebug('endMatchIpcHandler ended the match', { turnNumber: state.turnNumber });
     const appVersion = app.getVersion();
     recordStepBoundary(currentStepKey(), appVersion);
+    recordReplayViewsIfNeeded();
     exportFinishedMatchRecordingIfNeeded({
       userDataDir: app.getPath('userData'),
       appVersion,

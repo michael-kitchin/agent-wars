@@ -149,7 +149,7 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should use shared committed-path visibility policy helper'
   );
   assert.ok(
-    shouldDrawCommittedOrderPathsFn.includes('return !S.shiftKeyActive;'),
+    shouldDrawCommittedOrderPathsFn.includes('return !S.shiftKeyActive && !replayActive();'),
     'shouldDrawCommittedOrderPaths should hide committed paths while Shift is held for stack selection'
   );
   assert.ok(
