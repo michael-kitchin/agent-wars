@@ -20,7 +20,7 @@ import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBon
 import { landUnitSitsOutCombat } from './airlift';
 import { rollAntiAirCounterFire } from './airCounterFire';
 import { validateAirDropOrder } from './airDropValidation';
-import { applyTransportLossForRemovedNavalUnits } from './sealift';
+import { applyTransportLossForRemovedCarriers } from './transportCargoLoss';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
@@ -41,6 +41,15 @@ export type AirDropPhaseResult = {
   readonly removedUnitIds: string[];
   readonly removedUnits: CombatUnit[];
   readonly diceRolls: CombatDiceRoll[];
+  /**
+   * The carrier each lost cargo unit was aboard.
+   *
+   * Contract: Keys are ids of infantry in `removedUnits` that were lost with a shot-down carrier. Values are that carrier's id.
+   * When to use: Loss attribution, so the infantry is credited to whoever shot the carrier down.
+   * Expected outcome: Empty when no carrier was shot down.
+   * Exceptions: None.
+   */
+  readonly carrierIdByCargoId: ReadonlyMap<string, string>;
 };
 
 /**
@@ -99,6 +108,7 @@ export function resolveAirDropPhase(
   const moves: AirDropAnimationMove[] = [];
   const removedUnitIds: string[] = [];
   const removedUnits: CombatUnit[] = [];
+  const carrierIdByCargoId = new Map<string, string>();
   for (const order of orders) {
     const owner = dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [order.unitId]);
     if (!owner) continue;
@@ -153,17 +163,18 @@ export function resolveAirDropPhase(
       },
     });
     if (shotDown) {
-      const cargo = applyTransportLossForRemovedNavalUnits([{
+      const lost = applyTransportLossForRemovedCarriers([{
         id: carrier.id,
         player: carrier.player,
         unitType: 'air',
         h3Index: infantry.h3Index,
         displayOrder: carrier.displayOrder ?? undefined,
       }]);
-      for (const unit of cargo) {
+      for (const unit of lost.cargo) {
         removedUnitIds.push(unit.id);
         removedUnits.push(unit);
       }
+      for (const [cargoId, carrierId] of lost.carrierIdByCargoId) carrierIdByCargoId.set(cargoId, carrierId);
       moves.push({
         unitId: carrier.id,
         player: carrier.player,
@@ -184,7 +195,7 @@ export function resolveAirDropPhase(
       infantryUnitId: infantry.id,
     });
   }
-  return { moves, removedUnitIds, removedUnits, diceRolls: diceLog.rolls };
+  return { moves, removedUnitIds, removedUnits, diceRolls: diceLog.rolls, carrierIdByCargoId };
 }
 
 /**

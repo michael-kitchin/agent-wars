@@ -185,7 +185,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `CALLBACK_EVENT_VOCABULARY` | The subscribable event names and their parameters | `evaluateSubscriptionEvents` | n/a | 11 | both | required |
 | `CALLBACK_REPLACE_SEMANTICS` | Each response replaces the whole list; omitting the field clears it | `replaceSubscriptions` | n/a | 11 | both | required |
 | `CALLBACK_TACTICAL_SCOPE` | In battle, unit-scoped callbacks use sub-unit ids and the list is cleared when the battle ends | `filterCallbackSubscriptionsForTacticalBattleRoster`, battle-end restore | n/a | 22 | tactical | required |
-| `RECENT_TURN_NOTES` | Own previous messages, strategies, and losses on both sides for up to ten prior periods | `buildRecentTurnNotesSection` | own-side plus own losses | 1, 13 | both | conditional — at least one prior period qualifies |
+| `RECENT_TURN_NOTES` | Own previous strategies, plus losses on every side with the responsible side, cause, hex, and killer types, for up to ten prior periods | `buildRecentTurnNotesSection` | full record (no fog filter) | 1, 13 | both | conditional — at least one prior period qualifies |
 | `CONSULT_POLICY` | Whether the model is asked every period or only on an event | event-driven consult entry points | n/a | 28 | both | required |
 
 ### 3.9 Scenario and victory

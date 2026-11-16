@@ -9,6 +9,7 @@ import { logDebug, logTrace } from '../logger';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { airliftEmbarkAllowed } from './airlift';
+import { applyTransportLossForRemovedCarriers, type TransportCargoLoss } from './transportCargoLoss';
 import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
@@ -846,21 +847,21 @@ export function deleteTransportAssignmentsForRemovedUnits(unitIds: string[]): vo
  *
  * Purpose: Centralizes the paired `applyTransportLossForRemovedNavalUnits` + `deleteTransportAssignmentsForRemovedUnits` sequence used by Ready resolution and tactical DB parity.
  * When to use: After callers issue `DELETE FROM units` for every id in `removedUnitIds`, passing the same units as `CombatUnit` rows captured before deletion.
- * Expected outcome: Returns any extra land units removed because a deleted naval carrier was at sea with embarked cargo.
+ * Expected outcome: Returns any extra land units removed because a deleted naval or air carrier held embarked cargo, with the carrier each one was aboard.
  * Exceptions: None; delegates to existing helpers without additional validation.
  */
 export function applyTransportOutcomeForRemovedStrategicUnits(
   removedUnitIds: string[],
   removedUnits: CombatUnit[]
-): CombatUnit[] {
+): TransportCargoLoss {
   logDebug('applyTransportOutcomeForRemovedStrategicUnits', {
     removedUnitCount: removedUnitIds.length,
     removedCombatRowCount: removedUnits.length,
   });
-  const transportLosses = applyTransportLossForRemovedNavalUnits(removedUnits);
+  const transportLosses = applyTransportLossForRemovedCarriers(removedUnits);
   deleteTransportAssignmentsForRemovedUnits(removedUnitIds);
-  if (transportLosses.length > 0) {
-    deleteTransportAssignmentsForRemovedUnits(transportLosses.map((unit) => unit.id));
+  if (transportLosses.cargo.length > 0) {
+    deleteTransportAssignmentsForRemovedUnits(transportLosses.cargo.map((unit) => unit.id));
   }
   return transportLosses;
 }
@@ -898,40 +899,13 @@ export function deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId: 
 }
 
 /**
- * Defines the `applyTransportLossForRemovedNavalUnits` function shape (export function applyTransportLossForRemovedNavalUnits(removedUnits: CombatUnit[]): CombatUnit[]).
-
- * Purpose: Supports maintainability by documenting why `applyTransportLossForRemovedNavalUnits` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Deletes the cargo of destroyed naval and air carriers and returns the lost cargo rows.
+ *
+ * Purpose: Keeps the older cargo-only call shape for callers that do not need the carrier link.
+ * When to use: After the carrier rows are deleted, in strategic and tactical resolution.
+ * Expected outcome: The same rows as `applyTransportLossForRemovedCarriers(...).cargo`.
+ * Exceptions: Propagates database errors.
  */
 export function applyTransportLossForRemovedNavalUnits(removedUnits: CombatUnit[]): CombatUnit[] {
-  const removedCargo: CombatUnit[] = [];
-  const removedCarriers = removedUnits.filter((unit) => unit.unitType === 'naval' || unit.unitType === 'air');
-  for (const naval of removedCarriers) {
-    const assignments = dbGetAll<{ id: string; player: string; unitType: string; h3Index: string; displayOrder: number | null }>(
-      `SELECT lu.id AS id,
-              lu.player AS player,
-              lu.unit_type AS unitType,
-              lu.h3_index AS h3Index,
-              lu.display_order AS displayOrder
-       FROM unit_transport_assignments uta
-       JOIN units lu ON lu.id = uta.land_unit_id
-       WHERE uta.naval_unit_id = ?`,
-      [naval.id]
-    );
-    if (assignments.length <= 0) continue;
-    for (const land of assignments) {
-      dbRun('DELETE FROM units WHERE id = ?', [land.id]);
-      removedCargo.push({
-        id: land.id,
-        player: land.player,
-        unitType: land.unitType,
-        h3Index: land.h3Index,
-        displayOrder: typeof land.displayOrder === 'number' ? land.displayOrder : undefined,
-      });
-    }
-    dbRun('DELETE FROM unit_transport_assignments WHERE naval_unit_id = ?', [naval.id]);
-  }
-  return removedCargo;
+  return applyTransportLossForRemovedCarriers(removedUnits).cargo;
 }

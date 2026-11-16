@@ -8,7 +8,9 @@ import {
   airStrikeAttackerLossUnitIdsFromMoves,
   type KillEdge,
 } from '../../shared/lossSummaryFromResolution';
-import { emptyPlayerLossSummary, mergePlayerLossSummaries, serializePlayerLossSummary } from '../../shared/lossSummary';
+import { emptyPlayerLossSummary, mergePlayerLossSummaries } from '../../shared/lossSummary';
+import { attributeTurnLosses, type LossAttributionContext } from '../lossAttribution/lossAttributionCore';
+import { serializePlayerLossSummary } from '../../shared/lossSummaryJson';
 import {
   buildUnitDisplayNameLookup,
   fallbackDisplayNameFromUnitId,
@@ -139,6 +141,15 @@ export interface CaptureTurnLossNoteArgs {
    * Exceptions: None.
    */
   labelUnits?: readonly UnitDisplayIdentity[];
+  /**
+   * Attribution lookups for this resolution.
+   *
+   * Contract: Built by the strategic or tactical context builder.
+   * When to use: Always. A context with every map empty stores each loss as an unknown side, or as no side responsible for an `other` loss.
+   * Expected outcome: Each lost unit with an id carries who was responsible, the killer types, and the loss hex.
+   * Exceptions: None.
+   */
+  attribution: LossAttributionContext;
 }
 
 /**
@@ -164,6 +175,7 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     missileStrikeRemovedUnits,
     labelUnits,
     airStrikeMoves,
+    attribution,
   } = args;
   logDebug('captureTurnLossNoteFromResolution', {
     scope,
@@ -206,7 +218,8 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     resolveUnitMeta: (id: string) => metaMap.get(id),
   };
   for (const seatId of activeAiSeatIds(getSeatRoster())) {
-    const summary = buildTurnLossSummary({ ...lossArgs, perspectivePlayerId: seatId });
+    const built = buildTurnLossSummary({ ...lossArgs, perspectivePlayerId: seatId });
+    const summary = attributeTurnLosses(built, attribution);
     const own = summary.byOwner[seatId] ?? emptyPlayerLossSummary();
     const others = mergePlayerLossSummaries(
       Object.entries(summary.byOwner)

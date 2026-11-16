@@ -3,6 +3,7 @@
  */
 
 import { isBuildUnitType, type BuildUnitType } from './ipc/productionTypes';
+import type { LossAttribution } from './lossAttributionTypes';
 
 /** Maximum victim count on a prompt loss line before that line uses grouped type totals. */
 export const LOSS_ENTRY_LIST_MAX = 5;
@@ -79,11 +80,20 @@ export interface LostUnit {
    * Snapshot unit id for prompt-facing loss lists.
    *
    * Contract: Same id the rest of the AI prompt uses; omit on older persisted rows that only stored a display name.
-   * When to use: `formatPlayerLossInline` for recent-turn notes in the system prompt.
+   * When to use: `buildRecentTurnLossLines` for recent-turn notes in the system prompt.
    * Expected outcome: Prompt lists ids, never display names.
    * Exceptions: None.
    */
   unitId?: string;
+  /**
+   * Who lost this unit, where, and who was responsible.
+   *
+   * Contract: Absent on rows written before attribution existed and on every popup row. Popup formatters never read it.
+   * When to use: The main process sets it when it writes a commander's loss note. The recent-turn prompt formatter reads it.
+   * Expected outcome: Present on new loss notes, so the prompt can name the responsible side.
+   * Exceptions: None.
+   */
+  attribution?: LossAttribution;
 }
 
 /**
@@ -364,11 +374,11 @@ export function formatLossEntries(units: readonly LostUnit[]): string {
  * Formats victim entries for AI prompt loss lines using snapshot ids.
  *
  * Purpose: Prompt copy must address units by id; display names are a second handle the model must not see.
- * When to use: `formatPlayerLossInline` only.
+ * When to use: `buildRecentTurnLossLines` for each loss group.
  * Expected outcome: Comma-separated ids when every row has `unitId` and the list is short; otherwise grouped type totals.
  * Exceptions: None.
  */
-function formatLossEntriesForPrompt(units: readonly LostUnit[]): string {
+export function formatLossEntriesForPrompt(units: readonly LostUnit[]): string {
   if (units.length === 0) return '';
   if (units.length <= LOSS_ENTRY_LIST_MAX) {
     const ids = units.map((u) => u.unitId).filter((id): id is string => typeof id === 'string' && id.length > 0);
@@ -381,11 +391,11 @@ function formatLossEntriesForPrompt(units: readonly LostUnit[]): string {
  * Groups victims by type for crowded or id-less prompt lines.
  *
  * Purpose: Prompt fallback when a cause line is long or a victim has no id. Popup lines do not use this.
- * When to use: `formatLossEntriesForPrompt` when the line is long or a victim has no id.
+ * When to use: `formatLossEntriesForPrompt` when the line is long or a victim has no id, and `buildRecentTurnLossLines` for the closing killer counts.
  * Expected outcome: `N Naval, N Air, ...` with zero groups omitted.
  * Exceptions: None.
  */
-function formatGroupedTypeTotals(units: readonly LostUnit[]): string {
+export function formatGroupedTypeTotals(units: readonly { readonly unitType: LostUnitType }[]): string {
   const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
   for (const u of units) {
     if (u.unitType in counts) counts[u.unitType] += 1;
@@ -440,11 +450,11 @@ const CAUSE_SPECS: ReadonlyArray<{ key: keyof PlayerLossSummary; label: string }
 export const LOSS_CAUSE_LABELS: ReadonlyArray<string> = CAUSE_SPECS.map((spec) => spec.label);
 
 /**
- * The five loss-cause bucket keys of `PlayerLossSummary`, in display order.
+ * The six loss-cause bucket keys of `PlayerLossSummary`, in display order.
  *
  * Purpose: Lets callers walk every victim bucket without restating the key list.
  * When to use: When every `LostUnit` of a summary must be visited.
- * Expected outcome: `ranged`, `melee`, `returnFire`, `airStrike`, `other`.
+ * Expected outcome: `ranged`, `melee`, `returnFire`, `airStrike`, `missileStrike`, `other`.
  * Exceptions: None.
  */
 export const LOSS_CAUSE_KEYS: ReadonlyArray<keyof PlayerLossSummary> = CAUSE_SPECS.map((spec) => spec.key);
@@ -468,76 +478,3 @@ export function formatPlayerLossLinesMultiline(summary: PlayerLossSummary): Play
   return lines;
 }
 
-/**
- * Builds a single semicolon-separated loss summary for one player (prompt use).
- *
- * Purpose: Compact per-player loss text inside recent-turn prompt bullets.
- * When to use: `buildRecentTurnNotesSection` when formatting `Human Losses:` / `AI Losses:` lines.
- * Expected outcome: Empty string when no losses; otherwise `Ranged attack: ...; Melee attack: ...` with empty causes omitted.
- * Exceptions: None.
- */
-export function formatPlayerLossInline(summary: PlayerLossSummary): string {
-  const parts: string[] = [];
-  for (const spec of CAUSE_SPECS) {
-    const units = summary[spec.key];
-    if (units.length === 0) continue;
-    const text = formatLossEntriesForPrompt(units);
-    if (text.length > 0) parts.push(`${spec.label}: ${text}`);
-  }
-  return parts.join('; ');
-}
-
-/**
- * Parses a JSON blob into a {@link PlayerLossSummary}, tolerating partial or invalid data.
- *
- * Purpose: Hydrates persisted turn-note loss columns from SQLite.
- * When to use: `buildRecentTurnNotesSection` when reading `human_loss_json` / `ai_loss_json`.
- * Expected outcome: Returns empty buckets for null/invalid JSON; preserves valid units only.
- * Exceptions: None.
- */
-export function parsePlayerLossSummaryJson(raw: string | null | undefined): PlayerLossSummary {
-  const empty = emptyPlayerLossSummary();
-  if (!raw) return empty;
-  try {
-    const parsed = JSON.parse(raw) as Partial<Record<keyof PlayerLossSummary, unknown>>;
-    const readBucket = (key: keyof PlayerLossSummary): LostUnit[] => {
-      const arr = parsed[key];
-      if (!Array.isArray(arr)) return [];
-      return arr
-        .filter((u): u is LostUnit => {
-          if (!u || typeof u !== 'object') return false;
-          const row = u as LostUnit;
-          return typeof row.displayName === 'string' && typeof row.unitType === 'string';
-        })
-        .map((u) => ({
-          displayName: u.displayName,
-          unitType: u.unitType as LostUnitType,
-          ...(typeof (u as { unitId?: unknown }).unitId === 'string'
-            ? { unitId: (u as { unitId: string }).unitId }
-            : {}),
-        }));
-    };
-    return {
-      ranged: readBucket('ranged'),
-      melee: readBucket('melee'),
-      returnFire: readBucket('returnFire'),
-      airStrike: readBucket('airStrike'),
-      missileStrike: readBucket('missileStrike'),
-      other: readBucket('other'),
-    };
-  } catch {
-    return empty;
-  }
-}
-
-/**
- * Serializes a {@link PlayerLossSummary} for persistence in turn notes.
- *
- * Purpose: Writes loss buckets to SQLite JSON columns.
- * When to use: `upsertTurnLossNote` after `buildTurnLossSummary`.
- * Expected outcome: Stable JSON string with all five bucket keys present.
- * Exceptions: None.
- */
-export function serializePlayerLossSummary(summary: PlayerLossSummary): string {
-  return JSON.stringify(summary);
-}

@@ -81,6 +81,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     sightCues: pending.sightCues,
     airStrikeTransportLosses: pending.airStrikeTransportLosses,
     rangedTransportLosses: pending.rangedTransportLosses,
+    transportCarrierIdByCargoId: pending.transportCarrierIdByCargoId,
     combatUnitsAfter: pending.combatUnitsAfter,
     combatUnitsBefore: pending.combatUnitsBefore,
     humanMoves: pending.humanMoves,

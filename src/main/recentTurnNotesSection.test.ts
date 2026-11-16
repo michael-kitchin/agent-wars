@@ -37,6 +37,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
   const gameDb = await import('./gameDb');
 
   const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const { RECENT_TURN_LOSS_LEGEND } = await import('./briefing/recentTurnLossLines');
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recent-notes-'));
 
@@ -86,11 +87,12 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.equal(out.includes('Message:'), false);
 
-    assert.ok(out.includes('Enemy Losses: Ranged attack: human-inf-1'));
+    assert.ok(out.includes('- Losses of other sides:\n  - by unknown side, Ranged attack: human-inf-1'));
 
     assert.ok(!out.includes('Ranged attack: I'), 'prompt losses must not use display names');
 
-    assert.ok(!out.includes('Your Losses:'), 'empty own-loss line suppressed on turn 2');
+    assert.ok(!out.includes('- Your Losses:'), 'empty own-loss section suppressed on turn 2');
+    assert.equal(out.split(RECENT_TURN_LOSS_LEGEND).length - 1, 1, 'the legend prints once when a block has a loss line');
 
     assert.ok(out.includes('Turn 3:'));
 
@@ -133,6 +135,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
     assert.ok(!tactical.includes('Beat '), 'tactical notes use Turn labels');
 
     assert.ok(tactical.includes('Strategy: Hold the line'));
+    assert.equal(tactical.includes(RECENT_TURN_LOSS_LEGEND), false, 'no legend without a loss line');
 
   } finally {
 
@@ -215,12 +218,131 @@ async function testTenEntryWindow(): Promise<void> {
 }
 
 
+/**
+ * Builds stored loss JSON for one unit with an attribution.
+ *
+ * Purpose: The attribution tests write rows the way the capture step does.
+ * When to use: `testAttributedLossLines` and `testOlderTurnsAreCapped`.
+ * Expected outcome: A JSON string with one unit in the given cause bucket.
+ * Exceptions: None.
+ */
+function lossJson(cause: string, id: string, owner: string, responsible: string[], killers: Array<{ unitId: string; unitType: string }> = []): string {
+  return JSON.stringify({
+    ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [],
+    [cause]: [{ unitType: 'infantry', displayName: id, unitId: id, attribution: { ownerId: owner, lossH3Index: null, responsibleOwnerIds: responsible, killerUnits: killers } }],
+  });
+}
+
+/**
+ * Verifies the section names the responsible side and the killer types for an attributed loss.
+ *
+ * Purpose: Guards the end-to-end path from stored JSON to prompt text.
+ * When to use: After changing the section builder or the loss line formatter.
+ * Expected outcome: A `by h1` line with the killer counts under `Your Losses`, and the other side's loss under its own header.
+ * Exceptions: None.
+ */
+async function testAttributedLossLines(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recent-notes-attr-'));
+  try {
+    gameDb.openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
+    gameDb.upsertTurnLossNote(
+      'opponent', 'strategic', '', 1,
+      lossJson('ranged', 'a1-i1', 'opponent', ['human'], [{ unitId: 'h1-a1', unitType: 'armor' }]),
+      lossJson('melee', 'h1-i9', 'human', ['opponent'])
+    );
+    const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 2, heading: 'Recent Turn Notes' });
+    assert.ok(out.includes('- Your Losses:\n  - by h1, Ranged attack: a1-i1 (by 1 Armored)'));
+    assert.ok(out.includes('- Losses of h1:\n  - by you, Melee attack: h1-i9'));
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Verifies an older turn is capped and the newest turn is not.
+ *
+ * Purpose: Guards the per-block cap of loss groups.
+ * When to use: After changing the cap or how blocks are chosen for it.
+ * Expected outcome: Turn 1 ends with a one-group count line. Turn 2 has no count line.
+ * Exceptions: None.
+ */
+async function testOlderTurnsAreCapped(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recent-notes-cap-'));
+  try {
+    gameDb.openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
+    const causes = ['ranged', 'melee', 'returnFire', 'airStrike', 'missileStrike', 'other'];
+    const merged: Record<string, unknown[]> = { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
+    let counter = 0;
+    const add = (cause: string, responsible: string[]): void => {
+      counter += 1;
+      const one = JSON.parse(lossJson(cause, `a2-i${counter}`, 'opponent2', responsible)) as Record<string, unknown[]>;
+      merged[cause]!.push(...one[cause]!);
+    };
+    for (const cause of causes) {
+      add(cause, ['human']);
+      add(cause, ['opponent3']);
+    }
+    add('other', []);
+    const empty = JSON.stringify({ ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] });
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 1, empty, JSON.stringify(merged));
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 2, empty, lossJson('ranged', 'a2-i99', 'opponent2', ['human']));
+    const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 3, heading: 'Recent Turn Notes' });
+    const turnOne = out.slice(out.indexOf('Turn 1:'), out.indexOf('Turn 2:'));
+    const turnTwo = out.slice(out.indexOf('Turn 2:'));
+    assert.ok(turnOne.trimEnd().endsWith('- 1 more loss group on this turn is not listed.'));
+    assert.equal(turnTwo.includes('not listed'), false);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+
+/**
+ * Verifies a stored hex that is not a cell does not fail the prompt.
+ *
+ * Purpose: A damaged loss row must still print, without a hex code.
+ * When to use: After changing the hex resolver.
+ * Expected outcome: The section includes the unit id and does not throw.
+ * Exceptions: None.
+ */
+async function testBadLossHexDoesNotFailThePrompt(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recent-notes-bad-hex-'));
+  try {
+    gameDb.openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
+    const own = JSON.stringify({
+      ranged: [{
+        unitType: 'infantry', displayName: 'a1-i1', unitId: 'a1-i1',
+        attribution: { ownerId: 'opponent', lossH3Index: 'not-a-cell', responsibleOwnerIds: ['human'], killerUnits: [] },
+      }],
+      melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [],
+    });
+    const empty = JSON.stringify({ ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] });
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 1, own, empty);
+    const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 2, heading: 'Recent Turn Notes' });
+    assert.ok(out.includes('- Your Losses:\n  - by h1, Ranged attack: a1-i1'), out);
+    assert.equal(out.includes('not-a-cell'), false);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 async function run(): Promise<void> {
 
   await testRecentTurnNotesFormatting();
 
   await testTenEntryWindow();
+  await testAttributedLossLines();
+  await testOlderTurnsAreCapped();
+  await testBadLossHexDoesNotFailThePrompt();
 
   console.log('recentTurnNotesSection.test.ts passed');
 

@@ -1,0 +1,447 @@
+/**
+ * Attributed loss lines for one turn block of the Recent Turn Notes prompt section.
+ */
+
+import {
+  formatGroupedTypeTotals,
+  formatLossEntriesForPrompt,
+  LOSS_CAUSE_KEYS,
+  LOSS_CAUSE_LABELS,
+  type LostUnit,
+  type PlayerLossSummary,
+} from '../../shared/lossSummary';
+import type { LossKillerUnit } from '../../shared/lossAttributionTypes';
+import { isSeatId, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
+import { playerIdCodeFor } from '../../shared/unitIds';
+import { logDebug } from '../logger';
+
+/**
+ * Most loss groups an older turn block lists.
+ *
+ * Purpose: Ten turns of history must not grow without bound when a war is large.
+ * When to use: The `maxGroupLines` of every turn block except the newest.
+ * Expected outcome: 12. The newest turn block passes null and lists every group.
+ * Exceptions: None.
+ */
+export const RECENT_TURN_LOSS_GROUP_LINES_MAX = 12;
+
+/**
+ * Sentence that explains the loss lines to the model.
+ *
+ * Purpose: A loss line is a record kept by the game, so the model must not weigh it like a message from another side.
+ * When to use: Printed once under the Recent Turn Notes heading when any block has a loss line.
+ * Expected outcome: Names what `by`, `no side responsible`, `by unknown side`, and the closing counts mean.
+ * Exceptions: None.
+ */
+export const RECENT_TURN_LOSS_LEGEND =
+  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
+
+/**
+ * Owner key for a loss with no known owner.
+ *
+ * Purpose: An older row in the other-sides column has no attribution, so its owner is not known.
+ * When to use: As the victim owner of such a unit.
+ * Expected outcome: A string that no real owner id can equal.
+ * Exceptions: None.
+ */
+const UNKNOWN_OWNER_KEY = '\u0000unknown';
+
+/**
+ * How a loss group names who was responsible.
+ *
+ * Purpose: Groups sort side groups first, then no side, then unknown.
+ * When to use: `ResponsibleKey.kind`.
+ * Expected outcome: One of three words.
+ * Exceptions: None.
+ */
+type ResponsibleKind = 'sides' | 'none' | 'unknown';
+
+/**
+ * The responsibility of one unit, reduced to what a group key needs.
+ *
+ * Purpose: Units with the same responsibility share a loss line.
+ * When to use: `responsibleKeyOf`.
+ * Expected outcome: `sides` holds owner ids in rank order, and is empty for `none` and `unknown`.
+ * Exceptions: None.
+ */
+interface ResponsibleKey {
+  /**
+   * Kind of responsibility.
+   *
+   * Contract: `sides` when the list is non-empty, `none` for an empty list, `unknown` when the game could not tell.
+   * When to use: Choosing the `by ...` text and the sort order.
+   * Expected outcome: One of the three kinds.
+   * Exceptions: None.
+   */
+  readonly kind: ResponsibleKind;
+  /**
+   * Responsible owner ids, de-duplicated and sorted by rank.
+   *
+   * Contract: Empty unless `kind` is `sides`.
+   * When to use: Naming the sides in the line.
+   * Expected outcome: At least one id when `kind` is `sides`.
+   * Exceptions: None.
+   */
+  readonly sides: readonly string[];
+}
+
+/**
+ * One loss line before it is written.
+ *
+ * Purpose: Sorting, capping, and writing all work on the same group record.
+ * When to use: `groupLosses`.
+ * Expected outcome: The victims, the killers, and the keys that decide order.
+ * Exceptions: None.
+ */
+interface LossGroup {
+  /**
+   * Owner of the victims, or the unknown owner key.
+   *
+   * Contract: Every unit in the group has this owner.
+   * When to use: Choosing the section.
+   * Expected outcome: The reading seat, another owner, or `UNKNOWN_OWNER_KEY`.
+   * Exceptions: None.
+   */
+  readonly victimOwner: string;
+  /**
+   * Responsibility shared by every unit in the group.
+   *
+   * Contract: Equal for every unit.
+   * When to use: The `by ...` text.
+   * Expected outcome: A `ResponsibleKey`.
+   * Exceptions: None.
+   */
+  readonly responsible: ResponsibleKey;
+  /**
+   * Index into `LOSS_CAUSE_KEYS` and `LOSS_CAUSE_LABELS`.
+   *
+   * Contract: A valid index.
+   * When to use: The cause label and the sort order.
+   * Expected outcome: Zero for ranged, up to five for other.
+   * Exceptions: None.
+   */
+  readonly causeIndex: number;
+  /**
+   * Printed hex code, or an empty string.
+   *
+   * Contract: Equal for every unit.
+   * When to use: The `at ...` text.
+   * Expected outcome: Empty when the hex was not recorded or has no code.
+   * Exceptions: None.
+   */
+  readonly hexCode: string;
+  /**
+   * Victims in bucket order.
+   *
+   * Contract: Non-empty.
+   * When to use: The victim list of the line.
+   * Expected outcome: Printed by id, or as type counts.
+   * Exceptions: None.
+   */
+  readonly units: LostUnit[];
+}
+
+/**
+ * Input for `buildRecentTurnLossLines`.
+ *
+ * Purpose: One object keeps the formatter under the argument limit.
+ * When to use: Once per turn block.
+ * Expected outcome: Both summaries are parsed stored losses for the same turn.
+ * Exceptions: None.
+ */
+export interface RecentTurnLossLinesInput {
+  /**
+   * Seat of the commander reading the notes.
+   *
+   * Contract: An AI seat id.
+   * When to use: Naming that seat `you` and printing its own losses first.
+   * Expected outcome: Matches the seat whose `own_loss_json` is `ownLosses`.
+   * Exceptions: None.
+   */
+  readonly ownSeatId: string;
+  /**
+   * Parsed losses of the reading seat.
+   *
+   * Contract: Every unit belongs to `ownSeatId`.
+   * When to use: The `Your Losses` section.
+   * Expected outcome: Empty buckets when the seat lost nothing.
+   * Exceptions: None.
+   */
+  readonly ownLosses: PlayerLossSummary;
+  /**
+   * Parsed losses of every other owner, merged.
+   *
+   * Contract: Each unit carries its owner in its attribution when the row is new.
+   * When to use: The `Losses of ...` sections.
+   * Expected outcome: Empty buckets when no one else lost anything.
+   * Exceptions: None.
+   */
+  readonly otherLosses: PlayerLossSummary;
+  /**
+   * Every roster seat id, in seat order.
+   *
+   * Contract: Includes the reading seat.
+   * When to use: Ranking sides for sort order.
+   * Expected outcome: A seat missing from it ranks after the listed seats and before Neutral.
+   * Exceptions: None.
+   */
+  readonly seatOrder: readonly string[];
+  /**
+   * Turns an H3 index into the prompt's hex code.
+   *
+   * Contract: Returns undefined when the cell has no code.
+   * When to use: Printing `at XX` on a line.
+   * Expected outcome: The same code the map section prints.
+   * Exceptions: None.
+   */
+  readonly hexCodeFor: (h3Index: string) => string | undefined;
+  /**
+   * Most groups to list, or null for every group.
+   *
+   * Contract: A positive integer, or null.
+   * When to use: Null for the newest turn, `RECENT_TURN_LOSS_GROUP_LINES_MAX` for older turns.
+   * Expected outcome: Groups past the cap are replaced by one count line.
+   * Exceptions: None.
+   */
+  readonly maxGroupLines: number | null;
+}
+
+/**
+ * Rank of an owner for sort order.
+ *
+ * Purpose: Seats sort by roster order, then Neutral, then any other id.
+ * When to use: Sorting sides in a line and sections in a block.
+ * Expected outcome: The seat's index; `seatOrder.length - 0.5` for a seat id the roster does not list; `seatOrder.length` for Neutral; one more for anything else.
+ * Exceptions: None.
+ */
+function rankOf(ownerId: string, seatOrder: readonly string[]): number {
+  const index = seatOrder.indexOf(ownerId);
+  if (index >= 0) return index;
+  if (ownerId === NEUTRAL_OWNER_ID) return seatOrder.length;
+  if (isSeatId(ownerId)) return seatOrder.length - 0.5;
+  return seatOrder.length + 1;
+}
+
+/**
+ * Compares two owners by rank, then by label.
+ *
+ * Purpose: One total order for sides and sections.
+ * When to use: `Array.prototype.sort` over owner ids.
+ * Expected outcome: Negative when `left` comes first.
+ * Exceptions: None.
+ */
+function compareOwners(left: string, right: string, input: RecentTurnLossLinesInput): number {
+  const byRank = rankOf(left, input.seatOrder) - rankOf(right, input.seatOrder);
+  if (byRank !== 0) return byRank;
+  return sideLabel(left, input).localeCompare(sideLabel(right, input), 'en');
+}
+
+/**
+ * Names an owner in a loss line or header.
+ *
+ * Purpose: The reading seat is `you`, a seat is its prompt code, and Neutral is Neutral.
+ * When to use: Every `by ...` text and every `Losses of ...` header.
+ * Expected outcome: `you`, `Neutral`, a code such as `h1` or `a2`, or the id itself for anything else.
+ * Exceptions: None.
+ */
+function sideLabel(ownerId: string, input: RecentTurnLossLinesInput): string {
+  if (ownerId === input.ownSeatId) return 'you';
+  if (ownerId === NEUTRAL_OWNER_ID) return 'Neutral';
+  if (isSeatId(ownerId)) return playerIdCodeFor(ownerId);
+  return ownerId;
+}
+
+/**
+ * Reduces a unit's attribution to its responsibility key.
+ *
+ * Purpose: Units with the same responsibility share a loss line.
+ * When to use: `groupLosses`, once per unit.
+ * Expected outcome: `unknown` without attribution or with a null list, `none` for an empty list, otherwise `sides` in rank order.
+ * Exceptions: None.
+ */
+function responsibleKeyOf(unit: LostUnit, input: RecentTurnLossLinesInput): ResponsibleKey {
+  const ids = unit.attribution?.responsibleOwnerIds;
+  if (!ids) return { kind: 'unknown', sides: [] };
+  if (ids.length === 0) return { kind: 'none', sides: [] };
+  const sides = [...new Set(ids)].sort((left, right) => compareOwners(left, right, input));
+  return { kind: 'sides', sides };
+}
+
+/**
+ * Writes the `by ...` text of a loss line.
+ *
+ * Purpose: One place decides how one, two, and many sides read.
+ * When to use: `lineFor`.
+ * Expected outcome: `by unknown side`, `no side responsible`, `by X`, `by X and Y`, or `by X, Y, and Z`.
+ * Exceptions: None.
+ */
+function responsibleText(responsible: ResponsibleKey, input: RecentTurnLossLinesInput): string {
+  if (responsible.kind === 'unknown') return 'by unknown side';
+  if (responsible.kind === 'none') return 'no side responsible';
+  const names = responsible.sides.map((id) => sideLabel(id, input));
+  if (names.length === 1) return `by ${names[0]}`;
+  if (names.length === 2) return `by ${names[0]} and ${names[1]}`;
+  return `by ${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+}
+
+/**
+ * Splits both summaries into loss groups.
+ *
+ * Purpose: Units that share a victim owner, responsibility, cause, and hex code are one line.
+ * When to use: `buildRecentTurnLossLines`, before sorting.
+ * Expected outcome: One group per distinct key, with victims in bucket order.
+ * Exceptions: None.
+ */
+function groupLosses(input: RecentTurnLossLinesInput): LossGroup[] {
+  const groups = new Map<string, LossGroup>();
+  const add = (unit: LostUnit, victimOwner: string, causeIndex: number): void => {
+    const responsible = responsibleKeyOf(unit, input);
+    const h3Index = unit.attribution?.lossH3Index ?? null;
+    const hexCode = (h3Index ? input.hexCodeFor(h3Index) : undefined) ?? '';
+    const key = [victimOwner, responsible.kind, responsible.sides.join(','), causeIndex, hexCode].join('|');
+    const existing = groups.get(key);
+    if (existing) existing.units.push(unit);
+    else groups.set(key, { victimOwner, responsible, causeIndex, hexCode, units: [unit] });
+  };
+  LOSS_CAUSE_KEYS.forEach((causeKey, causeIndex) => {
+    for (const unit of input.ownLosses[causeKey]) add(unit, input.ownSeatId, causeIndex);
+    for (const unit of input.otherLosses[causeKey]) add(unit, unit.attribution?.ownerId ?? UNKNOWN_OWNER_KEY, causeIndex);
+  });
+  return [...groups.values()];
+}
+
+/**
+ * Compares two groups of the same section.
+ *
+ * Purpose: Side groups first, then no side, then unknown; then cause order, then hex code.
+ * When to use: Sorting the groups of one section.
+ * Expected outcome: Negative when `left` comes first.
+ * Exceptions: None.
+ */
+function compareGroups(left: LossGroup, right: LossGroup, input: RecentTurnLossLinesInput): number {
+  const kindOrder: Record<ResponsibleKind, number> = { sides: 0, none: 1, unknown: 2 };
+  const byKind = kindOrder[left.responsible.kind] - kindOrder[right.responsible.kind];
+  if (byKind !== 0) return byKind;
+  if (left.responsible.kind === 'sides') {
+    const byFirstSide = compareOwners(left.responsible.sides[0]!, right.responsible.sides[0]!, input);
+    if (byFirstSide !== 0) return byFirstSide;
+    const byCount = left.responsible.sides.length - right.responsible.sides.length;
+    if (byCount !== 0) return byCount;
+    const byNames = responsibleText(left.responsible, input).localeCompare(responsibleText(right.responsible, input), 'en');
+    if (byNames !== 0) return byNames;
+  }
+  if (left.causeIndex !== right.causeIndex) return left.causeIndex - right.causeIndex;
+  if (left.hexCode === right.hexCode) return 0;
+  if (left.hexCode.length === 0) return 1;
+  if (right.hexCode.length === 0) return -1;
+  return left.hexCode.localeCompare(right.hexCode, 'en');
+}
+
+/**
+ * Sorts groups into section order, then group order.
+ *
+ * Purpose: One canonical order decides both the printed order and which groups a cap keeps first.
+ * When to use: `buildRecentTurnLossLines`, after grouping.
+ * Expected outcome: The reading seat's groups, then other owners by rank, then the unknown owner.
+ * Exceptions: None.
+ */
+function sortGroups(groups: readonly LossGroup[], input: RecentTurnLossLinesInput): LossGroup[] {
+  const sectionOrder = (owner: string): number => {
+    if (owner === input.ownSeatId) return 0;
+    return owner === UNKNOWN_OWNER_KEY ? 2 : 1;
+  };
+  return [...groups].sort((left, right) => {
+    const bySection = sectionOrder(left.victimOwner) - sectionOrder(right.victimOwner);
+    if (bySection !== 0) return bySection;
+    if (left.victimOwner !== right.victimOwner) return compareOwners(left.victimOwner, right.victimOwner, input);
+    return compareGroups(left, right, input);
+  });
+}
+
+/**
+ * Keeps the groups a cap allows.
+ *
+ * Purpose: Groups that involve the reading seat are listed first, so evidence about that seat is never cut for other sides' fights.
+ * When to use: `buildRecentTurnLossLines` when `maxGroupLines` is set and exceeded.
+ * Expected outcome: At most `maxGroupLines` groups, in the order given.
+ * Exceptions: None.
+ */
+function capGroups(sorted: readonly LossGroup[], maxGroupLines: number, input: RecentTurnLossLinesInput): LossGroup[] {
+  const involves = (group: LossGroup): boolean =>
+    group.victimOwner === input.ownSeatId || group.responsible.sides.includes(input.ownSeatId);
+  const chosen = new Set<LossGroup>();
+  for (const group of sorted) {
+    if (chosen.size < maxGroupLines && involves(group)) chosen.add(group);
+  }
+  for (const group of sorted) {
+    if (chosen.size < maxGroupLines && !chosen.has(group)) chosen.add(group);
+  }
+  return sorted.filter((group) => chosen.has(group));
+}
+
+/**
+ * Writes the line of one group.
+ *
+ * Purpose: One line carries who was responsible, the cause, the hex, the victims, and the killer counts.
+ * When to use: `buildRecentTurnLossLines`, once per listed group.
+ * Expected outcome: `  - by h1, Ranged attack at QX: a1-i3, a1-a2 (by 2 Armored)`. The hex and the killer part are left out when empty.
+ * Exceptions: None.
+ */
+function lineFor(group: LossGroup, input: RecentTurnLossLinesInput): string {
+  const killers = new Map<string, LossKillerUnit>();
+  for (const unit of group.units) {
+    for (const killer of unit.attribution?.killerUnits ?? []) killers.set(killer.unitId, killer);
+  }
+  const hex = group.hexCode.length > 0 ? ` at ${group.hexCode}` : '';
+  const by = killers.size > 0 ? ` (by ${formatGroupedTypeTotals([...killers.values()])})` : '';
+  const cause = LOSS_CAUSE_LABELS[group.causeIndex];
+  return `  - ${responsibleText(group.responsible, input)}, ${cause}${hex}: ${formatLossEntriesForPrompt(group.units)}${by}`;
+}
+
+/**
+ * Writes the header of one section.
+ *
+ * Purpose: The reading seat's losses, each other owner's losses, and losses of an unknown owner each get a header.
+ * When to use: `buildRecentTurnLossLines`, when the owner changes.
+ * Expected outcome: `- Your Losses:`, `- Losses of other sides:`, or `- Losses of {side}:`.
+ * Exceptions: None.
+ */
+function headerFor(victimOwner: string, input: RecentTurnLossLinesInput): string {
+  if (victimOwner === input.ownSeatId) return '- Your Losses:';
+  if (victimOwner === UNKNOWN_OWNER_KEY) return '- Losses of other sides:';
+  return `- Losses of ${sideLabel(victimOwner, input)}:`;
+}
+
+/**
+ * Builds the attributed loss lines for one turn block.
+ *
+ * Purpose: Tells a commander who destroyed which units, where, and with what, for its own losses and for every other side's.
+ * When to use: `buildRecentTurnNotesSection`, once per turn block.
+ * Expected outcome: Section headers and group lines in canonical order, then a count line when a cap dropped groups. An empty list when nothing was lost.
+ * Exceptions: None.
+ */
+export function buildRecentTurnLossLines(input: RecentTurnLossLinesInput): string[] {
+  const sorted = sortGroups(groupLosses(input), input);
+  const capped = input.maxGroupLines !== null && sorted.length > input.maxGroupLines
+    ? capGroups(sorted, input.maxGroupLines, input)
+    : sorted;
+  logDebug('recentTurnLossLines buildRecentTurnLossLines', {
+    ownSeatId: input.ownSeatId,
+    maxGroupLines: input.maxGroupLines,
+    groupCount: sorted.length,
+    listedCount: capped.length,
+  });
+  const lines: string[] = [];
+  let currentOwner: string | null = null;
+  for (const group of capped) {
+    if (group.victimOwner !== currentOwner) {
+      lines.push(headerFor(group.victimOwner, input));
+      currentOwner = group.victimOwner;
+    }
+    lines.push(lineFor(group, input));
+  }
+  const dropped = sorted.length - capped.length;
+  if (dropped === 1) lines.push('- 1 more loss group on this turn is not listed.');
+  else if (dropped > 1) lines.push(`- ${dropped} more loss groups on this turn are not listed.`);
+  return lines;
+}

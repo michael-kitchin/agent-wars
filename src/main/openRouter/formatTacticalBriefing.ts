@@ -100,6 +100,7 @@ export function formatTacticalBriefing(args: {
     currentTurnNumber: tacticalBattle.tacticalTurnNumber,
     heading: SECTION_TITLE_RECENT_TURN_NOTES,
     seatId: ownSeat,
+    tacticalEnclosingH3Index: tacticalBattle.enclosingStrategicH3Index,
   });
   if (recentTurnNotes.trim().length > 0) {
     sections.push('\n\n' + recentTurnNotes.trim());

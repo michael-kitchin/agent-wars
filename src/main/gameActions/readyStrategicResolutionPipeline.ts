@@ -21,6 +21,7 @@ import type { ReadyResult, AirStrikeTargetType } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
 import { resolveStrategicFerryOrders, airCargoFollowMoves } from './airFerryResolution';
 import { resolveAirDropPhase, reconcileHumanAirActions } from './airDropResolution';
+import { mergeCarrierMaps } from './transportCargoLoss';
 import { resolveMissileLaunchPhase } from './missileLaunchResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
@@ -318,10 +319,11 @@ export function executeReadyStrategicTurn(
     techHitBonusAt,
     { hooks: fortificationHooks, tally: fortificationTally }
   );
-  const airStrikeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
+  const airStrikeTransport = applyTransportOutcomeForRemovedStrategicUnits(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
   );
+  const airStrikeTransportLosses = airStrikeTransport.cargo;
   const airDropResult = resolveAirDropPhase(allDropOrders, next, originHitBonusAt, techHitBonusAt);
   for (const roll of airDropResult.diceRolls) airStrikeResult.diceRolls.push(roll);
   const removedBeforeRanged = new Set<string>([
@@ -361,9 +363,14 @@ export function executeReadyStrategicTurn(
   for (const id of rangedResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
   }
-  const rangedTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
+  const rangedTransport = applyTransportOutcomeForRemovedStrategicUnits(
     rangedResult.removedUnitIds,
     rangedResult.removedUnits
+  );
+  const rangedTransportLosses = rangedTransport.cargo;
+  const transportCarrierIdByCargoId = mergeCarrierMaps(
+    airStrikeTransport.carrierIdByCargoId,
+    rangedTransport.carrierIdByCargoId
   );
 
   const mergedHuman = new Map<string, string>();
@@ -531,6 +538,7 @@ export function executeReadyStrategicTurn(
       sightCues,
       airStrikeTransportLosses,
       rangedTransportLosses,
+      transportCarrierIdByCargoId,
       humanMoves: [...humanMoves],
       aiMoves: [...aiMoves],
       embarkedFollowMoves: [...embarkedFollowMoves],
@@ -571,6 +579,7 @@ export function executeReadyStrategicTurn(
     sightCues,
     airStrikeTransportLosses,
     rangedTransportLosses,
+    transportCarrierIdByCargoId,
     combatUnitsAfter,
     combatUnitsBefore,
     humanMoves,

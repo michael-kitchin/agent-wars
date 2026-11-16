@@ -159,6 +159,19 @@ export function isHexCodeValidForContext(code: string, context: CoordinateContex
 }
 
 /**
+ * Returns whether the tactical registry for a battle has been built.
+ *
+ * Purpose: Lets a caller that only prints hex codes, such as the talk stage, build the battle's registry once and not rebuild it on every call.
+ * When to use: Before `initTacticalCoordinateRegistry` in a caller that does not own the consultation.
+ * Expected outcome: True after `initTacticalCoordinateRegistry` for that battle id, until a profile change clears the tables.
+ * Exceptions: None.
+ */
+export function hasTacticalCoordinateRegistry(battleId: string): boolean {
+  logTrace('hex-coordinates hasTacticalCoordinateRegistry', { battleId });
+  return tacticalRegistries.has(battleId);
+}
+
+/**
  * Ensures the strategic registry exists (lazy initialization for callers that skip explicit init).
  *
  * Purpose: Convenience for briefing and tests that expect idempotent setup.

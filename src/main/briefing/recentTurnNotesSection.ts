@@ -2,15 +2,22 @@
  * Builds recent turn notes markdown for AI system prompts from persisted history.
  */
 
-import {
-  formatPlayerLossInline,
-  parsePlayerLossSummaryJson,
-  playerHasAnyLoss,
-} from '../../shared/lossSummary';
+import { isValidCell } from 'h3-js';
+import { playerHasAnyLoss } from '../../shared/lossSummary';
+import { parsePlayerLossSummaryJson } from '../../shared/lossSummaryJson';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
-import { getRecentTurnNotes, RECENT_TURN_NOTES_LIMIT, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
-import { logTrace } from '../logger';
+import { sortSeatsByOrder } from '../../shared/seatRoster';
+import { getRecentTurnNotes, getSeatRoster, RECENT_TURN_NOTES_LIMIT, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
+import { logError, logTrace } from '../logger';
 import { subHeading } from '../openRouter/promptSpec/sectionHeadings';
+import type { CoordinateContext } from './map/coordinateContext';
+import {
+  ensureStrategicCoordinateRegistryInitialized,
+  getHexCodeForContext,
+  hasTacticalCoordinateRegistry,
+  initTacticalCoordinateRegistry,
+} from './map/hexCoordinates';
+import { buildRecentTurnLossLines, RECENT_TURN_LOSS_GROUP_LINES_MAX, RECENT_TURN_LOSS_LEGEND } from './recentTurnLossLines';
 
 /**
  * Arguments for assembling a recent turn notes prompt section.
@@ -61,6 +68,15 @@ export interface BuildRecentTurnNotesSectionArgs {
    * Exceptions: None.
    */
   seatId?: AiSeatId;
+  /**
+   * Strategic hex that encloses the battle, for tactical callers.
+   *
+   * Contract: `TacticalBattleSnapshot.enclosingStrategicH3Index`. Strategic callers omit it.
+   * When to use: Tactical callers that may run before an orders consultation has built the battle's hex codes, such as the talk stage.
+   * Expected outcome: The battle's hex codes are built once, so loss lines can print them. Without it, a tactical loss line prints no hex when no registry exists.
+   * Exceptions: None.
+   */
+  tacticalEnclosingH3Index?: string;
 }
 
 /**
@@ -92,32 +108,152 @@ function rowHasPromptContent(row: TurnNoteRow): boolean {
 }
 
 /**
- * Formats one turn block with the strategy and optional loss bullets.
+ * Everything one turn block needs besides its stored row.
+ *
+ * Purpose: Keeps `formatTurnBlock` under the argument limit.
+ * When to use: Built once per section by `buildRecentTurnNotesSection`.
+ * Expected outcome: The same seat, seat order, and hex resolver for every block, and a cap that differs by turn.
+ * Exceptions: None.
+ */
+interface TurnBlockContext {
+  /**
+   * Seat reading the notes.
+   *
+   * Contract: An AI seat id.
+   * When to use: Naming that seat `you` in loss lines.
+   * Expected outcome: The seat whose rows were read.
+   * Exceptions: None.
+   */
+  readonly ownSeatId: AiSeatId;
+  /**
+   * Every roster seat id in seat order.
+   *
+   * Contract: May be empty when no roster is stored.
+   * When to use: Ranking sides in loss lines.
+   * Expected outcome: Roster order.
+   * Exceptions: None.
+   */
+  readonly seatOrder: readonly string[];
+  /**
+   * Turns an H3 index into the hex code the map section prints.
+   *
+   * Contract: Returns undefined when no code exists. Never throws.
+   * When to use: Loss lines.
+   * Expected outcome: A code, or undefined so the line prints without a hex.
+   * Exceptions: None.
+   */
+  readonly hexCodeFor: (h3Index: string) => string | undefined;
+  /**
+   * Most loss groups this block lists, or null for all.
+   *
+   * Contract: Null for the newest block.
+   * When to use: Passed to `buildRecentTurnLossLines`.
+   * Expected outcome: Older blocks are capped.
+   * Exceptions: None.
+   */
+  readonly maxGroupLines: number | null;
+}
+
+/**
+ * One formatted turn block.
+ *
+ * Purpose: The section prints its legend only when some block has a loss line.
+ * When to use: Returned by `formatTurnBlock`.
+ * Expected outcome: The block text and whether it holds loss lines.
+ * Exceptions: None.
+ */
+interface FormattedTurnBlock {
+  /**
+   * Block text starting with `Turn N:`.
+   *
+   * Contract: Non-empty.
+   * When to use: Joined into the section.
+   * Expected outcome: A strategy bullet, then loss lines.
+   * Exceptions: None.
+   */
+  readonly text: string;
+  /**
+   * Whether the block has at least one loss line.
+   *
+   * Contract: True when `buildRecentTurnLossLines` returned lines.
+   * When to use: Deciding whether to print the legend.
+   * Expected outcome: False for a block with only a strategy.
+   * Exceptions: None.
+   */
+  readonly hasLossLines: boolean;
+}
+
+/**
+ * Builds a function that turns an H3 index into a hex code, building the code tables on first use.
+ *
+ * Purpose: A turn with no stored hex must not build a registry, and a registry failure must not fail the prompt.
+ * When to use: `buildRecentTurnNotesSection`, once per section.
+ * Expected outcome: A function that returns the hex code for the scope's map, or undefined when none exists, setup failed, or the index is not an H3 cell.
+ * Exceptions: None. A setup or lookup failure is logged and that call returns undefined.
+ */
+function lossHexCodeResolver(args: BuildRecentTurnNotesSectionArgs): (h3Index: string) => string | undefined {
+  let ready: boolean | null = null;
+  const context: CoordinateContext = args.scope === 'tactical'
+    ? { mode: 'tactical', battleId: args.battleId }
+    : { mode: 'strategic' };
+  const prepare = (): boolean => {
+    try {
+      if (args.scope === 'strategic') {
+        ensureStrategicCoordinateRegistryInitialized();
+      } else if (args.tacticalEnclosingH3Index && !hasTacticalCoordinateRegistry(args.battleId)) {
+        initTacticalCoordinateRegistry(args.battleId, args.tacticalEnclosingH3Index);
+      }
+      return true;
+    } catch (err) {
+      logError('recentTurnNotesSection hex code registry failed', { scope: args.scope, battleId: args.battleId, err });
+      return false;
+    }
+  };
+  return (h3Index) => {
+    if (ready === null) ready = prepare();
+    if (!ready) return undefined;
+    if (!isValidCell(h3Index)) {
+      logError('recentTurnNotesSection loss hex is not a cell', { scope: args.scope, battleId: args.battleId, h3Index });
+      return undefined;
+    }
+    try {
+      return getHexCodeForContext(h3Index, context);
+    } catch (err) {
+      logError('recentTurnNotesSection hex code lookup failed', { scope: args.scope, battleId: args.battleId, h3Index, err });
+      return undefined;
+    }
+  };
+}
+
+/**
+ * Formats one turn block with the strategy and the attributed loss lines.
  *
  * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes. A stored message from an older save is not printed.
  * When to use: For each qualifying row returned from the DB query.
- * Expected outcome: Multiline block starting with `Turn N:`.
+ * Expected outcome: Multiline block starting with `Turn N:`, then the strategy bullet, then the loss lines.
  * Exceptions: None.
  */
-function formatTurnBlock(row: TurnNoteRow): string {
-  const label = `Turn ${row.turnNumber}`;
-  const lines: string[] = [`${label}:`];
-  lines.push(`- Strategy: ${noteDisplayText(row.strategyText)}`);
-  const human = parsePlayerLossSummaryJson(row.humanLossJson);
-  const ai = parsePlayerLossSummaryJson(row.aiLossJson);
-  const humanInline = formatPlayerLossInline(human);
-  const aiInline = formatPlayerLossInline(ai);
-  if (humanInline.length > 0) lines.push(`- Enemy Losses: ${humanInline}`);
-  if (aiInline.length > 0) lines.push(`- Your Losses: ${aiInline}`);
-  return lines.join('\n');
+function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext): FormattedTurnBlock {
+  const lines: string[] = [`Turn ${row.turnNumber}:`, `- Strategy: ${noteDisplayText(row.strategyText)}`];
+  const lossLines = buildRecentTurnLossLines({
+    ownSeatId: context.ownSeatId,
+    // The stored columns are named from the human's point of view: `humanLossJson` holds every other owner's losses.
+    ownLosses: parsePlayerLossSummaryJson(row.aiLossJson),
+    otherLosses: parsePlayerLossSummaryJson(row.humanLossJson),
+    seatOrder: context.seatOrder,
+    hexCodeFor: context.hexCodeFor,
+    maxGroupLines: context.maxGroupLines,
+  });
+  lines.push(...lossLines);
+  return { text: lines.join('\n'), hasLossLines: lossLines.length > 0 };
 }
 
 /**
  * Builds the recent turn notes markdown block for AI prompts.
  *
- * Purpose: Replaces the legacy losses-since-consultation table with rolling ten-entry history.
- * When to use: Strategic `formatBriefing` and tactical block in `requestOrdersFlow` (both use `Turn N:` labels).
- * Expected outcome: Empty string when no qualifying prior turns; otherwise `## heading` plus per-turn bullets.
+ * Purpose: Replaces the legacy losses-since-consultation table with rolling ten-entry history, each loss naming who was responsible.
+ * When to use: Strategic `formatBriefing`, the tactical briefing, and the talk stage (all use `Turn N:` labels).
+ * Expected outcome: Empty string when no qualifying prior turns; otherwise `## heading`, the loss legend when any block has a loss line, and per-turn bullets. The newest block lists every loss group and older blocks are capped.
  * Exceptions: None.
  */
 export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArgs): string {
@@ -126,14 +262,25 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
     battleId: args.battleId,
     currentTurnNumber: args.currentTurnNumber,
   });
+  const ownSeatId = args.seatId ?? AI_SEAT_IDS[0];
   const rows = getRecentTurnNotes(
-    args.seatId ?? AI_SEAT_IDS[0],
+    ownSeatId,
     args.scope,
     args.battleId,
     args.currentTurnNumber,
     RECENT_TURN_NOTES_LIMIT
   ).filter(rowHasPromptContent);
   if (rows.length === 0) return '';
-  const blocks = rows.map((row) => formatTurnBlock(row));
-  return `${subHeading(args.heading)}\n\n${blocks.join('\n\n')}`;
+  const seatOrder = sortSeatsByOrder(getSeatRoster()).map((seat) => seat.seatId);
+  const hexCodeFor = lossHexCodeResolver(args);
+  const blocks = rows.map((row, index) =>
+    formatTurnBlock(row, {
+      ownSeatId,
+      seatOrder,
+      hexCodeFor,
+      maxGroupLines: index === rows.length - 1 ? null : RECENT_TURN_LOSS_GROUP_LINES_MAX,
+    })
+  );
+  const legend = blocks.some((block) => block.hasLossLines) ? `${RECENT_TURN_LOSS_LEGEND}\n\n` : '';
+  return `${subHeading(args.heading)}\n\n${legend}${blocks.map((block) => block.text).join('\n\n')}`;
 }

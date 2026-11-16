@@ -122,6 +122,7 @@ test('return fire removes the air unit and the infantry, and the infantry never 
     assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['air-1']) == null, true);
     assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['inf-1']) == null, true);
     assert.equal(shot.diceRolls[0]?.kind, 'antiAir');
+    assert.equal(shot.carrierIdByCargoId.get('inf-1'), 'air-1', 'the infantry is recorded as lost with its carrier');
     const roster = listUnitsForSnapshot().filter((unit) => !shot.removedUnitIds.includes(unit.id));
     assert.equal(roster.some((unit) => unit.id === 'air-1' || unit.id === 'inf-1'), false);
   });

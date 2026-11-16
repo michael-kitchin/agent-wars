@@ -6,7 +6,7 @@
  * Expected outcome: March rows, combat fields, reconciled city counts, and one tactical loss note per active AI seat.
  */
 
-import { HUMAN_SEAT_ID, type OwnerId } from '../../shared/seatIds';
+import type { OwnerId } from '../../shared/seatIds';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
 import type { TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalPlaybackMarchMove } from '../../shared/ipc/tacticalPlaybackTypes';
@@ -19,6 +19,7 @@ import { reconcileStrategicInfrastructureCountsFromTacticalOverrides } from '../
 import { logDebug, logTrace } from '../logger';
 import { tacticalMarchFirstStopAlongPath } from '../tacticalBattle/tacticalRulesAdapter';
 import type { TacticalBeatOutcome } from '../tacticalBattle/tacticalBeatOutcome';
+import { buildTacticalLossAttributionContext, lossNoteAirStrikeRemovedUnits } from '../lossAttribution/tacticalLossAttribution';
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 
 /**
@@ -221,7 +222,7 @@ export function reconcileInfrastructureAfterTacticalBeat(outcome: TacticalBeatOu
  *
  * Purpose: Recent Turn Notes in the next tactical briefing can name who was lost on the beat that just finished.
  * When to use: After embark rows for this beat have been written, so the note matches the stored battle.
- * Expected outcome: One note at `tacticalTurnNumber - 1` (at least 1). An air unit of the human seat that was not a ranged victim is treated as an air-strike loss.
+ * Expected outcome: One note at `tacticalTurnNumber - 1` (at least 1). Air-strike victims are filed as air-strike losses. A striker that did not return is included for every owner and filed as return fire. Each loss carries who was responsible.
  * Exceptions: None. The note writer logs a database failure.
  */
 export function captureTacticalBeatLossNote(outcome: TacticalBeatOutcome): void {
@@ -234,12 +235,12 @@ export function captureTacticalBeatLossNote(outcome: TacticalBeatOutcome): void 
   const tacticalRemovedById = new Map(outcome.removedUnits.map((unit) => [unit.id, unit] as const));
   for (const unit of outcome.meleePack.meleeRemovedUnits ?? []) tacticalRemovedById.set(unit.id, unit);
   const tacticalRemovedAll = [...tacticalRemovedById.values()];
-  const airStrikeVictimIds = new Set((outcome.killsByAirStrike ?? []).map((kill) => kill.victimId));
-  const rangedVictimIds = new Set(outcome.killsByDirectFire.map((kill) => kill.victimId));
-  const airStrikeRemovedUnits = tacticalRemovedAll.filter((unit) => {
-    if (airStrikeVictimIds.has(unit.id)) return true;
-    if (unit.player === HUMAN_SEAT_ID && unit.unitType === 'air' && !rangedVictimIds.has(unit.id)) return true;
-    return false;
+  const killsByMelee = outcome.meleePack.killsByMelee;
+  const airStrikeRemovedUnits = lossNoteAirStrikeRemovedUnits({
+    removedUnits: tacticalRemovedAll,
+    killsByAirStrike: outcome.killsByAirStrike ?? [],
+    killsByDirectFire: outcome.killsByDirectFire,
+    airStrikeMoves: outcome.airStrikePlaybackMoves,
   });
   captureTurnLossNoteFromResolution({
     scope: 'tactical',
@@ -247,10 +248,21 @@ export function captureTacticalBeatLossNote(outcome: TacticalBeatOutcome): void 
     turnNumber: Math.max(1, battle.tacticalTurnNumber - 1),
     killsByDirectFire: outcome.killsByDirectFire,
     killsByReturnFire: outcome.killsByReturnFire,
-    killsByMelee: outcome.meleePack.killsByMelee,
+    killsByMelee,
     killsByAirStrike: outcome.killsByAirStrike,
     removedUnits: tacticalRemovedAll,
     airStrikeRemovedUnits,
     airStrikeMoves: outcome.airStrikePlaybackMoves,
+    attribution: buildTacticalLossAttributionContext({
+      killsByDirectFire: outcome.killsByDirectFire,
+      killsByReturnFire: outcome.killsByReturnFire,
+      killsByMelee,
+      killsByAirStrike: outcome.killsByAirStrike ?? [],
+      removedUnits: tacticalRemovedAll,
+      subUnitsBeforeFerry: outcome.battleAfterMovementBeforeFerry.subUnits,
+      subUnitsAfter: battle.subUnits,
+      airStrikeMoves: outcome.airStrikePlaybackMoves,
+      airDropMoves: outcome.airDropPlaybackMoves ?? [],
+    }),
   });
 }

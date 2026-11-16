@@ -5,7 +5,6 @@
 import assert from 'node:assert/strict';
 import {
   formatLossEntries,
-  formatPlayerLossInline,
   formatPlayerLossLinesMultiline,
   type LostUnit,
   type PlayerLossSummary,
@@ -136,61 +135,6 @@ function testMultilineCauseOrderAndSuppression(): void {
 }
 
 /**
- * Verifies inline formatter joins cause lines with semicolons.
- *
- * Purpose: Protects prompt recent-turn loss bullet formatting.
- * When to use: Run after changing `formatPlayerLossInline`.
- * Expected outcome: Semicolon-separated `Cause: victims` pairs.
- * Exceptions: None.
- */
-function testInlineJoinsWithSemicolons(): void {
-  const summary: PlayerLossSummary = {
-    ranged: [{ unitType: 'infantry', displayName: 'A', unitId: 'human-inf-1' }],
-    melee: [{ unitType: 'armor', displayName: 'B', unitId: 'human-armor-1' }],
-    returnFire: [],
-    airStrike: [],
-    missileStrike: [],
-    other: [],
-  };
-  assert.strictEqual(
-    formatPlayerLossInline(summary),
-    'Ranged attack: human-inf-1; Melee attack: human-armor-1'
-  );
-}
-
-/**
- * Verifies prompt loss lines never fall back to display names when snapshot ids are missing.
- *
- * Purpose: Older persisted rows may have only `displayName`. Grouped type totals keep the prompt on one identity scheme.
- * When to use: Run after changing `formatLossEntriesForPrompt`.
- * Expected outcome: Grouped totals; display names absent even for a short list.
- * Exceptions: None.
- */
-function testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames(): void {
-  const summary: PlayerLossSummary = {
-    ranged: [{ unitType: 'infantry', displayName: 'IX Fleet' }],
-    melee: [
-      { unitType: 'armor', displayName: 'A', unitId: 'human-armor-1' },
-      { unitType: 'infantry', displayName: 'B' },
-    ],
-    returnFire: [],
-    airStrike: [],
-    missileStrike: [],
-    other: [],
-  };
-  const text = formatPlayerLossInline(summary);
-  assert.strictEqual(text, 'Ranged attack: 1 Infantry; Melee attack: 1 Armored, 1 Infantry');
-  assert.ok(!text.includes('IX Fleet'), 'prompt losses must not use display names');
-  assert.ok(!text.includes('human-armor-1'), 'partial ids fall back to grouped totals, not a mixed list');
-  const six = formatPlayerLossInline({
-    ...summary,
-    ranged: sampleUnits(6),
-    melee: [],
-  });
-  assert.strictEqual(six, 'Ranged attack: 6 Infantry');
-}
-
-/**
  * Runs all loss summary formatter tests.
  *
  * Purpose: Single entrypoint for the Node test runner manifest.
@@ -219,8 +163,6 @@ function run(): void {
   testUnknownTypeStaysNamed();
   testMissileGroupFollowsInfantry();
   testMultilineCauseOrderAndSuppression();
-  testInlineJoinsWithSemicolons();
-  testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames();
   console.log('lossSummary.test.ts passed');
 }
 

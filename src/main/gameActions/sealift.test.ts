@@ -21,6 +21,7 @@ import {
   executeSealiftSlotUpdate,
 } from './sealift';
 import { getStrategicProductionContext } from '../terrainClassificationCache';
+import { applyTransportLossForRemovedCarriers } from './transportCargoLoss';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -332,7 +333,7 @@ function testTransportLossDestroysAllEmbarkedCargoRegardlessOfTerrain(): void {
       'human-naval-coastal-loss',
     ]);
 
-    const removedCargo = applyTransportLossForRemovedNavalUnits([
+    const { cargo: removedCargo, carrierIdByCargoId } = applyTransportLossForRemovedCarriers([
       { id: 'human-naval-water-loss', player: 'human', unitType: 'naval', h3Index: waterHex } as CombatUnit,
       { id: 'human-naval-coastal-loss', player: 'human', unitType: 'naval', h3Index: coastalHex } as CombatUnit,
     ]);
@@ -342,6 +343,8 @@ function testTransportLossDestroysAllEmbarkedCargoRegardlessOfTerrain(): void {
       ['human-inf-coastal-loss', 'human-inf-water-loss'],
       'transport loss should remove all embarked land cargo'
     );
+    assert.strictEqual(carrierIdByCargoId.get('human-inf-water-loss'), 'human-naval-water-loss');
+    assert.strictEqual(carrierIdByCargoId.get('human-inf-coastal-loss'), 'human-naval-coastal-loss');
     assert.strictEqual(
       dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE id = ?', ['human-inf-water-loss'])?.count ?? 0,
       0,

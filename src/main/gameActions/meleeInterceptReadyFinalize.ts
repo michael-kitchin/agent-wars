@@ -10,7 +10,8 @@ import {
   getSeatRoster,
   listUnitsForSnapshot,
 } from '../gameDb';
-import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
+import { captureStrategicTurnLossNote, readLossHexControllers } from './strategicLossNoteCapture';
+import { mergeCarrierMaps } from './transportCargoLoss';
 import { processProductionAfterControlResolution, resolveStrategicControlAfterCombatAndMovement } from './controlAndProduction';
 import { applyTransportOutcomeForRemovedStrategicUnits } from './sealift';
 import type { AirDropPhaseResult } from './airDropResolution';
@@ -127,6 +128,15 @@ airStrikeTransportLosses: CombatUnit[];
    * Exceptions: None.
    */
 rangedTransportLosses: CombatUnit[];
+  /**
+   * The carrier each cargo unit lost in the air-strike and ranged phases was aboard.
+   *
+   * Contract: Keys are ids in `airStrikeTransportLosses` and `rangedTransportLosses`. Values are ids of destroyed carriers.
+   * When to use: Loss attribution in finalize, so cargo is credited to whoever destroyed its carrier.
+   * Expected outcome: Empty when no destroyed carrier held cargo.
+   * Exceptions: None.
+   */
+  transportCarrierIdByCargoId: ReadonlyMap<string, string>;
     /**
    * Specifies the contract for the `combatUnitsAfter` member (combatUnitsAfter: CombatUnit[];).
 
@@ -301,12 +311,17 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
   for (const id of meleeResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
   }
-  const meleeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
+  const meleeTransport = applyTransportOutcomeForRemovedStrategicUnits(
     meleeResult.removedUnitIds,
     meleeResult.removedUnits
   );
+  const meleeTransportLosses = meleeTransport.cargo;
 
   const fortificationReports = buildFortificationReports(args.fortificationTally);
+  const controllerBeforeControlByHex = readLossHexControllers({
+    airStrikeMoves: airStrikeResult.strikeMoves,
+    airDropMoves: airDropResult.moves,
+  });
   const controlTransitions = resolveStrategicControlAfterCombatAndMovement(traversedHexesByPlayer);
   const baseLossRemoved = destroyAirUnitsWithInvalidBase();
   const baseLossRemovedAir = baseLossRemoved.filter((unit) => unit.unitType === 'air');
@@ -457,18 +472,28 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     }))
   );
 
-  captureTurnLossNoteFromResolution({
-    scope: 'strategic',
-    battleId: '',
+  captureStrategicTurnLossNote({
     turnNumber,
-    kills: allKills,
+    allKills,
     killsByDirectFire: rangedResult.killsByDirectFire,
     killsByReturnFire: rangedResult.killsByReturnFire,
-    removedUnits: allRemovedUnits,
-    missileStrikeRemovedUnits: missileLaunchResult.removedUnits,
+    allRemovedUnits,
+    missileRemovedUnits: missileLaunchResult.removedUnits,
+    missileLaunches: missileLaunchResult.launches,
+    missileInfrastructureEvents: missileLaunchResult.infrastructureDestroyedEvents,
     airStrikeRemovedUnits: airStrikeResult.removedUnits,
-    labelUnits: killLabelUnits,
     airStrikeMoves: airStrikeResult.strikeMoves,
+    airStrikeInfrastructureEvents: airStrikeResult.infrastructureDestroyedEvents,
+    airDropRemovedUnits: airDropResult.removedUnits,
+    airDropMoves: airDropResult.moves,
+    killLabelUnits,
+    combatUnitsBefore,
+    combatUnitsAfter,
+    controlTransitions,
+    baseLossRemoved,
+    controllerBeforeControlByHex,
+    transportCarrierIdByCargoId: mergeCarrierMaps(args.transportCarrierIdByCargoId, meleeTransport.carrierIdByCargoId),
+    airDropCarrierIdByCargoId: airDropResult.carrierIdByCargoId,
   });
 
   /**

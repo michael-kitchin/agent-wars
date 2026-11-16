@@ -98,7 +98,11 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 
 #### `## Recent Turn Notes`
 
-Include when at least one of the previous ten periods in this battle has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Each block is the strategy and the loss lines. Scoped to this battle, not to the strategic timeline.
+Include when at least one of the previous ten periods in this battle has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Each block is the strategy and the attributed loss lines, with the same sections, legend, and cap as the strategic section.
+
+Hex codes are this battle's codes. A lost striker or drop carrier is placed at its target cell. An air-strike victim is credited to the one striker. Anti-air credits the sub-unit that shot the striker down. A striker lost with no shooter recorded is credited to the other sides in the battle, and that line has no counts. An air unit lost on a failed ferry prints `no side responsible`. Ranged and melee counts are still every unit of the side that fought. The strategic air-strike and anti-air limits do not apply here.
+
+Scoped to this battle, not to the strategic timeline.
 
 #### `## Active Callbacks`
 

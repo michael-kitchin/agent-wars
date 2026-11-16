@@ -150,6 +150,15 @@ airStrikeTransportLosses: CombatUnit[];
    * Exceptions: None.
    */
 rangedTransportLosses: CombatUnit[];
+  /**
+   * The carrier each cargo unit lost in the air-strike and ranged phases was aboard.
+   *
+   * Contract: Keys are ids in `airStrikeTransportLosses` and `rangedTransportLosses`. Values are ids of destroyed carriers.
+   * When to use: Loss attribution in finalize, so cargo is credited to whoever destroyed its carrier.
+   * Expected outcome: Empty when no destroyed carrier held cargo.
+   * Exceptions: None.
+   */
+  transportCarrierIdByCargoId: ReadonlyMap<string, string>;
     /**
    * Specifies the contract for the `humanMoves` member (humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 

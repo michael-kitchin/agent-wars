@@ -159,6 +159,7 @@ export function readTalkPromptInput(args: {
     currentTurnNumber: noteTurn,
     heading: SECTION_TITLE_RECENT_TURN_NOTES,
     seatId: args.seatId,
+    tacticalEnclosingH3Index: args.battle?.enclosingStrategicH3Index,
   });
   const opponent = opponentId ? roster.find((seat) => seat.seatId === opponentId) : undefined;
   logTrace('talkPromptInput readTalkPromptInput', {

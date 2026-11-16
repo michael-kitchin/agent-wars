@@ -179,7 +179,20 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 #### `## Recent Turn Notes`
 
-- **Shape:** up to ten prior turns (`RECENT_TURN_NOTES_LIMIT`) in ascending order; each block gives that turn's strategy and losses on each side. Loss lines name units by snapshot id, never by display name. A stored `message_text` from an older save is not printed.
+- **Shape:** up to ten prior turns (`RECENT_TURN_NOTES_LIMIT`) in ascending order. Each block is `Turn N:`, then `- Strategy: …`, then the loss lines from `buildRecentTurnLossLines`. A stored `message_text` from an older save is not printed. The record has no fog filter. Every side's losses are listed, including a fight between two other sides.
+
+- **Sections:** `- Your Losses:` for the commander reading the notes, then `- Losses of {code}:` for each other seat, `- Losses of Neutral:`, and `- Losses of other sides:` when a stored row has no owner. A seat missing from the roster sorts after the listed seats and before Neutral. A section with nothing listed is omitted. Inside a line the reading seat is `you`. Other seats are their codes, in that same order, and Neutral is `Neutral`.
+
+- **Lines:** units share a line when they share the owner, the responsible sides, the cause, and the hex code. The line is `  - {who}, {cause} at {code}: {units}`, plus ` (by {type counts})` when killer types are known. `{who}` is `by h1`, `by h1 and a2`, `by h1, a2, and Neutral`, `no side responsible`, or `by unknown side`. The hex is left off when none was stored, the index is not an H3 cell, or the map has no code for it. Units are snapshot ids, never display names, at most `LOSS_ENTRY_LIST_MAX` (5) ids before the line switches to type counts. For example: `by h1, Ranged attack at QX: a1-i3, a1-a2 (by 2 Armored)`.
+
+- **Legend:** when any block has a loss line, `RECENT_TURN_LOSS_LEGEND` is printed once between the heading and the first block. The text is: Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.
+
+- **Cap:** the newest block lists every group. Each older block lists at most `RECENT_TURN_LOSS_GROUP_LINES_MAX` (12). Groups in which this commander lost units, or was one of the responsible sides, are kept first. A block that drops one group ends with `- 1 more loss group on this turn is not listed.` More than one ends with `- {n} more loss groups on this turn are not listed.`
+
+- **Credit:** the responsible side is the owner stored on the unit at the fight, not the prefix of its id. Cargo lost with its carrier gets that carrier's credit and hex. A missile loss names the side that launched, with one missile in the counts. A shot-down air-drop carrier is return fire, and the infantry lost with it gets the same credit and is placed at the drop hex. An air unit lost because its base became invalid names the side that took the hex, or the side that destroyed the airport, and otherwise `no side responsible`. A row with no `attribution` prints `by unknown side` and no hex.
+
+- **Limits:** a strategic air-strike loss names every other side that struck that hex, because no striker is stored per victim, and a striker shot down before it hit is still counted. Ranged and melee counts list every unit of the side that fought, not the one that landed the hit. A strategic striker or drop carrier lost to anti-air names the other sides' units on the target hex, or that hex's controller when none stood there, and the line has no counts. When that controller is the striker's own side, or none is known, the line says `by unknown side`. Some removals never reach the notes: cargo aboard air destroyed when a missile or an air strike ruins the airport, an air unit and its cargo deleted because a strategic ferry's airport is already gone, and a stranded Neutral transport and its cargo.
+
 - **Items:** `RECENT_TURN_NOTES`.
 - **Include:** when at least one of those turns has a strategy or a loss. **Omit** otherwise.
 - **Model use:** continuity, so a plan begun two turns ago is not silently abandoned.
