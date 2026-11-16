@@ -1,0 +1,2312 @@
+{
+  "mode": "dry-run",
+  "repoRoot": "F:\\Projects\\Personal\\agent-wars-public",
+  "filesTouched": 576,
+  "editsPlanned": 2591,
+  "files": [
+    {
+      "file": "src\\renderer\\chrome\\controlTooltipText.ts",
+      "edits": 64
+    },
+    {
+      "file": "src\\shared\\mercenaryRules.ts",
+      "edits": 41
+    },
+    {
+      "file": "src\\main\\recorder\\matchFramePolicy.ts",
+      "edits": 35
+    },
+    {
+      "file": "src\\shared\\tacticalMapOverlayConstants.ts",
+      "edits": 32
+    },
+    {
+      "file": "src\\main\\tools\\tacticalPathfinding.ts",
+      "edits": 30
+    },
+    {
+      "file": "src\\renderer\\map\\worldLeafletMap.ts",
+      "edits": 28
+    },
+    {
+      "file": "src\\shared\\mapPlanningGesture.ts",
+      "edits": 28
+    },
+    {
+      "file": "src\\shared\\ipc\\tacticalPlaybackTypes.ts",
+      "edits": 27
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\sectionHeadings.test.ts",
+      "edits": 27
+    },
+    {
+      "file": "src\\shared\\ipc\\consultationPushTypes.ts",
+      "edits": 25
+    },
+    {
+      "file": "src\\shared\\tacticalLandMarchContinuity.ts",
+      "edits": 24
+    },
+    {
+      "file": "src\\main\\gameMap\\regionManifestRead.test.ts",
+      "edits": 24
+    },
+    {
+      "file": "src\\shared\\regionalRulesCatalog.ts",
+      "edits": 23
+    },
+    {
+      "file": "src\\shared\\tacticalMarchBeatSearch.ts",
+      "edits": 23
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkPrompt.test.ts",
+      "edits": 22
+    },
+    {
+      "file": "src\\renderer\\core\\resolutionMoveAnimationTypes.ts",
+      "edits": 22
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalStrategicOrderPhases.ts",
+      "edits": 20
+    },
+    {
+      "file": "src\\main\\ipc\\deferredResolutionPlaybackConsult.ts",
+      "edits": 20
+    },
+    {
+      "file": "src\\shared\\ipc\\gameApiTypes.ts",
+      "edits": 19
+    },
+    {
+      "file": "src\\shared\\tacticalMovementPlanner.ts",
+      "edits": 19
+    },
+    {
+      "file": "src\\shared\\matchRecording.ts",
+      "edits": 19
+    },
+    {
+      "file": "src\\renderer\\map\\basemapLayer.ts",
+      "edits": 19
+    },
+    {
+      "file": "src\\renderer\\map\\mapDoubleClickHandler.ts",
+      "edits": 19
+    },
+    {
+      "file": "src\\main\\gameDb\\seatRosterStore.ts",
+      "edits": 18
+    },
+    {
+      "file": "src\\shared\\orderPreviewSlowTerrainTooltip.ts",
+      "edits": 18
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalMovementPlanningCache.ts",
+      "edits": 18
+    },
+    {
+      "file": "src\\main\\openRouter\\commanderPool.ts",
+      "edits": 18
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalSnapshotGuards.ts",
+      "edits": 17
+    },
+    {
+      "file": "src\\main\\openRouter\\modelCallControl.ts",
+      "edits": 16
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalEntryFlow.ts",
+      "edits": 16
+    },
+    {
+      "file": "src\\shared\\tacticalTerrainCombatModifiers.ts",
+      "edits": 15
+    },
+    {
+      "file": "src\\main\\operations\\operationStepTypes.ts",
+      "edits": 15
+    },
+    {
+      "file": "src\\shared\\orderPreviewEffectsTooltip.ts",
+      "edits": 15
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\envelopeJsonSchema.test.ts",
+      "edits": 15
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalExitFlow.ts",
+      "edits": 15
+    },
+    {
+      "file": "src\\shared\\topBarStats.test.ts",
+      "edits": 15
+    },
+    {
+      "file": "src\\shared\\tacticalMarchStepCost.ts",
+      "edits": 14
+    },
+    {
+      "file": "src\\main\\gameDb\\sideMessageStore.ts",
+      "edits": 14
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalSealiftSlotUpdate.ts",
+      "edits": 13
+    },
+    {
+      "file": "src\\main\\openRouter\\malformedCompletionRetry.ts",
+      "edits": 13
+    },
+    {
+      "file": "src\\main\\tacticalFerryHoverPreview.test.ts",
+      "edits": 13
+    },
+    {
+      "file": "src\\main\\openRouter\\productionAttention.test.ts",
+      "edits": 13
+    },
+    {
+      "file": "src\\main\\originBonus\\originHitBonusLookup.test.ts",
+      "edits": 13
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalIpcHandlers.ts",
+      "edits": 13
+    },
+    {
+      "file": "src\\shared\\terrainEffectsForTooltip.ts",
+      "edits": 12
+    },
+    {
+      "file": "src\\main\\tacticalOpponentPlanPostBeatMerge.test.ts",
+      "edits": 12
+    },
+    {
+      "file": "src\\renderer\\map\\tacticalMapView.ts",
+      "edits": 12
+    },
+    {
+      "file": "src\\shared\\unitOriginTooltipText.test.ts",
+      "edits": 12
+    },
+    {
+      "file": "src\\shared\\ipc\\saveLoadTypes.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\main\\productionOrders.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\main\\tools\\tempoRuleAttacks.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\main\\gameActions\\captureTurnLossNote.test.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\renderer\\map\\terrainTooltipStrategicState.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\renderer\\gameplay\\productionOverlayHelpers.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\renderer\\map\\missileLaunchDoubleClick.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\shared\\newGameSides.test.ts",
+      "edits": 11
+    },
+    {
+      "file": "src\\shared\\unitIds.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\shared\\fortificationRules.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\main\\tools\\tempoRuleAirFerry.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\main\\openRouter\\ordersChatRequestHelpers.test.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\renderer\\map\\coastlineLayers.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\renderer\\rendering\\terrainHexPalettes.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\shared\\originBonusRules.test.ts",
+      "edits": 10
+    },
+    {
+      "file": "src\\shared\\activeGameMap.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\shared\\tacticalTerrainMovement.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\terrainClassificationCacheSerialization.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\gameDb\\mercenaryState.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\openRouter\\possibleUnitActionsTableAssembly.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\shared\\lossSummary.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\gameActions\\airCounterFire.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\gameActions\\humanMarchPreview\\humanMarchPreviewGroundRoute.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\shared\\saveLoadAvailability.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\saveGame\\saveFileFormat.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\tools\\combatEstimationSides.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouterChatTransport.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\requestTalk.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\gameIpcHandlers.test.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\main\\ipcPayloadGuards.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\shared\\mapLabelRules.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\renderer\\map\\mainMapCameraReturn.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\renderer\\chrome\\frameTooltipText.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\renderer\\map\\tacticalTransportVectorLayer.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\shared\\techBonusRules.test.ts",
+      "edits": 9
+    },
+    {
+      "file": "src\\shared\\h3GridRangePure.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\tacticalTransportLink.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\gameSize.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\gameDb\\tacticalRendererOverrideCache.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalCompositeOrdersApply.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\openRouter\\requestOrdersFlowSupport.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\gameActions\\humanMarchPreviewComputationContext.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\gameActions\\ownerTurnOrders.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkRound.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\main\\tools\\tacticalAssessUnit.test.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\mapKeyboardPanLogic.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\doctrineDescriptions.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\renderer\\rendering\\fortificationTickDrawing.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\renderer\\map\\leafletMainMapProjection.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\airStrikeInfrastructure.test.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\knockoutNotice.test.ts",
+      "edits": 8
+    },
+    {
+      "file": "src\\shared\\homeRegionRules.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\terrainTacticalOverrideRows.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\terrainCoverRules.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\gameActions\\airlift.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\tacticalStateAssertions.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalValidationResult.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalBattleSession.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\openRouter\\operationCommandParsing.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\gameRuleMercenaryText.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\humanMarchPreviewGroupAssembly.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\openRouter\\requestOrdersToolLoop.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\orderPreviewEffectsTooltip.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\openRouter\\afterResolutionTacticalBeat.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\openRouter\\consultationPolicyTacticalRangedAirActivity.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\techBonus\\techHitBonusLookup.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\main\\tools\\combatEstimationTactical.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\renderer\\chrome\\controlTooltip.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\renderer\\map\\createTransientPointerTooltip.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\mapLabelPlacement.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\queueItemTooltipText.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\lossFlagFacts.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\sideUnitCounts.test.ts",
+      "edits": 7
+    },
+    {
+      "file": "src\\shared\\ipc\\mercenaryTypes.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\main\\gameActions\\ownedUnitGuards.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\main\\tools\\standingOrdersGeneration.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\main\\tools\\combatEstimationTheater.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\main\\basemap\\basemapTileResolve.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\main\\gameActions\\endOfTurnOutcomeRules.test.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\shared\\fortificationTickGeometry.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\renderer\\map\\mapClickSelectionPolicy.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\renderer\\gameplay\\observeChrome.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\renderer\\rendering\\combatDiceChipDrawing.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\renderer\\gameplay\\readyHandler.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\renderer\\renderer.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\shared\\mapLabelPlacement.test.ts",
+      "edits": 6
+    },
+    {
+      "file": "src\\shared\\tacticalBattleTypes.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\returnFireEligibility.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\airportFerryRoute.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\numericPriorityMinHeap.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\gameActions\\sealiftSlotAssignment.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\possibleUnitActionsBestOptionsInterest.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\possibleUnitActionsAirDrop.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\gameActions\\humanMarchPreviewMixedSelection.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\gameActions\\airFerryResolution.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\secretConfig.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalRangedTargetResolve.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\basemap\\basemapPackRead.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\basemap\\basemapPrefetch.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouterToolCatalog.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\ipc\\sideMessageIpcHandler.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\saveGame\\saveFileInspect.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\navalStrategicPath.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\tacticalMarchHoverPreview.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\testSupport\\tacticalDbFixture.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\briefingSectionsSealift.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\pausedProductionAttention.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\openRouter\\promptContracts.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\lossToastUnitSegments.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\mapThemes.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\map\\adminBorderLayers.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\chat\\chatPanelClient.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\openRouter\\commanderPoolClient.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\map\\mapLabelLayer.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\rendering\\orderLineStroke.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\rendering\\tacticalCityOverlays.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\gameplay\\meleeInterceptHexTooltip.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalUiGuards.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\commanderSetupCopy.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\fortificationReport.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\lossSummaryJson.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\resolutionCasualtyDraw.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\topBarDateBlock.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\shared\\unitFrameBox.test.ts",
+      "edits": 5
+    },
+    {
+      "file": "src\\main\\logger.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\aiOnlyBattles.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\ipc\\humanOrderPreviewTypes.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\productionConfig.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameDb\\dbConnection.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameDb\\gameConfigKv.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameActions\\airFerryRoute.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\tacticalBattleFootprint.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\strategicUnitPreviousHex.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalAirDrop.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalOpponentOrderValidation.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\postureTypes.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameActions\\airDropResolution.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\sideMessages.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkPrompt.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\combatResolution.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\callbackEvaluation.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameActionsProduction.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\observeModeControls.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\sideMessages\\humanSideMessages.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\ipc\\buildQueueSealiftIpcHandler.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\openRouter\\scenarioGoals.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\orderPreviewSlowTerrainTooltip.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameActions\\strategicMarchStacking.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameActions\\humanMarchPreview\\armorMarchStopImpact.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\gameDb\\gameConfigRows.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\lossAttribution\\strategicLossAttribution.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouterToolResultHex.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\openRouter\\orderResponseParsing.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkRound.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\operations\\operationTurnOrders.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\sightCues\\sightCueBeams.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalTerrainCombatModifiers.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\seatPalette.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalStrategicOrderUiStash.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalUiOrchestration.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\renderer\\rendering\\orderDrawing.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\renderer\\gameplay\\buildQueueMultiPopup.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\renderer\\tactical\\applyTacticalPostBeatConsultSideEffects.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\landTraversalStrategic.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\mapViewMode.test.ts",
+      "edits": 4
+    },
+    {
+      "file": "src\\shared\\tacticalRanges.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\rangePerimeterModel.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\victoryRules.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\creditsRules.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\rangedResolutionShotLines.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\sideMessageView.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\briefing\\map\\hexCoordinates.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalLogging.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\consolidatedTurnUpdateToast.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\queuePauseReasons.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\terrainCover\\terrainCoverLookup.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\headOnContact.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\tools\\tacticalAssessUnit.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\gameActions\\airDropValidation.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\gameActions\\endOfTurnOutcomeRules.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\sightCues\\sightCueBeams.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\gameActions\\strategicHeadOnContact.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\gameActions\\readyStrategicResolutionPipeline.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\gameActions\\tacticalGroupRangedTargetValidation.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkReply.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\tacticalAnnihilation.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\aiOnlyTacticalBeat.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\tools\\pathfindingSessionCache.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\briefingFormatter.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\operations\\operationTurnOrders.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\hexLlmCodeAssignment.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\basemap\\basemapPartitionExtract.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\saveGame\\saveGamePaths.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\gameDb\\databaseReplace.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\orderPreviewBlockingCopy.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\productionOrders.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\rangePerimeterGeometry.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\briefing\\recentTurnLossLines.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\briefing\\map\\briefingMapSection.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\briefing\\map\\hexCoordinates.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\ipc\\deferredResolutionPlaybackConsult.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\lossAttribution\\tacticalLossAttribution.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\briefingSeats.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\tacticalPromptProjection.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\productionPriorities.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\promptText.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\seatBuildCapabilities.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\gameRuleText.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\ordersMessagesBlock.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkRoundPersistence.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\operations\\airOperationAdvance.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\operations\\seaOperationAdvance.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\main\\unitOrigin\\unitBirthCellSelection.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\gameplay\\newGameOptionsPopover.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\gameplay\\newGameSidesUi.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\openRouter\\resolutionPlaybackDeferral.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\battleForceCounts.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\gameplay\\saveLoadMenu.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\map\\tacticalEntryLayer.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\gameplay\\buildHirePopup.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\renderer\\map\\singleUnitHoverCallout.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\mapWaterLabelPlacement.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\mercenaryRules.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\standings.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\turnReportLines.test.ts",
+      "edits": 3
+    },
+    {
+      "file": "src\\shared\\h3Resolutions.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\ipc\\combatResultTypes.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\shortSideName.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\terrainNamingLoad.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\unitOrigin\\tacticalBirthCountryCache.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameDb\\seeding\\plannedUnits.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameDb\\turnStateReads.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\multiSideMelee.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\briefing\\map\\coordinateContext.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\hexLlmCodeAssignment.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\briefing\\briefingPerspective.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalFerryAirportGuards.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalTransportBaseline.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameActions\\airStrikeResolution.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameActions\\tacticalRangedInfrastructureRubble.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalHeadOnContact.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\operations\\operationOffer.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameDb\\operationMemory.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\operations\\operationTurnFlow.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameActions\\neutralLanding.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\recorder\\matchRecordStore.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\gameRuleFortificationText.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tools\\referenceTools.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouterToolResultHex.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\ordersChatCompletion.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameDb\\turnNotesHistory.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\commanderPoolSupport.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\ipc\\channels.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\ipc\\readyPlaybackMoves.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\h3GridRangePure.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\homeRegionRules.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\lossSummary.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\lossSummaryFromResolution.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\basemap\\basemapVectorRead.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\basemap\\basemapIpc.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\gameRuleSituationGates.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\consultPromptPartsHelpers.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\operations\\operationCommands.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\mercenaryHireRules.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\rangePerimeterGeometry.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\rangePerimeterModel.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\briefing\\activeCallbacksSection.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\gameActions\\testSupport\\meleeInterceptTestHexes.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\assignOrderHexParams.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\briefingSectionsAirOps.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\commanderPool.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\envelopeOrderRowsOperationCargo.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouter.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouterChatTransport.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\ordersRequestProfile.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\promptOutline.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\requestOrdersFinalOrdersRound.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\openRouter\\systemPromptStability.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\recorder\\matchRecordingSummary.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tools\\combatEstimation.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tools\\standingOrders.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tools\\standingOrdersInjectionMission.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tools\\tacticalPathfinding.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\main\\tools\\tempoRuleAirFerry.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\chrome\\sideNumberFlag.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\rendering\\mercenaryBadgeDrawing.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\vectorPackDecode.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\chrome\\toastInlineMarks.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\gameplay\\newGameDialogCollapse.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\map\\orderBlockHexTooltip.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\map\\orderSlowerHexTooltip.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\gameplay\\orderPreviewEffectsContext.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\chrome\\consoleFrame.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\mapLabelPack.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\mapLabelNudge.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\orderArrowGeometry.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\startMatchAiChoice.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\renderer\\core\\unitOriginTooltip.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\aiStrategyToastContent.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\combatDiceChips.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\fortificationTickGeometry.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\observeModeControls.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\resolutionPlaybackPhase.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\sideLabels.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\topBarSides.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\vectorPackDecode.test.ts",
+      "edits": 2
+    },
+    {
+      "file": "src\\shared\\abortError.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\missileRules.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\seatIds.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\bonusLevel.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\unitOriginTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\techBonusTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\weatherBonusTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\boundedMemoCache.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\queuePauseTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\unitDisplayNames.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\strategicTerrainFlags.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\attackMixReset.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\testSupport\\rendererSourceAssertions.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\ipc\\missileTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\openRouterProviderSort.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\ipc\\ordersTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\ipc\\fortificationTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\economySymbols.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\ipc\\readyTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\ipc\\deferredPlaybackConsultAbandoned.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\vectorPackTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\webMercator.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\sideNicknames.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\htmlTextFormatting.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\weather\\weatherPackLoad.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\terrainRoadRailSidesLoad.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\terrainRoadRailVectorsLoad.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\terrainClassificationCache.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\productionRules.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\sightCueSettings.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameDb\\controlInfrastructureAccess.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\visibility.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\fortificationCombat.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\airValidation.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalLandReachabilityWithinBudget.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\navalStrategicEdges.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\carrierCargoRules.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\sealift.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\possibleUnitActionsStrategicRanged.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\marchInvalidReasons.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\originBonus\\originHitBonusLookup.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\techBonus\\techHitBonusLookup.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\campaignTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\promptCoordinateMode.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\orderPreviewBlockingCopy.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalSubUnitCounts.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalMissilePlacement.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\computeTacticalBattleSnapshot.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalMovementApply.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\headOnInitiative.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\mercenaryTools.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\operationTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\operationRules.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\envelopeExampleRows.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\orderlessUnitSuggestions.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\landMovementConstraints.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\humanMarchPreviewCache.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\lossSummaryFromResolution.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\captureTurnLossNote.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\unitOwnershipTransfer.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\knockoutConsequences.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\seaOperationCandidates.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\airOperationCandidates.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\meleeInterceptReadyFinalize.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\meleeInterceptCandidates.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\neutralTurn.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\gameActionsReadyEntrypoints.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\tacticalHumanAirStrikeValidation.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\matchGeneration.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\recorder\\matchFrameCapture.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\recorder\\matchRecorder.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\briefing\\map\\hexGridProjection.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\subsectionHeadings.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\sideMessageRuleText.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\briefing\\recentTurnNotesSection.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalMarchPlaybackPath.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalMarchContinuations.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalRulesAdapter.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\meleeInterceptPendingState.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\productionQueueSnapshotTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\briefingOrderlessMission.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\openRouterToolGroups.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\combatResolution.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\envFlag.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\fortificationCombat.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\recorder\\matchRecordingExport.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\ipcPayloadGuardsTacticalCommit.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\basemap\\basemapPackTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\ipc\\loggedIpcHandler.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\sidesBlock.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\briefingGuideText.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\ordersMessagesBlock.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\buildTacticalAiPlanState.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalPlanStateMovement.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\liveModelId.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\ipc\\readyInFlight.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\saveGame\\saveLoadGate.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\saveGame\\autoSave.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\main.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\marchPathHelpers.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\oneStepMoveDestinations.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\productionRules.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\rangePerimeterStroke.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\recentTurnNotesSection.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\rendererChatPanelContracts.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\returnFireAirportLookup.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalFerryHoverPreview.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalTransportChordGeometry.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\terrainLandMassLoad.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\terrainTacticalCsv.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\turnNotesHistory.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\turnUpdateSummary.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\briefing\\map\\bestOptionsOdds.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\briefing\\map\\strategicMapWindow.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\testSupport\\strategicTestFixtures.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\homeControlProgress.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\knockoutConsequences.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameActions\\meleeInterceptCandidates.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameDb\\gameSizeConfig.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameDb\\originBonusConfig.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\gameDb\\turnStateReads.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\ipc\\readyIpcResolutionMapping.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\lossAttribution\\lossAttributionCore.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\afterResolutionSeats.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\airDropOrderRows.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\briefingSections.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\briefingSectionsCampaign.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\briefingSectionsMissiles.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\campaignTargetOverride.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\testSupport\\promptOutlineHelpers.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\explicitMoveMarch.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\missileLaunchOrderParsing.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\operationCommandParsing.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\requestOrdersFlowSupport.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\requestOrdersRoundCap.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\tacticalToolPromptText.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\promptSpec\\doctrineText.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\openRouter\\talk\\talkReply.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\airOperationCandidates.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\operationCommands.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\operationCommandsLand.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\operationTurnFlow.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\postureChoice.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\operations\\seaOperationCandidates.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\saveGame\\loadStaging.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\saveGame\\saveFileWrite.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalEmbarkOrderValidation.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalRangedTargetResolve.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tacticalBattle\\tacticalToastKillSlice.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\hexNeighborTerrain.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\mercenaryTools.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\orderlessUnitSuggestions.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\productionTools.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\rangedTargetOdds.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\referenceTools.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\standingMarchReceding.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\tools\\tempoRuleAttacks.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\main\\unitOrigin\\tacticalBirthCountry.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\core\\constants.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\anchoredPopupPlacement.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\popupControlTooltipText.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\map\\activeMapTheme.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\map\\mapThemeFilters.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\mapKeyboardZoom.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\map\\terrainView.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\rendering\\unitDrawing.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\lossFlagIndex.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\openRouter\\mapToastBody.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\map\\terrainTooltipTypes.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\rendererTacticalHydration.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\chrome\\panelSlideHelpers.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\popoverPlacement.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\openRouter\\openRouterModelRefresh.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\readyAiWaitLabel.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\openRouter\\openRouterUiHelpers.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\rendering\\terrainLegendRow.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\mapOrderGestureGate.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\map\\stackCalloutHost.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\resolutionPlaybackTiming.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\resolutionPlaybackPhase.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\gameplay\\newGameOptionsUi.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\mapViewMode.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\projectedRingCentroid.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\standings.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\topBarSides.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\chrome\\topBar.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\chrome\\confirmDialog.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\draftsWithoutUnits.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\chat\\chatPanel.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\map\\mapContainerResize.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\mapWaterLabelPlacement.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\openRouter\\openRouterRuntime.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\tactical\\tacticalAnnihilationDialog.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\unknownBattleContinentNames.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\gameplay\\readyResolutionAnnouncements.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\rendering\\rangePerimeterOverlay.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\rendering\\canvasColor.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\sightCueDrawModel.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\rendering\\gameScene.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\gameplay\\newGameAiStart.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\chrome\\hireTooltipText.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\gameplay\\tacticalBattlePromptPreference.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\gameplay\\sidebarSupport.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\knockoutDialogCopy.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\unknownBattleAnnouncement.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\entryCallbacks.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\aiStrategyToastContent.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\renderer\\openRouter\\modelDescriptionTooltip.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\singleUnitHoverCallout.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\anchoredPopupPlacement.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\chatPanelState.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\commanderMessageTabs.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\destroyedInBattleLine.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\lossToastUnitSegments.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\mapExtent.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\productionBuildability.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\rangedTargetTooltip.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalBattleFootprint.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\tacticalFortificationMovement.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\terrainBonusMarch.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\turnLossSections.test.ts",
+      "edits": 1
+    },
+    {
+      "file": "src\\shared\\unitIds.test.ts",
+      "edits": 1
+    }
+  ]
+}

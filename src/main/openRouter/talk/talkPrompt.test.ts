@@ -62,7 +62,7 @@ function input(extra: Partial<TalkPromptInput> = {}): TalkPromptInput {
   };
 }
 
-test('the system text names the side, the limit, and the trust rules, and has no other digits', () => {
+test('the system text names the side, the limit, the trust rules, and the stance basis, and has no other digits', () => {
   const text = buildTalkSystemText('Iberia');
   assert.match(text, /commander of Iberia/);
   assert.match(text, /280/);
@@ -72,6 +72,8 @@ test('the system text names the side, the limit, and the trust rules, and has no
   assert.match(text, /may or may not be telling the truth/);
   assert.match(text, /may or may not have your interests in mind/);
   assert.match(text, /written by the commander of one of the other sides/);
+  assert.match(text, /A loss line in Recent Turn Notes is a fact reported by the game/);
+  assert.match(text, /Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes record/);
 });
 
 test('the situation text nests, marks one new line, and quotes safely', () => {

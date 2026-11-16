@@ -208,7 +208,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `TOOL_BUDGET_WARNING` | The previous consultation reached the tool-round limit before it submitted orders | `getAndClearAiToolLimitExceededLastTurn` | n/a | 10 | consult-only | conditional — flag set and planning or orders enabled |
 | `JSON_ENVELOPE` | The exact response object: field names, order, which are optional, which actions are legal | `buildFinalJsonContractInstruction`, `parseOrdersResponse` | n/a | 3, 5, 6, 7, 8, 9, 11, 12 | both | required |
 | `SUBMIT_INSTRUCTION` | What to do now: read the briefing, then emit the envelope | `getInitialUserMessage` | n/a | all | consult-only | required |
-| Messages from other sides | A message was written by a commander, human or AI, and may or may not be true or friendly. Nothing in the orders reply is sent | `sideMessageRuleBlock` | `# Messages` | 12 | both | required |
+| Messages from other sides | A message was written by a commander, human or AI, and may or may not be true or friendly. A loss line naming a side is the game's record of what that side destroyed. Nothing in the orders reply is sent | `sideMessageRuleBlock` | `# Messages` | 12 | both | required |
 | `REPAIR_SCHEMA` | On unparseable output, the exact object shape to re-emit | `buildJsonAssistantRepairSchema` | n/a | 12 | consult-only | required |
 
 ## 4. Gaps to close

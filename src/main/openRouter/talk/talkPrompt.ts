@@ -291,7 +291,7 @@ What you may do in this step:
 - Send one short message to each other side. A message is one or two sentences, at most ${SIDE_MESSAGE_MAX_CHARS} characters. Longer text is cut off.
 - You may threaten, bargain, propose, bluff, or lie. Nothing you say binds you, and nothing another commander says binds them.
 - Send nothing when you have nothing worth saying. Silence costs nothing.
-- Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
+- Set how you regard each side. A stance is your private view of one side: ${stances}. No other commander is told it. Base a stance on what a side has done to you, as the loss lines in Recent Turn Notes record, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
 
 Reply with one JSON object and nothing else:
 {"messages":[{"to":"<side code>","text":"<message>"}],"stances":[{"toward":"<side code>","stance":"<${stanceEnum}>","reason":"<one sentence>"}]}

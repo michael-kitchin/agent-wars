@@ -14,7 +14,7 @@ A commander sees a message only when `sideMessageVisibleTo` says so. For a comma
 
 ## What a stance is
 
-A stance is a commander's private view of one other side. The values are `SIDE_STANCES`: `hostile`, `wary`, `neutral`, `cordial`, `friendly`. Each stored stance has a reason of at most `SIDE_STANCE_REASON_MAX_CHARS` (160) characters. An empty reason is kept. No other commander is told a stance. A stance does not create an alliance.
+A stance is a commander's private view of one other side. The values are `SIDE_STANCES`: `hostile`, `wary`, `neutral`, `cordial`, `friendly`. Each stored stance has a reason of at most `SIDE_STANCE_REASON_MAX_CHARS` (160) characters. An empty reason is kept. No other commander is told a stance. A stance does not create an alliance. The talk prompt tells the commander to base a stance on what a side has done to it, as the loss lines in Recent Turn Notes record, more than on what that side says.
 
 `side_stances` holds one row per commander and target. `upsertSideStance` writes a row only when the stance or the reason changed.
 
