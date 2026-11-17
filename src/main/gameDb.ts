@@ -33,11 +33,7 @@ import {
   ensureTurnStateRowWhenDbOpen,
   repairStrandedStrategicResolutionPhaseWhenDbOpen,
 } from './gameDb/databaseBootstrap';
-import { ensureHireOrderReservedCreditsColumn } from './gameDb/mercenaryState';
-import { ensureSeatAddedColumns } from './gameDb/seatRosterStore';
-import { ensurePendingAirDropOrdersTable } from './gameDb/pendingAirDropOrders';
-import { ensureMatchRecordsTable } from './gameDb/matchRecordsTable';
-import { ensureSideMessageTables, ensureSideStanceScoreColumns } from './gameDb/sideMessageTables';
+import { applyAdditiveSchemaMigrations } from './gameDb/additiveMigrations';
 import { getFullDdl } from './gameDb/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
@@ -148,7 +144,7 @@ export {
  * SQLite `user_version` that the current schema DDL produces.
  *
  * Purpose: Detects match databases created by an older schema. Bumping it also makes every saved game from an earlier version unloadable. Changing the shape of any JSON a save carries in `game_config`, without bumping this number, does the same, because an older or newer app would misread it.
- * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` or `ensureSeatAddedColumns` adds on open, or the `pending_air_drop_orders` table that `ensurePendingAirDropOrdersTable` creates on open, or the `match_records` table that `ensureMatchRecordsTable` creates on open, or the `side_messages` and `side_stances` tables that `ensureSideMessageTables` creates on open, or the `trust` and `threat` columns that `ensureSideStanceScoreColumns` adds on open. See `doc/save-files.md`.
+ * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` or `ensureSeatAddedColumns` adds on open, or the `pending_air_drop_orders` table that `ensurePendingAirDropOrdersTable` creates on open, or the `match_records` table that `ensureMatchRecordsTable` creates on open, or the `side_messages` and `side_stances` tables that `ensureSideMessageTables` creates on open, or the `trust` and `threat` columns that `ensureSideStanceScoreColumns` adds on open. The full list of on-open migrations is `applyAdditiveSchemaMigrations` in `gameDb/additiveMigrations.ts`. See `doc/save-files.md`.
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
@@ -245,12 +241,7 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   setDbHandle(database);
   applyGameDbPragmas(database);
   database.exec(getFullDdl());
-  ensureHireOrderReservedCreditsColumn(gameDbOps);
-  ensureSeatAddedColumns(gameDbOps);
-  ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
-  ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
-  ensureSideMessageTables((sql) => gameDbOps.run(sql));
-  ensureSideStanceScoreColumns(gameDbOps);
+  applyAdditiveSchemaMigrations(gameDbOps);
   ensureStrategicInfrastructureSyncTriggers();
   ensureTurnStateRow();
   database.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
@@ -290,12 +281,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     validateGameDatabaseOrThrow(d);
     setDbHandle(d);
     d = null;
-    ensureHireOrderReservedCreditsColumn(gameDbOps);
-    ensureSeatAddedColumns(gameDbOps);
-    ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
-    ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
-    ensureSideMessageTables((sql) => gameDbOps.run(sql));
-    ensureSideStanceScoreColumns(gameDbOps);
+    applyAdditiveSchemaMigrations(gameDbOps);
     runInfrastructureStartupConsistencyPass();
   } catch (err) {
     if (d) {
@@ -496,12 +482,7 @@ export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingG
     validateGameDatabaseOrThrow(pending);
     setDbHandle(pending);
     pending = null;
-    ensureHireOrderReservedCreditsColumn(gameDbOps);
-    ensureSeatAddedColumns(gameDbOps);
-    ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
-    ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
-    ensureSideMessageTables((sql) => gameDbOps.run(sql));
-    ensureSideStanceScoreColumns(gameDbOps);
+    applyAdditiveSchemaMigrations(gameDbOps);
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
     repairStrandedStrategicResolutionPhaseOnDbBootstrap();
