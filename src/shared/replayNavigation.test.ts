@@ -74,11 +74,11 @@ test('Play is possible only when a later step exists, or while it runs as Pause'
   assert.equal(canPlay({ ...middle, busy: true }), false);
 });
 
-test('stepping and seeking are off while playing or loading', () => {
+test('stepping and seeking are off while playing, and seeking stays on while a step loads', () => {
   const playing = { stepCount: 5, index: 2, busy: false, playing: true };
   assert.deepEqual([canStepBack(playing), canStepForward(playing), canSeek(playing)], [false, false, false]);
   assert.equal(canSeek({ ...playing, playing: false }), true);
-  assert.equal(canSeek({ ...playing, playing: false, busy: true }), false);
+  assert.equal(canSeek({ ...playing, playing: false, busy: true }), true);
 });
 
 test('nextPlaybackIndex moves forward, and ends at the last step or on a stop request', () => {

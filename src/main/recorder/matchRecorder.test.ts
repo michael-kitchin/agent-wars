@@ -11,9 +11,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { MATCH_ID_CONFIG_KEY, setGameOutcomeWithOps } from '../gameDb/gameConfigKv';
+import { upsertSideStance } from '../gameDb/sideMessageStore';
+import type { TurnStatistics } from '../../shared/matchStatistics';
 import { strategicStep, tacticalStep } from '../../shared/matchRecording';
 import { countMatchRecords, listMatchRecords } from './matchRecordStore';
-import { recordMatchEvent, recordStepBoundary, setRecorderClockForTests } from './matchRecorder';
+import { recordMatchEvent, recordStepBoundary, refreshCurrentFramePayload, setRecorderClockForTests } from './matchRecorder';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 test('boundaries write one frame per step change and one final frame at game over', () => {
@@ -69,6 +71,29 @@ test('game over adds one final frame and one match_ended', () => {
     } finally {
       setRecorderClockForTests(null);
     }
+  });
+});
+
+test('refreshing the final step also brings its statistics up to date in place, keeping the losses and hexes taken', () => {
+  withTempGameDb('aw-match-refresh-statistics-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    setGameOutcomeWithOps(gameDbOps, { winnerSeatId: null, endReason: 'ended_by_human' });
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    const latestStatistics = (): { recordId: number; payload: TurnStatistics } => {
+      const row = listMatchRecords(gameDbOps).filter((record) => record.recordType === 'side_statistics').at(-1)!;
+      return { recordId: row.recordId, payload: row.payload as TurnStatistics };
+    };
+    const before = latestStatistics();
+    assert.deepEqual(before.payload.relationships, []);
+    upsertSideStance(gameDbOps, { seatId: 'ai1', towardSeatId: 'human', stance: 'wary', reason: 'late', trust: 2, threat: 4, turnNumber: 1 });
+    const count = countMatchRecords(gameDbOps);
+    refreshCurrentFramePayload();
+    const after = latestStatistics();
+    assert.equal(countMatchRecords(gameDbOps), count);
+    assert.equal(after.recordId, before.recordId);
+    assert.deepEqual(after.payload.relationships.map((report) => [report.seatId, report.trust, report.threat]), [['ai1', 2, 4]]);
+    assert.deepEqual(after.payload.hexesTaken, before.payload.hexesTaken);
+    assert.deepEqual(after.payload.sides, before.payload.sides);
   });
 });
 

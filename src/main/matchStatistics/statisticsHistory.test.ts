@@ -49,6 +49,18 @@ test('the later event for a turn wins, the series is in turn order, and a broken
   });
 });
 
+test('a payload missing the relationship list, with a bad hexes-taken list, or with a side or report without seat ids is skipped', () => {
+  withTempGameDb('aw-statistics-history-shape-', () => {
+    insertStatistics(1, { turnNumber: 1, sides: [{ seatId: 'human' }], relationships: [{ seatId: 'ai1', towardSeatId: 'human' }], hexesTaken: [] });
+    insertStatistics(2, { turnNumber: 2, sides: [] });
+    insertStatistics(3, { turnNumber: 3, sides: [], relationships: [], hexesTaken: 'none' });
+    insertStatistics(4, { turnNumber: 4, sides: [{ hexes: 3 }], relationships: [], hexesTaken: null });
+    insertStatistics(5, { turnNumber: 5, sides: [], relationships: [{ seatId: 'ai1' }], hexesTaken: null });
+    insertStatistics(6, { turnNumber: 6, sides: [], relationships: [], hexesTaken: [null] });
+    assert.deepEqual(readStatisticsHistory(gameDbOps).map((turn) => turn.turnNumber), [1]);
+  });
+});
+
 test('a payload that cannot be decoded and a row of another format version are skipped, and the rest still reads', () => {
   withTempGameDb('aw-statistics-history-bad-', () => {
     insertStatistics(1, { turnNumber: 1, sides: [], relationships: [], hexesTaken: null });

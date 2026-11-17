@@ -525,13 +525,14 @@ function stackedHumanLandUnits(units, unitTypes) {
  * When to use: After `captureMainMap`, while nothing is queued. Armor is tried first, then infantry. A unit that
  *   stands alone is clicked in its hex; a unit that shares its hex is selected from the unit list.
  * Expected outcome: The Movement count reads 1. Returns the unit.
- * Exceptions: Throws when no land unit has a neighbor that takes the order.
+ * Exceptions: Throws when no land unit has a neighbor that takes the order. A lone unit whose hex click does not select it (a label or marker can sit over it after a played turn) is skipped like one with no free neighbor.
  */
 async function queueLoneUnitMarch(page, unitTypes = LAND_UNIT_TYPES) {
   const state = await readGameState(page);
   const lone = loneHumanUnits(state.units, unitTypes);
   for (const unit of lone) {
-    if (await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index))) return unit;
+    const queued = await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index)).catch(() => false);
+    if (queued) return unit;
   }
   const stacked = stackedHumanLandUnits(state.units, unitTypes);
   for (const unit of stacked) {

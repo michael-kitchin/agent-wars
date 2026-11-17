@@ -157,6 +157,24 @@ test('the first step has no result and no earlier view, and the next has both', 
   });
 });
 
+test('a turn with two snapshots gives the next step the fog of its newest one, while the timeline keeps its first', () => {
+  withHumanMatch(() => {
+    playTurn(1);
+    const firstPlayer = listMatchEventsOfType(gameDbOps, 'view_snapshot').find((row) => row.visibility !== 'engine');
+    const stored = firstPlayer!.payload as { snapshot: Record<string, unknown> };
+    recordMatchEvent({
+      type: 'view_snapshot',
+      step: strategicStep(1),
+      visibility: { seats: [HUMAN_SEAT_ID] },
+      payload: { ...stored, snapshot: { ...stored.snapshot, visibleHexes: ['after-the-battle'] } },
+    });
+    playTurn(2);
+    const [first, second] = readReplayTimeline().steps;
+    assert.equal(first?.recordId, firstPlayer!.recordId);
+    assert.deepEqual(readReplayStep(second!.recordId)?.visibleHexesBefore, ['after-the-battle']);
+  });
+});
+
 test('dispatches hold the strategy and every message, before and after the match ends', () => {
   withHumanMatch(() => {
     playTurn(1);
@@ -179,6 +197,21 @@ test('dispatches hold the strategy and every message, before and after the match
     assert.equal(finished.view, 'all');
     const after = readReplayStep(finished.steps[1]!.recordId)?.dispatches;
     assert.deepEqual(after, live);
+  });
+});
+
+test('a damaged message row is skipped and the step still loads with the rest of its dispatch', () => {
+  withHumanMatch(() => {
+    playTurn(1);
+    playTurn(2);
+    recordCommanderTalk(2);
+    gameDbOps.run(
+      `UPDATE match_records SET payload = X'00FF' WHERE record_id = (SELECT MAX(record_id) FROM match_records WHERE record_type = 'message_sent')`
+    );
+    const step = readReplayStep(readReplayTimeline().steps[1]!.recordId);
+    assert.ok(step);
+    assert.equal(step.dispatches[0]?.strategy, 'Hold the line.');
+    assert.deepEqual(step.dispatches[0]?.messages.map((message) => message.text), ['To the player.']);
   });
 });
 

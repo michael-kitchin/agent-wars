@@ -329,11 +329,11 @@ function restoreLastSeenMarkers(): void {
  *
  * Purpose: A step clears the busy flag when its read returns and sets it again when its presentation starts in a later microtask. Leaving must wait past that gap, so it waits for idle and then for the next task before it checks again.
  * When to use: From `runLeaveReplay`, before it shows the last step.
- * Expected outcome: Resolves when replay is off or when the flag stays clear across a task boundary.
+ * Expected outcome: Resolves when replay is off, when the flag stays clear across a task boundary, or at once when the match replay belongs to was replaced, since no step of that match will be shown.
  * Exceptions: None.
  */
 async function waitForStepToSettle(): Promise<void> {
-  while (currentReplay()?.busy) {
+  for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
     await waitForReplayIdle();
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 0);
@@ -375,7 +375,7 @@ export function replayReadyDeps(): ReadyHandlerDeps {
  *
  * Purpose: Stepping and playback load a step the same way, and a reply for a replay that ended is dropped.
  * When to use: With an index into the timeline, while no other step is loading.
- * Expected outcome: The view, with the busy flag cleared again. Null when the step is unknown, replay is off, another step is loading, or the match or replay changed while waiting. A failed read shows a sentence and keeps the old step.
+ * Expected outcome: The view, with the busy flag cleared again. Null when the step is unknown, replay is off, another step is loading, or the match or replay changed while waiting. A reply for a replaced match still clears the flag of the replay that asked, so a leave waiting on it can finish. A failed read shows a sentence and keeps the old step.
  * Exceptions: None. A rejected read is logged.
  */
 export async function loadReplayStep(index: number): Promise<ReplayStepView | null> {
@@ -390,8 +390,9 @@ export async function loadReplayStep(index: number): Promise<ReplayStepView | nu
     console.error('readReplayStep failed', error);
   }
   const waiting = currentReplay();
-  if (!waiting || waiting.session !== state.session || !rendererMatchEpochCurrent(state.matchEpoch)) return null;
+  if (!waiting || waiting.session !== state.session) return null;
   setReplay({ ...waiting, busy: false });
+  if (!rendererMatchEpochCurrent(state.matchEpoch)) return null;
   if (!view) showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
   return view;
 }
@@ -421,26 +422,31 @@ export interface PresentReplayStepOptions {
  *
  * Purpose: Stepping, the slider, the turn field, and playback all show a step through here.
  * When to use: With the view `loadReplayStep` returned for `index`.
- * Expected outcome: The snapshot is applied, the dialogs are shown, and the step becomes the current one. The busy flag is set until then.
- * Exceptions: None. Nothing is shown when replay was left while the view was loading.
+ * Expected outcome: The snapshot is applied, the dialogs are shown, and the step becomes the current one. The busy flag is set until then, and is cleared even when applying or showing throws, so a leave waiting on the step can finish.
+ * Exceptions: Rethrows a failure from applying the snapshot or showing the dialogs, after the busy flag is cleared and with the old step kept as current. Nothing is shown when replay was left while the view was loading.
  */
 export async function presentReplayStep(index: number, view: ReplayStepView, options: PresentReplayStepOptions): Promise<void> {
   const state = currentReplay();
   if (!state) return;
   setReplay({ ...state, busy: true });
-  await requireDeps().readyDeps().applyGameStateSnapshot(view.snapshot, {
-    refreshStandingOrders: false,
-    updateGameStateSidebarUi: true,
-    updateSelectionUi: false,
-    updateGameOverUi: false,
-    updateReadyButton: true,
-    refreshBuildPopup: false,
-    redraw: !options.forPlayback,
-    replay: 'step',
-  });
-  await showReplayStepDialogs(view, state.timeline.view, requireDeps().readyDeps());
-  const applied = currentReplay();
-  if (applied && applied.session === state.session) setReplay({ ...applied, index, busy: false });
+  let shown = false;
+  try {
+    await requireDeps().readyDeps().applyGameStateSnapshot(view.snapshot, {
+      refreshStandingOrders: false,
+      updateGameStateSidebarUi: true,
+      updateSelectionUi: false,
+      updateGameOverUi: false,
+      updateReadyButton: true,
+      refreshBuildPopup: false,
+      redraw: !options.forPlayback,
+      replay: 'step',
+    });
+    await showReplayStepDialogs(view, state.timeline.view, requireDeps().readyDeps());
+    shown = true;
+  } finally {
+    const applied = currentReplay();
+    if (applied && applied.session === state.session) setReplay({ ...applied, ...(shown ? { index } : {}), busy: false });
+  }
 }
 
 /**
@@ -541,7 +547,7 @@ async function runLeaveReplay(): Promise<void> {
     state = currentReplay();
   }
   if (!state) return;
-  await showReplayStep(state.timeline.steps.length - 1);
+  if (rendererMatchEpochCurrent(state.matchEpoch)) await showReplayStep(state.timeline.steps.length - 1);
   if (!replayActive()) return;
   setReplay(null);
   delete document.body.dataset.replay;

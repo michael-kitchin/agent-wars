@@ -279,23 +279,6 @@ export function insertMatchRecord(ops: BasicDbOps, record: NewMatchRecord): void
 }
 
 /**
- * Replaces the payload of the newest frame.
- *
- * Purpose: A finished match has no later frame, so the last snapshot is updated to the ended database.
- * When to use: Immediately before writing a recording of a finished match. This is the only update of a history row.
- * Expected outcome: The newest frame's payload is the new snapshot. No row is inserted. A match with no frame is unchanged.
- * Exceptions: Throws when the payload cannot be encoded or the update fails.
- */
-export function replaceLatestFramePayload(ops: BasicDbOps, payload: unknown): void {
-  const row = ops.getOne<{ record_id: number }>('SELECT record_id FROM match_records WHERE kind = ? ORDER BY record_id DESC LIMIT 1', [
-    'frame',
-  ]);
-  logDebug('matchRecordStore replaceLatestFramePayload', { found: row !== undefined });
-  if (!row) return;
-  ops.run('UPDATE match_records SET payload = ? WHERE record_id = ?', [encodeRecordPayload(payload), row.record_id]);
-}
-
-/**
  * Lists every history row in write order.
  *
  * Purpose: The export and the tests read the whole table through one mapper.
@@ -341,9 +324,39 @@ export function listReadableMatchEventsOfType(ops: BasicDbOps, recordType: Match
     [recordType]
   );
   logDebug('matchRecordStore listReadableMatchEventsOfType', { recordType, supportedVersion, count: rows.length });
+  return readableRows(rows, recordType, 'listReadableMatchEventsOfType');
+}
+
+/**
+ * Lists the events of one type at one step that this build can read, skipping the rest.
+ *
+ * Purpose: A replay step must survive one damaged or newer row. `listMatchEventsAtStep` throws on the first bad payload, which would refuse the whole step.
+ * When to use: Replay's dialog readers. Use `listMatchEventsAtStep` when one bad row must fail the read.
+ * Expected outcome: Rows with that `record_type` and `step_key` that `readableRows` keeps, ordered by `record_id`.
+ * Exceptions: Propagates a SQLite error. A decode error is caught per row.
+ */
+export function listReadableMatchEventsAtStep(ops: BasicDbOps, recordType: MatchEventType, stepKey: string): MatchRecord[] {
+  const rows = ops.getAll<StoredMatchRecordRow>(
+    `SELECT ${RECORD_COLUMNS} FROM match_records WHERE kind = 'event' AND record_type = ? AND step_key = ? ORDER BY record_id ASC`,
+    [recordType, stepKey]
+  );
+  logDebug('matchRecordStore listReadableMatchEventsAtStep', { recordType, stepKey, count: rows.length });
+  return readableRows(rows, recordType, 'listReadableMatchEventsAtStep');
+}
+
+/**
+ * Decodes the stored rows this build can read and skips the others.
+ *
+ * Purpose: The tolerant readers share one rule for which rows they keep and how a skipped row is logged.
+ * When to use: From `listReadableMatchEventsOfType` and `listReadableMatchEventsAtStep`, with the name of the caller for the log.
+ * Expected outcome: The rows whose `format_version` is `MATCH_EVENT_FORMAT_VERSIONS[recordType]` and whose payload decodes, in the given order. A row of another version is logged at debug level, and a payload that fails to decode at error level with its record id.
+ * Exceptions: None. A decode error is caught per row.
+ */
+function readableRows(rows: readonly StoredMatchRecordRow[], recordType: MatchEventType, caller: string): MatchRecord[] {
+  const supportedVersion = MATCH_EVENT_FORMAT_VERSIONS[recordType];
   return rows.flatMap((row) => {
     if (row.format_version !== supportedVersion) {
-      logDebug('matchRecordStore listReadableMatchEventsOfType: skipped a row of another format version', {
+      logDebug(`matchRecordStore ${caller}: skipped a row of another format version`, {
         recordType,
         recordId: row.record_id,
         formatVersion: row.format_version,
@@ -354,7 +367,7 @@ export function listReadableMatchEventsOfType(ops: BasicDbOps, recordType: Match
     try {
       return [toMatchRecord(row)];
     } catch (err) {
-      logError('matchRecordStore listReadableMatchEventsOfType: skipped a payload that could not be decoded', {
+      logError(`matchRecordStore ${caller}: skipped a payload that could not be decoded`, {
         recordType,
         recordId: row.record_id,
         err,

@@ -227,7 +227,7 @@ Every tool round, the final orders call, and the repair call go through `postOrd
 | `executeReadyStrategicTurn` phase order | present (`buildResolutionOrderRule`) |
 | `AIR_STRIKE_RANGE_HEXES` / `AIR_FERRY_RANGE_HEXES` | present when air is on the roster |
 | `getMaxUnitsPerType` | present as the deployment-cap line |
-| `UNIT_COST_BY_TYPE` / `BUILD_PREREQUISITES_BY_TYPE` | present (`buildProductionCostRulesLine`) |
+| `UNIT_COST_BY_TYPE` / `BUILD_PREREQUISITES_BY_TYPE` / `NAVAL_SEA_ACCESS_RULE_PART` | present (`buildProductionCostRulesLine`). Naval's clause is `water or coast in or next to the hex` |
 | `buildProductionIncomeRule` | present in production status |
 | `STALE_INTEL_TURNS` | present when fog is on (`buildIntelStalenessRule`) |
 | `KEY_MAX_LENGTH` / `CONTENT_MAX_LENGTH` | present when memory updates are offered |

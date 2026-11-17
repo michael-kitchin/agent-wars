@@ -367,13 +367,13 @@ function validateTurnField(field: HTMLInputElement): number | null {
  *
  * Purpose: Enter and leaving the field both commit an entry.
  * When to use: On Enter and on blur in the turn field.
- * Expected outcome: A valid other turn is shown. An invalid entry stays as typed with its red border, and nothing moves.
+ * Expected outcome: A valid other turn is shown. An invalid entry stays as typed with its red border, and nothing moves. An entry committed while a step loads is ignored and stays as typed, so Enter can commit it again.
  * Exceptions: None.
  */
 function commitTurnField(field: HTMLInputElement): void {
   const index = validateTurnField(field);
   const state = currentReplay();
-  if (index === null || !state || index === state.index) return;
+  if (index === null || !state || state.busy || index === state.index) return;
   void showReplayStep(index);
 }
 
@@ -407,7 +407,7 @@ function wireTurnField(field: HTMLInputElement): void {
  *
  * Purpose: Dragging only moves the thumb and the field. The map changes when the thumb is released.
  * When to use: From `wireReplayPanel`.
- * Expected outcome: Input writes the turn under the thumb into the field. Change shows that step and redraws the panel. The slider keeps focus, so the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
+ * Expected outcome: Input writes the turn under the thumb into the field. Change shows that step and redraws the panel. A change while a step loads is ignored, and the redraw puts the thumb back on the step on screen. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
  * Exceptions: None.
  */
 function wireSlider(slider: HTMLInputElement): void {
@@ -421,6 +421,10 @@ function wireSlider(slider: HTMLInputElement): void {
     field.removeAttribute('aria-invalid');
   });
   slider.addEventListener('change', () => {
+    if (currentReplay()?.busy) {
+      renderReplayPanel();
+      return;
+    }
     void showReplayStep(Number(slider.value)).then(() => {
       renderReplayPanel();
     });

@@ -15,8 +15,8 @@ import { withEveryHexVisible } from '../ipc/matchViewSnapshot';
 import { logDebug, logError, logTrace } from '../logger';
 import { modelLabel } from '../openRouter/commanderPoolSettle';
 import {
-  listMatchEventsAtStep,
   listMatchRecordHeadersOfType,
+  listReadableMatchEventsAtStep,
   readMatchRecord,
   type MatchRecordHeader,
 } from '../recorder/matchRecordStore';
@@ -176,15 +176,31 @@ interface StepBefore {
 }
 
 /**
+ * The id of the newest snapshot of the step before.
+ *
+ * Purpose: The timeline keeps a turn's first snapshot, but a turn with a battle has a later one, the picture the live update dialog used when the turn resolved.
+ * When to use: From `readBeforeStep`.
+ * Expected outcome: For a strategic step, the highest record id among that turn's strategic snapshots of the view, or the ref's own id when none is found. A beat's ref is already its newest snapshot and is returned as it is.
+ * Exceptions: Propagates a SQLite error.
+ */
+function newestSnapshotIdOf(previous: ReplayStepRef, view: ReplayView): number {
+  if (previous.scope === 'tactical') return previous.recordId;
+  const newest = listMatchRecordHeadersOfType(gameDbOps, 'view_snapshot')
+    .filter((header) => header.scope === 'strategic' && header.turnNumber === previous.turnNumber && headerIsInView(header, view))
+    .at(-1);
+  return newest?.recordId ?? previous.recordId;
+}
+
+/**
  * Reads what the viewer had before an earlier step.
  *
  * Purpose: The update dialog describes only the moves the viewer could see, and a battle beat needs its sub-units from before the commit.
  * When to use: For a step that has an earlier step in the timeline.
- * Expected outcome: The earlier snapshot's `visibleHexes` (every hex for the all-sides view) and its battle session's sub-units.
+ * Expected outcome: The `visibleHexes` of the earlier step's newest snapshot (every hex for the all-sides view), so a turn with a battle gives the picture after it, and for a beat its battle session's sub-units.
  * Exceptions: Propagates a database error.
  */
 function readBeforeStep(previous: ReplayStepRef, view: ReplayView): StepBefore {
-  const record = readMatchRecord(gameDbOps, previous.recordId);
+  const record = readMatchRecord(gameDbOps, newestSnapshotIdOf(previous, view));
   const snapshot = (
     record?.payload as
       | { snapshot?: { visibleHexes?: string[]; tacticalBattleSession?: { subUnits?: TacticalSubUnitSnapshot[] } } }
@@ -201,15 +217,15 @@ function readBeforeStep(previous: ReplayStepRef, view: ReplayView): StepBefore {
  *
  * Purpose: One dispatch per AI seat that stored a strategy or sent a message at the step. The messages are not filtered, as in the live dialog.
  * When to use: From `readReplayStep`, with the step's key and the strategic turn it belongs to.
- * Expected outcome: Dispatches in side order. A seat with neither a strategy nor a message has none.
+ * Expected outcome: Dispatches in side order. A seat with neither a strategy nor a message has none. A row that cannot be read is skipped and logged (`listReadableMatchEventsAtStep`).
  * Exceptions: Propagates a database error.
  */
 function readDispatches(step: StepKey): CommanderDispatch[] {
   const { turnNumber } = step;
   const stepKey = stepKeyText(step);
-  const strategies = listMatchEventsAtStep(gameDbOps, 'commander_strategy', stepKey);
-  const messages = listMatchEventsAtStep(gameDbOps, 'message_sent', stepKey);
-  const consultations = listMatchEventsAtStep(gameDbOps, 'consultation', stepKey);
+  const strategies = listReadableMatchEventsAtStep(gameDbOps, 'commander_strategy', stepKey);
+  const messages = listReadableMatchEventsAtStep(gameDbOps, 'message_sent', stepKey);
+  const consultations = listReadableMatchEventsAtStep(gameDbOps, 'consultation', stepKey);
   return readSeatRoster(gameDbOps).flatMap((seat) => {
     if (!isAiSeatId(seat.seatId)) return [];
     const seatId = seat.seatId;
@@ -243,11 +259,11 @@ function readDispatches(step: StepKey): CommanderDispatch[] {
  *
  * Purpose: The update dialog reads the result that led into the step that follows it.
  * When to use: From `readReplayStep`, for the turn or the beat before the shown one.
- * Expected outcome: The `result` of the last `resolution_view` of that kind at the step, or null.
+ * Expected outcome: The `result` of the last readable `resolution_view` of that kind at the step, or null.
  * Exceptions: Propagates a database error.
  */
 function readResolutionResult(step: StepKey): unknown | null {
-  const rows = listMatchEventsAtStep(gameDbOps, 'resolution_view', stepKeyText(step));
+  const rows = listReadableMatchEventsAtStep(gameDbOps, 'resolution_view', stepKeyText(step));
   const last = rows
     .map((row) => row.payload as { kind?: string; result?: unknown })
     .filter((payload) => payload.kind === step.scope)

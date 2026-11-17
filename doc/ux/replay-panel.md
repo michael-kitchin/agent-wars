@@ -17,7 +17,7 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Above the bar, while the panel is expanded: a turn field and a slider. The slider runs over the recorded turns. The panel opens compact.
 - One step is one turn, or inside a battle one beat. A step shows the snapshot recorded when that turn or beat began. The last step shows the snapshot recorded at its end.
 - A player with a human seat sees what that seat could see at that moment. An observer sees every side, and so does anyone after the match is over (`replayViewFor`).
-- Each step shows the update dialog and the commanders' message dialog that turn showed. The update dialog is rebuilt from the recorded result with that turn's viewer and fog. For a battle beat it is shown only when the beat had movement, fire, melee, kills, air strikes, or dice, as the live beat showed it (`tacticalPlaybackNeeded`). A step shows neither dialog of the step before it.
+- Each step shows the update dialog and the commanders' message dialog that turn showed. The update dialog is rebuilt from the recorded result with that turn's viewer and fog. The fog is what the viewer could see at the end of the step before, after any battle that turn had, as the live dialog had it (`readBeforeStep` in `src/main/replay/replayReading.ts`). A recorded strategy, message, consult, or result that cannot be read is left out and logged, and the step still shows (`listReadableMatchEventsAtStep`). For a battle beat it is shown only when the beat had movement, fire, melee, kills, air strikes, or dice, as the live beat showed it (`tacticalPlaybackNeeded`). A step shows neither dialog of the step before it.
 - Control tips for the expand control, the three buttons, and Pause are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
@@ -31,6 +31,7 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Play is enabled only when a turn after the one showing exists (`canPlay`). Playback stops by itself at the last recorded turn, which leaves Play disabled.
 - Clicking Pause while playback runs stops it after the turn that is animating. The turn finishes first, so a click during the one-second hold takes effect when the hold ends.
 - While playback runs, Step back, Step forward, the slider, and the turn field are disabled (`canStepBack`, `canStepForward`, `canSeek`).
+- While a step loads, Step back and Step forward are disabled, but the slider and the turn field stay enabled so a focused one keeps focus (`canSeek`). A slider release made then is ignored and the thumb returns to the turn on screen. A turn entry committed then is ignored and stays as typed.
 - A step that cannot be loaded during playback ends playback and toasts `REPLAY_STEP_FAILED_REASON` (`That turn could not be loaded.`).
 - Play does nothing while a live turn's end-of-animation notification is still queued, so a replay animation can never send it. Replay sends nothing to the main process except reads of recorded steps.
 - Map clicks, double-clicks, and right-clicks do nothing. Dragging and the wheel still pan and zoom the map. The build entry buttons and the tactical entry markers are hidden.

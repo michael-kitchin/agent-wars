@@ -410,11 +410,11 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    */
   readMatchCharts: () => Promise<MatchChartsSnapshot>;
   /**
-   * Lists the recorded turns replay can show.
+   * Lists the recorded turns replay can show, or the open battle's recorded beats.
    *
-   * Contract: Steps are for the current view, oldest first. Empty when nothing was recorded.
+   * Contract: Steps are for the current view, oldest first. Empty when the recorder is off or nothing was recorded.
    * When to use: When replay is entered.
-   * Expected outcome: A timeline whose last step is the current turn.
+   * Expected outcome: A timeline whose last step is the newest recorded turn or beat, which is the current one while the recorder has kept up with the match.
    * Exceptions: Rejects when the IPC channel fails.
    */
   readReplayTimeline: () => Promise<ReplayTimeline>;

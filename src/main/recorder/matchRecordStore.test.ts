@@ -22,6 +22,7 @@ import {
   listMatchEventsOfType,
   listMatchRecordHeadersOfType,
   listMatchRecords,
+  listReadableMatchEventsAtStep,
   matchHasEventOfType,
   readMatchRecord,
 } from './matchRecordStore';
@@ -106,5 +107,28 @@ test('the targeted readers find one record, one step, and the newest of a type',
     assert.deepEqual(headers.map((row) => row.recordId), [2, 4, 5]);
     assert.equal(headers.every((row) => !('payload' in row)), true);
     assert.deepEqual(headers.map((row) => row.turnNumber), [1, 2, 2]);
+  });
+});
+
+test('the readable per-step reader skips a payload that cannot be decoded and keeps the rest', () => {
+  withTempGameDb('aw-match-store-readable-step-', () => {
+    for (const text of ['first', 'damaged', 'third']) {
+      insertMatchRecord(gameDbOps, {
+        kind: 'event',
+        recordType: 'message_sent',
+        formatVersion: 1,
+        step: strategicStep(2),
+        visibility: 'engine',
+        displayText: null,
+        recordedAt: '2026-01-01T00:00:00.000Z',
+        payload: { text },
+      });
+    }
+    gameDbOps.run(`UPDATE match_records SET payload = X'00FF' WHERE record_id = 2`);
+    assert.throws(() => listMatchEventsAtStep(gameDbOps, 'message_sent', 's2'));
+    assert.deepEqual(listReadableMatchEventsAtStep(gameDbOps, 'message_sent', 's2').map((row) => row.payload), [
+      { text: 'first' },
+      { text: 'third' },
+    ]);
   });
 });

@@ -2,9 +2,9 @@
 'use strict';
 
 /**
- * Unit tests for the UI smoke checks and the battle-status pattern the scenes wait on.
+ * Unit tests for the UI smoke checks, the battle-status pattern the scenes wait on, and the observed battle's hex edit.
  *
- * Purpose: Covers how a check result is decided, and which battle header lines a beat wait accepts, without starting Electron.
+ * Purpose: Covers how a check result is decided, which battle header lines a beat wait accepts, which hex the observed battle is set up on, and what a missing battle reports, without starting Electron.
  * When to use: Discovered by `scripts/run-main-node-tests.cjs` as an extra CJS test.
  * Expected outcome: Exits 0 when the pass, missing-element, and thrown-check contracts hold.
  * Exceptions: Assertion failures abort the process via node:test.
@@ -13,7 +13,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
-const { battleStatusPattern } = require('./ui-smoke-beat-limit.cjs');
+const { aiContestedHexStatements, battleStatusPattern, missingBattleMessage } = require('./ui-smoke-beat-limit.cjs');
 
 /**
  * A one-row check table for these tests.
@@ -67,4 +67,30 @@ test('a beat wait accepts the beats-left count and rejects a longer beat number'
   const last = new RegExp(battleStatusPattern(30, ''));
   assert.equal(last.test('Beat 30 (0 left) · Tactical planning'), true);
   assert.equal(new RegExp(battleStatusPattern(3, '')).test('Beat 30 · Tactical planning'), false);
+});
+
+test('the battle hex is one the first side holds alone, and ships keep their cargo out of it', () => {
+  const state = {
+    seats: [{ seatId: 'ai-1', outTurn: null }, { seatId: 'ai-2', outTurn: null }, { seatId: 'ai-3', outTurn: 2 }],
+    units: [
+      { id: 'a1', player: 'ai-1', unitType: 'infantry', h3Index: 'shared', embarkedOnCarrierUnitId: null },
+      { id: 'x1', player: 'ai-3', unitType: 'armor', h3Index: 'shared' },
+      { id: 'a2', player: 'ai-1', unitType: 'armor', h3Index: 'sea', embarkedOnCarrierUnitId: 'n1' },
+      { id: 'a3', player: 'ai-1', unitType: 'infantry', h3Index: 'alone' },
+      { id: 'b1', player: 'ai-2', unitType: 'infantry', h3Index: 'home' },
+      { id: 'b2', player: 'ai-2', unitType: 'armor', h3Index: 'sea2', embarkedOnCarrierUnitId: 'n2' },
+      { id: 'b3', player: 'ai-2', unitType: 'naval', h3Index: 'home' },
+    ],
+  };
+  const edit = aiContestedHexStatements(state);
+  assert.equal(edit.h3Index, 'alone');
+  assert.deepEqual(edit.statements, [{ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: ['alone', 'b1'] }]);
+  const onlyShips = { ...state, units: state.units.filter((unit) => unit.id !== 'b1') };
+  assert.throws(() => aiContestedHexStatements(onlyShips), /land units by side: ai-1 2, ai-2 0/);
+});
+
+test('a battle that was not offered names the turns and the hex', () => {
+  const state = { turnNumber: 5, gameOver: false, units: [{ player: 'ai-1', h3Index: 'hex' }, { player: 'ai-1', h3Index: 'hex' }, { player: 'ai-2', h3Index: 'other' }] };
+  assert.equal(missingBattleMessage(4, state, 'hex'), 'Ready resolved turn 4 without offering a battle (now turn 5); hex hex holds ai-1 2');
+  assert.match(missingBattleMessage(4, { ...state, gameOver: true, units: [] }, 'hex'), /, and the match ended\); hex hex holds no units$/);
 });

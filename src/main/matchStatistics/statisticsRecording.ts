@@ -9,7 +9,7 @@
 
 import { gameDbOps } from '../gameDb/dbConnection';
 import { listAllSideStances } from '../gameDb/sideMessageStore';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import { getMatchGeneration } from '../matchGeneration';
 import type { MatchEventRequest } from '../recorder/matchRecorder';
 import type { StepKey } from '../../shared/matchRecording';
@@ -79,4 +79,22 @@ export function recordTurnStatistics(
   } catch (err) {
     logError('statisticsRecording recordTurnStatistics failed', { seatCount: seats.length, err });
   }
+}
+
+/**
+ * Brings a recorded turn's statistics up to the database as it stands now.
+ *
+ * Purpose: A consult that finishes after the match's last boundary changes the seat costs and the stances, and the finished recording must show them. The losses and hexes taken compare against the turn before, which cannot be read again, so they are kept as recorded.
+ * When to use: Immediately before a finished match's recording is written, on the statistics event of the current step.
+ * Expected outcome: The same turn with `sides` read again (each keeping its recorded `unitsLost`, or null for a seat that was not recorded) and `relationships` read again. `turnNumber` and `hexesTaken` are unchanged. Nothing is remembered or consumed.
+ * Exceptions: Propagates a SQLite error.
+ */
+export function refreshedTurnStatistics(recorded: TurnStatistics, seats: readonly SeatForStatistics[]): TurnStatistics {
+  logTrace('statisticsRecording refreshedTurnStatistics', { turnNumber: recorded.turnNumber, seatCount: seats.length });
+  const recordedLosses = new Map(recorded.sides.map((side) => [side.seatId, side.unitsLost]));
+  return {
+    ...recorded,
+    sides: readSideStatistics(gameDbOps, seats).map((side) => ({ ...side, unitsLost: recordedLosses.get(side.seatId) ?? null })),
+    relationships: readRelationships(),
+  };
 }

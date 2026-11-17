@@ -210,13 +210,13 @@ export function canPlay(position: ReplayPosition): boolean {
 /**
  * Whether the slider and the turn field can be used.
  *
- * Purpose: Jumping to a step while playback runs would fight the play loop.
+ * Purpose: Jumping to a step while playback runs would fight the play loop. A step that is loading leaves them enabled, because disabling a focused control drops its focus and the next arrow key would pan the map. A jump asked for while a step loads is ignored where it is committed.
  * When to use: Drawing the panel.
- * Expected outcome: True when nothing is loading and playback is not running.
+ * Expected outcome: True when playback is not running, whether or not a step is loading.
  * Exceptions: None.
  */
 export function canSeek(position: ReplayPosition): boolean {
-  return !position.busy && !position.playing;
+  return !position.playing;
 }
 
 /**

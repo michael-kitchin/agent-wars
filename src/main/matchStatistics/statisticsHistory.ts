@@ -13,17 +13,45 @@ import { listReadableMatchEventsOfType } from '../recorder/matchRecordStore';
 import type { TurnStatistics } from '../../shared/matchStatistics';
 
 /**
- * Reports whether a decoded payload has the shape of a turn's statistics.
+ * Reports whether a value is a list of objects that each carry the named string fields.
  *
- * Purpose: A damaged or foreign payload must not reach a chart.
- * When to use: Each recorded event.
- * Expected outcome: True for an object with a numeric `turnNumber` and a `sides` array.
+ * Purpose: The chart series look entries up by seat id, so an entry without one would break a lookup or match nothing.
+ * When to use: From `isTurnStatistics`, for the side, report, and hexes-taken lists.
+ * Expected outcome: True for an array whose every entry is a non-null object with a string value under each key.
  * Exceptions: None.
  */
-function isTurnStatistics(value: unknown): value is TurnStatistics {
+function isListOfEntriesWith(value: unknown, keys: readonly string[]): boolean {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        entry !== null && typeof entry === 'object' && keys.every((key) => typeof (entry as Record<string, unknown>)[key] === 'string')
+    )
+  );
+}
+
+/**
+ * Reports whether a decoded payload has the shape of a turn's statistics.
+ *
+ * Purpose: A damaged or foreign payload, such as one written before the statistics carried relationship reports, must not reach a chart, where a missing list throws.
+ * When to use: Each recorded event, here and before the recorder refreshes the final statistics.
+ * Expected outcome: True for an object with a numeric `turnNumber`, a `sides` array whose entries have a string `seatId`, a `relationships` array whose entries have string `seatId` and `towardSeatId`, and a `hexesTaken` that is null or an array whose entries have string `bySeatId` and `fromSeatId`.
+ * Exceptions: None.
+ */
+export function isTurnStatistics(value: unknown): value is TurnStatistics {
   if (value === null || typeof value !== 'object') return false;
-  const candidate = value as { readonly turnNumber?: unknown; readonly sides?: unknown };
-  return typeof candidate.turnNumber === 'number' && Array.isArray(candidate.sides);
+  const candidate = value as {
+    readonly turnNumber?: unknown;
+    readonly sides?: unknown;
+    readonly relationships?: unknown;
+    readonly hexesTaken?: unknown;
+  };
+  return (
+    typeof candidate.turnNumber === 'number' &&
+    isListOfEntriesWith(candidate.sides, ['seatId']) &&
+    isListOfEntriesWith(candidate.relationships, ['seatId', 'towardSeatId']) &&
+    (candidate.hexesTaken === null || isListOfEntriesWith(candidate.hexesTaken, ['bySeatId', 'fromSeatId']))
+  );
 }
 
 /**

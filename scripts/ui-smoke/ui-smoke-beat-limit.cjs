@@ -79,27 +79,77 @@ async function checkBeatLimitControl(page) {
 }
 
 /**
- * Moves one side's land units onto the first land hex of another side that still has land.
+ * True when the unit is a land unit that fights on the world map.
  *
- * Purpose: An observed match offers a battle only where two sides share a hex, and a fresh match has none. A side with no land unit cannot be one of those two.
+ * Purpose: A land unit still assigned to a ship sits out strategic combat, and moving it does not stick, because its position follows the ship again.
+ * When to use: Choosing which units make the battle hex.
+ * Expected outcome: True for an armor or infantry unit with no carrier.
+ * Exceptions: None.
+ */
+function isFightingLandUnit(unit) {
+  return LAND_UNIT_TYPES.includes(unit.unitType) && !unit.embarkedOnCarrierUnitId;
+}
+
+/**
+ * Moves one side's land units onto a hex that only another side holds.
+ *
+ * Purpose: An observed match offers a battle only where exactly two AI sides share a hex after movement and fire, and a fresh match has none. The smoke sides have no model, so they give no orders, and the hex keeps both sides unless a Neutral unit moves or fires there. A side with no land unit off a ship cannot be one of the two, and a hex with a third side's unit offers nothing.
  * When to use: With the game state read just before the app closes.
- * Expected outcome: One update per land unit of the second qualifying side, onto the first qualifying side's first land hex.
- * Exceptions: Throws when fewer than two active sides have a land unit. The message lists each active side's land-unit count.
+ * Expected outcome: `{ h3Index, statements }`: one update per land unit off a ship of the second qualifying side, onto the first hex where the first qualifying side has such a unit and no other side has any unit.
+ * Exceptions: Throws when fewer than two active sides have a land unit off a ship, or when no hex is held by the first side alone. The first message lists each active side's count.
  */
 function aiContestedHexStatements(state) {
-  const isLand = (unit) => LAND_UNIT_TYPES.includes(unit.unitType);
   const units = state.units || [];
   const active = (state.seats || []).filter((seat) => seat.outTurn == null);
-  const landCount = (seatId) => units.filter((unit) => unit.player === seatId && isLand(unit)).length;
-  const counts = active.map((seat) => `${seat.seatId} ${landCount(seat.seatId)}`).join(', ');
-  const qualified = active.filter((seat) => landCount(seat.seatId) > 0);
+  const landOf = (seatId) => units.filter((unit) => unit.player === seatId && isFightingLandUnit(unit));
+  const counts = active.map((seat) => `${seat.seatId} ${landOf(seat.seatId).length}`).join(', ');
+  const qualified = active.filter((seat) => landOf(seat.seatId).length > 0);
   if (qualified.length < 2) throw new Error(`a battle needs a land unit on each side (land units by side: ${counts})`);
   const first = qualified[0].seatId;
   const second = qualified[1].seatId;
-  const firstLand = units.filter((unit) => unit.player === first && isLand(unit));
-  const secondLand = units.filter((unit) => unit.player === second && isLand(unit));
-  const h3Index = firstLand[0].h3Index;
-  return secondLand.map((unit) => ({ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [h3Index, unit.id] }));
+  const heldAlone = (h3Index) => units.every((unit) => unit.h3Index !== h3Index || unit.player === first);
+  const anchor = landOf(first).find((unit) => heldAlone(unit.h3Index));
+  if (!anchor) throw new Error(`no hex holds only ${first}'s units`);
+  const h3Index = anchor.h3Index;
+  const statements = landOf(second).map((unit) => ({ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [h3Index, unit.id] }));
+  return { h3Index, statements };
+}
+
+/**
+ * Describes a Ready that resolved without offering the battle.
+ *
+ * Purpose: The scene must fail at once with what happened on the battle hex, rather than wait out the dialog's timeout.
+ * When to use: When the turn advanced or the match ended while the Tactical battles dialog was awaited.
+ * Expected outcome: One sentence naming the turns, the hex, and each side's unit count there.
+ * Exceptions: None.
+ */
+function missingBattleMessage(turnBefore, state, h3Index) {
+  const countBySide = new Map();
+  for (const unit of (state.units || []).filter((candidate) => candidate.h3Index === h3Index)) {
+    countBySide.set(unit.player, (countBySide.get(unit.player) || 0) + 1);
+  }
+  const held = [...countBySide.entries()].map(([side, count]) => `${side} ${count}`).join(', ') || 'no units';
+  const ended = state.gameOver ? ', and the match ended' : '';
+  return `Ready resolved turn ${turnBefore} without offering a battle (now turn ${state.turnNumber}${ended}); hex ${h3Index} holds ${held}`;
+}
+
+/**
+ * Waits for the Tactical battles dialog, and fails as soon as the turn resolves without it.
+ *
+ * Purpose: A Ready that finds no battle resolves the turn, and the dialog would then never open.
+ * When to use: Right after clicking Ready on the edited match.
+ * Expected outcome: Resolves when the dialog is visible.
+ * Exceptions: Throws `missingBattleMessage` when the turn advances or the match ends first, or an Error after 120 seconds.
+ */
+async function waitForBattlesDialog(page, battles, turnBefore, h3Index) {
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
+    if (await battles.isVisible()) return;
+    const state = await readGameState(page);
+    if (state.turnNumber > turnBefore || state.gameOver) throw new Error(missingBattleMessage(turnBefore, state, h3Index));
+    await page.waitForTimeout(500);
+  }
+  throw new Error(`the Tactical battles dialog did not open within 120 s, and turn ${turnBefore} did not resolve`);
 }
 
 /**
@@ -151,18 +201,19 @@ async function expectBeatLimitNotice(page) {
  * Purpose: This is the check that the notice waits for Ok, and that the timed notice then starts the next turn.
  * When to use: After the Observe scene, on a match with four AI sides, Balanced, and Beat limit 30.
  * Expected outcome: Returns the app and page still open, with auto-advance off. Adds one report note with how long the notice stayed up.
- * Exceptions: Throws an Error naming a missing battle, a wrong sentence, a notice that closed early, or a notice that stayed outside 2.5 to 6 seconds.
+ * Exceptions: Throws an Error naming a missing battle, with the turn and the battle hex's units when Ready resolved without one, a wrong sentence, a notice that closed early, or a notice that stayed outside 2.5 to 6 seconds.
  */
 async function runBeatLimitBattleScenes(args) {
   let { app, page } = args;
   const state = await readGameState(page);
-  const statements = aiContestedHexStatements(state);
+  const { h3Index, statements } = aiContestedHexStatements(state);
   ({ app, page } = await args.reopen(app, statements));
   await page.waitForFunction(() => (document.getElementById('topbar-sides')?.textContent || '').includes('Observing'), null, { timeout: 60000 });
   await page.waitForFunction(() => document.getElementById('ready-btn')?.disabled === false, null, { timeout: 120000 });
+  const readyTurn = (await readGameState(page)).turnNumber;
   await page.click('#ready-btn');
   const battles = page.getByRole('dialog', { name: 'Tactical battles' });
-  await battles.waitFor({ timeout: 120000 });
+  await waitForBattlesDialog(page, battles, readyTurn, h3Index);
   await battles.getByRole('button', { name: 'Fight', exact: true }).click();
   await waitForBattleStatus(page, 1, ' · Tactical planning');
 
@@ -210,4 +261,4 @@ async function runBeatLimitBattleScenes(args) {
   return { app, page };
 }
 
-module.exports = { battleStatusPattern, checkBeatLimitControl, runBeatLimitBattleScenes };
+module.exports = { aiContestedHexStatements, battleStatusPattern, checkBeatLimitControl, missingBattleMessage, runBeatLimitBattleScenes };

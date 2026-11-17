@@ -22,15 +22,17 @@ import {
   type RecordVisibility,
   type StepKey,
 } from '../../shared/matchRecording';
-import { recordTurnStatistics } from '../matchStatistics/statisticsRecording';
+import { isTurnStatistics } from '../matchStatistics/statisticsHistory';
+import { recordTurnStatistics, refreshedTurnStatistics } from '../matchStatistics/statisticsRecording';
 import { buildFramePayload } from './matchFrameCapture';
 import { currentStepKey } from './recorderStepKey';
 import {
   insertMatchRecord,
   lastFrameStepKeyText,
+  listReadableMatchEventsAtStep,
   matchHasEventOfType,
-  replaceLatestFramePayload,
 } from './matchRecordStore';
+import { replaceEventPayload, replaceLatestFramePayload } from './matchRecordRewrite';
 
 /**
  * The clock stored on each row.
@@ -208,11 +210,11 @@ export function recordStepBoundary(step: StepKey | null, appVersion: string): vo
 }
 
 /**
- * Replaces the current step's latest frame with a fresh snapshot.
+ * Replaces the current step's latest frame with a fresh snapshot, and brings that step's statistics up to date.
  *
  * Purpose: A finished match's file has to show the database after the last consult, and there is no later frame to compare.
  * When to use: Immediately before writing the recording file.
- * Expected outcome: The newest frame's payload matches the database when that frame is the current step. Otherwise nothing changes.
+ * Expected outcome: The newest frame's payload matches the database when that frame is the current step. At a strategic step the newest `side_statistics` event there gets fresh sides and relationships, keeping its recorded losses and hexes taken (`refreshedTurnStatistics`). The view snapshots are left as recorded. Otherwise nothing changes.
  * Exceptions: None. A failure is logged and swallowed.
  */
 export function refreshCurrentFramePayload(): void {
@@ -223,9 +225,24 @@ export function refreshCurrentFramePayload(): void {
     logDebug('matchRecorder refreshCurrentFramePayload', { step: stepText });
     if (stepText === null || lastFrameStepKeyText(gameDbOps) !== stepText) return;
     replaceLatestFramePayload(gameDbOps, buildFramePayload(gameDbOps));
+    if (step?.scope === 'strategic') refreshStatisticsAtStep(stepText);
   } catch (err) {
     logError('matchRecorder refreshCurrentFramePayload failed', { err });
   }
+}
+
+/**
+ * Rewrites the newest statistics event of one step from the database as it stands now.
+ *
+ * Purpose: The refreshed final frame and its statistics must agree, so a late consult's cost, stance, trust, and threat reach the recording.
+ * When to use: From `refreshCurrentFramePayload` only, at a strategic step.
+ * Expected outcome: The newest readable `side_statistics` event at the step holds `refreshedTurnStatistics` of its payload. A step with no such event, or one whose payload is not a turn's statistics, is left alone.
+ * Exceptions: Propagates a database error, which the caller logs.
+ */
+function refreshStatisticsAtStep(stepText: string): void {
+  const latest = listReadableMatchEventsAtStep(gameDbOps, 'side_statistics', stepText).at(-1);
+  if (!latest || !isTurnStatistics(latest.payload)) return;
+  replaceEventPayload(gameDbOps, latest.recordId, refreshedTurnStatistics(latest.payload, readSeatRoster(gameDbOps)));
 }
 
 /**
