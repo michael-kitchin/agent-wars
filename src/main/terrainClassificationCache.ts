@@ -452,24 +452,6 @@ export function ensureTerrainClassificationCacheLoaded(): void {
 }
 
 /**
- * Returns parsed strategic naming records from the loaded terrain snapshot.
- *
- * Purpose: Supplies `regionScenario` and similar helpers without re-reading `terrain_res1_naming.json`.
- * When to use: After `ensureTerrainClassificationCacheLoaded()` at startup or before region hex aggregation.
- * Expected outcome: Read-only array identical to the bundled naming envelope records used when the snapshot was built.
- * Exceptions: Throws if the classification cache has not been loaded yet.
- */
-export function getTerrainStrategicNamingRecordsFromSnapshot(): ReadonlyArray<TerrainNamingRecordStrategic> {
-  logTrace('terrainClassificationCache getTerrainRes1NamingRecordsFromSnapshot');
-  if (!cached) {
-    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
-    logError('terrainClassificationCache getTerrainRes1NamingRecordsFromSnapshot: cache empty', err);
-    throw err;
-  }
-  return cached.strategicNamingRecords;
-}
-
-/**
  * Defines the `getStrategicLandMassByH3` function shape (export function getStrategicLandMassByH3(): ReadonlyMap<string, StrategicLandMassRecord>).
 
  * Purpose: Supports maintainability by documenting why `getStrategicLandMassByH3` exists.

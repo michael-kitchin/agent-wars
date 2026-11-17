@@ -39,24 +39,3 @@ export function mergePendingTacticalEmbarkOrdersIntoSealiftState(
   return { ...base, navalRows: rows };
 }
 
-/**
- * Updates tactical embark draft rows after a sealift `<select>` change (tactical sub-unit ids).
- *
- * Purpose: Mirrors strategic `updateSealiftSlot` dedupe semantics: reassigned land clears its prior pending carrier; empty selection drops pending rows for the previous occupant only.
- * When to use: Tactical stack callout sealift controls; pass the prior `<select>` value as `previousLandId` (may be empty).
- * Expected outcome: Pending list stays aligned with the latest slot edit until tactical Ready commits it.
- * Exceptions: None.
- */
-export function updatePendingEmbarkAfterTacticalSealiftSelect(args: {
-  pending: EmbarkOrder[];
-  navalUnitId: string;
-  newLandId: string;
-  previousLandId: string;
-}): EmbarkOrder[] {
-  let next = args.pending.filter((p) => p.unitId !== args.previousLandId);
-  if (args.newLandId.trim().length > 0) {
-    next = next.filter((p) => p.unitId !== args.newLandId);
-    next.push({ unitId: args.newLandId, navalUnitId: args.navalUnitId });
-  }
-  return next;
-}

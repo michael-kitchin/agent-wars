@@ -1,4 +1,3 @@
-import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
 
 /**
  * Documents the module-scope binding `BACKGROUND_COLOR` (BACKGROUND_COLOR).
@@ -274,16 +273,6 @@ export const READY_REQUEST_TIMEOUT_MS = 120_000;
  * Exceptions: None.
  */
 export const TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS = 50;
-
-/**
- * Upper bound for waiting on background AI after advancing the tactical turn counter.
- *
- * Purpose: Stays a few seconds past `AI_CONSULTATION_WAIT_TIMEOUT_MS` so a tactical advance waiter does not give up before the background consult timer.
- * When to use: Paired with `TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS` when a tactical advance waits on commander planning.
- * Expected outcome: The waiter outlives one legal consultation by 5 seconds.
- * Exceptions: None.
- */
-export const TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS + 5_000;
 
 /**
  * Documents the module-scope binding `UNIT_ICON_HIT_PAD_PX` (UNIT_ICON_HIT_PAD_PX).

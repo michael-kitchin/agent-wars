@@ -6,42 +6,6 @@ import { tacticalHitIsInsideBattle } from '../../shared/mapOrderGestureGate';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
- * Minimal renderer slice consulted for tactical-vs-strategic interaction gating.
- *
- * Contract: Any object exposing `tacticalBattleSnapshot` with the same null semantics as `rendererSharedState`.
- * When to use: Pass `rendererSharedState` (or a test double) into tactical guard helpers without importing the full renderer graph.
- * Expected outcome: Callers branch on tactical presence without duplicating `!!S.tacticalBattleSnapshot` checks.
- * Exceptions: None.
- */
-export type TacticalRendererGateState = {
-  tacticalBattleSnapshot: TacticalBattleSnapshot | null;
-};
-
-/**
- * Returns true when the renderer holds an active tactical battle snapshot (tactical session).
- *
- * Contract: Pure; identical to `!!state.tacticalBattleSnapshot`.
- * When to use: Ready button disabling, map interaction blocking, and sidebar suppression checks.
- * Expected outcome: True during tactical play until snapshot is cleared.
- * Exceptions: None.
- */
-export function tacticalRendererIsBattleActive(state: TacticalRendererGateState): boolean {
-  return !!state.tacticalBattleSnapshot;
-}
-
-/**
- * Returns true when strategic human orders should be blocked because tactical mode owns the map.
- *
- * Contract: Currently identical to battle-active; kept as a named hook for future divergences (e.g. transitional states).
- * When to use: Any strategic-only gesture that must not fire while tactical mode is active.
- * Expected outcome: True whenever tactical battle snapshot is non-null.
- * Exceptions: None.
- */
-export function tacticalRendererShouldBlockStrategicMapOrders(state: TacticalRendererGateState): boolean {
-  return tacticalRendererIsBattleActive(state);
-}
-
-/**
  * Returns true when a hit-tested strategic or tactical hex lies inside the active tactical footprint.
  *
  * Contract: Accepts the enclosing strategic hex or a cell in `tacticalChildH3Indexes`. A cell one ring past that list is outside.

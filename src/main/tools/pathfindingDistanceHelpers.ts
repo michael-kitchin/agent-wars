@@ -3,9 +3,7 @@ import {
   computeGridDistancePure,
   computeGridDistanceWithPathFallbackPure,
 } from '../../shared/h3GridRangePure';
-import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
-import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 
@@ -240,74 +238,6 @@ export function nearestAdjacentWaterOrCoastalHex(
     samples: failureSamples,
   });
   return best;
-}
-
-/**
- * Puts the land origin in front of a path that starts at the seaport's water cell.
- *
- * Purpose: Pathfinding starts on water. The player still needs to see the step off the land hex.
- * When to use: After `findPath` when a seaport egress cell was used as the route origin.
- * Expected outcome: Null when `path` is null. The path unchanged when it does not start at `seaportEgressHex`. Otherwise `originH3` followed by the path.
- * Exceptions: None.
- */
-export function prependSeaportEgressStep(path: string[] | null, originH3: string, seaportEgressHex?: string): string[] | null {
-  if (!path) return null;
-  if (!seaportEgressHex || path[0] !== seaportEgressHex) return path;
-  return [originH3, ...path];
-}
-
-/**
- * Finds a path, and tries once more without the blocked set when the first search fails.
- *
- * Purpose: A blocked cell should not hide the only route. The retry says so in `warnings`.
- * When to use: Route preview and order paths that may avoid enemy or occupied cells.
- * Expected outcome: The first path, including a seaport egress step when one applies. When that fails and `blocked` was set, the same search without `blocked`, and `blockedRetryWarning` pushed onto `warnings` when both are set. A `land` search additionally requires `landMass`; omitting it makes every land route fail.
- * Exceptions: None. `findPath` failures come back as null.
- */
-export function findPathWithOptionalAvoidanceRetry(payload: {
-  routeOriginH3: string;
-  destinationH3: string;
-  hexSet: Set<string>;
-  terrainByH3: Map<string, string>;
-  passableFor: PassableDomain;
-  blocked?: Set<string>;
-  originH3: string;
-  seaportEgressHex?: string;
-  warnings?: string[];
-  blockedRetryWarning?: string;
-  landMass?: LandMassByH3;
-}): string[] | null {
-  const first = prependSeaportEgressStep(
-    findPath(
-      payload.routeOriginH3,
-      payload.destinationH3,
-      payload.hexSet,
-      payload.terrainByH3,
-      payload.passableFor,
-      payload.blocked,
-      payload.landMass
-    ),
-    payload.originH3,
-    payload.seaportEgressHex
-  );
-  if (first || !payload.blocked) return first;
-  const retried = prependSeaportEgressStep(
-    findPath(
-      payload.routeOriginH3,
-      payload.destinationH3,
-      payload.hexSet,
-      payload.terrainByH3,
-      payload.passableFor,
-      undefined,
-      payload.landMass
-    ),
-    payload.originH3,
-    payload.seaportEgressHex
-  );
-  if (retried && payload.blockedRetryWarning && payload.warnings) {
-    payload.warnings.push(payload.blockedRetryWarning);
-  }
-  return retried;
 }
 
 /**
