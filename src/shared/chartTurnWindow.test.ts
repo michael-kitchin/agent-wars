@@ -67,3 +67,8 @@ test('a refresh that lands on the opening window follows the newest turns again'
   const view = { min: 19, max: 30 };
   assert.equal(refreshedTurnView({ view, previousTurns: turnsFrom(1, 31), nextTurns: turnsFrom(1, 30), minSpan: 2 }), null);
 });
+
+test('a series of 12 turns or fewer is already fully shown by the opening window, so a refresh keeps following that window', () => {
+  assert.equal(refreshedTurnView({ view: null, previousTurns: turnsFrom(1, 12), nextTurns: turnsFrom(1, 13), minSpan: 2 }), null);
+  assert.deepEqual(initialTurnWindow(turnsFrom(1, 13)), { min: 2, max: 13 });
+});

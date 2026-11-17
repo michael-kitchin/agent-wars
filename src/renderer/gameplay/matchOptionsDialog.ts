@@ -96,7 +96,7 @@ let savedControls: OptionControlsMemo | null = null;
  * Whether the open dialog lets the player change settings.
  *
  * Purpose: Apply and the limit re-lock run only in the editable dialog.
- * When to use: Set on open.
+ * When to use: Set on open and again by `refreshMatchOptionsDialog`.
  * Expected outcome: False for the read-only dialog.
  * Exceptions: None.
  */
@@ -106,7 +106,7 @@ let editable = false;
  * The live match's turn when the dialog opened.
  *
  * Purpose: Turn limits before this turn stay disabled after the rule changes.
- * When to use: Set on open, read by the limit re-lock.
+ * When to use: Set on open and again by `refreshMatchOptionsDialog`, and read by the limit re-lock.
  * Expected outcome: A turn number.
  * Exceptions: None.
  */
@@ -116,7 +116,7 @@ let liveTurn = 0;
  * The renderer match epoch captured when the dialog opened.
  *
  * Purpose: A new match or a loaded save must not receive settings chosen for the old one.
- * When to use: Checked at Apply.
+ * When to use: Checked at Apply and by `refreshMatchOptionsDialog`.
  * Expected outcome: An epoch number.
  * Exceptions: None.
  */

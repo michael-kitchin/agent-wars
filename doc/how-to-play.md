@@ -484,7 +484,7 @@ The charts show every side and every turn, whatever fog of war is set to, so you
 - **Stance over time:** one strip for the side you choose, with a row for each commander. A solid cell is a stance the commander reported that turn. A lighter cell carries an earlier stance forward. An empty outline is no report.
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep per turn, units lost per turn, and model cost so far. Built units and mercenary units have a dropdown for the total or one unit type.
 
-Hover a chart for each side's value at that turn and their total. Scroll over a chart to zoom the turns, drag to move along a zoomed chart, and double-click to show every turn again. Once a chart shows every recorded turn, later turns stay in view. A tighter zoom stays where you left it. Charts begin at the first turn the game recorded, so a save from an earlier version shows "No turns have been recorded yet." until you play a turn.
+Hover a chart for each side's value at that turn and their total. Scroll over a chart to zoom the turns, drag to move along a zoomed chart, and double-click to show every turn again. Once you have zoomed a chart out past its opening window to every recorded turn, later turns stay in view. A series of 12 turns or fewer fits the opening window, so that window keeps following the newest turns. A tighter zoom stays where you left it. Charts begin at the first turn the game recorded, so a save from an earlier version shows "No turns have been recorded yet." until you play a turn.
 
 ## Replay
 

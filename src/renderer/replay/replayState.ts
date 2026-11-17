@@ -205,15 +205,49 @@ export function registerReplayLeaver(leave: () => Promise<void>): void {
 }
 
 /**
- * Leaves replay when it is on.
+ * Whether a leave is running.
+ *
+ * Purpose: A leave turns replay off before it has put the live match back on screen, so `replayActive()` is already false while it finishes. Actions that need the live match must still wait.
+ * When to use: `setReplayLeaveRunning` sets it. `replayLeaveRunning` and `requestReplayLeave` read it.
+ * Expected outcome: True from the start of a leave until it settles.
+ * Exceptions: None.
+ */
+let leaveRunning = false;
+
+/**
+ * Records whether a leave is running.
+ *
+ * Purpose: Replay mode owns the leave, and the rest of the renderer only needs to know that one is running.
+ * When to use: `leaveReplay` in replay mode, when a leave starts and when it settles.
+ * Expected outcome: `replayLeaveRunning` reports `running`.
+ * Exceptions: None.
+ */
+export function setReplayLeaveRunning(running: boolean): void {
+  leaveRunning = running;
+}
+
+/**
+ * Reports whether a leave is running.
+ *
+ * Purpose: The game menu holds a click that changes or saves the match while replay is on or still being left.
+ * When to use: Before running an action that needs the live match on screen.
+ * Expected outcome: True from the start of a leave until it settles.
+ * Exceptions: None.
+ */
+export function replayLeaveRunning(): boolean {
+  return leaveRunning;
+}
+
+/**
+ * Leaves replay when it is on, or waits for a leave that is running.
  *
  * Purpose: The game menu and similar actions must act on the present.
  * When to use: Before an action that needs the live match.
- * Expected outcome: Resolves once replay is off. Resolves at once when it was not on.
+ * Expected outcome: Resolves once replay is off and the live match is back on screen. Resolves at once when replay was not on and no leave is running.
  * Exceptions: Propagates a failure of the registered leaver.
  */
 export async function requestReplayLeave(): Promise<void> {
-  if (replayState === null || replayLeaver === null) return;
+  if ((replayState === null && !leaveRunning) || replayLeaver === null) return;
   await replayLeaver();
 }
 

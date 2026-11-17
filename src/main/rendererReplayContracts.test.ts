@@ -142,7 +142,7 @@ test('a watch waits during replay, the menu and a new match leave it, and the sm
   assertMatches(getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'runLeaveReplay'), /maybeObserveAutoAdvance\(\)/, 'leaving asks the watch again');
   const menuSource = readRendererSource('chrome', 'gameMenu.ts');
   assert.equal(getFunctionSource(menuSource, 'openGameMenu').includes('requestReplayLeave'), false, 'opening the menu keeps replay on');
-  assertMatches(menuSource, /REPLAY_SAFE_BUTTON_IDS\.has\(item\.id\) \|\| !replayActive\(\)[\s\S]*?requestReplayLeave\(\)/, 'a menu button that changes the match leaves replay first');
+  assertMatches(menuSource, /REPLAY_SAFE_BUTTON_IDS\.has\(item\.id\) \|\| !\(replayActive\(\) \|\| replayLeaveRunning\(\)\)[\s\S]*?requestReplayLeave\(\)/, 'a menu button that changes the match leaves replay first, or waits for a leave that is running');
   assertMatches(readRendererSource('gameplay', 'newGame.ts'), /abandonReplayForNewMatch\(\);/, 'a new match drops replay');
   assert.equal(readRepoFile('scripts', 'ui-smoke', 'ui-smoke-checks.cjs').includes('#replay-panel'), true);
 });

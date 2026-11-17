@@ -27,7 +27,7 @@ import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
 import { copyBattleState, type ReplayBattleCopy } from './replayBattleCopy';
 import { frameReplayStepIfFollowing } from './replayCamera';
 import { showReplayStepDialogs } from './replayDialogs';
-import { abandonReplay, currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, waitForStepToSettle } from './replayState';
+import { abandonReplay, currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, setReplayLeaveRunning, waitForStepToSettle } from './replayState';
 
 /**
  * Sentence shown when the match has no recorded turns.
@@ -515,8 +515,10 @@ export function leaveReplay(): Promise<void> {
   if (replayLeaving !== null) return replayLeaving;
   const leaving = runLeaveReplay().finally(() => {
     replayLeaving = null;
+    setReplayLeaveRunning(false);
   });
   replayLeaving = leaving;
+  setReplayLeaveRunning(true);
   return leaving;
 }
 

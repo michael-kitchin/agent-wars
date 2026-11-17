@@ -109,7 +109,8 @@ test('a click held while replay leaves runs once, only on an item still enabled 
 
 test('the checkboxes follow replay while the menu stays open', () => {
   const menu = readRendererSource('chrome', 'gameMenu.ts');
-  assert.equal(menu.includes("import { onReplayChange, replayActive, requestReplayLeave } from '../replay/replayState';"), true);
+  assert.equal(menu.includes("import { onReplayChange, replayActive, replayLeaveRunning, requestReplayLeave } from '../replay/replayState';"), true);
+  assert.equal(menu.includes('replayActive() || replayLeaveRunning()'), true, 'a click is held while a leave is still finishing');
   const wiring = menu.slice(menu.indexOf('export function wireGameMenu'));
   assert.equal(wiring.includes('onReplayChange(syncGameMenuViewItems)'), true);
 });

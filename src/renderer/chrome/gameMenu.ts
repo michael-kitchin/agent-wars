@@ -8,7 +8,7 @@
  * and Quit.
  */
 import { rendererSharedState as S } from '../core/state';
-import { onReplayChange, replayActive, requestReplayLeave } from '../replay/replayState';
+import { onReplayChange, replayActive, replayLeaveRunning, requestReplayLeave } from '../replay/replayState';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { syncSaveLoadItems } from '../gameplay/saveLoadMenu';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
@@ -304,7 +304,7 @@ export function wireGameMenu(actions: GameMenuActions): void {
         event.preventDefault();
         return;
       }
-      if (item.disabled || REPLAY_SAFE_BUTTON_IDS.has(item.id) || !replayActive()) return;
+      if (item.disabled || REPLAY_SAFE_BUTTON_IDS.has(item.id) || !(replayActive() || replayLeaveRunning())) return;
       event.stopImmediatePropagation();
       event.preventDefault();
       heldMenuClickPending = true;

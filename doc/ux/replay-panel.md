@@ -53,7 +53,7 @@ The game menu's Playback… checkbox also turns replay on (`openReplay`), with t
 
 ### Other
 
-- Opening the game menu does not leave replay. A menu button that changes or saves the match leaves replay first and then runs. Starting a new match drops replay without applying anything. Replay can be on over a finished match's standings, so it is dropped as soon as Start game is clicked, and a start that fails leaves replay off. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
+- Opening the game menu does not leave replay. A menu button that changes or saves the match leaves replay first and then runs, and it also waits when a leave started by P or Escape is still putting the present back (`requestReplayLeave`, `replayLeaveRunning`). Starting a new match drops replay without applying anything. Replay can be on over a finished match's standings, so it is dropped as soon as Start game is clicked, and a start that fails leaves replay off. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
 - Ready is disabled and does nothing. The Orders tab is disabled, and a selected Orders tab returns after replay ends. A collapsed console stays collapsed when replay starts and when it ends. Committed order lines are not drawn, and neither are the draft orders: queued battle marches, the march hover preview, and pending ranged, air strike, air drop, missile, and ferry lines (`shouldDrawPendingOrderOverlays` in `src/renderer/rendering/canvasPreviewPolicy.ts`).
 - The commander cards on the Commanders tab are inert. Their summary buttons are disabled, so no commander popover opens and no commander is saved. A seat-cost refresh leaves the past snapshot's seats alone. Leaving replay applies the live match, seats included.
 - Entering replay clears the unit selection. Leaving puts it back, without any unit that no longer exists in the present.
@@ -112,7 +112,7 @@ None.
 - `src/renderer/gameplay/resolutionAnimationStart.ts` (`buildStrategicResolutionAnimation`, `startResolutionAnimationFrames`)
 - `src/renderer/gameplay/tacticalAnimationStart.ts` (`tacticalPlaybackNeeded`, `buildTacticalResolutionAnimation`)
 - `src/renderer/replay/replayDialogs.ts` (`showReplayStepDialogs`)
-- `src/renderer/replay/replayState.ts` (`waitForStepToSettle`)
+- `src/renderer/replay/replayState.ts` (`waitForStepToSettle`, `requestReplayLeave`, `replayLeaveRunning`)
 - `src/renderer/replay/replayCamera.ts` (`frameReplayStepIfFollowing`, `setReplayFollowUnits`)
 - `src/renderer/map/unitFrameCamera.ts` (`fitStrategicUnitsNow`, `fitBattleUnitsNow`)
 - `src/renderer/replay/replayBattleCopy.ts` (`copyBattleState`)
