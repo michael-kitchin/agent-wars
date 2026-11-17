@@ -1,6 +1,11 @@
 /**
  * Electron preload script. Exposes a minimal, type-safe API to the renderer via contextBridge.
- * Runs in the preload context; only contextBridge and ipcRenderer are used.
+ * Runs in the preload context; only contextBridge and ipcRenderer are used at runtime.
+ *
+ * `scripts/build-preload.cjs` bundles this file into `dist/main/preload.js`, because a sandboxed preload can
+ * require only `electron` and a few built-in modules, so a relative `require` of a shared module would fail
+ * there. That is why this file may import `src/shared` modules, such as the channel tables in
+ * `../shared/ipc/channels`, as long as they touch no Node or DOM API.
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
@@ -63,108 +68,7 @@ import type {
   RangedTargetOddsPreview,
 } from '../shared/ipc/gameApiTypes';
 import type { HexNamingCaption } from '../shared/hexNamingCaption';
-/**
- * Preload-local IPC channel map for game handlers.
- *
- * Purpose: Sandbox preload scripts cannot import arbitrary local modules at runtime, so this keeps
- * the invoke channel literals available without requiring `../shared/ipc/channels`.
- * When to use: Only for `ipcRenderer.invoke` calls in this preload bridge.
- * Expected outcome: Channel names stay aligned with main-process handlers and preload loads reliably.
- * Exceptions: None.
- */
-const IPC_GAME = {
-  getState: 'game:getState',
-  getTacticalTerrainOverrides: 'game:getRes4TerrainOverrides',
-  getTacticalCityOverlays: 'game:getRes4CityOverlays',
-  getTacticalRoadRailOverlays: 'game:getRes4RoadRailOverlays',
-  getTacticalTransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
-  getStrategicBaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
-  getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
-  getHexContinentNames: 'game:getHexContinentNames',
-  listScenarioHomeRegions: 'game:listScenarioHomeRegions',
-  listGameMaps: 'game:listGameMaps',
-  newGameMapPreview: 'game:newGameMapPreview',
-  basemapNativeZoom: 'game:basemapNativeZoom',
-  basemapVectorDocument: 'game:basemapVectorDocument',
-  basemapPrefetch: 'game:basemapPrefetch',
-  newGame: 'game:newGame',
-  endMatch: 'game:endMatch',
-  saveGame: 'game:saveGame',
-  loadGame: 'game:loadGame',
-  setSeatCommander: 'game:setSeatCommander',
-  getHumanNickname: 'game:getHumanNickname',
-  setHumanNickname: 'game:setHumanNickname',
-  setMatchOptions: 'game:setMatchOptions',
-  startCommanderPlanning: 'game:startCommanderPlanning',
-  stopCommanderPlanning: 'game:stopCommanderPlanning',
-  readCommanderPool: 'game:readCommanderPool',
-  readSideMessages: 'game:readSideMessages',
-  readMatchCharts: 'game:readMatchCharts',
-  readReplayTimeline: 'game:readReplayTimeline',
-  readReplayStep: 'game:readReplayStep',
-  openHowToPlay: 'game:openHowToPlay',
-  stageSideMessage: 'game:stageSideMessage',
-  cancelStagedSideMessage: 'game:cancelStagedSideMessage',
-  submitOrders: 'game:submitOrders',
-  listHumanStandingOrders: 'game:listHumanStandingOrders',
-  previewHumanMarchOrder: 'game:previewHumanMarchOrder',
-  previewHumanMarchOrders: 'game:previewHumanMarchOrders',
-  assignHumanMarchOrder: 'game:assignHumanMarchOrder',
-  assignHumanMarchOrders: 'game:assignHumanMarchOrders',
-  commitHumanTacticalDraftOrders: 'game:commitHumanTacticalDraftOrders',
-  validateGroupRangedTarget: 'game:validateGroupRangedTarget',
-  previewRangedTargetOdds: 'game:previewRangedTargetOdds',
-  validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
-  validateGroupAirDropTarget: 'game:validateGroupAirDropTarget',
-  validateGroupFerryTarget: 'game:validateGroupFerryTarget',
-  validateGroupMissileLaunchTarget: 'game:validateGroupMissileLaunchTarget',
-  cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',
-  getHexBuildQueue: 'game:getHexBuildQueue',
-  getHexHireView: 'game:getHexHireView',
-  placeHireOrder: 'game:placeHireOrder',
-  removeHireOrder: 'game:removeHireOrder',
-  dismissMercenary: 'game:dismissMercenary',
-  addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
-  updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
-  removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
-  applyBuildQueueTemplateToHexes: 'game:applyBuildQueueTemplateToHexes',
-  setHexesKeepBuilding: 'game:setHexesKeepBuilding',
-  getSealiftStackState: 'game:getSealiftStackState',
-  getTacticalSealiftStackState: 'game:getTacticalSealiftStackState',
-  updateTacticalSealiftSlot: 'game:updateTacticalSealiftSlot',
-  updateSealiftSlot: 'game:updateSealiftSlot',
-  startTacticalBattle: 'game:startTacticalBattle',
-  endTacticalBattle: 'game:endTacticalBattle',
-  ready: 'game:ready',
-  resolveMeleeIntercept: 'game:resolveMeleeIntercept',
-  notifyResolutionPlaybackComplete: 'game:notifyResolutionPlaybackComplete',
-  postResolutionConsultation: 'game:postResolutionConsultation',
-  postTacticalBeatConsultation: 'game:postTacticalBeatConsultation',
-  cancelRequestAiOrders: 'game:cancelRequestAiOrders',
-} as const;
-
-/**
- * Preload-local IPC channel map for OpenRouter settings and log streaming.
- *
- * Purpose: Keeps preload runtime free of non-Electron module imports in sandbox mode.
- * When to use: For invoke/listener channel names in this preload bridge.
- * Expected outcome: Renderer receives OpenRouter logs and settings operations through stable channels.
- * Exceptions: None.
- */
-const IPC_OPENROUTER = {
-  log: 'openRouter:log',
-  getToolGroupList: 'openRouter:getToolGroupList',
-  getKey: 'openRouter:getKey',
-  getSelectedModel: 'openRouter:getSelectedModel',
-  setKey: 'openRouter:setKey',
-  listModels: 'openRouter:listModels',
-  setSelectedModel: 'openRouter:setSelectedModel',
-  getSelectedReasoningEffort: 'openRouter:getSelectedReasoningEffort',
-  setSelectedReasoningEffort: 'openRouter:setSelectedReasoningEffort',
-  getCommanderKeyMemory: 'openRouter:getCommanderKeyMemory',
-  getSeatApiKey: 'openRouter:getSeatApiKey',
-} as const;
-
+import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
 /**
  * Documents the module-scope binding `openRouterLogListener` (openRouterLogListener: ((payload: { line: string; isError?: boolean })).
 

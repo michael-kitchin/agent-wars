@@ -272,8 +272,8 @@ npm run build
 npm start
 ```
 
-- **Build:** compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
-- **Start:** runs Electron; the window loads the renderer from `static/index.html`. Game state is stored in SQLite through **better-sqlite3** (a native module), in your Electron user-data directory.
+- **Build:** compiles the main process with TypeScript (`dist/`), bundles the preload script into `dist/main/preload.js` with esbuild (a sandboxed preload cannot load other local modules, so the bundle inlines the shared IPC channel names), and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
+- **Start:** runs Electron on the last build (`npm start` does not rebuild); the window loads the renderer from `static/index.html`. Game state is stored in SQLite through **better-sqlite3** (a native module), in your Electron user-data directory.
 - **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's Inside](#whats-inside).
 - **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/2026-03/2026-03-11-packaging.md](.spec/completed/2026-03/2026-03-11-packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
 
