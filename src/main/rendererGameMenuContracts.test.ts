@@ -46,18 +46,22 @@ test('How to play is enabled and opens the guide through main', () => {
   assert.equal(readRendererSource('chrome', 'gameMenu.ts').includes('openHowToPlay()'), true);
 });
 
-test('Playback and Metrics sit in their own section after Load game, each with its key', () => {
+test('Playback and Charts are checkboxes in their own section after Load game, each with its key', () => {
   const html = readRepoFile('static', 'index.html');
   const load = html.indexOf('id="game-menu-load-btn"');
   const tacticalBattles = html.indexOf('id="openrouter-tactical-battles"');
   for (const [id, key] of [
-    ['game-menu-playback-btn', 'P'],
-    ['game-menu-metrics-btn', 'C'],
+    ['game-menu-playback-check', 'P'],
+    ['game-menu-charts-check', 'C'],
   ] as const) {
     const at = html.indexOf(`id="${id}"`);
     assert.equal(load < at && at < tacticalBattles, true, id);
-    assert.equal(openingTagWithId(html, id).includes(`aria-keyshortcuts="${key}"`), true, id);
+    const tag = openingTagWithId(html, id);
+    assert.equal(tag.includes(`aria-keyshortcuts="${key}"`), true, id);
+    assert.equal(tag.includes('type="checkbox"'), true, id);
   }
+  assert.equal(html.includes('Charts…'), true);
+  assert.equal(html.includes('Metrics…'), false);
   const section = html.slice(load, tacticalBattles);
   assert.equal(section.split('class="game-menu-separator"').length - 1, 2);
 });
@@ -66,11 +70,24 @@ test('the menu gets replay and the charts by injection, so it adds no import cyc
   const menu = readRendererSource('chrome', 'gameMenu.ts');
   assert.equal(menu.includes("from '../replay/replayMode'"), false);
   assert.equal(menu.includes("from '../charts/chartsDialog'"), false);
-  assert.equal(menu.includes('actions.openReplay()'), true);
-  assert.equal(menu.includes('actions.openCharts()'), true);
+  assert.equal(menu.includes('actions.openReplay'), true);
+  assert.equal(menu.includes('actions.closeReplay'), true);
+  assert.equal(menu.includes('actions.openCharts'), true);
+  assert.equal(menu.includes('actions.closeCharts'), true);
   const renderer = readRendererSource('renderer.ts');
   const call = renderer.slice(renderer.indexOf('wireGameMenu('));
-  const args = call.slice(0, call.indexOf('\n'));
-  assert.equal(args.includes('openReplay'), true, args);
-  assert.equal(args.includes('openChartsDialog'), true, args);
+  const wiring = call.slice(0, call.indexOf('});'));
+  for (const name of ['openReplay', 'closeReplay', 'replayIsOpen', 'openCharts', 'closeCharts', 'chartsIsOpen']) {
+    assert.equal(wiring.includes(name), true, name);
+  }
+});
+
+test('the checkboxes close the menu before they act, and opening the menu no longer leaves replay', () => {
+  const menu = readRendererSource('chrome', 'gameMenu.ts');
+  const wire = menu.slice(menu.indexOf('const wireViewCheckbox'));
+  assert.equal(wire.indexOf('closeGameMenu()') < wire.indexOf('open()'), true);
+  const opener = menu.slice(menu.indexOf('export function openGameMenu'), menu.indexOf('export function closeGameMenu'));
+  assert.equal(opener.includes('requestReplayLeave'), false);
+  assert.equal(opener.includes('syncGameMenuViewItems()'), true);
+  assert.equal(menu.includes('REPLAY_SAFE_BUTTON_IDS'), true);
 });

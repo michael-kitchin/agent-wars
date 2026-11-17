@@ -112,7 +112,7 @@ Element documents share a fixed heading set:
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup, the Hire panel on that same popup, and the markers that open them.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
 - [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, the date block, the Settings button that opens Game Options for the match, and the battle header it becomes in a battle.
-- [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Save game, Load game, Playback, Metrics, Offer tactical battles, How to play, and Quit.
+- [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Save game, Load game, Playback, Charts, Offer tactical battles, How to play, and Quit.
 - [save-and-load.md](ux/save-and-load.md): Save game and Load game, the confirm before a load replaces a live match, and the automatic saves.
 - [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
 - [console-command-bar.md](ux/console-command-bar.md): Ready, and the reticle, the air-drop button, and the air-strike target list in the selection panel.

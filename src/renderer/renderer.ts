@@ -124,7 +124,7 @@ import { wireConsoleFrame } from './chrome/consoleFrame';
 import { fetchMatchSnapshot } from './core/matchSnapshotClient';
 import { wireObserveMode } from './gameplay/observeChrome';
 import { wireGameMenu } from './chrome/gameMenu';
-import { openChartsDialog } from './chrome/gameMenuActions';
+import { chartsDialogIsOpen, closeChartsDialogIfOpen, openChartsDialog } from './chrome/gameMenuActions';
 import { wireChartsDialog } from './charts/chartsDialog';
 import { wireMatchOptionsDialog } from './gameplay/matchOptionsDialog';
 import { showLoadedSaveToastAfterReload, wireSaveLoadMenu } from './gameplay/saveLoadMenu';
@@ -209,6 +209,7 @@ import {
 import { renderSelectionPanel, wireSelectionPanel } from './gameplay/selectionPanel';
 import { HUMAN_SEAT_ID } from '../shared/seatIds';
 import { bindReplayDeps, openReplay } from './replay/replayMode';
+import { replayActive, requestReplayLeave } from './replay/replayState';
 import { wireReplayPanel } from './replay/replayPanel';
 
 /**
@@ -733,7 +734,14 @@ function init(): void {
     redrawMap: redraw,
     redrawSelectionPanel: renderSelectionPanel,
   });
-  wireGameMenu({ openReplay: () => { void openReplay(); }, openCharts: openChartsDialog });
+  wireGameMenu({
+    openReplay: () => { void openReplay(); },
+    closeReplay: () => { void requestReplayLeave(); },
+    replayIsOpen: replayActive,
+    openCharts: openChartsDialog,
+    closeCharts: closeChartsDialogIfOpen,
+    chartsIsOpen: chartsDialogIsOpen,
+  });
   wireMatchOptionsDialog({ applySnapshot: applyGameStateSnapshot });
   wireChartsDialog();
   wireReplayPanel();

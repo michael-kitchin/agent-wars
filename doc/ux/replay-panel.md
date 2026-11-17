@@ -10,7 +10,7 @@ Show the player what the map, the update dialog, and the commanders' messages lo
 
 The P key turns replay on and off. It starts only with a match loaded, no dialog open that needs the player's choice, and the new-game overlay closed or not open over a live match. It does not start while a turn is resolving or its playback is running, and that refusal toasts one sentence (`REPLAY_BUSY_REASON` in `src/shared/replayNavigation.ts`). It does start inside a tactical battle, where it covers that battle's beats and nothing else. A match with no recorded turn toasts `REPLAY_NO_TURNS_REASON` in `src/renderer/replay/replayMode.ts`. When the last recorded turn cannot be put on screen, P toasts `REPLAY_STEP_FAILED_REASON`, logs the failure, and leaves replay again, so the present is shown (`toggleReplay`). See [modes-and-transitions.md](modes-and-transitions.md).
 
-The game menu's Playback… item also enters replay (`openReplay`), with the same conditions, refusals, and failure handling as P. It only enters. Opening the menu already starts leaving replay, so Playback… waits for that leave to finish and then enters on the newest recorded turn. When replay is already on, it does nothing. See [game-menu.md](game-menu.md).
+The game menu's Playback… checkbox also turns replay on (`openReplay`), with the same conditions, refusals, and failure handling as P, and turns it off when unchecked (`requestReplayLeave`). It is checked while replay is on. Opening the menu does not leave replay. See [game-menu.md](game-menu.md).
 
 ## Information Displayed
 
@@ -53,7 +53,7 @@ The game menu's Playback… item also enters replay (`openReplay`), with the sam
 
 ### Other
 
-- Opening the game menu leaves replay first. Starting a new match drops replay without applying anything. Replay can be on over a finished match's standings, so it is dropped as soon as Start game is clicked, and a start that fails leaves replay off. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
+- Opening the game menu does not leave replay. A menu button that changes or saves the match leaves replay first and then runs. Starting a new match drops replay without applying anything. Replay can be on over a finished match's standings, so it is dropped as soon as Start game is clicked, and a start that fails leaves replay off. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
 - Ready is disabled and does nothing. The Orders tab is disabled, and a selected Orders tab returns after replay ends. A collapsed console stays collapsed when replay starts and when it ends. Committed order lines are not drawn, and neither are the draft orders: queued battle marches, the march hover preview, and pending ranged, air strike, air drop, missile, and ferry lines (`shouldDrawPendingOrderOverlays` in `src/renderer/rendering/canvasPreviewPolicy.ts`).
 - The commander cards on the Commanders tab are inert. Their summary buttons are disabled, so no commander popover opens and no commander is saved. A seat-cost refresh leaves the past snapshot's seats alone. Leaving replay applies the live match, seats included.
 - Entering replay clears the unit selection. Leaving puts it back, without any unit that no longer exists in the present.

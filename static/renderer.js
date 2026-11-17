@@ -15154,6 +15154,15 @@
      */
     automaticFramedBeatNumber: null,
     /**
+     * Whether replay's follow-units toggle is on.
+     *
+     * Purpose: While it is on, replay fits the camera to the visible units on every step it shows.
+     * When to use: Read by `frameReplayStepIfFollowing` and the replay panel. Written only by `setReplayFollowUnits`.
+     * Expected outcome: False when the app opens. It lasts for the app session, is not saved, and is not reset by a new match or by leaving replay.
+     * Exceptions: None.
+     */
+    replayFollowUnits: false,
+    /**
        * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).
     
        * Purpose: Supports maintainability by documenting why `strategicDominantTerrainKindByH3` exists.
@@ -16803,15 +16812,15 @@
     { lo: -180, hi: 180, offset: 0 },
     { lo: 180, hi: 540, offset: 360 }
   ];
-  function decodePart(part, quantumDeg, lngOffset) {
-    if (part.length < 4 || part.length % 2 !== 0) return [];
+  function decodePart(part2, quantumDeg, lngOffset) {
+    if (part2.length < 4 || part2.length % 2 !== 0) return [];
     const points2 = [];
-    let lat = part[0] * quantumDeg;
-    let lng = part[1] * quantumDeg + lngOffset;
+    let lat = part2[0] * quantumDeg;
+    let lng = part2[1] * quantumDeg + lngOffset;
     points2.push([lat, lng]);
-    for (let index = 2; index < part.length; index += 2) {
-      lat += part[index] * quantumDeg;
-      lng += part[index + 1] * quantumDeg;
+    for (let index = 2; index < part2.length; index += 2) {
+      lat += part2[index] * quantumDeg;
+      lng += part2[index + 1] * quantumDeg;
       points2.push([lat, lng]);
     }
     return points2;
@@ -16954,9 +16963,9 @@
     const cells = {};
     for (const [key, parts] of Object.entries(value)) {
       if (!Array.isArray(parts)) throw new Error(`cells ${key} is not an array`);
-      cells[key] = parts.map((part) => {
-        if (!Array.isArray(part) || part.some((item) => typeof item !== "number")) throw new Error("part is not a number list");
-        return part;
+      cells[key] = parts.map((part2) => {
+        if (!Array.isArray(part2) || part2.some((item) => typeof item !== "number")) throw new Error("part is not a number list");
+        return part2;
       });
     }
     return cells;
@@ -17264,8 +17273,8 @@
   }
   function vectorLines(parts, quantumDeg, lngOffset) {
     const lines = [];
-    for (const part of parts) {
-      const decoded = decodePart(part, quantumDeg, lngOffset);
+    for (const part2 of parts) {
+      const decoded = decodePart(part2, quantumDeg, lngOffset);
       if (decoded.length >= 2) lines.push(decoded);
     }
     return lines;
@@ -21592,6 +21601,23 @@
     const aliased = TERRAIN_KIND_ALIASES[kind] ?? kind;
     return isPipelineTerrainKind(aliased) ? aliased : null;
   }
+  function originBonusSettingsFromSnapshot(state) {
+    return {
+      originBonusEnabled: state.originBonusEnabled === true,
+      terrainBonusEnabled: state.terrainBonusEnabled === true,
+      ...state.originBonusEnabled === true && state.originBonusLevel ? { originBonusLevel: state.originBonusLevel } : {},
+      ...state.terrainBonusEnabled === true && state.terrainBonusLevel ? { terrainBonusLevel: state.terrainBonusLevel } : {},
+      ...state.weatherBonusEnabled === true ? {
+        weatherBonusEnabled: true,
+        startMonth: state.startMonth,
+        ...state.weatherBonusLevel ? { weatherBonusLevel: state.weatherBonusLevel } : {}
+      } : {},
+      ...state.techBonusEnabled === true ? {
+        techBonusEnabled: true,
+        ...state.techBonusLevel ? { techBonusLevel: state.techBonusLevel } : {}
+      } : {}
+    };
+  }
 
   // src/shared/techBonusRules.ts
   var TECH_ADVANCED_MIN_URBAN_HEX_COUNT = GLOBAL_GAME_MAP.rules.advancedMinUrbanCells;
@@ -21599,6 +21625,10 @@
   function techLevelFromUrbanHexCount(urbanHexCount) {
     if (urbanHexCount == null || !Number.isFinite(urbanHexCount)) return "basic";
     return urbanHexCount >= advancedTechMinUrbanCells() ? "advanced" : "basic";
+  }
+  function techBonusLevelOf(settings) {
+    if (settings.techBonusEnabled !== true) return "off";
+    return settings.techBonusLevel ?? "low";
   }
 
   // src/shared/featureIconHtml.ts
@@ -22295,6 +22325,14 @@ ${bonuses}`;
       };
       replayListeners.push(listener);
     });
+  }
+  async function waitForStepToSettle() {
+    for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
+      await waitForReplayIdle();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    }
   }
 
   // src/renderer/openRouter/openRouterToolCountLabels.ts
@@ -23778,7 +23816,11 @@ ${bonuses}`;
   function newGameOptionsPopoverIsOpen() {
     return popover2 != null && !popover2.hidden;
   }
+  function popoverInMatchMode() {
+    return document.getElementById("new-game-options-popover")?.dataset.mode === "match";
+  }
   function closeNewGameOptionsPopover() {
+    if (popoverInMatchMode()) return;
     detachListeners2?.();
     detachListeners2 = null;
     if (popover2) popover2.hidden = true;
@@ -23786,6 +23828,7 @@ ${bonuses}`;
     anchor2 = null;
   }
   function toggleNewGameOptionsPopover(button) {
+    if (popoverInMatchMode()) return;
     if (newGameOptionsPopoverIsOpen()) {
       closeNewGameOptionsPopover();
       return;
@@ -23799,7 +23842,9 @@ ${bonuses}`;
     placeNewGameOptionsPopover();
     detachListeners2 = attachAnchoredPopoverListeners({
       containsTarget: (target) => !!(popover2?.contains(target) || anchor2?.contains(target)),
-      close: closeNewGameOptionsPopover,
+      close: () => {
+        if (!popoverInMatchMode()) closeNewGameOptionsPopover();
+      },
       reposition: placeNewGameOptionsPopover
     });
   }
@@ -23809,6 +23854,7 @@ ${bonuses}`;
       button.addEventListener("click", () => toggleNewGameOptionsPopover(button));
     }
     document.querySelector("#new-game-options-popover .commander-popover-close")?.addEventListener("click", () => {
+      if (popoverInMatchMode()) return;
       closeNewGameOptionsPopover();
     });
     document.getElementById("new-game-panel-grip")?.addEventListener("pointerdown", () => {
@@ -25421,7 +25467,7 @@ ${bonuses}`;
   }
   function formatTerrainCoverTooltipHtml(pair) {
     const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
-      (part) => part != null
+      (part2) => part2 != null
     );
     return parts.length > 0 ? parts.join(", ") : null;
   }
@@ -30875,7 +30921,7 @@ ${bonuses}`;
     return item;
   }
   function metaLine(row) {
-    const parts = [row.commanderSummary, row.consultationsLabel, row.thinkTimeLabel, row.costLabel].filter((part) => part !== null);
+    const parts = [row.commanderSummary, row.consultationsLabel, row.thinkTimeLabel, row.costLabel].filter((part2) => part2 !== null);
     if (parts.length === 0) return null;
     const meta = document.createElement("p");
     meta.className = "game-over-standings-meta";
@@ -30902,6 +30948,19 @@ ${bonuses}`;
       syncGameSizeCapPreview();
     });
     syncGameSizeCapPreview();
+  }
+
+  // src/renderer/gameplay/matchOptionsDialogState.ts
+  var registeredCloser = null;
+  function matchOptionsDialogIsOpen() {
+    const popover3 = document.getElementById("new-game-options-popover");
+    return popover3 !== null && popover3.dataset.mode === "match" && !popover3.hidden;
+  }
+  function registerMatchOptionsDialogCloser(close) {
+    registeredCloser = close;
+  }
+  function closeMatchOptionsDialogIfOpen() {
+    if (matchOptionsDialogIsOpen()) registeredCloser?.();
   }
 
   // src/renderer/openRouter/resolutionPlaybackDeferral.ts
@@ -31077,11 +31136,9 @@ ${bonuses}`;
     });
     if (!open2) return;
     const indexes = state.units.map((unit) => unit.h3Index).filter((index) => index.length > 0);
-    const framed = frameForIndexes(indexes, null);
-    if (!framed) return;
-    if (!fitMainMapToFrame(framed)) return;
+    if (!fitStrategicUnitsNow(indexes)) return;
     rendererSharedState.automaticFramedTurnNumber = state.turnNumber;
-    console.debug("automatic unit frame", { turnNumber: state.turnNumber, ...framed });
+    console.debug("automatic unit frame", { turnNumber: state.turnNumber, cells: indexes.length });
   }
   function frameAutomaticBattleUnits(battleLimit) {
     try {
@@ -31104,11 +31161,24 @@ ${bonuses}`;
     });
     if (!open2) return;
     const indexes = snap.subUnits.filter((unit) => unit.h3Index.length > 0).map((unit) => unit.h3Index);
-    const framed = frameForIndexes(indexes, battleLimit);
-    if (!framed) return;
-    if (!fitMainMapToFrame(framed)) return;
+    if (!fitBattleUnitsNow(indexes, battleLimit)) return;
     rendererSharedState.automaticFramedBeatNumber = snap.tacticalTurnNumber;
-    console.debug("automatic battle frame", { tacticalTurnNumber: snap.tacticalTurnNumber, ...framed });
+    console.debug("automatic battle frame", { tacticalTurnNumber: snap.tacticalTurnNumber, cells: indexes.length });
+  }
+  function fitStrategicUnitsNow(indexes) {
+    return fitCellsNow(indexes, null);
+  }
+  function fitBattleUnitsNow(indexes, battleLimit) {
+    return fitCellsNow(indexes, battleLimit);
+  }
+  function fitCellsNow(indexes, battleLimit) {
+    try {
+      const framed = frameForIndexes(indexes, battleLimit);
+      return framed !== null && fitMainMapToFrame(framed);
+    } catch (err) {
+      console.error("unit frame failed", err);
+      return false;
+    }
   }
   function frameForIndexes(indexes, battleLimit) {
     if (indexes.length === 0) return null;
@@ -31384,7 +31454,7 @@ ${bonuses}`;
     const aiOnlyStillPlaying = rendererSharedState.tacticalBattleSnapshot?.leadPartyId != null && rendererSharedState.tacticalBattleSnapshot.aiOnlyEndReason == null;
     if (rendererSharedState.resolutionMoveAnimation || rendererSharedState.tacticalBattleSnapshot && !aiOnlyStillPlaying) return false;
     if (isDeferredResolutionPlaybackConsultPending() || anyCommanderIsPlanning() || commanderStartIsSettling()) return false;
-    if (newGameOverlayIsOpen()) return false;
+    if (newGameOverlayIsOpen() || matchOptionsDialogIsOpen()) return false;
     const knockout = document.getElementById("knockout-dialog");
     if (knockout && !knockout.classList.contains("hidden")) return false;
     const annihilation = document.getElementById("tactical-annihilation-overlay");
@@ -32124,6 +32194,7 @@ ${bonuses}`;
   var LOADED_SAVE_FILE_NAME_KEY = "agentWarsLoadedSaveFileName";
   var SAVE_BUTTON_ID = "game-menu-save-btn";
   var LOAD_BUTTON_IDS = ["game-menu-load-btn", "topbar-load-btn"];
+  var SETTINGS_BUTTON_ID = "topbar-settings-btn";
   function readSaveLoadUiState() {
     const hexes = rendererSharedState.gameState?.hexes.length ?? 0;
     return {
@@ -32138,6 +32209,8 @@ ${bonuses}`;
     applyItem(SAVE_BUTTON_ID, saveGameItemState(state));
     const load = loadGameItemState(state);
     for (const id of LOAD_BUTTON_IDS) applyItem(id, load);
+    const settings = document.getElementById(SETTINGS_BUTTON_ID);
+    if (settings instanceof HTMLButtonElement) settings.disabled = !state.matchLoaded || state.newGameScreenOpen;
   }
   function wireSaveLoadMenu() {
     syncSaveLoadItems();
@@ -32229,7 +32302,7 @@ ${bonuses}`;
     dismissStaleControlTooltip();
     if (options.restoreFocus) button.focus();
   }
-  function wireGameMenu() {
+  function wireGameMenu(actions) {
     const menu = document.getElementById(GAME_MENU_ID);
     const button = document.getElementById(GAME_MENU_BUTTON_ID);
     if (!menu || !button) return;
@@ -32242,6 +32315,15 @@ ${bonuses}`;
     menu.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("button")) closeGameMenu();
+    });
+    document.getElementById("game-menu-playback-btn")?.addEventListener("click", () => {
+      actions.openReplay();
+    });
+    document.getElementById("game-menu-metrics-btn")?.addEventListener("click", () => {
+      actions.openCharts();
+    });
+    document.getElementById("game-menu-how-to-play-btn")?.addEventListener("click", () => {
+      void window.gameApi?.openHowToPlay();
     });
     document.getElementById("game-menu-quit-btn")?.addEventListener("click", () => {
       window.close();
@@ -33438,6 +33520,7 @@ ${bonuses}`;
       return overlay != null && wasHidden === false;
     }
     overlay?.classList.remove("hidden");
+    closeMatchOptionsDialogIfOpen();
     resetNewGameOptionControls();
     if (wasHidden) {
       closeNewGameOptionsPopover();
@@ -33822,7 +33905,7 @@ ${bonuses}`;
     return name.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase("en").trim();
   }
   function cityNamesInOverlayLabel(label) {
-    return label.split(" / ").map((part) => part.trim()).filter((part) => part.length > 0);
+    return label.split(" / ").map((part2) => part2.trim()).filter((part2) => part2.length > 0);
   }
   function cityCenterIsInView(center, view2) {
     return center.x >= 0 && center.x <= view2.width && center.y >= 0 && center.y <= view2.height;
@@ -38673,7 +38756,7 @@ ${bonuses}`;
     if (input.readyInFlight || input.playbackRunning) return { ok: false, reason: REPLAY_BUSY_REASON };
     return { ok: true };
   }
-  var REPLAY_PLAYBACK_DWELL_MS = 1e3;
+  var REPLAY_PLAYBACK_DWELL_MS = 500;
   function canStepBack(position) {
     return position.index > 0 && !position.busy && !position.playing;
   }
@@ -38820,6 +38903,9 @@ ${bonuses}`;
         age: report === void 0 ? "none" : fresh ? "fresh" : "old"
       };
     });
+  }
+  function relationshipSubjectSeatIds(snapshot3) {
+    return [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder).filter((seat) => reporterSeatIds(snapshot3, seat.seatId).length > 0).map((seat) => seat.seatId);
   }
   function relationshipStrip(snapshot3, subjectSeatId) {
     return {
@@ -43495,9 +43581,9 @@ ${bonuses}`;
     const bar = document.createElement("span");
     bar.className = score === null ? "charts-score-bar charts-score-bar-empty" : "charts-score-bar";
     for (let step = 0; step <= RELATIONSHIP_SCALE_MAX; step += 1) {
-      const part = document.createElement("span");
-      part.className = score !== null && step <= score ? "charts-score-step charts-score-step-on" : "charts-score-step";
-      bar.appendChild(part);
+      const part2 = document.createElement("span");
+      part2.className = score !== null && step <= score ? "charts-score-step charts-score-step-on" : "charts-score-step";
+      bar.appendChild(part2);
     }
     const number = document.createElement("span");
     number.className = "charts-score-number";
@@ -43535,6 +43621,7 @@ ${bonuses}`;
       side.className = "charts-row-side";
       const flag = args.flagOf(row.reporterSeatId);
       const name = document.createElement("span");
+      name.className = "charts-row-side-name";
       name.textContent = args.nameOf(row.reporterSeatId);
       side.append(...flag === null ? [name] : [flag, name]);
       const asOf = row.reportedTurn === null ? "\u2013" : `turn ${row.reportedTurn}${row.age === "old" ? " (old)" : ""}`;
@@ -43824,20 +43911,18 @@ ${bonuses}`;
     return { titleRow, plotHost };
   }
   function fillStacks(host, snapshot3, lookups) {
-    const seats = [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder);
-    host.style.gridTemplateColumns = `repeat(${Math.min(seats.length, MAX_SEATS)}, minmax(0, 1fr))`;
-    host.replaceChildren(
-      ...seats.map(
-        (seat) => buildRelationshipStack({
-          subjectSeatId: seat.seatId,
-          rows: relationshipRows(snapshot3, seat.seatId),
-          nameOf: lookups.nameOf,
-          flagOf: lookups.flagOf,
-          seatNumberOf: lookups.seatNumberOf,
-          subjectIsViewer: isHumanSeatId(seat.seatId)
-        })
-      )
+    const stacks = relationshipSubjectSeatIds(snapshot3).map(
+      (seatId) => buildRelationshipStack({
+        subjectSeatId: seatId,
+        rows: relationshipRows(snapshot3, seatId),
+        nameOf: lookups.nameOf,
+        flagOf: lookups.flagOf,
+        seatNumberOf: lookups.seatNumberOf,
+        subjectIsViewer: isHumanSeatId(seatId)
+      })
     );
+    const empty = Object.assign(document.createElement("p"), { className: "charts-empty", textContent: "No AI commander reports on any side." });
+    host.replaceChildren(...stacks.length > 0 ? stacks : [empty]);
   }
   function buildLineChartBlock(body, definition, snapshot3, lookups) {
     const { titleRow, plotHost } = appendBlock(body, definition.title);
@@ -43884,10 +43969,10 @@ ${bonuses}`;
     subjectSelect.className = "charts-select";
     subjectSelect.setAttribute("aria-label", "How they see");
     subjectSelect.dataset.controlTooltip = "Choose the side whose standing with each commander the strip shows.";
-    for (const seat of [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder)) {
+    for (const seatId of relationshipSubjectSeatIds(snapshot3)) {
       const option2 = document.createElement("option");
-      option2.value = seat.seatId;
-      option2.textContent = seat.name;
+      option2.value = seatId;
+      option2.textContent = lookups.nameOf(seatId);
       subjectSelect.appendChild(option2);
     }
     const subjectLabel = document.createElement("label");
@@ -44066,6 +44151,38 @@ ${bonuses}`;
     }
   }
 
+  // src/renderer/replay/replayBattleCopy.ts
+  function copyBattleState() {
+    return {
+      snapshot: rendererSharedState.tacticalBattleSnapshot,
+      marches: rendererSharedState.tacticalPendingMarches.map((row) => ({ ...row })),
+      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      airStrikes: [...rendererSharedState.pendingAirStrikes],
+      airDrops: [...rendererSharedState.pendingAirDrops],
+      missileLaunches: [...rendererSharedState.pendingMissileLaunches],
+      ferryOrders: [...rendererSharedState.pendingFerryOrders],
+      embarkOrders: [...rendererSharedState.pendingEmbarkOrders]
+    };
+  }
+
+  // src/renderer/replay/replayCamera.ts
+  function frameReplayStepIfFollowing() {
+    if (!rendererSharedState.replayFollowUnits || !replayActive()) return;
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const limit = tacticalBattleAreaFrameBox(battle.tacticalChildH3Indexes);
+      if (!limit) return;
+      fitBattleUnitsNow(battle.subUnits.map((unit) => unit.h3Index).filter((index) => index.length > 0), limit);
+      return;
+    }
+    const units = rendererSharedState.gameState?.units ?? [];
+    fitStrategicUnitsNow(units.map((unit) => unit.h3Index).filter((index) => index.length > 0));
+  }
+  function setReplayFollowUnits(on2) {
+    rendererSharedState.replayFollowUnits = on2;
+    if (on2) frameReplayStepIfFollowing();
+  }
+
   // src/shared/consolidatedTurnUpdateToast.ts
   var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
   var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
@@ -44231,7 +44348,7 @@ ${bonuses}`;
       countPhrase(airports, "airport", "airports"),
       countPhrase(seaports, "seaport", "seaports"),
       countPhrase(fortifications, "fortification", "fortifications")
-    ].filter((part) => part !== null);
+    ].filter((part2) => part2 !== null);
     const destroyed = phrases.length === 0 ? "destroyed nothing" : `destroyed ${joinWithSerialComma(phrases)}`;
     const squadronClause = squadrons === 0 ? "" : `; ${squadrons} ${squadrons === 1 ? "squadron" : "squadrons"} lost`;
     const strike = entries.length === 1 ? "strike" : "strikes";
@@ -45364,6 +45481,9 @@ ${bonuses}`;
       await leaveReplay();
       return;
     }
+    await enterReplay();
+  }
+  async function enterReplay() {
     const decision = entryDecision();
     if (!decision.ok) {
       if (decision.reason !== null) showMapToast(decision.reason, { isError: false, skipReport: true });
@@ -45405,6 +45525,11 @@ ${bonuses}`;
       await leaveReplay();
     }
   }
+  async function openReplay() {
+    if (replayLeaving !== null) await replayLeaving;
+    if (replayActive()) return;
+    await enterReplay();
+  }
   function setAsideLastSeenMarkers() {
     savedMarkers = {
       observed: new Map(rendererSharedState.lastObservedEnemyByUnitId),
@@ -45414,18 +45539,6 @@ ${bonuses}`;
     rendererSharedState.lastObservedEnemyByUnitId.clear();
     rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
     rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-  }
-  function copyBattleState() {
-    return {
-      snapshot: rendererSharedState.tacticalBattleSnapshot,
-      marches: rendererSharedState.tacticalPendingMarches.map((row) => ({ ...row })),
-      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
-      airStrikes: [...rendererSharedState.pendingAirStrikes],
-      airDrops: [...rendererSharedState.pendingAirDrops],
-      missileLaunches: [...rendererSharedState.pendingMissileLaunches],
-      ferryOrders: [...rendererSharedState.pendingFerryOrders],
-      embarkOrders: [...rendererSharedState.pendingEmbarkOrders]
-    };
   }
   function restoreBattleState() {
     if (savedBattle === null) return;
@@ -45448,14 +45561,6 @@ ${bonuses}`;
     for (const [key, value] of savedMarkers.stale) rendererSharedState.clientStaleEnemyIntelByUnitId.set(key, value);
     for (const [key, value] of savedMarkers.rendered) rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(key, value);
     savedMarkers = null;
-  }
-  async function waitForStepToSettle() {
-    for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
-      await waitForReplayIdle();
-      await new Promise((resolve) => {
-        setTimeout(resolve, 0);
-      });
-    }
   }
   function restoreSelection(unitIds) {
     if (unitIds.length === 0) return;
@@ -45502,7 +45607,7 @@ ${bonuses}`;
         redraw: !options.forPlayback,
         replay: "step"
       });
-      await showReplayStepDialogs(view2, state.timeline.view, requireDeps().readyDeps());
+      if (options.showDialogs) await showReplayStepDialogs(view2, state.timeline.view, requireDeps().readyDeps());
       shown = true;
     } finally {
       const applied = currentReplay();
@@ -45512,11 +45617,16 @@ ${bonuses}`;
   async function showReplayStep(index) {
     if (currentReplay()?.playing) return;
     const view2 = await loadReplayStep(index);
-    if (view2) await presentReplayStep(index, view2, { forPlayback: false });
+    if (!view2) return;
+    await presentReplayStep(index, view2, { forPlayback: false, showDialogs: true });
+    if (replayLeaving === null) frameReplayStepIfFollowing();
   }
   var ORDERS_TAB_ID2 = "console-tab-orders";
   var ordersTabWasSelected = false;
   var replayLeaving = null;
+  function replayIsLeaving() {
+    return replayLeaving !== null;
+  }
   function leaveReplay() {
     if (replayLeaving !== null) return replayLeaving;
     const leaving = runLeaveReplay().finally(() => {
@@ -45731,6 +45841,7 @@ ${bonuses}`;
       newGameBtn.textContent = "Start game";
       newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
     }
+    closeMatchOptionsDialogIfOpen();
     resetNewGameOptionControls();
     void (async () => {
       await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
@@ -49877,6 +49988,346 @@ ${bonuses}`;
     window.addEventListener("blur", hideUnitOriginTooltip);
   }
 
+  // src/renderer/chrome/gameMenuActions.ts
+  function openChartsDialog() {
+    if (!chartsDialogIsOpen()) toggleChartsDialog();
+  }
+
+  // src/renderer/gameplay/matchOptionsControls.ts
+  var ALWAYS_LOCKED_CONTROL_IDS = ["new-game-human-nickname", "new-game-fog-checkbox", "new-game-auto-start-checkbox"];
+  var EDITABLE_CONTROL_IDS = [
+    "new-game-victory-select",
+    "new-game-ai-only-battles-select",
+    "new-game-sight-cues-checkbox",
+    "new-game-origin-bonus-select",
+    "new-game-tech-bonus-select",
+    "new-game-terrain-bonus-select",
+    "new-game-weather-bonus-select"
+  ];
+  var VICTORY_SELECT_ID = "new-game-victory-select";
+  var TURN_LIMIT_SELECT_ID = "new-game-turn-limit-select";
+  var AI_ONLY_SELECT_ID = "new-game-ai-only-battles-select";
+  var BEAT_LIMIT_SELECT_ID = "new-game-beat-limit-select";
+  var CITY_HEXES_RULE = "most_city_hexes_at_turn_limit";
+  var AUTO_START_MATCH_TOOLTIP = "Use the Commanders Start/Stop button to turn planning on or off during a match.";
+  function popoverControls() {
+    const popover3 = document.getElementById("new-game-options-popover");
+    return popover3 ? Array.from(popover3.querySelectorAll("select, input")) : [];
+  }
+  function selectById(id) {
+    const element = document.getElementById(id);
+    return element instanceof HTMLSelectElement ? element : null;
+  }
+  function inputById(id) {
+    const element = document.getElementById(id);
+    return element instanceof HTMLInputElement ? element : null;
+  }
+  function setSelectValue(id, value) {
+    const select = selectById(id);
+    if (select) select.value = value;
+  }
+  function setChecked(id, checked) {
+    const box = inputById(id);
+    if (box) box.checked = checked;
+  }
+  function captureOptionControls() {
+    return {
+      controls: popoverControls().map((element) => ({
+        element,
+        value: element.value,
+        checked: element instanceof HTMLInputElement ? element.checked : false,
+        disabled: element.disabled,
+        tooltip: element.getAttribute("data-control-tooltip"),
+        disabledOptionValues: element instanceof HTMLSelectElement ? Array.from(element.options).filter((option2) => option2.disabled).map((option2) => option2.value) : []
+      }))
+    };
+  }
+  function restoreOptionControls(memo) {
+    const drivers = /* @__PURE__ */ new Set([VICTORY_SELECT_ID, AI_ONLY_SELECT_ID]);
+    for (const control of memo.controls) {
+      if (drivers.has(control.element.id)) control.element.value = control.value;
+    }
+    renderNewGameVictory();
+    for (const control of memo.controls) {
+      const { element } = control;
+      if (element instanceof HTMLInputElement && element.type === "checkbox") element.checked = control.checked;
+      else element.value = control.value;
+      element.disabled = control.disabled;
+      if (control.tooltip === null) element.removeAttribute("data-control-tooltip");
+      else element.setAttribute("data-control-tooltip", control.tooltip);
+      if (element instanceof HTMLSelectElement) {
+        for (const option2 of Array.from(element.options)) option2.disabled = control.disabledOptionValues.includes(option2.value);
+      }
+    }
+  }
+  function fillOptionControlsFromMatch(live, runButtonOn) {
+    setSelectValue(VICTORY_SELECT_ID, live.victory?.rule ?? DEFAULT_VICTORY_RULE);
+    setSelectValue(AI_ONLY_SELECT_ID, live.aiOnlyBattles ?? "none");
+    renderNewGameVictory();
+    const turnLimit = live.victory?.turnLimit;
+    setSelectValue(TURN_LIMIT_SELECT_ID, turnLimit == null ? "" : String(turnLimit));
+    setSelectValue(BEAT_LIMIT_SELECT_ID, aiOnlyBeatLimitToStored(live.aiOnlyBeatLimit ?? null));
+    setChecked("new-game-sight-cues-checkbox", live.sightCues !== false);
+    setSelectValue("new-game-origin-bonus-select", bonusLevelOf(live.originBonusEnabled, live.originBonusLevel));
+    setSelectValue("new-game-terrain-bonus-select", bonusLevelOf(live.terrainBonusEnabled, live.terrainBonusLevel));
+    setSelectValue("new-game-weather-bonus-select", weatherBonusLevelOf(live));
+    setSelectValue("new-game-tech-bonus-select", techBonusLevelOf(originBonusSettingsFromSnapshot(live)));
+    setChecked("new-game-fog-checkbox", live.fogOfWarEnabled !== false);
+    setChecked("new-game-auto-start-checkbox", runButtonOn);
+    const nickname = inputById("new-game-human-nickname");
+    const human = live.seats?.find((seat) => isHumanSeatId(seat.seatId));
+    if (nickname) nickname.value = human ? sideDisplayName(human) : HUMAN_NICKNAME_DEFAULT;
+  }
+  function lockOptionControls(editable2, currentTurn) {
+    for (const id of ALWAYS_LOCKED_CONTROL_IDS) {
+      const control = inputById(id);
+      if (control) control.disabled = true;
+    }
+    inputById("new-game-auto-start-checkbox")?.setAttribute("data-control-tooltip", AUTO_START_MATCH_TOOLTIP);
+    if (!editable2) {
+      for (const control of popoverControls()) control.disabled = true;
+      return;
+    }
+    for (const id of EDITABLE_CONTROL_IDS) {
+      const control = document.getElementById(id);
+      if (control instanceof HTMLSelectElement || control instanceof HTMLInputElement) control.disabled = false;
+    }
+    const victory = selectById(VICTORY_SELECT_ID);
+    const openLimits = TURN_LIMIT_OPTIONS.filter((turns) => turns >= currentTurn);
+    const cityOption = victory ? Array.from(victory.options).find((option2) => option2.value === CITY_HEXES_RULE) : void 0;
+    if (cityOption) cityOption.disabled = openLimits.length === 0;
+    const limit = selectById(TURN_LIMIT_SELECT_ID);
+    if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, currentTurn);
+    const beatLimit = selectById(BEAT_LIMIT_SELECT_ID);
+    if (beatLimit) beatLimit.disabled = selectById(AI_ONLY_SELECT_ID)?.value === "none";
+  }
+  function lockTurnLimit(limit, cityHexes3, currentTurn) {
+    limit.disabled = !cityHexes3;
+    if (!cityHexes3) return;
+    const options = Array.from(limit.options);
+    for (const option2 of options) option2.disabled = !(Number(option2.value) >= currentTurn);
+    if (limit.selectedOptions[0]?.disabled !== false) {
+      const firstOpen = options.find((option2) => !option2.disabled);
+      if (firstOpen) limit.value = firstOpen.value;
+    }
+  }
+  function readMatchOptionsUpdate() {
+    const { victoryRule, turnLimit } = readNewGameVictory();
+    const { originBonusLevel, techBonusLevel, terrainBonusLevel, weatherBonusLevel } = readNewGameOptionChoices();
+    return {
+      victoryRule,
+      turnLimit: victoryRule === CITY_HEXES_RULE ? turnLimit : null,
+      aiOnlyBattles: readNewGameAiOnlyBattles(),
+      aiOnlyBeatLimit: readNewGameAiOnlyBeatLimit(),
+      sightCues: readNewGameSightCues(),
+      originBonusLevel,
+      techBonusLevel,
+      terrainBonusLevel,
+      weatherBonusLevel
+    };
+  }
+
+  // src/renderer/gameplay/matchOptionsDialog.ts
+  var LIVE_SNAPSHOT_APPLY_OPTIONS = {
+    refreshStandingOrders: true,
+    updateGameStateSidebarUi: true,
+    updateSelectionUi: true,
+    updateGameOverUi: false,
+    updateReadyButton: true,
+    refreshBuildPopup: false,
+    redraw: true
+  };
+  var READ_ONLY_NOTE = "These are the settings in force. They can be changed while you plan a turn on the world map.";
+  var SAVE_FAILED_NOTE = "The settings could not be saved.";
+  var LIMIT_DRIVER_IDS = ["new-game-victory-select", "new-game-ai-only-battles-select"];
+  var dialogDeps = null;
+  var savedControls = null;
+  var editable = false;
+  var liveTurn = 0;
+  var openEpoch2 = 0;
+  var openCounter2 = 0;
+  var pressStartedOnBackdrop2 = false;
+  function part(id) {
+    return document.getElementById(id);
+  }
+  function chartsOverlayShowing() {
+    const overlay = part("charts-overlay");
+    return overlay !== null && !overlay.hidden;
+  }
+  function openIsRefused() {
+    return matchOptionsDialogIsOpen() || newGameOverlayIsOpen() || blockingDialogIsOpen() || chartsOverlayShowing();
+  }
+  function setNote(text) {
+    const note2 = part("match-options-note");
+    if (!note2) return;
+    note2.textContent = text ?? "";
+    note2.hidden = text === null;
+  }
+  function focusableControls(popover3) {
+    return Array.from(popover3.querySelectorAll("button, select, input, [tabindex]")).filter(
+      (element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
+    );
+  }
+  function trapTabKey2(event, popover3) {
+    const focusable = focusableControls(popover3);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+    const active2 = document.activeElement;
+    if (event.shiftKey && (active2 === first || !popover3.contains(active2))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active2 === last || !popover3.contains(active2))) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+  function handleDialogKey(event, popover3) {
+    event.stopPropagation();
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMatchOptionsDialog();
+    } else if (event.key === "Tab") {
+      trapTabKey2(event, popover3);
+    }
+  }
+  function onWindowKeydown(event) {
+    const popover3 = part("new-game-options-popover");
+    if (!popover3 || !matchOptionsDialogIsOpen()) return;
+    if (event.target instanceof Node && popover3.contains(event.target)) return;
+    handleDialogKey(event, popover3);
+  }
+  async function openMatchOptionsDialog() {
+    if (openIsRefused()) return;
+    openCounter2 += 1;
+    const counter = openCounter2;
+    const epoch = currentRendererMatchEpoch();
+    let live;
+    try {
+      live = await fetchMatchSnapshot();
+    } catch (error) {
+      console.error("Game Options could not read the live match", error);
+      return;
+    }
+    const popover3 = part("new-game-options-popover");
+    if (!popover3 || counter !== openCounter2 || !rendererMatchEpochCurrent(epoch) || openIsRefused() || live.hexes.length === 0) return;
+    openEpoch2 = epoch;
+    savedControls = captureOptionControls();
+    fillOptionControlsFromMatch(live, rendererSharedState.runButtonOn);
+    editable = !replayActive() && live.phase === "planning" && !rendererSharedState.tacticalBattleSnapshot && !rendererSharedState.readyRequestInFlight && !live.gameOver;
+    liveTurn = live.turnNumber;
+    lockOptionControls(editable, liveTurn);
+    setNote(editable ? null : READ_ONLY_NOTE);
+    const apply = part("match-options-apply");
+    if (apply instanceof HTMLButtonElement) {
+      apply.hidden = !editable;
+      apply.disabled = false;
+    }
+    const cancel = part("match-options-cancel");
+    if (cancel) cancel.textContent = editable ? "Cancel" : "Close";
+    popover3.dataset.mode = "match";
+    popover3.setAttribute("aria-modal", "true");
+    for (const side of ["left", "top", "right", "bottom"]) popover3.style.removeProperty(side);
+    for (const id of ["match-options-backdrop", "match-options-footer"]) {
+      const element = part(id);
+      if (element) element.hidden = false;
+    }
+    popover3.hidden = false;
+    window.addEventListener("keydown", onWindowKeydown, true);
+    const firstControl = focusableControls(popover3).find((element) => element.matches("select, input"));
+    (firstControl ?? cancel)?.focus();
+  }
+  function closeMatchOptionsDialog() {
+    const popover3 = part("new-game-options-popover");
+    if (!popover3 || popover3.dataset.mode !== "match") return;
+    openCounter2 += 1;
+    window.removeEventListener("keydown", onWindowKeydown, true);
+    if (savedControls) restoreOptionControls(savedControls);
+    savedControls = null;
+    editable = false;
+    delete popover3.dataset.mode;
+    popover3.removeAttribute("aria-modal");
+    for (const id of ["match-options-backdrop", "match-options-footer"]) {
+      const element = part(id);
+      if (element) element.hidden = true;
+    }
+    setNote(null);
+    popover3.hidden = true;
+    part("topbar-settings-btn")?.focus();
+    void maybeObserveAutoAdvance();
+  }
+  async function applyMatchOptions() {
+    if (!matchOptionsDialogIsOpen() || !editable) return;
+    if (!rendererMatchEpochCurrent(openEpoch2)) {
+      closeMatchOptionsDialog();
+      return;
+    }
+    const apply = part("match-options-apply");
+    if (apply instanceof HTMLButtonElement) apply.disabled = true;
+    const counter = openCounter2;
+    const showFailure = (reason) => {
+      if (counter !== openCounter2) return;
+      setNote(reason);
+      if (apply instanceof HTMLButtonElement) apply.disabled = false;
+    };
+    try {
+      const api = window.gameApi;
+      if (!api?.setMatchOptions) throw new Error("setMatchOptions is unavailable");
+      const result = await api.setMatchOptions(readMatchOptionsUpdate());
+      if (!result.ok) {
+        showFailure(result.reason);
+        return;
+      }
+    } catch (error) {
+      console.error("Game Options could not be applied", error);
+      showFailure(SAVE_FAILED_NOTE);
+      return;
+    }
+    try {
+      const live = await fetchMatchSnapshot();
+      if (counter === openCounter2 && rendererMatchEpochCurrent(openEpoch2)) await dialogDeps?.applySnapshot(live, LIVE_SNAPSHOT_APPLY_OPTIONS);
+    } catch (error) {
+      console.error("Game Options could not show the new settings", error);
+    }
+    if (counter === openCounter2) closeMatchOptionsDialog();
+  }
+  function wireMatchOptionsDialog(deps) {
+    dialogDeps = deps;
+    registerMatchOptionsDialogCloser(closeMatchOptionsDialog);
+    part("topbar-settings-btn")?.addEventListener("click", () => {
+      void openMatchOptionsDialog();
+    });
+    part("match-options-apply")?.addEventListener("click", () => {
+      void applyMatchOptions();
+    });
+    part("match-options-cancel")?.addEventListener("click", closeMatchOptionsDialog);
+    const popover3 = part("new-game-options-popover");
+    popover3?.querySelector(".commander-popover-close")?.addEventListener("click", () => {
+      if (matchOptionsDialogIsOpen()) closeMatchOptionsDialog();
+    });
+    popover3?.addEventListener("keydown", (event) => {
+      if (matchOptionsDialogIsOpen()) handleDialogKey(event, popover3);
+    });
+    popover3?.addEventListener("change", (event) => {
+      if (!matchOptionsDialogIsOpen() || !editable) return;
+      if (event.target instanceof HTMLElement && LIMIT_DRIVER_IDS.includes(event.target.id)) lockOptionControls(true, liveTurn);
+    });
+    const backdrop = part("match-options-backdrop");
+    if (!backdrop) return;
+    backdrop.addEventListener("pointerdown", (event) => {
+      pressStartedOnBackdrop2 = event.target === backdrop;
+    });
+    backdrop.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const fromBackdrop = pressStartedOnBackdrop2;
+      pressStartedOnBackdrop2 = false;
+      if (event.target === backdrop && fromBackdrop) closeMatchOptionsDialog();
+    });
+    for (const type of ["pointerdown", "mousedown", "dblclick", "wheel"]) {
+      backdrop.addEventListener(type, (event) => event.stopPropagation());
+    }
+  }
+
   // src/renderer/gameplay/formatTargetingValidationReason.ts
   function formatTargetingValidationReason2(reason, fallbackMessage, resolveUnitDisplayName) {
     const trimmed = reason?.trim();
@@ -51347,6 +51798,74 @@ ${bonuses}`;
     });
   }
 
+  // src/shared/replaySliderPreview.ts
+  var REPLAY_SLIDER_PREVIEW_INTERVAL_MS = 250;
+  function createSliderPreviewScheduler(options) {
+    const { intervalMs, show, now, setTimer, clearTimer } = options;
+    let pending3 = null;
+    let lastShown = null;
+    let lastStartAt = null;
+    let running = null;
+    let timer = null;
+    let generation = 0;
+    const stopTimer = () => {
+      if (timer !== null) clearTimer(timer);
+      timer = null;
+    };
+    const forget = () => {
+      stopTimer();
+      pending3 = null;
+      lastShown = null;
+      lastStartAt = null;
+      generation += 1;
+    };
+    const start = () => {
+      const index = pending3;
+      pending3 = null;
+      if (index === null || index === lastShown) return;
+      lastShown = index;
+      lastStartAt = now();
+      const run = (async () => {
+        try {
+          await show(index);
+        } catch {
+        }
+      })();
+      running = run;
+      void run.then(() => {
+        if (running === run) running = null;
+        schedule();
+      });
+    };
+    const schedule = () => {
+      if (pending3 === null || running !== null || timer !== null) return;
+      const wait = lastStartAt === null ? 0 : lastStartAt + intervalMs - now();
+      if (wait <= 0) {
+        start();
+        return;
+      }
+      const scheduledIn = generation;
+      timer = setTimer(() => {
+        timer = null;
+        if (scheduledIn === generation) schedule();
+      }, wait);
+    };
+    return {
+      request(index) {
+        if (index === (pending3 ?? lastShown)) return;
+        pending3 = index;
+        schedule();
+      },
+      async settle() {
+        forget();
+        while (running !== null) await running;
+      },
+      cancel() {
+        forget();
+      }
+    };
+  }
+
   // src/renderer/replay/replayPlayback.ts
   function positionOf(state) {
     return { stepCount: state.timeline.steps.length, index: state.index, busy: state.busy, playing: state.playing };
@@ -51389,8 +51908,11 @@ ${bonuses}`;
   async function playReplayStep(index, view2, continues) {
     const animation = view2.ref.scope === "tactical" ? tacticalAnimationFor(view2) : strategicAnimationFor(view2);
     if (animation) rendererSharedState.resolutionMoveAnimation = animation;
-    await presentReplayStep(index, view2, { forPlayback: animation !== null });
-    if (!animation) return;
+    await presentReplayStep(index, view2, { forPlayback: animation !== null, showDialogs: true });
+    if (!animation) {
+      frameReplayStepIfFollowing();
+      return;
+    }
     if (!continues() || rendererSharedState.resolutionMoveAnimation !== animation) {
       if (rendererSharedState.resolutionMoveAnimation === animation) clearResolutionPlaybackAnimationState();
       return;
@@ -51398,6 +51920,7 @@ ${bonuses}`;
     const finished = waitForNextResolutionPlaybackFinished();
     startResolutionAnimationFrames(replayReadyDeps().tickResolutionMoveAnimation);
     await finished;
+    frameReplayStepIfFollowing();
   }
   async function startReplayPlayback() {
     const start = currentReplay();
@@ -51432,6 +51955,32 @@ ${bonuses}`;
     if (state?.playing) setReplay({ ...state, stopRequested: true });
   }
 
+  // src/renderer/replay/replayStepPreview.ts
+  function sliderMayShowStep() {
+    return replayActive() && currentReplay()?.playing !== true && !replayIsLeaving();
+  }
+  async function previewReplayStep(index) {
+    if (!sliderMayShowStep()) return;
+    try {
+      const view2 = await loadReplayStep(index);
+      if (!view2 || !sliderMayShowStep()) return;
+      await presentReplayStep(index, view2, { forPlayback: false, showDialogs: false });
+      frameReplayStepIfFollowing();
+    } catch (error) {
+      console.error("replay slider preview failed", error);
+    }
+  }
+  async function showReleasedReplayStep(index, settle3) {
+    await settle3();
+    await waitForStepToSettle();
+    if (!sliderMayShowStep()) return;
+    try {
+      await showReplayStep(index);
+    } catch (error) {
+      console.error("replay slider release could not show the step", error);
+    }
+  }
+
   // src/renderer/replay/replayPanel.ts
   var SHOW_SEEK_LABEL = "Show the turn slider";
   var HIDE_SEEK_LABEL = "Hide the turn slider";
@@ -51447,6 +51996,12 @@ ${bonuses}`;
   var BEAT_NOUN = "Beat";
   var expanded4 = false;
   var slide4 = null;
+  var sliderDragging = false;
+  var pendingSliderReleases = 0;
+  function sliderThumbPinned() {
+    return sliderDragging || pendingSliderReleases > 0;
+  }
+  var sliderPreview = null;
   function byId(id) {
     return document.getElementById(id);
   }
@@ -51509,6 +52064,7 @@ ${bonuses}`;
       return;
     }
     panel.removeAttribute("hidden");
+    byId("replay-follow-units")?.setAttribute("aria-pressed", String(rendererSharedState.replayFollowUnits));
     const label = byId("replay-panel-label");
     if (label) label.textContent = replayLabel(state.timeline.steps, state.index, state.timeline.scope);
     const unit = state.timeline.scope === "tactical" ? BEAT_NOUN : TURN_NOUN;
@@ -51516,12 +52072,12 @@ ${bonuses}`;
     if (slider) {
       slider.setAttribute("aria-label", unit);
       slider.max = String(Math.max(0, position.stepCount - 1));
-      slider.value = String(state.index);
+      if (!sliderThumbPinned()) slider.value = String(state.index);
       slider.disabled = !canSeek(position);
     }
     const field = byId("replay-turn-input");
     field?.setAttribute("aria-label", unit);
-    if (field && document.activeElement !== field) {
+    if (field && document.activeElement !== field && !sliderThumbPinned()) {
       field.value = shownNumberText(state);
       field.removeAttribute("aria-invalid");
     }
@@ -51576,7 +52132,27 @@ ${bonuses}`;
     });
     field.addEventListener("blur", () => commitTurnField(field));
   }
+  function endSliderDrag() {
+    if (!sliderDragging) return;
+    sliderDragging = false;
+    renderReplayPanel();
+  }
   function wireSlider(slider) {
+    const scheduler = createSliderPreviewScheduler({
+      intervalMs: REPLAY_SLIDER_PREVIEW_INTERVAL_MS,
+      show: previewReplayStep,
+      now: () => performance.now(),
+      setTimer: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimer: (handle) => window.clearTimeout(handle)
+    });
+    sliderPreview = scheduler;
+    slider.addEventListener("pointerdown", () => {
+      sliderDragging = true;
+    });
+    slider.addEventListener("pointercancel", endSliderDrag);
+    window.addEventListener("pointerup", () => {
+      if (sliderDragging) window.setTimeout(endSliderDrag, 0);
+    });
     slider.addEventListener("input", () => {
       const state = currentReplay();
       const step = state?.timeline.steps[Number(slider.value)];
@@ -51585,16 +52161,23 @@ ${bonuses}`;
       if (turn === void 0 || !field) return;
       field.value = String(turn);
       field.removeAttribute("aria-invalid");
+      scheduler.request(Number(slider.value));
     });
     slider.addEventListener("change", () => {
-      if (currentReplay()?.busy) {
-        renderReplayPanel();
-        return;
-      }
-      void showReplayStep(Number(slider.value)).then(() => {
-        renderReplayPanel();
+      sliderDragging = false;
+      pendingSliderReleases += 1;
+      void showReleasedReplayStep(Number(slider.value), () => scheduler.settle()).catch((error) => {
+        console.error("replay slider release failed", error);
+      }).finally(() => {
+        pendingSliderReleases -= 1;
+        if (pendingSliderReleases === 0) renderReplayPanel();
       });
     });
+  }
+  function forgetSliderWhenReplayEnds() {
+    if (currentReplay() !== null) return;
+    sliderPreview?.cancel();
+    sliderDragging = false;
   }
   function wireReplayPanel() {
     const panel = byId("replay-panel");
@@ -51606,6 +52189,10 @@ ${bonuses}`;
     settlePanel(panel);
     syncExpandControl3(button);
     button.addEventListener("click", () => toggleExpanded(panel, bar, button));
+    byId("replay-follow-units")?.addEventListener("click", () => {
+      setReplayFollowUnits(!rendererSharedState.replayFollowUnits);
+      renderReplayPanel();
+    });
     byId("replay-step-back")?.addEventListener("click", () => {
       const state = currentReplay();
       if (state) void showReplayStep(state.index - 1);
@@ -51620,6 +52207,7 @@ ${bonuses}`;
     });
     wireTurnField(field);
     wireSlider(slider);
+    onReplayChange(forgetSliderWhenReplayEnds);
     onReplayChange(renderReplayPanel);
   }
 
@@ -51945,7 +52533,10 @@ ${bonuses}`;
       redrawMap: redraw,
       redrawSelectionPanel: renderSelectionPanel
     });
-    wireGameMenu();
+    wireGameMenu({ openReplay: () => {
+      void openReplay();
+    }, openCharts: openChartsDialog });
+    wireMatchOptionsDialog({ applySnapshot: applyGameStateSnapshot2 });
     wireChartsDialog();
     wireReplayPanel();
     wireSaveLoadMenu();

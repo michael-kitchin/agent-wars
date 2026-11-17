@@ -476,7 +476,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 ## Charts
 
-Press **C** during a match, or at game over, to open the charts, or choose **Metrics…** in the game menu. Press **C** again, press Escape, or click outside the dialog to close it. The key does nothing while you type in a field, and the charts do not open over a dialog that needs your choice.
+Press **C** during a match, or at game over, to open the charts, or check **Charts…** in the game menu (uncheck it to close them). Each chart opens on its newest 12 turns, with the points filling in from the left edge and blank space on the right until turn 12. Press **C** again, press Escape, or click outside the dialog to close it. The key does nothing while you type in a field, and the charts do not open over a dialog that needs your choice.
 
 The charts show every side and every turn, whatever fog of war is set to, so you can see credits and units you could not see on the map. No AI commander is shown them.
 
@@ -488,7 +488,7 @@ Hover a chart for each side's value at that turn and their total. Scroll over a 
 
 ## Replay
 
-Press **P** during a match, or choose **Playback…** in the game menu, to look back at the turns already played. A panel opens at the map's bottom-left with a label such as "Replay · Turn 3 of 7", Step back and Step forward buttons, and a Play button. The arrow at its left shows a slider and a turn field, so you can jump to a turn. While you drag the slider, the map follows the turn under it, and that turn's messages open when you let go. Press **P** again or Escape to return to the present.
+Press **P** during a match, or check **Playback…** in the game menu (uncheck it to return), to look back at the turns already played. A panel opens at the map's bottom-left with a label such as "Replay · Turn 3 of 7", Step back and Step forward buttons, and a Play button. The arrow at its left shows a slider and a turn field, so you can jump to a turn. While you drag the slider, the map follows the turn under it, and that turn's messages open when you let go. Press **P** again or Escape to return to the present.
 
 The magnifying glass beside the arrow turns on follow units: the map then fits the units on screen at every turn replay shows, until you click it again. It stays as you left it until you close the app.
 

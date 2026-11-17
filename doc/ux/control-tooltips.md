@@ -68,8 +68,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Settings, in the top bar: Show the game options for this match. Some can be changed while you plan a turn.
 - Auto-start AI, in the in-match Game Options dialog: Use the Commanders Start/Stop button to turn planning on or off during a match (`AUTO_START_MATCH_TOOLTIP` in `src/renderer/gameplay/matchOptionsControls.ts`). Closing the dialog puts the new-game sentence back.
 - How to play, in the game menu: Open the How to play guide on GitHub in your web browser.
-- Playback…, in the game menu: Step through the turns already played. Same as the P key.
-- Metrics…, in the game menu: Open the match charts. Same as the C key.
+- Playback…, in the game menu: Check to step through the turns already played. Uncheck to return to the live match. Same as the P key.
+- Charts…, in the game menu: Check to show the match charts. Uncheck to hide them. Same as the C key.
 - Charts close control: Close the charts. You can also press C or Escape.
 - Built units and Mercenary units dropdowns, on the charts dialog: Show the total or one unit type for built units, or for mercenary units.
 - How they see dropdown, on the charts dialog: Choose the side whose standing with each commander the strip shows.

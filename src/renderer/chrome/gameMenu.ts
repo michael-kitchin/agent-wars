@@ -1,6 +1,6 @@
 /**
- * The game menu under the top bar's menu button: New game, Save and Load, Playback and Metrics, Offer tactical battles,
- * How to play, and Quit.
+ * The game menu under the top bar's menu button: New game, Save and Load, the Playback and Charts checkboxes, Offer
+ * tactical battles, How to play, and Quit.
  *
  * The menu is a disclosure popup. The button's `aria-expanded` and the menu's `hidden` attribute always agree.
  * New game and Offer tactical battles keep their own handlers in `openRouterControls.ts`; this module opens and
@@ -8,7 +8,7 @@
  * and Quit.
  */
 import { rendererSharedState as S } from '../core/state';
-import { requestReplayLeave } from '../replay/replayState';
+import { replayActive, requestReplayLeave } from '../replay/replayState';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { syncSaveLoadItems } from '../gameplay/saveLoadMenu';
 import { dismissStaleControlTooltip } from './controlTooltip';
@@ -45,6 +45,27 @@ const GAME_MENU_BUTTON_ID = 'game-menu-btn';
 const NEW_GAME_ITEM_ID = 'openrouter-new-btn';
 
 /**
+ * Ids of the menu's buttons that run while replay stays on.
+ *
+ * Purpose: Every other button changes or saves the live match, so it first takes the player out of replay. These two
+ *   do not touch the match.
+ * When to use: The capture listener that leaves replay before a menu button runs.
+ * Expected outcome: How to play and Quit.
+ * Exceptions: None.
+ */
+const REPLAY_SAFE_BUTTON_IDS: ReadonlySet<string> = new Set(['game-menu-how-to-play-btn', 'game-menu-quit-btn']);
+
+/**
+ * The actions behind the menu, kept for `syncGameMenuViewItems`.
+ *
+ * Purpose: The menu opens outside `wireGameMenu`, so the checkbox states need the actions it was given.
+ * When to use: `wireGameMenu` sets it. `syncGameMenuViewItems` reads it.
+ * Expected outcome: Null until the menu is wired.
+ * Exceptions: None.
+ */
+let menuActions: GameMenuActions | null = null;
+
+/**
  * Reports whether the game menu is open.
  *
  * Purpose: Key and pointer handlers act only while the menu shows.
@@ -78,21 +99,38 @@ export function syncGameMenuNewGameItem(): void {
 }
 
 /**
+ * Checks or unchecks the Playback… and Charts… items to match what is showing.
+ *
+ * Purpose: Each item is a checkbox that says whether its surface is visible.
+ * When to use: When the menu opens.
+ * Expected outcome: Playback… is checked while replay is on, and Charts… while the charts dialog is open. Nothing
+ *   changes before `wireGameMenu` has run.
+ * Exceptions: None; does nothing when an item is missing.
+ */
+export function syncGameMenuViewItems(): void {
+  if (menuActions === null) return;
+  const playback = document.getElementById('game-menu-playback-check');
+  const charts = document.getElementById('game-menu-charts-check');
+  if (playback instanceof HTMLInputElement) playback.checked = menuActions.replayIsOpen();
+  if (charts instanceof HTMLInputElement) charts.checked = menuActions.chartsIsOpen();
+}
+
+/**
  * Opens the game menu.
  *
  * Purpose: Shows the menu under its button.
  * When to use: From the menu button's click handler.
- * Expected outcome: The menu shows with New game enabled or disabled for the current screen, and the button reports
- *   `aria-expanded="true"`.
+ * Expected outcome: The menu shows with New game enabled or disabled for the current screen, the Playback… and Charts…
+ *   checkboxes matching what is showing, and the button reporting `aria-expanded="true"`. Replay stays on.
  * Exceptions: None; does nothing when the markup is missing.
  */
 export function openGameMenu(): void {
   const menu = document.getElementById(GAME_MENU_ID);
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
-  void requestReplayLeave();
   syncGameMenuNewGameItem();
   syncSaveLoadItems();
+  syncGameMenuViewItems();
   menu.hidden = false;
   button.setAttribute('aria-expanded', 'true');
 }
@@ -118,11 +156,11 @@ export function closeGameMenu(options: { readonly restoreFocus?: boolean } = {})
 }
 
 /**
- * The actions the menu's Playback… and Metrics… items run.
+ * The actions behind the menu's Playback… and Charts… checkboxes.
  *
  * Purpose: The menu cannot import replay or the charts dialog without an import cycle, so `renderer.ts` passes them in.
  * When to use: The argument of `wireGameMenu`.
- * Expected outcome: Each action opens its surface and never closes it.
+ * Expected outcome: Checking an item opens its surface, unchecking closes it, and the state readers say which is showing.
  * Exceptions: None.
  */
 export interface GameMenuActions {
@@ -130,20 +168,56 @@ export interface GameMenuActions {
    * Enters replay, after any leave that is running.
    *
    * Contract: Does nothing when replay is already on. A refusal shows its own sentence.
-   * When to use: When the player clicks Playback….
+   * When to use: When the player checks Playback….
    * Expected outcome: Replay opens on the newest recorded step, or stays off with a sentence.
    * Exceptions: None.
    */
   readonly openReplay: () => void;
   /**
+   * Leaves replay.
+   *
+   * Contract: Does nothing when replay is off.
+   * When to use: When the player unchecks Playback….
+   * Expected outcome: The live match shows again.
+   * Exceptions: None.
+   */
+  readonly closeReplay: () => void;
+  /**
+   * Reports whether replay is on.
+   *
+   * Contract: Reads current state and changes nothing.
+   * When to use: When the menu opens.
+   * Expected outcome: True while replay is on.
+   * Exceptions: None.
+   */
+  readonly replayIsOpen: () => boolean;
+  /**
    * Opens the charts dialog when it is closed.
    *
-   * Contract: Never closes the dialog. Refuses as the charts key does.
-   * When to use: When the player clicks Metrics….
+   * Contract: Refuses as the charts key does.
+   * When to use: When the player checks Charts….
    * Expected outcome: The charts dialog shows.
    * Exceptions: None.
    */
   readonly openCharts: () => void;
+  /**
+   * Closes the charts dialog when it is open.
+   *
+   * Contract: Does nothing when the dialog is closed.
+   * When to use: When the player unchecks Charts….
+   * Expected outcome: The charts dialog hides.
+   * Exceptions: None.
+   */
+  readonly closeCharts: () => void;
+  /**
+   * Reports whether the charts dialog is open.
+   *
+   * Contract: Reads current state and changes nothing.
+   * When to use: When the menu opens.
+   * Expected outcome: True while the dialog shows.
+   * Exceptions: None.
+   */
+  readonly chartsIsOpen: () => boolean;
 }
 
 /**
@@ -154,16 +228,19 @@ export interface GameMenuActions {
  * Expected outcome: The button toggles the menu. It does not open while the top bar ignores the pointer. An enabled
  *   menu button closes it after its own handler runs; the checkbox leaves it open. Escape closes it first, before
  *   the map's Escape handling, and returns focus to the button. A press outside the menu and its button closes it.
- *   Playback… and Metrics… run `actions`, which open replay and the charts. How to play asks main to open the guide
- *   on GitHub in the system browser. Quit closes the window.
+ *   Checking or unchecking Playback… or Charts… closes the menu first, so the charts are not blocked by it, and then
+ *   runs `actions` to open or close replay or the charts. A button that changes or saves the match takes the player out
+ *   of replay before it runs. How to play asks main to open the guide on GitHub in the system browser. Quit closes the
+ *   window.
  * Exceptions: None; does nothing when the markup is missing.
  *
- * @param actions The replay and charts openers, injected so this module imports neither.
+ * @param actions The replay and charts actions, injected so this module imports neither.
  */
 export function wireGameMenu(actions: GameMenuActions): void {
   const menu = document.getElementById(GAME_MENU_ID);
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
+  menuActions = actions;
 
   button.addEventListener('click', () => {
     const topbar = document.getElementById('app-topbar');
@@ -172,6 +249,29 @@ export function wireGameMenu(actions: GameMenuActions): void {
     else openGameMenu();
   });
 
+  // Replay no longer ends when the menu opens, so a button that changes or saves the match leaves it first. The click
+  // is held, replay leaves, and the same button is clicked again. The second click skips this listener.
+  let replayingClick = false;
+  menu.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const item = target?.closest('button');
+      if (replayingClick || !item || item.disabled || REPLAY_SAFE_BUTTON_IDS.has(item.id) || !replayActive()) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      void requestReplayLeave().then(() => {
+        replayingClick = true;
+        try {
+          item.click();
+        } finally {
+          replayingClick = false;
+        }
+      });
+    },
+    true
+  );
+
   // A disabled button gets no clicks, so a click that reaches the menu from a button came from an enabled item. That
   // item's own handler has already run and may have disabled it: New game does, by opening the new-game screen.
   menu.addEventListener('click', (event) => {
@@ -179,13 +279,18 @@ export function wireGameMenu(actions: GameMenuActions): void {
     if (target?.closest('button')) closeGameMenu();
   });
 
-  document.getElementById('game-menu-playback-btn')?.addEventListener('click', () => {
-    actions.openReplay();
-  });
-
-  document.getElementById('game-menu-metrics-btn')?.addEventListener('click', () => {
-    actions.openCharts();
-  });
+  // The menu closes before the action runs: an open menu blocks the charts dialog, and replay opens over the map.
+  const wireViewCheckbox = (id: string, open: () => void, close: () => void): void => {
+    document.getElementById(id)?.addEventListener('change', (event) => {
+      const box = event.target instanceof HTMLInputElement ? event.target : null;
+      if (box === null) return;
+      closeGameMenu();
+      if (box.checked) open();
+      else close();
+    });
+  };
+  wireViewCheckbox('game-menu-playback-check', actions.openReplay, actions.closeReplay);
+  wireViewCheckbox('game-menu-charts-check', actions.openCharts, actions.closeCharts);
 
   document.getElementById('game-menu-how-to-play-btn')?.addEventListener('click', () => {
     void window.gameApi?.openHowToPlay();

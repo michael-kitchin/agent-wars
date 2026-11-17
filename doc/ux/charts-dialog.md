@@ -12,7 +12,7 @@ The charts key (C) opens the dialog while a match is loaded, in Strategic planni
 
 The dialog does not open while another dialog is showing that needs the player's choice: the tactical battles list, the melee intercept list, "You're out", the start and load confirmations, the annihilation dialog, the Game Options popover, the game menu, or a commander popover (`blockingDialogIsOpen` in `src/renderer/chrome/blockingDialogGuards.ts`). The new-game screen is not on that list, because it shows the standings at game over.
 
-The game menu's Metrics… item opens the dialog under the same conditions as the C key. It never closes an open dialog (`openChartsDialog`).
+The game menu's Charts… checkbox opens the dialog under the same conditions as the C key, and closes it when unchecked (`openChartsDialog`, `closeChartsDialogIfOpen`). It is checked while the dialog is open.
 
 A match that began in an earlier build has no recorded turns before the turn it was loaded on. Until a turn is played, the dialog shows "No turns have been recorded yet." A failed read when the dialog opens shows "The charts could not be loaded." A database error in the main process is a failed read: `buildMatchChartsSnapshot` throws and the channel rejects, rather than returning an empty snapshot. A failed read while charts are already showing leaves them as they were.
 
@@ -59,10 +59,11 @@ Hovering a turn shows "Turn {n}" and one line per commander: "{name}: {stance} (
 
 - Clicking the close control, or the backdrop outside the dialog, closes the dialog. A backdrop click closes it only when the press also started on the backdrop, so a text selection dragged out of the dialog leaves it open.
 - Hovering a line chart shows a tooltip: "Turn {n}", one line per side with a color swatch and that side's value at the nearest turn, "no data" for a gap, and a "Total" over the values that exist. Model cost prints two decimals. Every other chart prints whole numbers.
-- The wheel over a line chart or the strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than three turns (`MIN_ZOOM_SPAN_TURNS` in `src/renderer/charts/chartZoom.ts` is the last turn shown minus the first). Scrolling down zooms out, to every turn. Each wheel step scales the span by `WHEEL_ZOOM_IN_FACTOR` or its reciprocal. The strip always shows whole turns, so its cells fill its width and its turn labels stay under their cells after a zoom or a pan (`wholeTurnRange`). The wheel does not scroll the dialog while the pointer is over one of them.
+- The wheel over a line chart or the strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than three turns (`MIN_ZOOM_SPAN_TURNS` in `src/renderer/charts/chartZoom.ts` is the last turn shown minus the first). Scrolling down zooms out, to every recorded turn, or to the 12-turn opening window when fewer than 12 turns are recorded. Each wheel step scales the span by `WHEEL_ZOOM_IN_FACTOR` or its reciprocal. The strip always shows whole turns, so its cells fill its width and its turn labels stay under their cells after a zoom or a pan (`wholeTurnRange`). The wheel does not scroll the dialog while the pointer is over one of them.
 - Dragging a zoomed line chart or the strip left or right pans it. Dragging does not select a region.
-- A double-click on a line chart or the strip shows every turn again.
+- A double-click on a line chart or the strip zooms all the way out: every recorded turn, or the 12-turn opening window when fewer than 12 turns are recorded.
 - Changing a dropdown redraws that chart, or the strip, and keeps its zoom.
+- Every chart with turns on its X axis (the nine line charts and the stance strip) opens on a window of 12 turns (`INITIAL_VISIBLE_TURNS` and `initialTurnWindow` in `src/shared/chartTurnWindow.ts`), and every time the dialog opens it starts from that window again, whatever the player did before. Points fill in from the left edge, the first recorded turn. With fewer than 12 turns, blank space stays to the right of the last point, and it shrinks as turns arrive, until turn 12 fills the axis. With more than 12 turns, the window ends on the newest turn. While the player has not zoomed or panned, a refresh keeps following that window. A tooltip appears only over a recorded turn, not over the blank space.
 - A click, wheel, or drag on the dialog or its backdrop never reaches the map.
 
 ### Keyboard
@@ -115,7 +116,7 @@ None.
 - `static/index.html` (`#charts-overlay`, `#charts-dialog`, `#charts-dialog-close`, `#charts-dialog-body`)
 - `static/chartsChrome.css`
 - `src/renderer/charts/chartsDialog.ts` (`wireChartsDialog`, `toggleChartsDialog`, `refreshChartsDialogIfOpen`, `closeChartsDialogIfOpen`)
-- `src/renderer/chrome/gameMenuActions.ts` (`openChartsDialog`, the game menu's Metrics… item)
+- `src/renderer/chrome/gameMenuActions.ts` (`openChartsDialog`, the game menu's Charts… checkbox)
 - `src/renderer/charts/lineChart.ts`
 - `src/renderer/charts/relationshipStack.ts`
 - `src/renderer/charts/relationshipTimeline.ts`
@@ -123,5 +124,6 @@ None.
 - `src/renderer/chrome/blockingDialogGuards.ts`
 - `src/renderer/map/initCore.ts` (the window `keydown` handler)
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/shared/chartTurnWindow.ts` (`INITIAL_VISIBLE_TURNS`, `initialTurnWindow`, `zoomExtentTurnRange`)
 - `src/shared/matchChartSeries.ts` (`relationshipSubjectSeatIds`, `relationshipRows`, `relationshipStrip`)
 - `src/shared/chartsDialogState.ts`

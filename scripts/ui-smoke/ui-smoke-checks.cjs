@@ -240,14 +240,14 @@ const FRAME_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'game-menu-playback-metrics-and-how-to-play',
+    name: 'game-menu-playback-charts-and-how-to-play',
     scenes: [SCENES.gameMenuOpen],
-    needs: ['#game-menu-playback-btn', '#game-menu-metrics-btn', '#game-menu-playback-btn kbd', '#game-menu-metrics-btn kbd', '#game-menu-how-to-play-btn'],
+    needs: ['#game-menu-playback-check', '#game-menu-charts-check', '#game-menu-playback-item kbd', '#game-menu-charts-item kbd', '#game-menu-how-to-play-btn'],
     run: (p, el) => {
-      const items = [['#game-menu-playback-btn', 'Playback…', 'P'], ['#game-menu-metrics-btn', 'Metrics…', 'C']];
-      for (const [selector, name, key] of items) {
+      const items = [['#game-menu-playback-check', '#game-menu-playback-item', 'Playback…', 'P'], ['#game-menu-charts-check', '#game-menu-charts-item', 'Charts…', 'C']];
+      for (const [selector, row, name, key] of items) {
         if (!el(selector).shown || el(selector).disabled) return `${name} is not shown and enabled`;
-        if (el(`${selector} kbd`).text !== key) return `${name} shows the key "${el(`${selector} kbd`).text}", expected "${key}"`;
+        if (el(`${row} kbd`).text !== key) return `${name} shows the key "${el(`${row} kbd`).text}", expected "${key}"`;
       }
       return el('#game-menu-how-to-play-btn').disabled ? 'How to play is disabled' : null;
     },

@@ -3,10 +3,11 @@
  *
  * Purpose: Shows how each commander's stance toward one side changed over the match, and which turns carry a stance forward from an earlier report.
  * When to use: The charts dialog builds one strip with a subject selector.
- * Expected outcome: A canvas with DOM labels beside it. Wheel zooms, drag pans, double-click resets, and a tooltip names the stance per reporter.
+ * Expected outcome: A canvas with DOM labels beside it. It opens on a window of at most 12 turns (`initialTurnWindow`). Wheel zooms, drag pans, double-click zooms all the way out, and a tooltip names the stance per reporter.
  * Exceptions: None.
  */
 
+import { initialTurnWindow, sameTurnRange, zoomExtentTurnRange } from '../../shared/chartTurnWindow';
 import {
   pannedTurnRange,
   zoomedTurnRange,
@@ -210,25 +211,34 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
   args.host.append(labels, canvas, empty, tooltip);
 
   /**
-   * Gives the full turn range of the strip.
+   * Gives the widest turn range of the strip.
    *
-   * Purpose: Zoom and pan stay inside it.
-   * When to use: Each wheel step, drag step, and draw.
-   * Expected outcome: The first and last turn, or null with no turns.
+   * Purpose: Zoom and pan stay inside it. A strip shorter than the opening window keeps that window's blank space on the right.
+   * When to use: Each wheel step, drag step, and double-click.
+   * Expected outcome: The first turn through the last, widened to the opening window for a short strip.
    * Exceptions: None.
    */
-  const fullRange = (): TurnRange | null =>
-    strip.turns.length === 0 ? null : { min: strip.turns[0], max: strip.turns[strip.turns.length - 1] };
+  const fullRange = (): TurnRange => zoomExtentTurnRange(strip.turns);
 
   /**
-   * Gives the visible range, or the full range when not zoomed.
+   * Gives the window the strip opens on and follows until the player zooms or pans.
+   *
+   * Purpose: At most 12 turns show. A short strip fills in from the left edge, and a long one shows its newest turns.
+   * When to use: `visibleRange`, `showRange`, and `update`.
+   * Expected outcome: The opening window for the current turns.
+   * Exceptions: None.
+   */
+  const openingRange = (): TurnRange => initialTurnWindow(strip.turns);
+
+  /**
+   * Gives the visible range, or the opening window when the player has not zoomed or panned.
    *
    * Purpose: Drawing, zoom, and pan start from what is shown.
    * When to use: Everywhere the strip reads its range.
-   * Expected outcome: A range, or null with no turns.
+   * Expected outcome: A range.
    * Exceptions: None.
    */
-  const visibleRange = (): TurnRange | null => view ?? fullRange();
+  const visibleRange = (): TurnRange => view ?? openingRange();
 
   /**
    * Chooses the row height that fits the available height.
@@ -293,7 +303,7 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
     canvas.style.width = `${plotWidth()}px`;
     canvas.style.height = `${height}px`;
     const context = canvas.getContext('2d');
-    if (context === null || range === null) return;
+    if (context === null) return;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     const turnCount = range.max - range.min + 1;
     const cellWidth = plotWidth() / turnCount;
@@ -356,13 +366,12 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
    *
    * Purpose: One place sets `view`, so the strip and its range agree. The range is rounded to whole turns, so cells fill the canvas and the turn labels stay on their cells after a zoom or a pan.
    * When to use: Wheel, drag, and double-click.
-   * Expected outcome: `view` is null for the full range, otherwise the range rounded by `wholeTurnRange`.
+   * Expected outcome: `view` is null for the opening window, otherwise the range rounded by `wholeTurnRange`.
    * Exceptions: None.
    */
   const showRange = (range: TurnRange): void => {
-    const full = fullRange();
-    const whole = full === null ? range : wholeTurnRange(range, full);
-    view = full !== null && whole.min <= full.min && whole.max >= full.max ? null : whole;
+    const whole = wholeTurnRange(range, fullRange());
+    view = sameTurnRange(whole, openingRange()) ? null : whole;
     render();
   };
 
@@ -376,7 +385,6 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
    */
   const turnAt = (clientX: number): number => {
     const range = visibleRange();
-    if (range === null) return 0;
     const cellWidth = plotWidth() / (range.max - range.min + 1);
     return range.min + (clientX - canvas.getBoundingClientRect().left) / cellWidth - 0.5;
   };
@@ -393,7 +401,6 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
     event.preventDefault();
     const full = fullRange();
     const range = visibleRange();
-    if (full === null || range === null) return;
     const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
     showRange(zoomedTurnRange({ range, full, anchor: turnAt(event.clientX), factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
   };
@@ -408,7 +415,7 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
    */
   const onPointerDown = (event: PointerEvent): void => {
     const range = visibleRange();
-    if (range === null || event.button !== 0) return;
+    if (event.button !== 0) return;
     dragStart = { x: event.clientX, range };
     canvas.setPointerCapture(event.pointerId);
   };
@@ -461,7 +468,7 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
    */
   const onPointerMove = (event: PointerEvent): void => {
     const full = fullRange();
-    if (dragStart !== null && full !== null) {
+    if (dragStart !== null) {
       const turnsPerPixel = (dragStart.range.max - dragStart.range.min + 1) / plotWidth();
       showRange(pannedTurnRange({ range: dragStart.range, full, deltaTurns: -(event.clientX - dragStart.x) * turnsPerPixel }));
       return;
@@ -496,14 +503,13 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
   /**
    * Shows every turn again.
    *
-   * Purpose: A double-click resets the zoom.
+   * Purpose: A double-click zooms all the way out.
    * When to use: The `dblclick` listener.
-   * Expected outcome: The full range is visible.
+   * Expected outcome: The full range is visible, which is the opening window for a short strip.
    * Exceptions: None.
    */
   const onDoubleClick = (): void => {
-    view = null;
-    render();
+    showRange(fullRange());
   };
 
   canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -517,12 +523,10 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
   return {
     update(next: RelationshipStrip): void {
       strip = next;
-      const full = fullRange();
-      if (view !== null && full !== null) {
-        view = wholeTurnRange(zoomedTurnRange({ range: view, full, anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }), full);
-        if (view.min <= full.min && view.max >= full.max) view = null;
-      } else {
-        view = null;
+      if (view !== null) {
+        const full = fullRange();
+        const kept = wholeTurnRange(zoomedTurnRange({ range: view, full, anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }), full);
+        view = sameTurnRange(kept, openingRange()) ? null : kept;
       }
       render();
     },

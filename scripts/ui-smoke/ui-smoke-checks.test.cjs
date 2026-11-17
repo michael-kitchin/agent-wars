@@ -129,18 +129,18 @@ test('the Game Options close check wants the popover hidden, out of match mode, 
   assert.equal(runOneCheck(SCENES.matchOptionsClosed, name, closed, '').detail, 'focus is on "", expected the settings button');
 });
 
-test('the game menu check wants Playback and Metrics enabled with their keys, and How to play enabled', () => {
-  const name = 'game-menu-playback-metrics-and-how-to-play';
+test('the game menu check wants Playback and Charts enabled with their keys, and How to play enabled', () => {
+  const name = 'game-menu-playback-charts-and-how-to-play';
   const item = { shown: true, disabled: false };
   const elements = {
-    '#game-menu-playback-btn': item,
-    '#game-menu-metrics-btn': item,
-    '#game-menu-playback-btn kbd': { text: 'P' },
-    '#game-menu-metrics-btn kbd': { text: 'C' },
+    '#game-menu-playback-check': item,
+    '#game-menu-charts-check': item,
+    '#game-menu-playback-item kbd': { text: 'P' },
+    '#game-menu-charts-item kbd': { text: 'C' },
     '#game-menu-how-to-play-btn': item,
   };
   assert.equal(runOneCheck(SCENES.gameMenuOpen, name, elements).status, 'PASS');
-  assert.equal(runOneCheck(SCENES.gameMenuOpen, name, { ...elements, '#game-menu-metrics-btn kbd': { text: 'M' } }).detail, 'Metrics… shows the key "M", expected "C"');
+  assert.equal(runOneCheck(SCENES.gameMenuOpen, name, { ...elements, '#game-menu-charts-item kbd': { text: 'M' } }).detail, 'Charts… shows the key "M", expected "C"');
   assert.equal(runOneCheck(SCENES.gameMenuOpen, name, { ...elements, '#game-menu-how-to-play-btn': { shown: true, disabled: true } }).detail, 'How to play is disabled');
 });
 

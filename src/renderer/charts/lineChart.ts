@@ -1,5 +1,7 @@
 /**
- * One uPlot line chart with wheel zoom, drag pan, a tooltip, and a double-click reset.
+ * One uPlot line chart with wheel zoom, drag pan, a tooltip, and a double-click that zooms all the way out.
+ *
+ * The chart opens on a window of at most 12 turns (`initialTurnWindow`).
  *
  * Purpose: Every count over turns in the charts dialog is drawn the same way.
  * When to use: The charts dialog builds one per line chart.
@@ -15,6 +17,7 @@ import {
   type LineChartData,
   type TurnRange,
 } from '../../shared/matchChartSeries';
+import { initialTurnWindow, sameTurnRange, zoomExtentTurnRange } from '../../shared/chartTurnWindow';
 import { MIN_ZOOM_SPAN_TURNS, WHEEL_ZOOM_IN_FACTOR } from './chartZoom';
 
 /**
@@ -111,9 +114,9 @@ export interface CreateLineChartArgs {
  */
 export interface LineChartHandle {
   /**
-   * Replaces the data and keeps the zoom range when the chart is zoomed.
+   * Replaces the data and keeps the zoom range when the player has zoomed or panned.
    *
-   * Contract: A zoomed chart stays zoomed, clamped to the new turns.
+   * Contract: A zoomed chart stays zoomed, clamped to the new turns. A chart still on its opening window follows it: blank space on the right shrinks as turns arrive, and a long series keeps showing the newest turns.
    * When to use: A selector change and a refresh after a turn resolves.
    * Expected outcome: The chart redraws.
    * Exceptions: None.
@@ -152,16 +155,15 @@ function toUplotData(data: LineChartData): uPlot.AlignedData {
 }
 
 /**
- * The full turn range of a data set.
+ * The widest turn range a data set can be zoomed out to.
  *
- * Purpose: Zoom and pan stay inside it.
+ * Purpose: Zoom and pan stay inside it. A series shorter than the opening window keeps that window's blank space on the right.
  * When to use: Every wheel and drag step, and after an update.
- * Expected outcome: The first and last turn, or null with fewer than two turns.
+ * Expected outcome: The first turn through the last, widened to the opening window for a short series.
  * Exceptions: None.
  */
-function fullTurnRange(data: LineChartData): TurnRange | null {
-  if (data.turns.length < 2) return null;
-  return { min: data.turns[0], max: data.turns[data.turns.length - 1] };
+function fullTurnRange(data: LineChartData): TurnRange {
+  return zoomExtentTurnRange(data.turns);
 }
 
 /**
@@ -282,7 +284,9 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
           (u) => {
             const index = u.cursor.idx;
             const left = u.cursor.left ?? -1;
-            if (typeof index !== 'number' || left < 0 || data.turns[index] === undefined) {
+            // Blank space to the right of the last turn snaps to that turn, so it must not show a tooltip.
+            const overBlankSpace = typeof index === 'number' && Math.abs(u.posToVal(left, 'x') - data.turns[index]) > 0.5;
+            if (typeof index !== 'number' || left < 0 || data.turns[index] === undefined || overBlankSpace) {
               tooltip.hidden = true;
               return;
             }
@@ -298,28 +302,39 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
   );
 
   /**
-   * Applies a visible range and remembers it, or clears the zoom for the full range.
+   * Gives the window the chart opens on and follows until the player zooms or pans.
    *
-   * Purpose: One place changes the X scale so `view` always matches what is drawn.
+   * Purpose: At most 12 turns show. A short series fills in from the left edge, and a long one shows its newest turns.
+   * When to use: Building the chart, `showRange`, and `update`.
+   * Expected outcome: The opening window for the current data.
+   * Exceptions: None.
+   */
+  const openingRange = (): TurnRange => initialTurnWindow(data.turns);
+
+  /**
+   * Applies a visible range and remembers it, or clears the zoom when it is the opening window.
+   *
+   * Purpose: One place changes the X scale so `view` always matches what is drawn. A null `view` follows the opening window as turns arrive.
    * When to use: The wheel, drag, double-click, and update handlers.
    * Expected outcome: The X scale shows `range`.
    * Exceptions: None.
    */
   const showRange = (range: TurnRange): void => {
-    const full = fullTurnRange(data);
-    view = full !== null && range.min <= full.min && range.max >= full.max ? null : range;
+    view = sameTurnRange(range, openingRange()) ? null : range;
     plot.setScale('x', range);
   };
 
   /**
-   * Returns the visible range, or the full range when not zoomed.
+   * Returns the visible range, or the opening window when the player has not zoomed or panned.
    *
    * Purpose: Zoom and pan start from what is drawn.
    * When to use: The wheel and drag handlers.
-   * Expected outcome: A range, or null with fewer than two turns.
+   * Expected outcome: A range.
    * Exceptions: None.
    */
-  const currentRange = (): TurnRange | null => view ?? fullTurnRange(data);
+  const currentRange = (): TurnRange => view ?? openingRange();
+
+  plot.setScale('x', openingRange());
 
   /**
    * Zooms around the pointer on a wheel step.
@@ -333,7 +348,6 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
     event.preventDefault();
     const full = fullTurnRange(data);
     const range = currentRange();
-    if (full === null || range === null) return;
     const anchor = plot.posToVal(event.clientX - plot.over.getBoundingClientRect().left, 'x');
     const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
     showRange(zoomedTurnRange({ range, full, anchor, factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
@@ -351,7 +365,7 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
    */
   const onPointerDown = (event: PointerEvent): void => {
     const range = currentRange();
-    if (range === null || event.button !== 0) return;
+    if (event.button !== 0) return;
     dragStart = { x: event.clientX, range };
     plot.over.setPointerCapture(event.pointerId);
   };
@@ -366,7 +380,7 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
    */
   const onPointerMove = (event: PointerEvent): void => {
     const full = fullTurnRange(data);
-    if (dragStart === null || full === null) return;
+    if (dragStart === null) return;
     const turnsPerPixel = (dragStart.range.max - dragStart.range.min) / Math.max(1, plot.over.clientWidth);
     const deltaTurns = -(event.clientX - dragStart.x) * turnsPerPixel;
     showRange(pannedTurnRange({ range: dragStart.range, full, deltaTurns }));
@@ -387,14 +401,13 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
   /**
    * Shows every turn again.
    *
-   * Purpose: A double-click resets the zoom.
+   * Purpose: A double-click zooms all the way out.
    * When to use: The `dblclick` listener on the plot.
-   * Expected outcome: The X scale shows the full range.
+   * Expected outcome: The X scale shows the full range, which is the opening window for a short series.
    * Exceptions: None.
    */
   const onDoubleClick = (): void => {
-    const full = fullTurnRange(data);
-    if (full !== null) showRange(full);
+    showRange(fullTurnRange(data));
   };
 
   plot.over.addEventListener('wheel', onWheel, { passive: false });
@@ -407,14 +420,12 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
   return {
     update(next: LineChartData): void {
       data = next;
-      const full = fullTurnRange(next);
-      const keep = view !== null && full !== null ? view : null;
-      plot.setData(toUplotData(next), keep === null);
-      if (keep !== null && full !== null) {
-        showRange(zoomedTurnRange({ range: keep, full, anchor: keep.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }));
-      } else {
-        view = null;
+      plot.setData(toUplotData(next), false);
+      if (view === null) {
+        showRange(openingRange());
+        return;
       }
+      showRange(zoomedTurnRange({ range: view, full: fullTurnRange(next), anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }));
     },
     resize(width: number, height: number): void {
       plot.setSize({ width, height });

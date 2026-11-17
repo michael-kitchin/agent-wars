@@ -140,7 +140,9 @@ test('the live turn takes its playback plan from the shared function, which only
 test('a watch waits during replay, the menu and a new match leave it, and the smoke run covers the key', () => {
   assertMatches(readRendererSource('gameplay', 'observeChrome.ts'), /if \(replayActive\(\) \|\| !autoAdvanceReady\(\)/, 'auto advance waits during replay');
   assertMatches(getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'runLeaveReplay'), /maybeObserveAutoAdvance\(\)/, 'leaving asks the watch again');
-  assertMatches(getFunctionSource(readRendererSource('chrome', 'gameMenu.ts'), 'openGameMenu'), /requestReplayLeave\(\)/, 'the menu leaves replay');
+  const menuSource = readRendererSource('chrome', 'gameMenu.ts');
+  assert.equal(getFunctionSource(menuSource, 'openGameMenu').includes('requestReplayLeave'), false, 'opening the menu keeps replay on');
+  assertMatches(menuSource, /REPLAY_SAFE_BUTTON_IDS\.has\(item\.id\) \|\| !replayActive\(\)[\s\S]*?requestReplayLeave\(\)/, 'a menu button that changes the match leaves replay first');
   assertMatches(readRendererSource('gameplay', 'newGame.ts'), /abandonReplayForNewMatch\(\);/, 'a new match drops replay');
   assert.equal(readRepoFile('scripts', 'ui-smoke', 'ui-smoke-checks.cjs').includes('#replay-panel'), true);
 });

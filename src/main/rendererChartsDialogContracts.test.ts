@@ -110,7 +110,7 @@ test('the line charts and the strip share one zoom module, and the strip shows w
     assert.equal(/\b0\.8\b|\b1\.25\b/.test(source), false, `${file} has no literal wheel factor`);
   }
   const strip = readRendererSource('charts', 'relationshipTimeline.ts');
-  assert.equal(/const showRange = [^\n]*\n[\s\S]*?wholeTurnRange\(range, full\)/.test(strip), true, 'showRange rounds to whole turns');
+  assert.equal(/const showRange = [^\n]*\n[\s\S]*?wholeTurnRange\(range, fullRange\(\)\)/.test(strip), true, 'showRange rounds to whole turns');
 });
 
 test('a failed first read shows the sentence and a failed refresh keeps the charts', () => {
@@ -146,4 +146,17 @@ test('the dropdowns use the field colors of the top bar select', () => {
   assert.equal(rule.includes('color: var(--field-text)'), true);
   assert.equal(rule.includes('background: var(--field-bg)'), true);
   assert.match(css, /\.charts-select option \{[^}]*color: var\(--field-text\)/);
+});
+
+test('every chart with turns on its X axis opens on the 12-turn window and follows it until zoomed', () => {
+  const line = readRendererSource('charts', 'lineChart.ts');
+  const strip = readRendererSource('charts', 'relationshipTimeline.ts');
+  for (const source of [line, strip]) {
+    assert.equal(source.includes('initialTurnWindow('), true);
+    assert.equal(source.includes('zoomExtentTurnRange('), true);
+    assert.equal(source.includes('sameTurnRange('), true);
+  }
+  assert.equal(line.includes("plot.setScale('x', openingRange());"), true, 'the line chart opens on the window');
+  assert.equal(line.includes('overBlankSpace'), true, 'no tooltip over the blank space');
+  assert.equal(line.includes('plot.setData(toUplotData(next), false);'), true, 'a refresh does not rescale to every turn');
 });
