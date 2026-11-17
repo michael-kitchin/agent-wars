@@ -9,6 +9,7 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
+import { shouldDrawPendingOrderOverlays } from './canvasPreviewPolicy';
 import { drawAirDropLines, drawAirStrikeLines, drawMissileLaunchLines, drawPendingFerryLines, drawRangedAttackLines } from './orderDrawing';
 
 /**
@@ -67,7 +68,7 @@ export function drawMarchHoverPreviewStageIfEnabled(
  *
  * Purpose: Single policy path for strategic vs tactical `drawGameScene` so overlay ordering cannot drift between branches.
  * When to use: After terrain (and strategic-only standing-order lines) and before unit markers / production overlays.
- * Expected outcome: Tactical callers supply `drawTacticalPendingMarchesFirst` to mirror the historical tactical-only stage.
+ * Expected outcome: Tactical callers supply `drawTacticalPendingMarchesFirst` to mirror the historical tactical-only stage. While replay is on, the queued marches, the hover preview, and the support orders are skipped, because they belong to the present and not to the turn or beat on screen.
  * Exceptions: None; delegates drawing to the existing stage helpers.
  */
 export function drawPendingMarchesHoverAndSupportOrderStack(options: {
@@ -81,6 +82,7 @@ export function drawPendingMarchesHoverAndSupportOrderStack(options: {
   resolutionAnimationBlocksMarchHoverPreview: boolean;
   drawMarchHoverPreview: (c: CanvasRenderingContext2D) => void;
 }): void {
+  if (!shouldDrawPendingOrderOverlays()) return;
   options.drawTacticalPendingMarchesFirst?.();
   drawMarchHoverPreviewStageIfEnabled(options.ctx, {
     shouldDraw: options.shouldDrawMarchHoverPreview,

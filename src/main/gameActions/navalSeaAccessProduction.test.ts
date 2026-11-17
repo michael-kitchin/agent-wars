@@ -17,6 +17,7 @@ import {
 } from '../gameDb';
 import {
   addHexBuildQueueEntry,
+  applyBuildQueueTemplateToHexes,
   getHexBuildQueue,
   updateHexBuildQueueEntry,
 } from '../gameActions';
@@ -101,5 +102,40 @@ test('Keep building naval is cleared at a port without sea access', () => {
     processProductionAfterControlResolution();
     assert.equal(getKeepBuildingForHex(port).keepBuilding, false);
     assert.equal(humanNavalCount(), before);
+  });
+});
+
+test('applying a template at a port without sea access keeps its queued naval row and adds no new one', () => {
+  withTempGameDb('aw-sea-access-prod-', () => {
+    const port = listLandSeaportsBySeaAccess().dry[0]!;
+    giveHumanPort(port);
+    replaceBuildQueueForHex(port, [
+      { unitType: 'naval', remainingCount: 2 },
+      { unitType: 'infantry', remainingCount: 1 },
+    ]);
+    const result = applyBuildQueueTemplateToHexes(
+      [port],
+      [
+        { unitType: 'naval', count: 5 },
+        { unitType: 'infantry', count: 3 },
+      ],
+      'human'
+    );
+    assert.deepEqual(result.applied, [port]);
+    const rows = listBuildQueueRowsForHex(port).map((row) => [row.unitType, row.remainingCount]);
+    assert.deepEqual(rows, [
+      ['naval', 2],
+      ['infantry', 3],
+    ]);
+  });
+});
+
+test('applying a template with naval at a port without sea access and no queued naval adds none', () => {
+  withTempGameDb('aw-sea-access-prod-', () => {
+    const port = listLandSeaportsBySeaAccess().dry[0]!;
+    giveHumanPort(port);
+    const result = applyBuildQueueTemplateToHexes([port], [{ unitType: 'naval', count: 1 }], 'human');
+    assert.equal(result.skipped[0]?.reason, NAVAL_NO_SEA_ACCESS_REASON);
+    assert.equal(listBuildQueueRowsForHex(port).length, 0);
   });
 });

@@ -193,15 +193,20 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         refreshBuildPopup: false,
         redraw: false,
       });
-      const outcome: MeleeInterceptModalOutcome = readyResult.aiOnlyBattleH3Index && S.autoAdvance
-        ? { decision: 'fight', selectedH3Index: readyResult.aiOnlyBattleH3Index }
-        : readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()
-          ? await (closeChartsDialogIfOpen(), deps.openMeleeInterceptModal({
-              candidates: readyResult.meleeInterceptCandidates ?? [],
-              buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
-              preselectH3Index: readyResult.aiOnlyBattleH3Index,
-            }))
-          : { decision: 'ignore' };
+      let outcome: MeleeInterceptModalOutcome;
+      if (readyResult.aiOnlyBattleH3Index && S.autoAdvance) {
+        outcome = { decision: 'fight', selectedH3Index: readyResult.aiOnlyBattleH3Index };
+      } else if (readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()) {
+        // The battles list needs the player's choice, so the charts dialog must not stay open over it.
+        closeChartsDialogIfOpen();
+        outcome = await deps.openMeleeInterceptModal({
+          candidates: readyResult.meleeInterceptCandidates ?? [],
+          buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
+          preselectH3Index: readyResult.aiOnlyBattleH3Index,
+        });
+      } else {
+        outcome = { decision: 'ignore' };
+      }
       const resolveResult = await window.gameApi.resolveMeleeIntercept({
         meleeDecisionToken: readyResult.meleeDecisionToken ?? '',
         decision: outcome.decision,

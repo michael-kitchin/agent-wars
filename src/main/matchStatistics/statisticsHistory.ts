@@ -9,7 +9,7 @@
 
 import type { BasicDbOps } from '../gameDb/dbOps';
 import { logTrace } from '../logger';
-import { listMatchEventsOfType } from '../recorder/matchRecordStore';
+import { listReadableMatchEventsOfType } from '../recorder/matchRecordStore';
 import type { TurnStatistics } from '../../shared/matchStatistics';
 
 /**
@@ -31,12 +31,12 @@ function isTurnStatistics(value: unknown): value is TurnStatistics {
  *
  * Purpose: The charts channel serves the whole series with no fog filter.
  * When to use: When a chart view opens or refreshes.
- * Expected outcome: One entry per turn, the last event written for it, in turn order. A payload that is not a turn's statistics is skipped.
+ * Expected outcome: One entry per turn, the last event written for it, in turn order. A row of another format version, a payload that cannot be decoded, and a payload that is not a turn's statistics are skipped (`listReadableMatchEventsOfType`).
  * Exceptions: Propagates a SQLite error.
  */
 export function readStatisticsHistory(ops: BasicDbOps): TurnStatistics[] {
   const latestByTurn = new Map<number, TurnStatistics>();
-  for (const row of listMatchEventsOfType(ops, 'side_statistics')) {
+  for (const row of listReadableMatchEventsOfType(ops, 'side_statistics')) {
     if (isTurnStatistics(row.payload)) latestByTurn.set(row.payload.turnNumber, row.payload);
   }
   logTrace('statisticsHistory readStatisticsHistory', { turnCount: latestByTurn.size });

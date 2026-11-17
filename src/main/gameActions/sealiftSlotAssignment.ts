@@ -110,13 +110,13 @@ export function normalizeSealiftSlots(
 /**
  * Reports whether sealift controls are disabled for a stack context.
  *
- * Purpose: Open water and a coast without a port disable embark controls. A port does not.
+ * Purpose: Open water, a coast without a port, and a land seaport with no sea access disable embark controls. A port where boarding is allowed does not.
  * When to use: Naval rows and the stack state share this test.
- * Expected outcome: True for `water` and `coastal_no_port`. False otherwise.
+ * Expected outcome: True for `water`, `coastal_no_port`, and `port_no_sea_access`. False otherwise.
  * Exceptions: None.
  */
 function controlsDisabledFor(contextMode: SealiftContextMode): boolean {
-  return contextMode === 'water' || contextMode === 'coastal_no_port';
+  return contextMode === 'water' || contextMode === 'coastal_no_port' || contextMode === 'port_no_sea_access';
 }
 
 /**

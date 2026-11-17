@@ -21,6 +21,7 @@ import {
   type SealiftSlotPair,
 } from './sealiftSlotAssignment';
 import { isLandUnitType } from '../../shared/landUnitType';
+import { isLandSeaportHex } from '../../shared/navalStrategicEdges';
 import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 
 /**
@@ -297,7 +298,7 @@ export function canManualDebarkFromHex(h3Index: string, playerId: string): boole
  *
  * Purpose: Embark dropdowns enable only where the human may embark; water means no valid embark on that hex.
  * When to use: `readSealiftStackState` and tactical stack state that reuses this classifier.
- * Expected outcome: `coastal_port` for native coastal, land seaports, and controlled water seaports; `water` for open ocean and enemy or uncontrolled water seaports; `coastal_no_port` when movement terrain is coastal but embark is not allowed; `unsupported` when the hex is missing or inland without a seaport.
+ * Expected outcome: `coastal_port` for native coastal, land seaports with water or coast in or next to the hex, and controlled water seaports; `water` for open ocean and enemy or uncontrolled water seaports; `coastal_no_port` when movement terrain is coastal but embark is not allowed; `port_no_sea_access` for a land seaport with no sea access, where boarding is refused and debark stays allowed; `unsupported` when the hex is missing or inland without a seaport.
  * Exceptions: None.
  */
 export function getSealiftStackContextModeForHex(h3Index: string): SealiftContextMode {
@@ -307,6 +308,12 @@ export function getSealiftStackContextModeForHex(h3Index: string): SealiftContex
   if (canPlayerEmbarkFromHex(h3Index, HUMAN_SEAT_ID)) return 'coastal_port';
   if (context.normalizedMovementTerrain === 'water') return 'water';
   if (context.normalizedMovementTerrain === 'coastal') return 'coastal_no_port';
+  const landSeaport = isLandSeaportHex({
+    nativeTerrain: context.nativeTerrain,
+    terrainKind: context.terrainKind,
+    hasSeaport: context.seaportCount > 0,
+  });
+  if (landSeaport) return 'port_no_sea_access';
   return 'unsupported';
 }
 

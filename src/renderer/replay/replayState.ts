@@ -221,7 +221,7 @@ export async function requestReplayLeave(): Promise<void> {
  *
  * Purpose: A new match replaces the one replay belongs to, and the live state is already the new match's.
  * When to use: Where a new match's state is applied.
- * Expected outcome: Replay is off and the body attribute is removed. No snapshot is applied.
+ * Expected outcome: Replay is off and the body attribute is removed. No snapshot is applied. The copies replay mode kept for leaving are not put back; the next entry replaces them.
  * Exceptions: None.
  */
 export function abandonReplay(): void {
@@ -234,7 +234,7 @@ export function abandonReplay(): void {
  * Resolves once no replay step is loading.
  *
  * Purpose: Leaving replay while a step is loading must wait for that step to settle before it shows the last one.
- * When to use: From `leaveReplay`, after playback was told to stop.
+ * When to use: From `leaveReplay`, through its wait for a loading step to settle, after playback was told to stop or while a step loads.
  * Expected outcome: Resolves at once when replay is off or idle, and otherwise after the change that clears the busy flag or ends replay.
  * Exceptions: None.
  */

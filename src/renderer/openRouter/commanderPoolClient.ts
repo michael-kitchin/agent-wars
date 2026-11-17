@@ -14,6 +14,7 @@ import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelType
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { rendererSharedState as S } from '../core/state';
+import { replayActive } from '../replay/replayState';
 import { applyCommanderToolCountSum } from './openRouterToolCountLabels';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
@@ -353,15 +354,15 @@ export async function refreshCommanderSeatCosts(): Promise<void> {
  *
  * Purpose: Cost is stored on the seat, and the footer reads the snapshot the player is looking at.
  * When to use: From `refreshCommanderSeatCosts`, and after a draining pool read.
- * Expected outcome: `S.gameState.seats` matches the database for this match.
+ * Expected outcome: `S.gameState.seats` matches the database for this match. While replay is on nothing is copied, because the snapshot on screen is a past one, and leaving replay applies the live match with its seats.
  * Exceptions: A rejected read is logged. A reply after Start is left unused.
  */
 async function refreshSeatCosts(): Promise<void> {
-  if (!window.gameApi?.getGameState || !S.gameState) return;
+  if (!window.gameApi?.getGameState || !S.gameState || replayActive()) return;
   const matchEpoch = currentRendererMatchEpoch();
   try {
     const next = await fetchMatchSnapshot();
-    if (!poolReplyIsCurrent(matchEpoch) || !S.gameState || !next?.seats) return;
+    if (!poolReplyIsCurrent(matchEpoch) || !S.gameState || !next?.seats || replayActive()) return;
     S.gameState.seats = next.seats;
   } catch (err) {
     console.error('commander pool cost refresh failed', err);

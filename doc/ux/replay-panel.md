@@ -40,14 +40,17 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - P turns replay on, and turns it off again. Turning it off shows the present.
 - Escape leaves replay and shows the present.
 - P or Escape while playback runs stops it at once, cancels the animation, and leaves replay. The present is shown.
+- P or Escape while a step loads waits for that step to finish loading, then leaves replay.
 - In the turn field, which takes a beat number inside a battle and is named Beat there, a valid recorded turn number is accepted as it is typed, Enter and leaving the field show it, and anything else marks the field invalid with a red border (`aria-invalid`, `parseTurnEntry`). Escape in the field puts the last shown turn back and does not leave replay.
 - C opens the charts dialog during replay, as it does at any other time.
 
 ### Other
 
 - Opening the game menu leaves replay first. Starting a new match drops replay without applying anything.
-- Ready is disabled and does nothing. The Orders tab is disabled, and a selected Orders tab returns after replay ends. Committed order lines are not drawn.
-- A watch's automatic Ready waits during replay and presses when replay ends.
+- Ready is disabled and does nothing. The Orders tab is disabled, and a selected Orders tab returns after replay ends. Committed order lines are not drawn, and neither are the draft orders: queued battle marches, the march hover preview, and pending ranged, air strike, air drop, missile, and ferry lines (`shouldDrawPendingOrderOverlays` in `src/renderer/rendering/canvasPreviewPolicy.ts`).
+- The commander cards on the Commanders tab are inert. Their summary buttons are disabled, so no commander popover opens and no commander is saved. A seat-cost refresh leaves the past snapshot's seats alone. Leaving replay applies the live match, seats included.
+- Entering replay clears the unit selection. Leaving puts it back, without any unit that no longer exists in the present.
+- A watch's automatic Ready waits during replay and presses when replay ends. The end of a replay animation does not move the watch camera or count as framing a turn or beat.
 - A commander that finishes while replay is on does not open its message dialog over a past turn. Its messages are still filed in the Reports tab.
 - The map toasts a step shows are not filed in the Reports tab or the activity log a second time.
 - Inside a battle, Exit Battle is disabled while replay is on, and it is enabled again when replay is left. The battle view, the queued sub-unit marches, and the pending order lists are copied when replay starts and put back when it ends, so leaving shows the current beat with its queued marches and its dialogs. Stepping does not re-frame the battle view.
@@ -58,7 +61,7 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Off: no panel.
 - On, compact: the bar alone.
 - On, expanded: the bar, the turn field, and the slider.
-- Busy: a step is loading. A second step request waits for it.
+- Busy: a step is loading. A step request made while it loads is ignored. P or Escape waits for the load and then leaves.
 - Playing: Play shows as Pause. Every other control except the expand control is disabled.
 - Invalid entry: the turn field has a red border.
 

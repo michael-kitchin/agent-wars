@@ -169,15 +169,79 @@ export interface SideStanceRow {
  * Exceptions: None.
  */
 type StanceSqlRow = {
+  /**
+   * The seat that holds the stance.
+   *
+   * Contract: The `seat_id` column, a seat id from the roster.
+   * When to use: Mapped to `SideStanceRow.seatId`.
+   * Expected outcome: A non-empty seat id.
+   * Exceptions: None.
+   */
   readonly seat_id: string;
+  /**
+   * The seat the stance is held toward.
+   *
+   * Contract: The `toward_seat_id` column, never the same as `seat_id`.
+   * When to use: Mapped to `SideStanceRow.towardSeatId`.
+   * Expected outcome: A non-empty seat id.
+   * Exceptions: None.
+   */
   readonly toward_seat_id: string;
+  /**
+   * The declared stance.
+   *
+   * Contract: The `stance` column, one of `SIDE_STANCES`.
+   * When to use: Mapped to `SideStanceRow.stance`.
+   * Expected outcome: A stance value.
+   * Exceptions: None.
+   */
   readonly stance: SideStance;
+  /**
+   * The commander's stated reason for the stance.
+   *
+   * Contract: The `reason` column, as the commander wrote it.
+   * When to use: Mapped to `SideStanceRow.reason`.
+   * Expected outcome: A string, possibly empty.
+   * Exceptions: None.
+   */
   readonly reason: string;
+  /**
+   * The turn the stance was last written.
+   *
+   * Contract: The `updated_turn` column.
+   * When to use: Mapped to `SideStanceRow.updatedTurn`, which the statistics report as `reportedTurn`.
+   * Expected outcome: A turn number.
+   * Exceptions: None.
+   */
   readonly updated_turn: number;
+  /**
+   * How far the holder believes the other side.
+   *
+   * Contract: The `trust` column, 0 to `RELATIONSHIP_SCALE_MAX`, or null when never reported.
+   * When to use: Mapped to `SideStanceRow.trust`.
+   * Expected outcome: A whole number or null.
+   * Exceptions: None.
+   */
   readonly trust: number | null;
+  /**
+   * How dangerous the holder finds the other side.
+   *
+   * Contract: The `threat` column, 0 to `RELATIONSHIP_SCALE_MAX`, or null when never reported.
+   * When to use: Mapped to `SideStanceRow.threat`.
+   * Expected outcome: A whole number or null.
+   * Exceptions: None.
+   */
   readonly threat: number | null;
 };
 
+/**
+ * The select list for a full stance row.
+ *
+ * Purpose: Both stance queries read the same columns in the order `StanceSqlRow` names them.
+ * When to use: In the SELECT of every stance query in this file.
+ * Expected outcome: The seven `side_stances` columns that `toStanceRow` maps.
+ * Exceptions: None.
+ */
 const STANCE_COLUMNS = `seat_id, toward_seat_id, stance, reason, updated_turn, trust, threat`;
 
 /**

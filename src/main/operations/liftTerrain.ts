@@ -109,7 +109,14 @@ export function buildLiftTerrain(args: {
   readonly state: GameStateSnapshot;
   readonly seatId: string;
   readonly landMass: LandMassByH3;
-  // Answers whether a land seaport has water or coast next to it. Defaults to the database read `hexHasSeaAccess`; only a test with no database passes another.
+  /**
+   * Answers whether a land seaport has water or coast in or next to it.
+   *
+   * Purpose: Boarding at a land seaport needs sea access, read from true terrain rather than the seat's snapshot, which can mask terrain.
+   * When to use: Omit it in the app so the database read `hexHasSeaAccess` is used. Only a test with no database passes another check.
+   * Expected outcome: The embark test calls it with a hex index and treats false as no boarding at a land seaport.
+   * Exceptions: None of its own. The default database read propagates a SQLite error.
+   */
   readonly seaAccessOf?: SeaAccessCheck;
 }): LiftTerrain {
   const seaAccessOf = args.seaAccessOf ?? hexHasSeaAccess;

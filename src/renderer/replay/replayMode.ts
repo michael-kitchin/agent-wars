@@ -15,6 +15,7 @@ import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
 import { refreshConsoleHeader, showConsoleTab } from '../chrome/consoleFrame';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
+import { replaceSelection } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import type { ReadyHandlerDeps } from '../gameplay/readyHandlerTypes';
@@ -137,6 +138,16 @@ let savedBattle: {
 } | null = null;
 
 /**
+ * The unit selection that existed when replay opened.
+ *
+ * Purpose: Replay clears the selection so nothing present is marked over a past turn, and leaving puts it back.
+ * When to use: Set on entering, read and cleared on leaving.
+ * Expected outcome: The selected unit ids, which are battle sub-unit ids inside a battle. Empty outside replay.
+ * Exceptions: None.
+ */
+let savedSelection: readonly string[] = [];
+
+/**
  * Binds the dependencies and registers the leaver.
  *
  * Purpose: Replay is wired once, from the renderer entry file.
@@ -216,9 +227,10 @@ export async function toggleReplay(): Promise<void> {
   const deps = requireDeps();
   deps.hideBuildPopup();
   deps.hideStackCallout();
+  savedSelection = [...S.selectedUnitIds];
   clearSelectionLikeRightClick(deps.selectionDeps);
   setAsideLastSeenMarkers();
-  if (timeline.scope === 'tactical') setAsideBattleState();
+  savedBattle = timeline.scope === 'tactical' ? copyBattleState() : null;
   ordersTabWasSelected = document.getElementById(ORDERS_TAB_ID)?.getAttribute('aria-selected') === 'true';
   const last = timeline.steps.length - 1;
   setReplay({ timeline, index: last, busy: false, matchEpoch: epoch, playing: false, stopRequested: false, session: nextReplaySession() });
@@ -248,15 +260,15 @@ function setAsideLastSeenMarkers(): void {
 }
 
 /**
- * Copies the battle's own state and keeps it aside.
+ * Copies the battle's own state.
  *
  * Purpose: Replaying a battle's beats must leave the queued marches and the pending orders as they were.
- * When to use: On entering replay while a battle is open.
- * Expected outcome: The battle view, the queued marches, and the pending order lists are copied. The live values stay where they are.
+ * When to use: On entering replay while a battle is open. Entering over the world map stores null instead, so a copy kept by a replay a new match dropped is never put back.
+ * Expected outcome: Copies of the battle view, the queued marches, and the pending order lists. The live values stay where they are.
  * Exceptions: None.
  */
-function setAsideBattleState(): void {
-  savedBattle = {
+function copyBattleState(): NonNullable<typeof savedBattle> {
+  return {
     snapshot: S.tacticalBattleSnapshot,
     marches: S.tacticalPendingMarches.map((row) => ({ ...row })),
     rangedAttacks: [...S.pendingRangedAttacks],
@@ -306,6 +318,40 @@ function restoreLastSeenMarkers(): void {
   for (const [key, value] of savedMarkers.stale) S.clientStaleEnemyIntelByUnitId.set(key, value);
   for (const [key, value] of savedMarkers.rendered) S.lastRenderedVisibleEnemyByUnitId.set(key, value);
   savedMarkers = null;
+}
+
+/**
+ * Resolves once no step is loading or being presented.
+ *
+ * Purpose: A step clears the busy flag when its read returns and sets it again when its presentation starts in a later microtask. Leaving must wait past that gap, so it waits for idle and then for the next task before it checks again.
+ * When to use: From `leaveReplay`, before it shows the last step.
+ * Expected outcome: Resolves when replay is off or when the flag stays clear across a task boundary.
+ * Exceptions: None.
+ */
+async function waitForStepToSettle(): Promise<void> {
+  while (currentReplay()?.busy) {
+    await waitForReplayIdle();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+}
+
+/**
+ * Puts the selection from before replay back.
+ *
+ * Purpose: Replay must not change the selection that existed before it.
+ * When to use: On leaving replay, after the live snapshot is applied.
+ * Expected outcome: The selection holds the kept ids that still name a living unit of the player, through `replaceSelection`, and the selection views and the map follow. Nothing happens when nothing was selected.
+ * Exceptions: None.
+ */
+function restoreSelection(unitIds: readonly string[]): void {
+  if (unitIds.length === 0) return;
+  replaceSelection([...unitIds]);
+  const { updateSidebar, updateRangedSidebar, redraw } = requireDeps().selectionDeps;
+  updateSidebar();
+  updateRangedSidebar();
+  redraw();
 }
 
 /**
@@ -430,9 +476,9 @@ let ordersTabWasSelected = false;
 /**
  * Leaves replay and brings the present back.
  *
- * Purpose: Leaving shows the current turn as if the player had stepped forward to it, then applies the live state. Playback that is running is stopped and its animation cancelled first.
+ * Purpose: Leaving shows the current turn as if the player had stepped forward to it, then applies the live state. Playback that is running is stopped and its animation cancelled first, and a step that is loading is allowed to settle.
  * When to use: `p`, Escape, the game menu, and a new match.
- * Expected outcome: Replay is off, the last-seen markers and, over a battle, the battle's own state are back, the console shows the Orders tab again when it was selected on entry, the live snapshot is on screen, and a watch that was waiting presses Ready.
+ * Expected outcome: Replay is off, the last-seen markers and, over a battle, the battle's own state are back, the selection from before replay is back without the units that no longer exist, the console shows the Orders tab again when it was selected on entry, the live snapshot is on screen, and a watch that was waiting presses Ready.
  * Exceptions: None. A failed live read is logged and the last recorded step stays on screen.
  */
 export async function leaveReplay(): Promise<void> {
@@ -440,16 +486,20 @@ export async function leaveReplay(): Promise<void> {
   if (state?.playing) {
     setReplay({ ...state, playing: false, stopRequested: true });
     clearResolutionPlaybackAnimationState();
-    await waitForReplayIdle();
+  }
+  if (state?.busy || state?.playing) {
+    await waitForStepToSettle();
     state = currentReplay();
   }
-  if (!state || state.busy) return;
+  if (!state) return;
   await showReplayStep(state.timeline.steps.length - 1);
   if (!replayActive()) return;
   setReplay(null);
   delete document.body.dataset.replay;
   restoreLastSeenMarkers();
   restoreBattleState();
+  const selection = savedSelection;
+  savedSelection = [];
   try {
     const live = await fetchMatchSnapshot();
     await requireDeps().readyDeps().applyGameStateSnapshot(live, {
@@ -465,6 +515,7 @@ export async function leaveReplay(): Promise<void> {
   } catch (error) {
     console.error('leaving replay could not read the live match', error);
   }
+  restoreSelection(selection);
   refreshConsoleHeader();
   syncTacticalExitButtonElementVisibility();
   if (ordersTabWasSelected) showConsoleTab(ORDERS_TAB_ID);

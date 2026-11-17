@@ -600,7 +600,6 @@ Run the Verification Bar and `npm run ui:smoke`. Run the app: open the dialog in
 
 | Phase | Result | Sketch differences | Files changed outside the Add/Edit lists | Docs updated | What you saw in the running app |
 |-------|--------|--------------------|-------------------------------------------|--------------|---------------------------------|
-
 | 0 | Pass | Prerequisites confirmed. `upsertSideStance` re-stamps `updated_turn` on any change of stance, reason, trust, or threat (not stance and reason only). | none | none | n/a |
 | 1 | Pass | Types moved to `src/shared/matchChartSeriesTypes.ts` (re-exported) to stay under 600 lines. | `src/shared/matchChartSeriesTypes.ts` | none | n/a |
 | 2 | Pass | uPlot 1.6.32. All named members exist in `uPlot.d.ts`. | none | `THIRD-PARTY-NOTICES.md` | n/a |

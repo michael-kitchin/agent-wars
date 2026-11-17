@@ -20,14 +20,14 @@ import { readStatisticsHistory } from './statisticsHistory';
  *
  * Purpose: The cases need events without running the recorder.
  * When to use: Every case.
- * Expected outcome: One engine-only `side_statistics` row at the turn's step.
+ * Expected outcome: One engine-only `side_statistics` row at the turn's step, at format version 1 unless another is given.
  * Exceptions: Propagates a SQLite error.
  */
-function insertStatistics(turnNumber: number, payload: unknown): void {
+function insertStatistics(turnNumber: number, payload: unknown, formatVersion = 1): void {
   insertMatchRecord(gameDbOps, {
     kind: 'event',
     recordType: 'side_statistics',
-    formatVersion: 1,
+    formatVersion,
     step: strategicStep(turnNumber),
     visibility: 'engine',
     displayText: null,
@@ -46,5 +46,18 @@ test('the later event for a turn wins, the series is in turn order, and a broken
     const history = readStatisticsHistory(gameDbOps);
     assert.deepEqual(history.map((turn) => turn.turnNumber), [2, 3]);
     assert.equal((history[0] as unknown as { marker: string }).marker, 'late');
+  });
+});
+
+test('a payload that cannot be decoded and a row of another format version are skipped, and the rest still reads', () => {
+  withTempGameDb('aw-statistics-history-bad-', () => {
+    insertStatistics(1, { turnNumber: 1, sides: [], relationships: [], hexesTaken: null });
+    insertStatistics(2, { turnNumber: 2, sides: [], relationships: [], hexesTaken: null });
+    gameDbOps.run(
+      `UPDATE match_records SET payload = X'00FF' WHERE record_id = (SELECT MAX(record_id) FROM match_records)`
+    );
+    insertStatistics(3, { turnNumber: 3, sides: [], relationships: [], hexesTaken: null }, 2);
+    insertStatistics(4, { turnNumber: 4, sides: [], relationships: [], hexesTaken: null });
+    assert.deepEqual(readStatisticsHistory(gameDbOps).map((turn) => turn.turnNumber), [1, 4]);
   });
 });

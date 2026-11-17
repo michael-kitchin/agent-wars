@@ -2,9 +2,9 @@
 'use strict';
 
 /**
- * Unit tests for the UI smoke checks.
+ * Unit tests for the UI smoke checks and the battle-status pattern the scenes wait on.
  *
- * Purpose: Covers how a check result is decided, without starting Electron.
+ * Purpose: Covers how a check result is decided, and which battle header lines a beat wait accepts, without starting Electron.
  * When to use: Discovered by `scripts/run-main-node-tests.cjs` as an extra CJS test.
  * Expected outcome: Exits 0 when the pass, missing-element, and thrown-check contracts hold.
  * Exceptions: Assertion failures abort the process via node:test.
@@ -13,6 +13,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
+const { battleStatusPattern } = require('./ui-smoke-beat-limit.cjs');
 
 /**
  * A one-row check table for these tests.
@@ -56,4 +57,14 @@ test('runChecks reports a failing rule and a thrown error as FAIL', () => {
   assert.deepEqual(runChecks('scene', probeWithPanel(40), TEST_CHECKS), [{ check: 'wide', status: 'FAIL', detail: '#panel is 40 wide' }]);
   const throwing = [{ ...TEST_CHECKS[0], run: () => { throw new Error('boom'); } }];
   assert.deepEqual(runChecks('scene', probeWithPanel(120), throwing), [{ check: 'wide', status: 'FAIL', detail: 'check threw: boom' }]);
+});
+
+test('a beat wait accepts the beats-left count and rejects a longer beat number', () => {
+  const planning = new RegExp(battleStatusPattern(1, ' · Tactical planning'));
+  assert.equal(planning.test('Beat 1 (29 left) · Tactical planning · April, Year 1'), true);
+  assert.equal(planning.test('Beat 1 · Tactical planning · April, Year 1'), true);
+  assert.equal(planning.test('Beat 12 · Tactical planning'), false);
+  const last = new RegExp(battleStatusPattern(30, ''));
+  assert.equal(last.test('Beat 30 (0 left) · Tactical planning'), true);
+  assert.equal(new RegExp(battleStatusPattern(3, '')).test('Beat 30 · Tactical planning'), false);
 });

@@ -11,6 +11,7 @@ import {
   type LatLngFrameBox,
 } from '../../shared/unitFrameBox';
 import { rendererSharedState as S } from '../core/state';
+import { replayActive } from '../replay/replayState';
 import { WEB_MERCATOR_MAX_ABS_LAT } from './hexGrid';
 import { loadedMapExtentTarget } from './mapExtent';
 import { getLeafletGlobal } from './mapHelpers';
@@ -118,12 +119,12 @@ export function frameAutomaticStrategicUnits(): void {
  *
  * Purpose: Keeps a bad cell or a map error from escaping `frameAutomaticStrategicUnits`.
  * When to use: `frameAutomaticStrategicUnits` only.
- * Expected outcome: The camera moves and the turn is remembered, or the camera stays and the error is logged.
+ * Expected outcome: The camera moves and the turn is remembered, or the camera stays and the error is logged. During replay nothing happens, because the turn on screen is a past one.
  * Exceptions: An unexpected failure propagates. `frameAutomaticStrategicUnits` logs it and does not rethrow.
  */
 function frameStrategicUnits(): void {
   const state = S.gameState;
-  if (!state) return;
+  if (!state || replayActive()) return;
   const open = shouldApplyAutomaticUnitFrame({
     observing: observeModeControls(state.seats ?? []).observing,
     autoAdvance: S.autoAdvance,
@@ -163,13 +164,13 @@ export function frameAutomaticBattleUnits(battleLimit: LatLngFrameBox): void {
  *
  * Purpose: Keeps a bad cell or a map error from escaping `frameAutomaticBattleUnits`.
  * When to use: `frameAutomaticBattleUnits` only.
- * Expected outcome: The camera moves and the beat is remembered, or the camera stays and the error is logged.
+ * Expected outcome: The camera moves and the beat is remembered, or the camera stays and the error is logged. During replay nothing happens, because the beat on screen is a past one.
  * Exceptions: An unexpected failure propagates. `frameAutomaticBattleUnits` logs it and does not rethrow.
  */
 function frameBattleUnits(battleLimit: LatLngFrameBox): void {
   const snap = S.tacticalBattleSnapshot;
   const state = S.gameState;
-  if (!snap || !state || snap.aiOnlyEndReason != null) return;
+  if (!snap || !state || snap.aiOnlyEndReason != null || replayActive()) return;
   const open = shouldApplyAutomaticBattleFrame({
     observing: observeModeControls(state.seats ?? []).observing,
     autoAdvance: S.autoAdvance,

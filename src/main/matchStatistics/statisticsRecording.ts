@@ -1,7 +1,7 @@
 /**
  * Writes one `side_statistics` event at a strategic step boundary.
  *
- * Purpose: Upkeep and production come from engine functions that read the live match, so the numbers are computed at each turn boundary and stored as one event.
+ * Purpose: The numbers describe the live match at one turn boundary, so they are read then and stored as one event. Upkeep and treasury come from `readMercenaryFunds`, the function the top bar's credits readout uses. Production capacity is a SQL sum in `sideStatisticsRead.ts` that follows the top bar's rule (`computeTopBarStats`).
  * When to use: From the recorder, directly after a strategic frame is written. The recorder passes its own event writer, so this module does not import it at runtime.
  * Expected outcome: One engine-only event per call at a strategic step. Nothing at a tactical step.
  * Exceptions: None. A failure is logged and swallowed.
@@ -15,6 +15,7 @@ import type { MatchEventRequest } from '../recorder/matchRecorder';
 import type { StepKey } from '../../shared/matchRecording';
 import type { RelationshipReport, SeatForStatistics, TurnStatistics } from '../../shared/matchStatistics';
 import { readSideStatistics } from './sideStatisticsRead';
+import { takeSpentMissileIds } from './spentMissiles';
 import {
   hexesTakenBetween,
   readTurnOwnership,
@@ -62,7 +63,7 @@ export function recordTurnStatistics(
     const seatIds = seats.map((seat) => seat.seatId);
     const current = readTurnOwnership(gameDbOps, step.turnNumber, generation);
     const previous = rememberedTurnOwnership(step.turnNumber - 1, generation);
-    const lost = unitsLostBySeat(previous, current, seatIds);
+    const lost = unitsLostBySeat(previous, current, seatIds, takeSpentMissileIds());
     const sides = readSideStatistics(gameDbOps, seats).map((side) => ({
       ...side,
       unitsLost: lost?.get(side.seatId) ?? null,

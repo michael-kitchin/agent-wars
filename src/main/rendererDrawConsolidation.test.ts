@@ -150,7 +150,7 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
   );
   assert.ok(
     shouldDrawCommittedOrderPathsFn.includes('return !S.shiftKeyActive && !replayActive();'),
-    'shouldDrawCommittedOrderPaths should hide committed paths while Shift is held for stack selection'
+    'shouldDrawCommittedOrderPaths should hide committed paths while Shift is held for stack selection or replay is showing a past turn'
   );
   assert.ok(
     drawSceneFn.includes(

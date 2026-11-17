@@ -6,7 +6,7 @@ The engine is the authority. The symbols named below are the ones to check when 
 
 ## What is recorded
 
-`recordTurnStatistics` (`src/main/matchStatistics/statisticsRecording.ts`) writes one `side_statistics` event directly after each strategic frame, including the forced final frame at match end. The recorder calls it from `insertFrame` in `src/main/recorder/matchRecorder.ts`. A tactical step writes nothing. A turn with a battle has a second strategic frame after the battle and so a second event. Readers use the last event for each turn (`readStatisticsHistory`). The event is engine-only, format version 1. Its row layout and visibility are in [match-recording.md](match-recording.md).
+`recordTurnStatistics` (`src/main/matchStatistics/statisticsRecording.ts`) writes one `side_statistics` event directly after each strategic frame, including the forced final frame at match end. The recorder calls it from `insertFrame` in `src/main/recorder/matchRecorder.ts`. A tactical step writes nothing. A turn with a battle has a second strategic frame after the battle and so a second event. Readers use the last event for each turn (`readStatisticsHistory`). The event is engine-only, format version 1. The reader skips a row of another format version and a row whose payload cannot be decoded or is not a turn's statistics, and logs the skip, so one damaged row does not empty the charts (`listReadableMatchEventsOfType` in `src/main/recorder/matchRecordStore.ts`). Its row layout and visibility are in [match-recording.md](match-recording.md).
 
 The payload is `TurnStatistics` (`src/shared/matchStatistics.ts`): the turn number, one `SideStatistics` per seat in side order, every stored stance row as a `RelationshipReport`, and `hexesTaken`. Statistics are strategic. Tactical sub-units are not counted.
 
@@ -19,7 +19,7 @@ A match that began in an earlier build has no statistics before the turn it was 
 | `builtUnits` | Units the seat owns that are not mercenaries, keyed by `STATISTIC_UNIT_TYPES` (infantry, armor, naval, air, missile). Every key is present | `readSideStatistics`, a count of `units` by `unit_type` and `is_mercenary` |
 | `mercenaryUnits` | Mercenaries the seat owns, keyed by `STATISTIC_MERCENARY_TYPES` (infantry, armor, naval, air) | `readSideStatistics` |
 | `hexes` | Strategic hexes the seat controls | A count of `res_s_control` rows |
-| `productionPerTurn` | City cells in the controlled hexes, leaving out neutral-border hexes. This is production capacity, the figure the top bar shows as Production per turn (`computeTopBarStats`). A controlled city with no build queue still counts | The sum of `res_s_infrastructure.urban_hex_count`, skipping `hexes.map_role` of `neutral_border` |
+| `productionPerTurn` | City cells in the controlled hexes, leaving out neutral-border hexes. This is production capacity, the figure the top bar shows as Production per turn (`computeTopBarStats`). A controlled city with no build queue still counts | A SQL sum in `readSideStatistics` (`src/main/matchStatistics/sideStatisticsRead.ts`) of `res_s_infrastructure.urban_hex_count`, each hex's count truncated toward zero and floored at 0 as the top bar does, skipping `hexes.map_role` of `neutral_border`, the role `isNeutralBorderHex` reads |
 | `storedPoints` | Unspent production points in the controlled hexes | The sum of `res_s_build_progress.stored_points` |
 | `treasury` | The seat's credits | `readMercenaryFunds` (`src/main/gameDb/mercenaryEconomyRead.ts`) |
 | `upkeepPerTurn` | Credits owed for mercenaries each turn | `readMercenaryFunds`, the same function the top bar's credits readout uses |
@@ -33,7 +33,9 @@ A side's production per turn is the sum of the city cells in the hexes it contro
 
 `unitsLost` and `hexesTaken` are differences from the previous turn. The previous turn's ownership is kept in memory (`rememberTurnOwnership`), not in the save, so both are null for the first turn after a load, after a new match, and after a gap of more than one turn. A value a commander never reported (trust or threat) is null, and each reported value carries the turn it was reported (`reportedTurn`).
 
-`unitsLost` is an ownership difference. A unit that disappeared or changed owner counts as lost by its old owner, so a deserting mercenary counts. Who destroyed each unit is a different record: the `losses_attributed` event described in [match-recording.md](match-recording.md). The two numbers can differ, and both are kept.
+`unitsLost` is an ownership difference. A unit that disappeared or changed owner counts as lost by its old owner, so a deserting mercenary counts. A launched missile does not count, because a launch deletes the missile (`spendMissile` in `src/main/gameActions/missileLaunchResolution.ts`) and a spent missile is not a loss. The launch is noted with `noteSpentMissile` in `src/main/matchStatistics/spentMissiles.ts`, and `unitsLostBySeat` leaves those ids out. A missile destroyed in melee, or one that changed owner, still counts. Who destroyed each unit is a different record: the `losses_attributed` event described in [match-recording.md](match-recording.md). The two numbers can differ, and both are kept.
+
+The two records also file a loss under different turns. A unit lost while turn N resolves is in the `losses_attributed` event at strategic step N, the turn that resolved (`captureStrategicTurnLossNote`). The frame written after that resolution is turn N+1's, so the same loss is in `unitsLost` of turn N+1's `side_statistics` event.
 
 ## Relationship metrics
 
@@ -48,7 +50,7 @@ The first three come from the talk reply and are stored in `side_stances`. See [
 
 ## Who may see it
 
-The charts are for the human player only, and the player sees every value whatever fog of war is set to. `game:readMatchCharts` (`src/main/ipc/matchChartsIpcHandler.ts`) applies no fog filter and returns a `MatchChartsSnapshot`: the seats in side order with their `sideDisplayName` names, the recorded turns in turn order, and the current turn. With no match open it returns empty lists and turn 1.
+The charts are for the human player only, and the player sees every value whatever fog of war is set to. `game:readMatchCharts` (`src/main/ipc/matchChartsIpcHandler.ts`) applies no fog filter and returns a `MatchChartsSnapshot`: the seats in side order with their `sideDisplayName` names, the recorded turns in turn order, and the current turn. With no match open it returns empty lists and turn 1. A failed read is logged and rejected, so the dialog shows its load error instead of an empty series.
 
 Commanders are told nothing new. No prompt contains another side's statistics or another commander's stance, trust, or threat, with fog of war on or off. A commander sees only its own stance, trust, and threat, in the Sides table of the talk prompt and the stance list of the orders prompt. Nothing under `src/main/openRouter/` calls the charts channel or reads the statistics event.
 

@@ -23,6 +23,18 @@ export function shouldDrawCommittedOrderPaths(): boolean {
 }
 
 /**
+ * Whether the draft orders still being planned should be drawn on the overlay canvas.
+ *
+ * Purpose: Queued battle marches, the march hover preview, and pending ranged, air, missile, and ferry orders belong to the present. During replay they would be drawn over a past turn or beat, so replay hides them.
+ * When to use: At the start of `drawPendingMarchesHoverAndSupportOrderStack`, which draws all of them.
+ * Expected outcome: `false` while replay is on; otherwise `true`.
+ * Exceptions: None.
+ */
+export function shouldDrawPendingOrderOverlays(): boolean {
+  return !replayActive();
+}
+
+/**
  * Whether the hovered march preview polyline should be drawn for the current selection.
  *
  * Purpose: Suppresses preview when Shift is held or nothing is selected.

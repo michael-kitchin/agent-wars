@@ -15,26 +15,7 @@ import {
   type LineChartData,
   type TurnRange,
 } from '../../shared/matchChartSeries';
-
-/**
- * The narrowest span, in turns, a wheel zoom may reach.
- *
- * Purpose: A chart zoomed to one turn has nothing to read.
- * When to use: The wheel handler.
- * Expected outcome: 2.
- * Exceptions: None.
- */
-const MIN_ZOOM_SPAN_TURNS = 2;
-
-/**
- * The span multiplier for one wheel step that zooms in.
- *
- * Purpose: Scrolling up narrows the visible turns.
- * When to use: The wheel handler.
- * Expected outcome: 0.8. Zooming out uses its reciprocal.
- * Exceptions: None.
- */
-const WHEEL_ZOOM_IN_FACTOR = 0.8;
+import { MIN_ZOOM_SPAN_TURNS, WHEEL_ZOOM_IN_FACTOR } from './chartZoom';
 
 /**
  * Tick spacings, in turns, the X axis may use.

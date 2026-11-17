@@ -213,3 +213,58 @@ test('the live beat and replay build a beat animation through the same function'
   assertMatches(play, /tacticalPlaybackNeeded\(/, 'replay tests the recorded playback with the shared function');
   assertMatches(play, /buildTacticalResolutionAnimation\(\{[^}]*subUnitsBefore: view\.subUnitsBefore/, 'replay builds the beat animation from the recorded sub-units');
 });
+
+test('draft order lines are not drawn over a past turn or beat', () => {
+  const policy = getFunctionSource(readRendererSource('rendering', 'canvasPreviewPolicy.ts'), 'shouldDrawPendingOrderOverlays');
+  assertMatches(policy, /return !replayActive\(\);/, 'the pending-order policy is off during replay');
+  const stages = readRendererSource('rendering', 'orderOverlayStages.ts');
+  // The signature holds an object type, so the body is read from the declaration to the end of the file.
+  const stack = stages.slice(stages.indexOf('export function drawPendingMarchesHoverAndSupportOrderStack('));
+  const guard = stack.indexOf('if (!shouldDrawPendingOrderOverlays()) return;');
+  assert.ok(guard >= 0, 'the overlay stack asks the pending-order policy');
+  assert.ok(guard < stack.indexOf('drawTacticalPendingMarchesFirst?.()'), 'the guard comes before the queued battle marches');
+  assert.ok(guard < stack.indexOf('drawPendingSupportOrderOverlays('), 'the guard comes before the support orders');
+});
+
+test('the commander cards cannot change a commander and a cost refresh leaves the past seats alone during replay', () => {
+  const cards = readRendererSource('openRouter', 'commanderCardsUi.ts');
+  assertMatches(getFunctionSource(cards, 'cardElement'), /summary\.disabled = presentation\.summaryDisabled \|\| replayActive\(\);/, 'the summary button is disabled in replay');
+  assertMatches(getFunctionSource(cards, 'openSeatCommander'), /if \(replayActive\(\) \|\|/, 'the popover does not open in replay');
+  assertMatches(getFunctionSource(cards, 'saveCommander'), /^[^\n]*\{\r?\n\s+if \(replayActive\(\)\) return;/, 'a save does nothing in replay');
+  assertMatches(cards, /onReplayChange\(/, 'the cards repaint when replay turns on or off');
+  const pool = getFunctionSource(readRendererSource('openRouter', 'commanderPoolClient.ts'), 'refreshSeatCosts');
+  assert.equal(pool.split('replayActive()').length - 1, 2, 'the seat-cost refresh checks replay before the read and before it writes');
+});
+
+test('replay keeps the selection from before it and puts it back on leaving', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  const toggle = getFunctionSource(mode, 'toggleReplay');
+  const saved = toggle.indexOf('savedSelection = [...S.selectedUnitIds];');
+  assert.ok(saved >= 0 && saved < toggle.indexOf('clearSelectionLikeRightClick('), 'the selection is copied before it is cleared');
+  const leave = getFunctionSource(mode, 'leaveReplay');
+  assert.ok(leave.indexOf('restoreSelection(selection)') > leave.indexOf('applyGameStateSnapshot(live'), 'the selection returns after the live snapshot');
+  assertMatches(getFunctionSource(mode, 'restoreSelection'), /replaceSelection\(/, 'the restored ids are reconciled through replaceSelection');
+});
+
+test('a replay animation never moves the watch camera', () => {
+  assertMatches(getFunctionSource(readRendererSource('gameplay', 'observeChrome.ts'), 'frameAutomaticWatchCamera'), /if \(replayActive\(\) \|\|/, 'the watch camera does nothing in replay');
+  const frame = readRendererSource('map', 'unitFrameCamera.ts');
+  assertMatches(getFunctionSource(frame, 'frameStrategicUnits'), /replayActive\(\)\) return;/, 'strategic framing does nothing in replay');
+  assertMatches(getFunctionSource(frame, 'frameBattleUnits'), /replayActive\(\)\) return;/, 'battle framing does nothing in replay');
+});
+
+test('a played step starts no frames when replay was left while it was presented', () => {
+  const step = getFunctionSource(readRendererSource('replay', 'replayPlayback.ts'), 'playReplayStep');
+  const check = step.indexOf('S.resolutionMoveAnimation !== animation');
+  assert.ok(check > step.indexOf('await presentReplayStep('), 'the animation is checked after the step is presented');
+  assert.ok(check < step.indexOf('startResolutionAnimationFrames('), 'the check comes before the frames start');
+  assertMatches(step, /!continues\(\)/, 'the step asks whether playback continues');
+});
+
+test('entering over the world map drops a kept battle, and leaving waits for a loading step', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  assertMatches(getFunctionSource(mode, 'toggleReplay'), /savedBattle = timeline\.scope === 'tactical' \? copyBattleState\(\) : null;/, 'a strategic entry clears the kept battle');
+  const leave = getFunctionSource(mode, 'leaveReplay');
+  assert.equal(/state\.busy\) return;/.test(leave), false, 'a loading step does not cancel leaving');
+  assertMatches(leave, /await waitForStepToSettle\(\);/, 'leaving waits for the step to settle');
+});

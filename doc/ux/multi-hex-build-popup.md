@@ -29,7 +29,7 @@ Shared row editing is the same as [build-popup.md](build-popup.md). Costs and ca
 
 ### Mouse
 
-- When the player adds a template row, changes a type, changes a count, or removes a row, the template is written to every selected hex. A hex that cannot build a type skips that type.
+- When the player adds a template row, changes a type, changes a count, or removes a row, the template is written to every selected hex. A hex that cannot build a type skips that type. A seaport with no sea access skips a naval row, and the naval rows already queued at that hex stay in its queue with their own counts, at the place of the template's first naval row (`executeApplyBuildQueueTemplateToHexes`). No naval is added there, and a ship queued before sea access was required still finishes. A template with no naval row drops them, as it drops any row it does not list.
 - When the first extra hex is added, the template is seeded from the hex that was already open. If that seed fails, the new hex is not kept and an error toast says the template failed to load.
 - When a further hex is added, the current template is applied to that hex.
 - When the player changes Keep building, the flag is set or cleared on every selected hex.

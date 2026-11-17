@@ -473,11 +473,21 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
     ipcRenderer.invoke(IPC_GAME.readMatchCharts),
   /**
    * Lists the recorded turns replay can show.
+   *
+   * Purpose: The replay panel knows how far it can step before it loads any snapshot.
+   * When to use: When the player enters replay.
+   * Expected outcome: The strategic steps of the current view oldest first, or the open battle's beats when a battle is open. Empty with the recorder off, nothing recorded, or a failed read in the main process.
+   * Exceptions: Rejects when the IPC channel fails.
    */
   readReplayTimeline: (): Promise<ReplayTimeline> =>
     ipcRenderer.invoke(IPC_GAME.readReplayTimeline),
   /**
    * Reads one recorded turn with its snapshot and what its dialogs showed.
+   *
+   * Purpose: Replay draws the recorded snapshot and the dialogs that were showing when the turn or beat began.
+   * When to use: When replay shows a step that `readReplayTimeline` listed, passing that step's `recordId`.
+   * Expected outcome: The step's view, or null when the record is missing, is not a view snapshot, belongs to another view or level than the timeline's, the payload has no integer `recordId`, or the main-process read failed.
+   * Exceptions: Rejects when the IPC channel fails.
    */
   readReplayStep: (payload: { recordId: number }): Promise<ReplayStepView | null> =>
     ipcRenderer.invoke(IPC_GAME.readReplayStep, payload),

@@ -71,11 +71,11 @@ export function observeAutoAdvanceHeldForBattleEntry(): boolean {
  *
  * Purpose: Turning auto-advance on, and the end of playback, share one camera decision.
  * When to use: The observe checkbox, Watch the rest, and playback finishing.
- * Expected outcome: An open battle frames its current beat. A world-map planning turn frames visible units. A held battle entry does nothing.
+ * Expected outcome: An open battle frames its current beat. A world-map planning turn frames visible units. A held battle entry does nothing, and so does replay, whose animations end on past turns and beats.
  * Exceptions: None.
  */
 export function frameAutomaticWatchCamera(): void {
-  if (observeAutoAdvanceHeldForBattleEntry()) return;
+  if (replayActive() || observeAutoAdvanceHeldForBattleEntry()) return;
   if (S.tacticalBattleSnapshot && S.tacticalBattleSnapshot.aiOnlyEndReason == null) {
     frameOpenAutomaticBattle();
     return;

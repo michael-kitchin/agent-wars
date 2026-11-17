@@ -46,9 +46,9 @@ function readUnitCounts(
 /**
  * Reads the hex, production, and stored-point totals for one seat.
  *
- * Purpose: Production capacity counts city cells in controlled hexes, leaving out neutral-border hexes, as the top bar does.
+ * Purpose: Production capacity counts city cells in controlled hexes, leaving out neutral-border hexes, as the top bar does (`computeTopBarStats`).
  * When to use: Once per seat.
- * Expected outcome: The controlled hex count, the capacity, and the unspent points.
+ * Expected outcome: The controlled hex count, the capacity, and the unspent points. Each hex's `urban_hex_count` is truncated toward zero and floored at 0 before it is summed, the top bar's `Math.max(0, Math.trunc(...))`. A hex is left out when `hexes.map_role` is `neutral_border`, the same role `isNeutralBorderHex` reads, because seeding copies the loaded role into that column.
  * Exceptions: Propagates a SQLite error.
  */
 function readHexTotals(
@@ -57,7 +57,7 @@ function readHexTotals(
 ): { readonly hexes: number; readonly productionPerTurn: number; readonly storedPoints: number } {
   const hexes = ops.getOne<{ n: number }>('SELECT COUNT(*) AS n FROM res_s_control WHERE controller_player_id = ?', [seatId])?.n ?? 0;
   const production = ops.getOne<{ n: number | null }>(
-    `SELECT SUM(i.urban_hex_count) AS n
+    `SELECT SUM(MAX(0, CAST(i.urban_hex_count AS INTEGER))) AS n
      FROM res_s_control c
      JOIN res_s_infrastructure i ON i.h3_index = c.h3_index
      JOIN hexes h ON h.h3_index = c.h3_index

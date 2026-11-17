@@ -13,6 +13,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
+import { isLandSeaportHex } from '../../shared/navalStrategicEdges';
 import type { SeaAccessCheck } from '../../shared/seaAccess';
 import { hexHasSeaAccess } from '../gameDb/seaAccessReads';
 import { gridHopDistancesFrom } from '../tools/assessUnitProximity';
@@ -21,7 +22,7 @@ import { SECTION_TITLE_NAVAL_TRANSPORT_STATUS, topLevelHeading } from './promptS
 /**
  * Returns the closest hex where this player may embark, using the same rule as stack sealift.
  *
- * Purpose: Naval Transport Status "Nearest Embark Hex" must match `canEmbarkAtHex` (coastal and land seaports with sea access without control; water seaports only when controlled). Sea access comes from `seaAccessOf`, never from `state.hexes`, because a commander's snapshot can mask terrain.
+ * Purpose: Naval Transport Status "Nearest Embark Hex" must match `canEmbarkAtHex` (coastal and land seaports with sea access without control; water seaports only when controlled). Sea access comes from `seaAccessOf`, never from `state.hexes`, because a commander's snapshot can mask terrain. Only a land seaport reads sea access, so `seaAccessOf` is called for land seaports only.
  * When to use: Strategic `buildSealiftBriefingBlock` for each opponent naval unit.
  * Expected outcome: Formatted hex plus hop count, or `—` when no eligible hex is in the snapshot. Hops use neighbor BFS so pentagon-crossing pairs still score.
  * Exceptions: Unreachable or invalid cells are omitted.
@@ -38,13 +39,12 @@ function findNearestOpponentEmbarkHex(
   const legalH3: string[] = [];
   for (const hex of state.hexes) {
     const seaport = Number(infraByHex.get(hex.h3Index)?.seaportCount ?? 0);
+    const terrain = { nativeTerrain: hex.terrain, terrainKind: hex.terrainKind, hasSeaport: seaport > 0 };
     if (
       canEmbarkAtHex({
-        nativeTerrain: hex.terrain,
-        terrainKind: hex.terrainKind,
-        hasSeaport: seaport > 0,
+        ...terrain,
         hexControlledByPlayer: controlByHex.get(hex.h3Index) === ownSeatId,
-        seaAccess: seaport > 0 && seaAccessOf(hex.h3Index),
+        seaAccess: isLandSeaportHex(terrain) && seaAccessOf(hex.h3Index),
       })
     ) {
       legalH3.push(hex.h3Index);

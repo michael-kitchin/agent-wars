@@ -17,6 +17,7 @@ import { AI_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from '../../shared/
 import { sideDisplayName, defaultAiNickname } from '../../shared/sideNicknames';
 import { repaintChatThread } from '../chat/chatPanelClient';
 import { rendererSharedState as S } from '../core/state';
+import { onReplayChange, replayActive } from '../replay/replayState';
 import { commanderPoolStatuses, subscribeCommanderPool } from './commanderPoolClient';
 import { commanderPopoverIsOpen, openCommanderPopover, reanchorCommanderPopover } from './commanderPopover';
 import { syncOpenRouterRunToggle } from './openRouterRunToggle';
@@ -125,7 +126,7 @@ function option(label: string, value: string): HTMLOptionElement {
  *
  * Purpose: The dot, name, status, cost, and summary stay together.
  * When to use: Each AI seat.
- * Expected outcome: The summary button opens the commander popover, except when the seat is out.
+ * Expected outcome: The summary button opens the commander popover, except when the seat is out or replay is on.
  * Exceptions: None.
  */
 function cardElement(seat: SeatSnapshot): HTMLElement {
@@ -157,7 +158,7 @@ function cardElement(seat: SeatSnapshot): HTMLElement {
   summary.className = 'commander-card-summary';
   summary.dataset.seatId = seat.seatId;
   summary.textContent = summaryText(seat);
-  summary.disabled = presentation.summaryDisabled;
+  summary.disabled = presentation.summaryDisabled || replayActive();
   summary.addEventListener('click', () => void openSeatCommander(seat, summary));
   card.append(dot, name, chip, cost, summary);
   if (presentation.detail) {
@@ -221,11 +222,11 @@ function modelLabel(modelId: string | null): string | null {
  *
  * Purpose: Changes are saved on that seat. The key is loaded before the popover can save.
  * When to use: The summary button.
- * Expected outcome: The popover opens under the button after the key fetch settles. A knocked-out seat is not opened. A failed fetch leaves the key field empty and does not send an empty key.
+ * Expected outcome: The popover opens under the button after the key fetch settles. A knocked-out seat is not opened, and nothing opens while replay is on. A failed fetch leaves the key field empty and does not send an empty key.
  * Exceptions: None. A rejected save is logged by `saveCommander`. A rejected key fetch is logged here.
  */
 async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promise<void> {
-  if (!seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
+  if (replayActive() || !seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
   const seatId = seat.seatId;
   let includeKey = false;
   let apiKey = '';
@@ -238,7 +239,7 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
   } catch (err) {
     console.error('getSeatApiKey failed', seatId, err);
   }
-  if (!anchor.isConnected) return;
+  if (!anchor.isConnected || replayActive()) return;
   const commander: NewGameCommanderInput = {
     modelId: seat.commander.modelId,
     reasoningEffort: seat.commander.reasoningEffort,
@@ -276,13 +277,14 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
  *
  * Purpose: The card follows the seat the main process stored.
  * When to use: The popover's change.
- * Expected outcome: That seat in the snapshot is replaced, the cards render again, and the message panel repaints with the new name.
+ * Expected outcome: That seat in the snapshot is replaced, the cards render again, and the message panel repaints with the new name. Nothing is sent while replay is on, and a reply that arrives during replay leaves the past snapshot alone.
  * Exceptions: A rejected IPC is logged and does not throw.
  */
 async function saveCommander(seatId: AiSeatId, commander: NewGameCommanderInput): Promise<void> {
+  if (replayActive()) return;
   try {
     const updated = await window.gameApi?.setSeatCommander(seatId, commander);
-    if (!updated || !S.gameState?.seats) return;
+    if (!updated || !S.gameState?.seats || replayActive()) return;
     S.gameState = { ...S.gameState, seats: S.gameState.seats.map((seat) => (seat.seatId === updated.seatId ? updated : seat)) };
     renderCommanderCards();
     repaintChatThread();
@@ -305,5 +307,21 @@ function formatCost(dollars: number): string {
 }
 
 subscribeCommanderPool(() => {
+  renderCommanderCards();
+});
+
+/**
+ * Whether the cards on screen were painted while replay was on.
+ *
+ * Purpose: The replay listener repaints only when replay turns on or off, not on every step change.
+ * When to use: The replay change listener below.
+ * Expected outcome: Matches `replayActive()` as of the last repaint the listener made.
+ * Exceptions: None.
+ */
+let cardsPaintedForReplay = false;
+
+onReplayChange(() => {
+  if (replayActive() === cardsPaintedForReplay) return;
+  cardsPaintedForReplay = replayActive();
   renderCommanderCards();
 });

@@ -8,8 +8,9 @@
  */
 
 import type { BasicDbOps } from '../gameDb/dbOps';
-import { logDebug, logTrace } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import {
+  MATCH_EVENT_FORMAT_VERSIONS,
   stepKeyText,
   visibilityText,
   type MatchEventType,
@@ -323,6 +324,44 @@ export function listMatchEventsOfType(ops: BasicDbOps, recordType: MatchEventTyp
   );
   logTrace('matchRecordStore listMatchEventsOfType', { recordType, count: rows.length });
   return rows.map(toMatchRecord);
+}
+
+/**
+ * Lists the events of one type that this build can read, skipping the rest.
+ *
+ * Purpose: A chart series must survive one damaged or newer row. `listMatchEventsOfType` throws on the first bad payload, which would empty every chart.
+ * When to use: A reader that shows whatever it can, such as the statistics history. Use `listMatchEventsOfType` when one bad row must fail the read.
+ * Expected outcome: Rows with that `record_type` whose `format_version` is `MATCH_EVENT_FORMAT_VERSIONS[recordType]` and whose payload decodes, ordered by `record_id`. A row of another version is skipped and logged at debug level. A payload that fails to decode is skipped and logged at error level with its record id.
+ * Exceptions: Propagates a SQLite error. A decode error is caught per row.
+ */
+export function listReadableMatchEventsOfType(ops: BasicDbOps, recordType: MatchEventType): MatchRecord[] {
+  const supportedVersion = MATCH_EVENT_FORMAT_VERSIONS[recordType];
+  const rows = ops.getAll<StoredMatchRecordRow>(
+    `SELECT ${RECORD_COLUMNS} FROM match_records WHERE kind = 'event' AND record_type = ? ORDER BY record_id ASC`,
+    [recordType]
+  );
+  logDebug('matchRecordStore listReadableMatchEventsOfType', { recordType, supportedVersion, count: rows.length });
+  return rows.flatMap((row) => {
+    if (row.format_version !== supportedVersion) {
+      logDebug('matchRecordStore listReadableMatchEventsOfType: skipped a row of another format version', {
+        recordType,
+        recordId: row.record_id,
+        formatVersion: row.format_version,
+        supportedVersion,
+      });
+      return [];
+    }
+    try {
+      return [toMatchRecord(row)];
+    } catch (err) {
+      logError('matchRecordStore listReadableMatchEventsOfType: skipped a payload that could not be decoded', {
+        recordType,
+        recordId: row.record_id,
+        err,
+      });
+      return [];
+    }
+  });
 }
 
 /**

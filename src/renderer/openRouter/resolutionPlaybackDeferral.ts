@@ -149,7 +149,9 @@ export function flushResolutionPlaybackCompleteNotifyCallbacks(): void {
     }
   }
   notifyResolutionPlaybackFinished();
-}/**
+}
+
+/**
  * Whether a playback-complete notify is waiting to be flushed.
  *
  * Purpose: A live turn whose announcement failed can leave a notify queued with no animation running. Replay must not let its own animation end send it.
@@ -160,5 +162,3 @@ export function flushResolutionPlaybackCompleteNotifyCallbacks(): void {
 export function hasQueuedResolutionPlaybackCompleteNotify(): boolean {
   return playbackCompleteNotifyQueue.length > 0;
 }
-
-

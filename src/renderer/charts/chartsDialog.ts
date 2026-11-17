@@ -90,6 +90,16 @@ let openEpoch = 0;
 let previousFocus: HTMLElement | null = null;
 
 /**
+ * Whether the last press inside the overlay started on the backdrop itself.
+ *
+ * Purpose: A click closes the dialog only when both the press and the release were on the backdrop, so a text selection dragged out of the dialog does not close it.
+ * When to use: Set by the overlay's `pointerdown` listener, read and cleared by its `click` listener.
+ * Expected outcome: True between a press on the backdrop and the click that follows it.
+ * Exceptions: None.
+ */
+let pressStartedOnBackdrop = false;
+
+/**
  * Finds the overlay element.
  *
  * Purpose: Every function reaches the dialog through its ids.
@@ -499,7 +509,7 @@ function closeDialog(overlay: HTMLElement): void {
 /**
  * Binds the close button, the backdrop, and the Tab trap.
  *
- * Purpose: The dialog closes from its button and from a click outside it, and keeps focus inside. The overlay stops pointer events from reaching the map.
+ * Purpose: The dialog closes from its button and from a click outside it that also started outside it, and keeps focus inside. The overlay stops pointer events from reaching the map.
  * When to use: Once at start-up.
  * Expected outcome: The listeners exist.
  * Exceptions: None.
@@ -508,9 +518,14 @@ export function wireChartsDialog(): void {
   const overlay = overlayElement();
   if (overlay === null) return;
   document.getElementById('charts-dialog-close')?.addEventListener('click', () => closeDialog(overlay));
+  overlay.addEventListener('pointerdown', (event) => {
+    pressStartedOnBackdrop = event.target === overlay;
+  });
   overlay.addEventListener('click', (event) => {
     event.stopPropagation();
-    if (event.target === overlay) closeDialog(overlay);
+    const fromBackdrop = pressStartedOnBackdrop;
+    pressStartedOnBackdrop = false;
+    if (event.target === overlay && fromBackdrop) closeDialog(overlay);
   });
   overlay.addEventListener('keydown', trapTabKey);
   for (const type of ['pointerdown', 'mousedown', 'dblclick', 'wheel']) {

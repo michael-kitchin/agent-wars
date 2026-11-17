@@ -47,9 +47,17 @@ beforeEach(() => forgetTurnOwnershipForTests());
 test('a unit that vanishes or changes owner is lost by its old owner', () => {
   const previous = ownership(1, { a: 'human', b: 'human', c: 'opponent', d: 'neutral' }, {});
   const current = ownership(2, { b: 'opponent', c: 'opponent' }, {});
-  const lost = unitsLostBySeat(previous, current, seats);
+  const lost = unitsLostBySeat(previous, current, seats, new Set());
   assert.equal(lost?.get('human'), 2);
   assert.equal(lost?.get('opponent'), 0);
+});
+
+test('a launched missile is spent, not lost; a destroyed missile and one that changes owner are lost', () => {
+  const previous = ownership(1, { missileA: 'human', missileB: 'opponent', missileC: 'opponent', infantry: 'human' }, {});
+  const current = ownership(2, { missileB: 'human' }, {});
+  const lost = unitsLostBySeat(previous, current, seats, new Set(['missileA']));
+  assert.equal(lost?.get('human'), 1);
+  assert.equal(lost?.get('opponent'), 2);
 });
 
 test('a hex that moves between seats is one hex taken, and other changes are not captures', () => {
@@ -60,9 +68,9 @@ test('a hex that moves between seats is one hex taken, and other changes are not
 
 test('a missing previous turn, another match, and a gap are unknown', () => {
   const current = ownership(3, {}, {});
-  assert.equal(unitsLostBySeat(null, current, seats), null);
+  assert.equal(unitsLostBySeat(null, current, seats, new Set()), null);
   assert.equal(hexesTakenBetween(null, current, seats), null);
-  assert.equal(unitsLostBySeat(ownership(2, {}, {}, 9), current, seats), null);
+  assert.equal(unitsLostBySeat(ownership(2, {}, {}, 9), current, seats, new Set()), null);
   assert.equal(hexesTakenBetween(ownership(1, {}, {}), current, seats), null);
   assert.deepEqual(hexesTakenBetween(ownership(2, {}, {}), current, seats), []);
 });

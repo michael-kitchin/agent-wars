@@ -8,7 +8,7 @@ Keep orders, the reports from this match, the commanders' settings, and Ready in
 
 ## Availability
 
-Shown in Strategic planning, Tactical planning, Resolution playback, the tactical battles list, and Tactical annihilation. It is not on screen in New game or Game over, including while the new-game choices are hidden, and the map widens to the window's right edge. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list is open, the console stays visible and does not receive pointer input. In Tactical annihilation, pointer input on the console is off except the annihilation dialog, which is not part of the console. While [replay](replay-panel.md) is on, the Orders tab is disabled and a selected Orders tab moves to Commanders until replay ends.
+Shown in Strategic planning, Tactical planning, Resolution playback, the tactical battles list, and Tactical annihilation. It is not on screen in New game or Game over, including while the new-game choices are hidden, and the map widens to the window's right edge. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list is open, the console stays visible and does not receive pointer input. In Tactical annihilation, pointer input on the console is off except the annihilation dialog, which is not part of the console. While [replay](replay-panel.md) is on, the Orders tab is disabled and a selected Orders tab moves to Commanders until replay ends. The commander cards on Commanders are inert during replay, so no commander can be changed.
 
 ## Information Displayed
 

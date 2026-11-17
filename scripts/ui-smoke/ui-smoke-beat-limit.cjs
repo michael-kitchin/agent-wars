@@ -103,15 +103,30 @@ function aiContestedHexStatements(state) {
 }
 
 /**
- * Waits until the battle header starts with the given text.
+ * Builds the pattern for a battle header status line that starts with one beat.
+ *
+ * Purpose: An AI-only battle with a beat limit shows " (N left)" right after the beat number (`formatAiOnlyBeatsLeftLabel`), so the line reads "Beat 1 (29 left) · Tactical planning".
+ * When to use: `waitForBattleStatus`.
+ * Expected outcome: A pattern for "Beat {beat}", an optional " (N left)", then `rest` exactly. With no `rest`, the beat number may not continue with another digit.
+ * Exceptions: None.
+ */
+function battleStatusPattern(beat, rest) {
+  const escaped = rest.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const tail = escaped === '' ? '(?!\\d)' : escaped;
+  return `^Beat ${beat}(?: \\(\\d+ left\\))?${tail}`;
+}
+
+/**
+ * Waits until the battle header shows the given beat, followed by the given text.
  *
  * Purpose: Reopening a saved battle should show that beat, not the world map.
- * When to use: After a reopen that left a battle in the file.
- * Expected outcome: Resolves when the status starts with `prefix`.
- * Exceptions: Throws a Playwright timeout, or an Error naming the status when the wait ends another way.
+ * When to use: After a reopen that left a battle in the file, or after Fight opens one.
+ * Expected outcome: Resolves when the status matches `battleStatusPattern(beat, rest)`, with or without the beats-left count.
+ * Exceptions: Throws a Playwright timeout.
  */
-async function waitForBattleStatus(page, prefix) {
-  await page.waitForFunction((expected) => (document.getElementById('battle-header-status')?.textContent || '').startsWith(expected), prefix, { timeout: 60000 });
+async function waitForBattleStatus(page, beat, rest = '') {
+  const source = battleStatusPattern(beat, rest);
+  await page.waitForFunction((pattern) => new RegExp(pattern).test(document.getElementById('battle-header-status')?.textContent || ''), source, { timeout: 60000 });
 }
 
 /**
@@ -149,13 +164,13 @@ async function runBeatLimitBattleScenes(args) {
   const battles = page.getByRole('dialog', { name: 'Tactical battles' });
   await battles.waitFor({ timeout: 120000 });
   await battles.getByRole('button', { name: 'Fight', exact: true }).click();
-  await waitForBattleStatus(page, 'Beat 1 · Tactical planning');
+  await waitForBattleStatus(page, 1, ' · Tactical planning');
 
   ({ app, page } = await args.reopen(app, [{
     sql: "UPDATE game_config SET value = json_set(value, '$.tacticalTurnNumber', 30) WHERE key = 'tactical_battle_snapshot_json_v1'",
     params: [],
   }]));
-  await waitForBattleStatus(page, 'Beat 30');
+  await waitForBattleStatus(page, 30);
   await page.waitForFunction(() => document.getElementById('ready-btn')?.disabled === false, null, { timeout: 120000 });
   await page.click('#ready-btn');
   const overlay = page.locator('#tactical-annihilation-overlay');
@@ -168,7 +183,7 @@ async function runBeatLimitBattleScenes(args) {
     sql: "UPDATE game_config SET value = json_set(json_remove(value, '$.aiOnlyEndReason'), '$.tacticalTurnNumber', 30) WHERE key = 'tactical_battle_snapshot_json_v1'",
     params: [],
   }]));
-  await waitForBattleStatus(page, 'Beat 30');
+  await waitForBattleStatus(page, 30);
   const turnBefore = (await readGameState(page)).turnNumber;
   await page.click('#observe-auto-advance-input');
   const timedOverlay = page.locator('#tactical-annihilation-overlay');
@@ -195,4 +210,4 @@ async function runBeatLimitBattleScenes(args) {
   return { app, page };
 }
 
-module.exports = { checkBeatLimitControl, runBeatLimitBattleScenes };
+module.exports = { battleStatusPattern, checkBeatLimitControl, runBeatLimitBattleScenes };

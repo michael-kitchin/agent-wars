@@ -781,6 +781,27 @@ function testLandSeaportBoardingNeedsSeaAccess(): void {
 }
 
 /**
+ * The stack popup at a land seaport with no sea access disables boarding and keeps unloading.
+ *
+ * Purpose: Every boarding pick fails at such a port, so the lists must not be offered as usable.
+ * When to use: After changes to the stack context mode or land-seaport sea access.
+ * Expected outcome: Context mode `port_no_sea_access`, the stack and row controls disabled, and debark allowed at the hex.
+ * Exceptions: None.
+ */
+function testSealiftStateDisablesEmbarkAtLandSeaportWithoutSeaAccess(): void {
+  withTempDb(() => {
+    const port = listLandSeaportsBySeaAccess().dry[0]!;
+    insertUnit('human-naval-dry-state', 'human', 'naval', port);
+    insertUnit('human-inf-dry-state', 'human', 'infantry', port);
+    assert.strictEqual(getSealiftStackContextModeForHex(port), 'port_no_sea_access');
+    const state = readSealiftStackState(port);
+    assert.strictEqual(state.controlsDisabled, true);
+    assert.strictEqual(state.debarkAllowedAtHex, true);
+    assert.strictEqual(state.navalRows[0]?.controlsDisabled, true);
+  });
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -798,6 +819,7 @@ function run(): void {
   testCanManualDebarkFromHexCoastalWaterPortAndOpenWater();
   testLandSeaportSealiftWithoutControl();
   testLandSeaportBoardingNeedsSeaAccess();
+  testSealiftStateDisablesEmbarkAtLandSeaportWithoutSeaAccess();
   testGameStateSnapshotIncludesEmbarkedOnNavalUnitId();
   testTransportLossSparesManuallyDebarkedCoLocatedLand();
   testSealiftStateDisablesDebarkButtonsOnOpenWater();

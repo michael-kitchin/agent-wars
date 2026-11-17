@@ -16,6 +16,7 @@ import { createCombatDieRoller } from '../combatDice';
 import type { CombatUnit } from '../combatUnitTypes';
 import { dbGetOne, dbRun, getHexController, listTacticalFeatureOverridesForGame, updateTacticalFeatureOverrideRow } from '../gameDb';
 import { logDebug } from '../logger';
+import { noteSpentMissile } from '../matchStatistics/spentMissiles';
 import { destroyBasedAirUnitsAtHex, pruneBuildQueueForInfrastructureState } from './airStrikeResolution';
 import { validateMissileLaunchOrder } from './missileValidation';
 
@@ -290,10 +291,11 @@ function updateClearedFlags(h3Index: string, isUrban: boolean, isAirport: boolea
  *
  * Purpose: A spent missile is not a loss. It leaves the map without a casualty row.
  * When to use: After the launch's damage has been applied.
- * Expected outcome: The unit, its standing order, and its pending launch are gone.
+ * Expected outcome: The unit, its standing order, and its pending launch are gone, and the launch is noted for the units-lost count (`noteSpentMissile`).
  * Exceptions: None.
  */
 function spendMissile(unitId: string): void {
+  noteSpentMissile(unitId);
   dbRun('DELETE FROM units WHERE id = ?', [unitId]);
   dbRun('DELETE FROM standing_orders WHERE unit_id = ?', [unitId]);
   dbRun('DELETE FROM pending_missile_launches WHERE unit_id = ?', [unitId]);

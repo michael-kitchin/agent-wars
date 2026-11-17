@@ -3,10 +3,10 @@
  *
  * Purpose: Tells the renderer whether embark controls belong at a port, on open water, or not at all.
  * When to use: `SealiftStackState.contextMode` from strategic and tactical stack builders.
- * Expected outcome: `coastal_port` is a valid human embark hex (native coastal, land seaport, or controlled water seaport). `water` is open ocean or a water seaport the human does not control. `coastal_no_port` is coastal movement terrain that is not a valid embark hex. `unsupported` is missing or inland without a seaport.
+ * Expected outcome: `coastal_port` is a valid human embark hex (native coastal, land seaport with water or coast in or next to the hex, or controlled water seaport). `water` is open ocean or a water seaport the human does not control. `coastal_no_port` is coastal movement terrain that is not a valid embark hex. `port_no_sea_access` is a land seaport with no water or coast in or next to the hex: nothing boards there, and cargo may still debark. `unsupported` is missing or inland without a seaport.
  * Exceptions: None.
  */
-export type SealiftContextMode = 'coastal_port' | 'coastal_no_port' | 'water' | 'unsupported';
+export type SealiftContextMode = 'coastal_port' | 'coastal_no_port' | 'port_no_sea_access' | 'water' | 'unsupported';
 
 /**
  * Documents the `SealiftLandUnitOption` interface as a named contract surface (export interface SealiftLandUnitOption).
@@ -85,7 +85,7 @@ slot2Disabled: boolean;
     /**
    * Whether this row's embark dropdowns are disabled.
  *
- * Contract: True on open water and `coastal_no_port`; false at a valid embark hex including a controlled water seaport. Armor in slot 1 still sets `slot2Disabled` separately.
+ * Contract: True on open water, `coastal_no_port`, and `port_no_sea_access`; false at a valid embark hex including a controlled water seaport. Armor in slot 1 still sets `slot2Disabled` separately.
  * When to use: Renderer `select.disabled` for sealift slots.
  * Expected outcome: False at controlled water seaports so cargo can board.
  * Exceptions: None.
@@ -141,7 +141,7 @@ showSealiftSection: boolean;
     /**
    * Stack classification used with `controlsDisabled` for embark dropdowns.
  *
- * Contract: `coastal_port` means the human may embark here (native coastal, land seaport, or controlled water seaport). `water` means open ocean or a water seaport the human does not control.
+ * Contract: `coastal_port` means the human may embark here (native coastal, land seaport with water or coast in or next to the hex, or controlled water seaport). `water` means open ocean or a water seaport the human does not control. `port_no_sea_access` means a land seaport with no sea access, where nothing boards and debark stays allowed.
  * When to use: Debugging and tests; the renderer gates embark on `controlsDisabled`, not this field.
  * Expected outcome: Matches `getSealiftStackContextModeForHex` for the stack hex.
  * Exceptions: None.
@@ -150,7 +150,7 @@ contextMode: SealiftContextMode;
     /**
    * Whether embark slot dropdowns are disabled for this stack.
  *
- * Contract: True for `water` and `coastal_no_port`; false for `coastal_port`.
+ * Contract: True for `water`, `coastal_no_port`, and `port_no_sea_access`; false for `coastal_port`.
  * When to use: Renderer sealift selects. Debark buttons use `debarkSlot*Enabled` instead.
  * Expected outcome: False at controlled water seaports so cargo can board.
  * Exceptions: None.

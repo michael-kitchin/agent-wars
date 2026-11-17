@@ -565,12 +565,29 @@ export function executeRemoveHexBuildQueueEntry(
 }
 
 /**
+ * Lists the naval rows already queued at a hex where naval is refused only for sea access.
+ *
+ * Purpose: Ships queued before sea access was required still finish, so a template write must not drop them.
+ * When to use: Once per hex in `executeApplyBuildQueueTemplateToHexes`, before the template rows are filtered.
+ * Expected outcome: The hex's queued naval rows as replacement rows with their remaining counts, in queue order. Empty when the hex has sea access, has no seaport, or has no naval row.
+ * Exceptions: None. SQL errors propagate.
+ */
+function queuedNavalRowsKeptForSeaAccess(h3Index: string): { unitType: BuildQueueItemType; remainingCount: number }[] {
+  if (!navalBlockedBySeaAccess(h3Index)) return [];
+  return listBuildQueueRowsForHex(h3Index)
+    .filter((row) => row.unitType === 'naval')
+    .map((row) => ({ unitType: row.unitType, remainingCount: row.remainingCount }));
+}
+
+/**
  * Applies one ordered queue template independently to every requested production hex.
  *
  * Purpose: Provides the authoritative best-effort write used by the renderer's multi-hex queue editor.
  * When to use: Synchronizing a shared template after a selected hex joins or a template row changes.
  * Expected outcome: Valid hexes are replaced in request order, unavailable unit types are reported as
- * skips, and a failure for one hex does not roll back successful sibling writes.
+ * skips, and a failure for one hex does not roll back successful sibling writes. At a seaport with no
+ * sea access, a template naval row is skipped and the hex's already-queued naval rows take the place of
+ * the first one, with their own counts, so no new naval is added and none already queued is dropped.
  * Exceptions: Exceptions are captured as per-hex failures and logged at error level.
  */
 export function executeApplyBuildQueueTemplateToHexes(
@@ -618,16 +635,16 @@ export function executeApplyBuildQueueTemplateToHexes(
         continue;
       }
       const availableTypes = new Set(context.queueView.availableUnitTypes);
+      const keptNaval = { rows: queuedNavalRowsKeptForSeaAccess(h3Index), placed: false };
       const applicableEntries = normalizedEntries.flatMap((entry) => {
         if (availableTypes.has(entry.unitType)) {
           return [{ unitType: entry.unitType, remainingCount: entry.count }];
         }
-        result.skipped.push({
-          h3Index,
-          unitType: entry.unitType,
-          reason: unavailableQueueItemReason(entry.unitType, h3Index),
-        });
-        return [];
+        const reason = unavailableQueueItemReason(entry.unitType, h3Index);
+        result.skipped.push({ h3Index, unitType: entry.unitType, reason });
+        if (reason !== NAVAL_NO_SEA_ACCESS_REASON || keptNaval.placed) return [];
+        keptNaval.placed = true;
+        return keptNaval.rows;
       });
       replaceBuildQueueForHex(h3Index, applicableEntries);
       syncStandingOrderAfterQueueMutation(h3Index);

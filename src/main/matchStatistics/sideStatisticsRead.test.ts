@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { STATISTIC_MERCENARY_TYPES, STATISTIC_UNIT_TYPES, type SeatForStatistics } from '../../shared/matchStatistics';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { computeTopBarStats } from '../../shared/topBarStats';
 import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { readMercenaryFunds } from '../gameDb/mercenaryEconomyRead';
@@ -128,5 +129,40 @@ test('production counts city cells in controlled hexes except neutral-border hex
 
     gameDbOps.run(`UPDATE hexes SET map_role = 'neutral_border' WHERE h3_index = ?`, [hex]);
     assert.equal(read().productionPerTurn, base.productionPerTurn);
+  });
+});
+
+test('a fractional or negative city-cell count is truncated and floored at zero, matching the top bar', () => {
+  const regions = largestHomeRegions(2);
+  withSeatedTempGameDb('aw-side-production-trunc-', {
+    gameMapId: 'global',
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    const seat = AI_SEAT_IDS[0];
+    const controlled = gameDbOps.getAll<{ h3_index: string }>(
+      'SELECT h3_index FROM res_s_control WHERE controller_player_id = ? LIMIT 2',
+      [seat]
+    );
+    assert.equal(controlled.length, 2);
+    gameDbOps.run('UPDATE res_s_infrastructure SET urban_hex_count = 7.9 WHERE h3_index = ?', [controlled[0]!.h3_index]);
+    gameDbOps.run('UPDATE res_s_infrastructure SET urban_hex_count = -3 WHERE h3_index = ?', [controlled[1]!.h3_index]);
+    const control = gameDbOps.getAll<{ h3Index: string; controllerPlayerId: string | null }>(
+      'SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId FROM res_s_control'
+    );
+    const infrastructure = gameDbOps.getAll<{ h3Index: string; urbanHexCount: number }>(
+      'SELECT h3_index AS h3Index, urban_hex_count AS urbanHexCount FROM res_s_infrastructure'
+    );
+    const topBar = computeTopBarStats({
+      units: [],
+      viewerSeatId: seat,
+      strategicControl: control,
+      strategicInfrastructure: infrastructure,
+    });
+    const side = readSideStatistics(gameDbOps, roster()).find((entry) => entry.seatId === seat)!;
+    assert.equal(side.productionPerTurn, topBar.productionPerTurn);
+    assert.equal(Number.isInteger(side.productionPerTurn), true);
   });
 });

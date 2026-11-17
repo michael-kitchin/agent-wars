@@ -109,21 +109,24 @@ function isDirectPredecessor(previous: TurnOwnership | null, current: TurnOwners
 /**
  * Counts the units each seat had last turn and no longer has.
  *
- * Purpose: Units lost per turn is an ownership difference. A mercenary that deserted counts as lost.
- * When to use: With the remembered previous turn and the turn just read.
- * Expected outcome: A count for every seat in `seatIds`, or null when `previous` is null, from another match, or not directly before `current`.
+ * Purpose: Units lost per turn is an ownership difference. A mercenary that deserted counts as lost. A missile that was launched does not, because a launch deletes it (`spendMissile`) and a spent missile is not a loss. A missile destroyed in combat does.
+ * When to use: With the remembered previous turn, the turn just read, and the missiles launched in between (`takeSpentMissileIds`).
+ * Expected outcome: A count for every seat in `seatIds`, or null when `previous` is null, from another match, or not directly before `current`. A unit that changed owner counts for its old owner whatever its type. A vanished unit in `spentMissileIds` is not counted.
  * Exceptions: None.
  */
 export function unitsLostBySeat(
   previous: TurnOwnership | null,
   current: TurnOwnership,
-  seatIds: readonly string[]
+  seatIds: readonly string[],
+  spentMissileIds: ReadonlySet<string>
 ): Map<string, number> | null {
   logTrace('turnDifferences unitsLostBySeat', { turnNumber: current.turnNumber, seatCount: seatIds.length });
   if (!isDirectPredecessor(previous, current)) return null;
   const lost = new Map(seatIds.map((seatId) => [seatId, 0]));
   for (const [unitId, owner] of previous.unitOwnerById) {
-    if (current.unitOwnerById.get(unitId) === owner) continue;
+    const currentOwner = current.unitOwnerById.get(unitId);
+    if (currentOwner === owner) continue;
+    if (currentOwner === undefined && spentMissileIds.has(unitId)) continue;
     const count = lost.get(owner);
     if (count !== undefined) lost.set(owner, count + 1);
   }

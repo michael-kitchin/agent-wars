@@ -13,6 +13,7 @@ import {
   type RelationshipStrip,
   type TurnRange,
 } from '../../shared/matchChartSeries';
+import { MIN_ZOOM_SPAN_TURNS, WHEEL_ZOOM_IN_FACTOR, wholeTurnRange } from './chartZoom';
 
 /**
  * The height of one reporter's row when there is room.
@@ -63,16 +64,6 @@ const LABEL_WIDTH = 120;
  * Exceptions: None.
  */
 const LETTER_MIN_CELL_WIDTH = 14;
-
-/**
- * The smallest span, in turns, a wheel zoom may reach.
- *
- * Purpose: Matches the line charts.
- * When to use: The wheel handler.
- * Expected outcome: 2.
- * Exceptions: None.
- */
-const MIN_ZOOM_SPAN_TURNS = 2;
 
 /**
  * What a caller controls about the strip.
@@ -363,14 +354,15 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
   /**
    * Applies a new visible range.
    *
-   * Purpose: One place sets `view`, so the strip and its range agree.
+   * Purpose: One place sets `view`, so the strip and its range agree. The range is rounded to whole turns, so cells fill the canvas and the turn labels stay on their cells after a zoom or a pan.
    * When to use: Wheel, drag, and double-click.
-   * Expected outcome: `view` is null for the full range, otherwise the range.
+   * Expected outcome: `view` is null for the full range, otherwise the range rounded by `wholeTurnRange`.
    * Exceptions: None.
    */
   const showRange = (range: TurnRange): void => {
     const full = fullRange();
-    view = full !== null && range.min <= full.min && range.max >= full.max ? null : range;
+    const whole = full === null ? range : wholeTurnRange(range, full);
+    view = full !== null && whole.min <= full.min && whole.max >= full.max ? null : whole;
     render();
   };
 
@@ -402,7 +394,7 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
     const full = fullRange();
     const range = visibleRange();
     if (full === null || range === null) return;
-    const factor = event.deltaY < 0 ? 0.8 : 1.25;
+    const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
     showRange(zoomedTurnRange({ range, full, anchor: turnAt(event.clientX), factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
   };
 
@@ -527,7 +519,7 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
       strip = next;
       const full = fullRange();
       if (view !== null && full !== null) {
-        view = zoomedTurnRange({ range: view, full, anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS });
+        view = wholeTurnRange(zoomedTurnRange({ range: view, full, anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }), full);
         if (view.min <= full.min && view.max >= full.max) view = null;
       } else {
         view = null;

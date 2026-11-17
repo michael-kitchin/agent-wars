@@ -101,3 +101,32 @@ test('the turn handler refreshes the open dialog and closes it before a dialog t
   assert.equal(ready.includes('closeChartsDialogIfOpen'), true);
   assert.equal(getFunctionSource(readRendererSource('charts', 'chartsDialog.ts'), 'toggleChartsDialog').includes('blockingDialogIsOpen'), true);
 });
+
+test('the line charts and the strip share one zoom module, and the strip shows whole turns', () => {
+  for (const file of ['lineChart.ts', 'relationshipTimeline.ts']) {
+    const source = readRendererSource('charts', file);
+    assert.equal(source.includes("from './chartZoom'"), true, `${file} imports the shared zoom constants`);
+    assert.equal(/const (MIN_ZOOM_SPAN_TURNS|WHEEL_ZOOM_IN_FACTOR) =/.test(source), false, `${file} does not define its own`);
+    assert.equal(/\b0\.8\b|\b1\.25\b/.test(source), false, `${file} has no literal wheel factor`);
+  }
+  const strip = readRendererSource('charts', 'relationshipTimeline.ts');
+  assert.equal(/const showRange = [^\n]*\n[\s\S]*?wholeTurnRange\(range, full\)/.test(strip), true, 'showRange rounds to whole turns');
+});
+
+test('a failed first read shows the sentence and a failed refresh keeps the charts', () => {
+  const dialog = readRendererSource('charts', 'chartsDialog.ts');
+  const first = getFunctionSource(dialog, 'renderCharts');
+  assert.equal(first.slice(first.indexOf('catch')).includes("showBodyMessage(body, 'The charts could not be loaded.')"), true);
+  const refresh = getFunctionSource(dialog, 'refreshChartsDialogIfOpen');
+  const handler = refresh.slice(refresh.indexOf('catch'));
+  for (const banned of ['destroyView', 'showBodyMessage', 'replaceChildren']) {
+    assert.equal(handler.includes(banned), false, `a failed refresh does not call ${banned}`);
+  }
+});
+
+test('a backdrop click closes the dialog only when the press started on the backdrop', () => {
+  const wire = getFunctionSource(readRendererSource('charts', 'chartsDialog.ts'), 'wireChartsDialog');
+  assert.equal(wire.includes('pressStartedOnBackdrop = event.target === overlay;'), true);
+  assert.equal(wire.includes('if (event.target === overlay && fromBackdrop) closeDialog(overlay);'), true);
+  assert.equal(readRendererSource('gameplay', 'readyHandler.ts').includes('await (closeChartsDialogIfOpen(),'), false, 'no comma expression before the intercept list');
+});

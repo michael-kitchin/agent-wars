@@ -12,7 +12,7 @@ The charts key (C) opens the dialog while a match is loaded, in Strategic planni
 
 The dialog does not open while another dialog is showing that needs the player's choice: the tactical battles list, the melee intercept list, "You're out", the start and load confirmations, the annihilation dialog, the Game Options popover, the game menu, or a commander popover (`blockingDialogIsOpen` in `src/renderer/chrome/blockingDialogGuards.ts`). The new-game screen is not on that list, because it shows the standings at game over.
 
-A match that began in an earlier build has no recorded turns before the turn it was loaded on. Until a turn is played, the dialog shows "No turns have been recorded yet." A failed read shows "The charts could not be loaded."
+A match that began in an earlier build has no recorded turns before the turn it was loaded on. Until a turn is played, the dialog shows "No turns have been recorded yet." A failed read when the dialog opens shows "The charts could not be loaded." A database error in the main process is a failed read: `buildMatchChartsSnapshot` throws and the channel rejects, rather than returning an empty snapshot. A failed read while charts are already showing leaves them as they were.
 
 ## Information Displayed
 
@@ -53,9 +53,9 @@ Hovering a turn shows "Turn {n}" and one line per commander: "{name}: {stance} (
 
 ### Mouse
 
-- Clicking the close control, or the backdrop outside the dialog, closes the dialog.
+- Clicking the close control, or the backdrop outside the dialog, closes the dialog. A backdrop click closes it only when the press also started on the backdrop, so a text selection dragged out of the dialog leaves it open.
 - Hovering a line chart shows a tooltip: "Turn {n}", one line per side with a color swatch and that side's value at the nearest turn, "no data" for a gap, and a "Total" over the values that exist. Model cost prints two decimals. Every other chart prints whole numbers.
-- The wheel over a line chart or the strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than two turns. Scrolling down zooms out, to every turn. The wheel does not scroll the dialog while the pointer is over one of them.
+- The wheel over a line chart or the strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than three turns (`MIN_ZOOM_SPAN_TURNS` in `src/renderer/charts/chartZoom.ts` is the last turn shown minus the first). Scrolling down zooms out, to every turn. Each wheel step scales the span by `WHEEL_ZOOM_IN_FACTOR` or its reciprocal. The strip always shows whole turns, so its cells fill its width and its turn labels stay under their cells after a zoom or a pan (`wholeTurnRange`). The wheel does not scroll the dialog while the pointer is over one of them.
 - Dragging a zoomed line chart or the strip left or right pans it. Dragging does not select a region.
 - A double-click on a line chart or the strip shows every turn again.
 - Changing a dropdown redraws that chart, or the strip, and keeps its zoom.
@@ -69,9 +69,9 @@ Hovering a turn shows "Turn {n}" and one line per commander: "{name}: {stance} (
 
 ### Other
 
-- The dialog reads the charts when it opens, and again after each turn or beat resolves while it is open. Every chart gains the new turn and keeps its zoom, each dropdown keeps its choice, and the body keeps its scroll position. There is no timer.
+- The dialog reads the charts when it opens, and again after each strategic turn resolves while it is open. A battle beat does not refresh it. Every chart gains the new turn and keeps its zoom, each dropdown keeps its choice, and the body keeps its scroll position. There is no timer.
 - When Ready opens the melee intercept list, or knocks the human seat out, the dialog closes first, so that dialog is not hidden under it.
-- A refresh that finds a new match has started, or a save has been loaded, closes the dialog instead of drawing the old match (`currentRendererMatchEpoch`).
+- A refresh that finds a new match has started, or a save has been loaded, closes the dialog instead of drawing the old match (`currentRendererMatchEpoch`). A refresh whose read fails is logged and keeps the charts on screen.
 - Resizing the window resizes every chart. Nothing overflows the dialog horizontally at the smallest window the app allows. The four stacks stay in one row, and their text wraps or ends in an ellipsis.
 
 ## States
@@ -114,6 +114,7 @@ None.
 - `src/renderer/charts/lineChart.ts`
 - `src/renderer/charts/relationshipStack.ts`
 - `src/renderer/charts/relationshipTimeline.ts`
+- `src/renderer/charts/chartZoom.ts` (`MIN_ZOOM_SPAN_TURNS`, `WHEEL_ZOOM_IN_FACTOR`, `wholeTurnRange`)
 - `src/renderer/chrome/blockingDialogGuards.ts`
 - `src/renderer/map/initCore.ts` (the window `keydown` handler)
 - `src/renderer/gameplay/readyHandler.ts`

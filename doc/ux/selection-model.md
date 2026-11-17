@@ -36,7 +36,7 @@ One selection drives the [selection panel](selection-panel.md), the gold ring on
 - When a grouped march or ferry is committed, the selection clears. See [order-lifecycle.md](order-lifecycle.md).
 - When the player confirms Dismiss, the mercenary and any cargo converted with a loaded ship leave the selection, because they are no longer the player's units. Hover preview and Ranged, Strike, and Launch targeting turn off. An empty selection clears the selected hex. When other units stay selected, the selected hex becomes the first remaining unit's hex. The map rings and that hex highlight follow. See [selection-panel.md](selection-panel.md).
 - Clicking a different hex does not clear an existing unit selection. Clicking the selected unit's hex but missing the icon does not clear it either.
-- Turning on [replay](replay-panel.md) clears the selection as a right-click does, and the map ignores clicks until it ends.
+- Turning on [replay](replay-panel.md) clears the selection as a right-click does, and the map ignores clicks until it ends. Leaving replay puts the earlier selection back, without any unit that no longer exists.
 - Entering New game or Game over clears the selection. Entering Tactical planning reconciles the selection to units that exist in the battle, which is usually empty. See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Selection and Targeting Modes

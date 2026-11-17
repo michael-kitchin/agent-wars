@@ -3,7 +3,7 @@
  *
  * Purpose: The player sees every side's numbers, including an opponent's treasury, with fog of war on.
  * When to use: `npm run build:main`, then `node dist/main/ipc/matchChartsIpcHandler.test.js`.
- * Expected outcome: Every seat is named, the recorded turns are listed, and with no database the snapshot is empty.
+ * Expected outcome: Every seat is named, the recorded turns are listed, with no database the snapshot is empty, and a failed read throws.
  * Exceptions: None. The temporary match is closed afterward.
  */
 
@@ -64,4 +64,18 @@ test('the snapshot lists every seat and every recorded turn with fog of war on',
 
 test('with no match open the snapshot is empty and on turn 1', () => {
   assert.deepEqual(buildMatchChartsSnapshot(), { seats: [], turns: [], currentTurnNumber: 1 });
+});
+
+test('a failed read throws instead of returning an empty snapshot', () => {
+  const regions = largestHomeRegions(2);
+  withSeatedTempGameDb('aw-match-charts-ipc-fail-', {
+    gameMapId: 'global',
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    gameDbOps.run('DROP TABLE match_records');
+    assert.throws(() => buildMatchChartsSnapshot());
+  });
 });

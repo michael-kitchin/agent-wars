@@ -9,6 +9,7 @@
 
 import * as fs from 'fs';
 import { gunzipSync } from 'node:zlib';
+import { logTrace } from '../logger';
 import {
   RECORDING_FILE_FORMAT,
   RECORDING_FILE_FORMAT_VERSION,
@@ -27,6 +28,7 @@ import {
  * Exceptions: Throws when the first line is not a header of this format, when the file version is newer than this build, or when a line is not JSON. The message names the line number.
  */
 export function parseRecordingLines(text: string): ParsedRecording {
+  logTrace('matchRecordingFile parseRecordingLines', { length: text.length });
   return parseLineList(text.split('\n').filter((line) => line.length > 0));
 }
 
@@ -39,6 +41,7 @@ export function parseRecordingLines(text: string): ParsedRecording {
  * Exceptions: Throws when the file cannot be read, is not gzip, or is not a recording this build can read.
  */
 export function readRecordingFile(filePath: string): ParsedRecording {
+  logTrace('matchRecordingFile readRecordingFile', { filePath });
   const bytes = gunzipSync(fs.readFileSync(filePath));
   const lines: string[] = [];
   let start = 0;
