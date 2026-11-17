@@ -4,7 +4,8 @@
  * Purpose: The frame checks, the console checks, the scenario checks, the map chrome checks, the battle checks, and the
  *   runner name scenes, wait, and compare boxes the same way.
  * When to use: Required by `ui-smoke-checks.cjs`, `ui-smoke-console-checks.cjs`, `ui-smoke-scenario-checks.cjs`,
- *   `ui-smoke-map-chrome-checks.cjs`, `ui-smoke-battle-checks.cjs`, `ui-smoke-new-game.cjs`, and `ui-smoke.cjs`.
+ *   `ui-smoke-map-chrome-checks.cjs`, `ui-smoke-battle-checks.cjs`, `ui-smoke-new-game.cjs`, `ui-smoke-match-options.cjs`,
+ *   and `ui-smoke.cjs`.
  * Expected outcome: Plain constants and pure functions; nothing runs on load.
  * Exceptions: None.
  */
@@ -63,6 +64,8 @@ const SCENES = Object.freeze({
   gameMenuOutside: 'game-menu-outside',
   chartsOpen: 'charts-open',
   chartsClosed: 'charts-closed',
+  matchOptionsOpen: 'match-options-open',
+  matchOptionsClosed: 'match-options-closed',
   replayOpen: 'replay-open',
   replayClosed: 'replay-closed',
   mapTech: 'map-tech',

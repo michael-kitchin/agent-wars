@@ -25,6 +25,7 @@ const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-che
 const { NEW_GAME_MOVE, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
 const { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const { checkNewGameOverBattleLabels } = require('./ui-smoke-map-label-checks.cjs');
+const { runMatchOptionsScenes } = require('./ui-smoke-match-options.cjs');
 const { runMultiCommanderScenes } = require('./ui-smoke-multi.cjs');
 const {
   LAND_UNIT_TYPES,
@@ -232,6 +233,9 @@ async function runFirstSession(app, page, report, outDir) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.chartsClosed);
+
+  // The settings button opens Game Options over the match, and Cancel closes it with nothing applied.
+  await runMatchOptionsScenes({ page, report, outDir, recordScene });
 
   // The replay key shows a past turn with its own panel in place of the selection and chat panels, and Escape leaves.
   // A unit is selected first so the selection panel is on screen before replay hides it. Leaving puts the selection

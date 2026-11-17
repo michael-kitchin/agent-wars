@@ -104,7 +104,7 @@ The user made these.
    - The top bar's settings button opens the Game Options content as a modal dialog centered over the window.
    - **Editable:**
      - Victory rule;
-     - Turn limit, limited to limits later than the current turn;
+     - Turn limit, limited to limits not earlier than the current turn (a limit equal to the current turn ends the match after that turn resolves);
      - AI-only battles;
      - Beat limit;
      - Sight cues;
@@ -646,9 +646,9 @@ Every command succeeds, or its failure is recorded as already present.
    - a valid update writes each value, and a fresh snapshot reports it;
    - Deathmatch → city hexes with limit 40 at turn 3 writes `turn_limit` = 40;
    - city hexes → Deathmatch deletes the `turn_limit` row;
-   - a limit at or before the current turn is refused, and nothing is written (compare every `game_config` row before and after);
+   - a limit equal to the current turn is accepted (at turn 30, limit 30), and a limit earlier than the current turn is refused (at turn 30, limit 20), and nothing is written (compare every `game_config` row before and after);
    - a limit outside `TURN_LIMIT_OPTIONS` (`src/shared/victoryRules.ts`) is refused;
-   - city hexes when the current turn is 50 or later is refused;
+   - city hexes when the current turn is later than 50 is refused, and at turn 50 only limit 50 is accepted;
    - **the start month is unchanged after a bonus write.** `persistOriginBonusSettings` also writes the start month, so a careless write resets the calendar to month 1;
    - Sight cues going off and then on deletes the `game_config` row keyed `SIGHT_CUE_SEEN_UNITS_CONFIG_KEY` (`src/shared/sightCueSettings.ts`), while on → on keeps it;
    - a bad enum value is refused.
@@ -789,7 +789,7 @@ Every command succeeds, or its failure is recorded as already present.
      - when `editable` is false, disable every control;
      - when it is true:
        - enable the editable ones;
-       - disable each turn-limit option whose number is not greater than `currentTurn`;
+       - disable each turn-limit option whose number is less than `currentTurn`;
        - disable the city-hexes rule option when no limit is left;
        - when the selected limit is disabled, select the first enabled one.
    - `readMatchOptionsUpdate(): MatchOptionsUpdate`. It reuses `readNewGameVictory`, `readNewGameAiOnlyBattles`, `readNewGameAiOnlyBeatLimit`, `readNewGameSightCues`, and `readNewGameOptionChoices`, and maps their results to the update type. Read each signature first; do not re-read the DOM yourself.
@@ -916,7 +916,7 @@ Every command succeeds, or its failure is recorded as already present.
 6. **Settings.**
    - During planning, change a bonus and press Apply. The next turn uses it, and the calendar month is unchanged.
    - Open the dialog during replay or a battle: it is read-only and shows the live settings.
-   - You cannot pick a turn limit at or before the current turn.
+   - You cannot pick a turn limit earlier than the current turn. A limit equal to the current turn can be picked and ends the match after that turn.
    - Cancel leaves everything as it was.
    - Start a new game afterwards: its options are the defaults.
 7. **Follow units.** In replay, turn on the magnifying glass.

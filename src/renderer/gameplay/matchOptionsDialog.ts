@@ -105,7 +105,7 @@ let editable = false;
 /**
  * The live match's turn when the dialog opened.
  *
- * Purpose: Turn limits not after this turn stay disabled after the rule changes.
+ * Purpose: Turn limits before this turn stay disabled after the rule changes.
  * When to use: Set on open, read by the limit re-lock.
  * Expected outcome: A turn number.
  * Exceptions: None.

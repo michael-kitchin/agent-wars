@@ -57,7 +57,7 @@ function isListed<T>(list: readonly T[], value: unknown): value is T {
 /**
  * Checks the win rule and the turn limit against the current turn.
  *
- * Purpose: A city-hexes limit at or before the current turn would end the match at once, or never.
+ * Purpose: The match ends after the turn that reaches the limit resolves, so a limit equal to the current turn ends it after this turn. A limit before the current turn has already passed.
  * When to use: `validateMatchOptionsUpdate`.
  * Expected outcome: The stored rule and limit, Deathmatch with a null limit, or a reason.
  * Exceptions: None.
@@ -70,7 +70,7 @@ function validateVictory(
   if (!isListed(VICTORY_RULES, victoryRule)) return 'The victory rule is not one of the offered rules.';
   if (victoryRule !== 'most_city_hexes_at_turn_limit') return { victoryRule, turnLimit: null };
   if (!isListed(TURN_LIMIT_OPTIONS, turnLimit)) return 'The turn limit is not one of the offered limits.';
-  if (turnLimit <= currentTurn) return `The turn limit must be later than the current turn, ${currentTurn}.`;
+  if (turnLimit < currentTurn) return `The turn limit cannot be earlier than the current turn, ${currentTurn}.`;
   const victory = victorySettingsForRequest(victoryRule, turnLimit);
   return { victoryRule: victory.rule, turnLimit: victory.turnLimit };
 }

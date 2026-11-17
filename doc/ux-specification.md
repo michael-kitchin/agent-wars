@@ -70,6 +70,7 @@ Scenes that click units find them through the game state and the main map (`ui-s
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
 | The Reports tab, or where the map toasts show | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [reports-tab.md](ux/reports-tab.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
+| Game Options during a match, from the top bar's Settings button | [modes-and-transitions.md](ux/modes-and-transitions.md), [top-bar.md](ux/top-bar.md), [control-tooltips.md](ux/control-tooltips.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
 | Turn or beat animation | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [resolution-playback.md](ux/resolution-playback.md) |
 | Tactical entry markers | [modes-and-transitions.md](ux/modes-and-transitions.md) | [tactical-entry-markers.md](ux/tactical-entry-markers.md) |
 | Fight or Ignore | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md) | [tactical-battles-list.md](ux/tactical-battles-list.md) |
@@ -110,7 +111,7 @@ Element documents share a fixed heading set:
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup, the Hire panel on that same popup, and the markers that open them.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
-- [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block, and the battle header it becomes in a battle.
+- [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, the date block, the Settings button that opens Game Options for the match, and the battle header it becomes in a battle.
 - [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Save game, Load game, Playback, Metrics, Offer tactical battles, How to play, and Quit.
 - [save-and-load.md](ux/save-and-load.md): Save game and Load game, the confirm before a load replaces a live match, and the automatic saves.
 - [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
@@ -119,12 +120,12 @@ Element documents share a fixed heading set:
 - [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, holds the reticle that aims a ranged attack, an air strike, or a missile launch, holds the air-drop button immediately left of that reticle, and offers Dismiss for one of your mercenaries during strategic planning.
 - [chat-panel.md](ux/chat-panel.md): the panel at the map's bottom-right where the player reads messages and stages one. It is sent when Ready commits the turn or a battle beat. An observer can read and cannot write. The panel hides while automatic turns are on.
 - [charts-dialog.md](ux/charts-dialog.md): the dialog the charts key opens: a relationship stack for each side an AI commander reports on, a stance timeline, and nine line charts of every side over every turn. It shows every value whatever fog of war is set to.
-- [replay-panel.md](ux/replay-panel.md): the panel the P key opens at the map's bottom-left, which steps through the match's past turns, or a battle's past beats, one at a time, plays them forward with their animations, and shows each step's update and message dialogs. Replay is read-only.
+- [replay-panel.md](ux/replay-panel.md): the panel the P key opens at the map's bottom-left, which steps through the match's past turns, or a battle's past beats, one at a time, plays them forward with their animations, and shows each step's update and message dialogs. Dragging its slider previews the steps under the thumb, and its follow-units toggle fits the camera to each step's units. Replay is read-only.
 - [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Commanders tab's Tool groups section.
 - [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Start or Stop and its sentence, one card per commander, and the activity log. Each commander's popover sets that seat's nickname, API key, model, reasoning effort, provider choice, and doctrine. The new-game popover uses the same model list. A card's name is `sideDisplayName` in `src/shared/sideNicknames.ts`. A null nickname shows that side's short home name. The commander's prompt still uses the full home name.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
 - [reports-tab.md](ux/reports-tab.md): the console tab that keeps what the map toasts showed during the match.
-- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it. Game Options holds the human Nickname. Each AI side's Nickname is on that side's commander.
+- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it. Game Options holds the human Nickname. During a match the same Game Options opens as a centered dialog from the top bar, where some options can change while the player plans a turn. Each AI side's Nickname is on that side's commander.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.
 - [tactical-entry-markers.md](ux/tactical-entry-markers.md): markers on contested hexes that lead into a tactical battle.
 - [tactical-battles-list.md](ux/tactical-battles-list.md): the list of melee hexes where the player chooses to fight or ignore.

@@ -4,7 +4,7 @@
 /**
  * Unit tests for the UI smoke checks, the battle-status pattern the scenes wait on, and the observed battle's hex edit.
  *
- * Purpose: Covers how a check result is decided, which top-bar controls the placeholder check expects disabled, which battle header lines a beat wait accepts, which hex the observed battle is set up on, what a missing battle reports, and which march attempts skip a unit, without starting Electron.
+ * Purpose: Covers how a check result is decided, which top-bar controls the placeholder check expects disabled, what the Game Options, game menu, and follow-units checks accept, which battle header lines a beat wait accepts, which hex the observed battle is set up on, what a missing battle reports, and which march attempts skip a unit, without starting Electron.
  * When to use: Discovered by `scripts/run-main-node-tests.cjs` as an extra CJS test.
  * Expected outcome: Exits 0 when the pass, missing-element, and thrown-check contracts hold.
  * Exceptions: Assertion failures abort the process via node:test.
@@ -70,6 +70,86 @@ test('the placeholder check leaves the settings button out, since it opens Game 
   };
   const result = runChecks(SCENES.strategic, probe).find((row) => row.check === 'placeholders-disabled');
   assert.deepEqual(result, { check: 'placeholders-disabled', status: 'PASS', detail: '' });
+});
+
+/**
+ * Runs one named real check on a probe that holds only the given elements.
+ *
+ * Purpose: The Game Options, game menu, and follow-units tests each vary a few element fields.
+ * When to use: The tests below that exercise one real check row.
+ * Expected outcome: That check's result row, or undefined when the check does not apply to the scene.
+ * Exceptions: None.
+ */
+function runOneCheck(sceneName, checkName, elements, activeElementId = '') {
+  const probe = { viewport: { w: 1280, h: 720, dpr: 1 }, scroll: { w: 1280, h: 720 }, activeElementId, elements };
+  return runChecks(sceneName, probe).find((row) => row.check === checkName);
+}
+
+/**
+ * Builds the elements of the Game Options dialog as the match-mode open scene expects them.
+ *
+ * Purpose: Each Game Options test changes one field from a passing dialog.
+ * When to use: With `runOneCheck` for `SCENES.matchOptionsOpen`.
+ * Expected outcome: A centered, shown popover in match mode, the backdrop, three locked controls, an enabled victory
+ *   rule, Apply shown, and Cancel reading "Cancel". `overrides` replaces whole elements by selector.
+ * Exceptions: None.
+ */
+function openMatchOptionsElements(overrides = {}) {
+  const shown = { shown: true, disabled: false, text: '' };
+  return {
+    '#new-game-options-popover': { ...shown, x: 440, y: 160, w: 400, h: 400, mode: 'match' },
+    '#match-options-backdrop': shown,
+    '#new-game-human-nickname': { ...shown, disabled: true },
+    '#new-game-fog-checkbox': { ...shown, disabled: true },
+    '#new-game-auto-start-checkbox': { ...shown, disabled: true },
+    '#new-game-victory-select': shown,
+    '#match-options-apply': shown,
+    '#match-options-cancel': { ...shown, text: 'Cancel' },
+    ...overrides,
+  };
+}
+
+test('the Game Options check passes a centered match-mode dialog and names an unlocked control or an off-center box', () => {
+  const name = 'settings-button-opens-game-options-centered-with-locked-controls';
+  assert.equal(runOneCheck(SCENES.matchOptionsOpen, name, openMatchOptionsElements()).status, 'PASS');
+  const unlocked = runOneCheck(SCENES.matchOptionsOpen, name, openMatchOptionsElements({ '#new-game-fog-checkbox': { shown: true, disabled: false } }));
+  assert.deepEqual(unlocked, { check: name, status: 'FAIL', detail: 'controls that should be locked during a match: #new-game-fog-checkbox' });
+  const anchored = openMatchOptionsElements({ '#new-game-options-popover': { shown: true, x: 0, y: 44, w: 400, h: 400, mode: 'match' } });
+  assert.match(runOneCheck(SCENES.matchOptionsOpen, name, anchored).detail, /expected centered in the 1280x720 window$/);
+  const newGameMode = openMatchOptionsElements({ '#new-game-options-popover': { shown: true, x: 440, y: 160, w: 400, h: 400, mode: null } });
+  assert.match(runOneCheck(SCENES.matchOptionsOpen, name, newGameMode).detail, /data-mode "null", expected shown in match mode$/);
+});
+
+test('the Game Options close check wants the popover hidden, out of match mode, and focus on the settings button', () => {
+  const name = 'game-options-cancel-closes-and-returns-focus';
+  const closed = { '#new-game-options-popover': { shown: false, mode: null }, '#match-options-backdrop': { shown: false } };
+  assert.equal(runOneCheck(SCENES.matchOptionsClosed, name, closed, 'topbar-settings-btn').status, 'PASS');
+  const stuck = { ...closed, '#new-game-options-popover': { shown: false, mode: 'match' } };
+  assert.equal(runOneCheck(SCENES.matchOptionsClosed, name, stuck, 'topbar-settings-btn').detail, 'Game Options keeps data-mode "match" after Cancel');
+  assert.equal(runOneCheck(SCENES.matchOptionsClosed, name, closed, '').detail, 'focus is on "", expected the settings button');
+});
+
+test('the game menu check wants Playback and Metrics enabled with their keys, and How to play enabled', () => {
+  const name = 'game-menu-playback-metrics-and-how-to-play';
+  const item = { shown: true, disabled: false };
+  const elements = {
+    '#game-menu-playback-btn': item,
+    '#game-menu-metrics-btn': item,
+    '#game-menu-playback-btn kbd': { text: 'P' },
+    '#game-menu-metrics-btn kbd': { text: 'C' },
+    '#game-menu-how-to-play-btn': item,
+  };
+  assert.equal(runOneCheck(SCENES.gameMenuOpen, name, elements).status, 'PASS');
+  assert.equal(runOneCheck(SCENES.gameMenuOpen, name, { ...elements, '#game-menu-metrics-btn kbd': { text: 'M' } }).detail, 'Metrics… shows the key "M", expected "C"');
+  assert.equal(runOneCheck(SCENES.gameMenuOpen, name, { ...elements, '#game-menu-how-to-play-btn': { shown: true, disabled: true } }).detail, 'How to play is disabled');
+});
+
+test('the follow-units check wants the replay toggle shown, named, and not pressed', () => {
+  const name = 'replay-panel-shows-the-follow-units-toggle-off';
+  const toggle = { shown: true, disabled: false, label: 'Follow units', pressed: 'false' };
+  assert.equal(runOneCheck(SCENES.replayOpen, name, { '#replay-follow-units': toggle }).status, 'PASS');
+  assert.match(runOneCheck(SCENES.replayOpen, name, { '#replay-follow-units': { ...toggle, pressed: 'true' } }).detail, /aria-pressed "true"/);
+  assert.equal(runOneCheck(SCENES.replayClosed, name, { '#replay-follow-units': toggle }), undefined);
 });
 
 test('a beat wait accepts the beats-left count and rejects a longer beat number', () => {

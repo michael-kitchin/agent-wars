@@ -376,8 +376,13 @@ test('the slider previews steps while it is dragged and shows the released step 
   assertMatches(slider, /scheduler\.request\(Number\(slider\.value\)\)/, 'input asks for a preview');
   assert.equal(slider.includes('currentReplay()?.busy'), false, 'a release is no longer dropped while a step loads');
   const render = getFunctionSource(panel, 'renderReplayPanel');
-  assertMatches(render, /if \(!sliderDragging\) slider\.value = String\(state\.index\);/, 'a drag keeps the thumb where the pointer put it');
-  assertMatches(render, /document\.activeElement !== field && !sliderDragging\)/, 'a drag keeps the field the drag wrote');
+  assertMatches(render, /if \(!sliderThumbPinned\(\)\) slider\.value = String\(state\.index\);/, 'a drag keeps the thumb where the pointer put it');
+  assertMatches(render, /document\.activeElement !== field && !sliderThumbPinned\(\)\)/, 'a drag keeps the field the drag wrote');
+  assertMatches(getFunctionSource(panel, 'sliderThumbPinned'), /return sliderDragging \|\| pendingSliderReleases > 0;/, 'a release still loading pins the thumb as a drag does');
+  const change = slider.slice(slider.indexOf("addEventListener('change'"));
+  const raised = change.indexOf('pendingSliderReleases += 1;');
+  assert.ok(raised >= 0 && raised < change.indexOf('showReleasedReplayStep('), 'a release pins the thumb before it starts showing the step');
+  assertMatches(change, /\.finally\(\(\) => \{\s+pendingSliderReleases -= 1;\s+if \(pendingSliderReleases === 0\) renderReplayPanel\(\);/, 'the pin is lifted after the step shows or fails, and only then is the panel redrawn');
   const forget = getFunctionSource(panel, 'forgetSliderWhenReplayEnds');
   assertMatches(forget, /sliderPreview\?\.cancel\(\);[\s\S]*sliderDragging = false;/, 'ending replay cancels previews and the drag');
   const present = getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'presentReplayStep');

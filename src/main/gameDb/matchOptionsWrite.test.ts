@@ -155,14 +155,25 @@ test('city hexes at turn 3 stores the limit, and Deathmatch deletes it again', (
   });
 });
 
-test('a limit that is not later than the current turn, or not offered, is refused', () => {
+test('a limit equal to the current turn is accepted, since the match ends after that turn resolves', () => {
+  withMatch('aw-match-options-equal-limit-', () => {
+    setTurn(30);
+    assert.equal(applyUpdate({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 30 }).ok, true);
+    assert.equal(selectGameConfigValue(gameDbOps, 'turn_limit'), '30');
+    setTurn(50);
+    assert.equal(applyUpdate({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 50 }).ok, true);
+    assert.equal(selectGameConfigValue(gameDbOps, 'turn_limit'), '50');
+  });
+});
+
+test('a limit earlier than the current turn, or not offered, is refused', () => {
   withMatch('aw-match-options-refused-limit-', () => {
-    setTurn(20);
+    setTurn(30);
     assertRefused({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 20 });
     assertRefused({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 35 });
     assertRefused({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: null });
     setTurn(50);
-    assertRefused({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 50 });
+    assertRefused({ ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 40 });
   });
 });
 

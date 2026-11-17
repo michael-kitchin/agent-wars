@@ -63,6 +63,12 @@ test('a valid request while planning is written once', () => {
   assert.deepEqual(writes, [VALID_UPDATE]);
 });
 
+test('a turn limit equal to the current turn is written, since the match ends after that turn', () => {
+  const { deps, writes } = fakeDeps({ currentTurn: () => 30 });
+  assert.deepEqual(handleSetMatchOptions(VALID_UPDATE, deps), { ok: true });
+  assert.deepEqual(writes, [VALID_UPDATE]);
+});
+
 test('each blocked match state is refused without a write', () => {
   const blocked: Partial<MatchOptionsDeps>[] = [
     { matchLoaded: () => false },
@@ -70,7 +76,7 @@ test('each blocked match state is refused without a write', () => {
     { phase: () => 'resolving' },
     { readyInFlight: () => true },
     { battleOpen: () => true },
-    { currentTurn: () => 30 },
+    { currentTurn: () => 31 },
   ];
   for (const overrides of blocked) {
     const { deps, writes } = fakeDeps(overrides);

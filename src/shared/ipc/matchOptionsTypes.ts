@@ -23,7 +23,7 @@ export interface MatchOptionsUpdate {
   /**
    * The win rule from the next turn's resolution on.
    *
-   * Contract: One of `VICTORY_RULES`. City hexes needs a turn limit later than the current turn.
+   * Contract: One of `VICTORY_RULES`. City hexes needs a turn limit not earlier than the current turn.
    * When to use: The Victory rule select.
    * Expected outcome: Stored as `game_config.victory_rule`.
    * Exceptions: None.
@@ -32,7 +32,7 @@ export interface MatchOptionsUpdate {
   /**
    * The turn the city-hexes rule ends the match on.
    *
-   * Contract: One of `TURN_LIMIT_OPTIONS` and greater than the current turn when the rule is city hexes. Ignored for Deathmatch.
+   * Contract: One of `TURN_LIMIT_OPTIONS` and at least the current turn when the rule is city hexes. Ignored for Deathmatch.
    * When to use: The Turn limit select.
    * Expected outcome: Stored as `game_config.turn_limit`; Deathmatch deletes the row.
    * Exceptions: None.

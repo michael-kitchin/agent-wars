@@ -1,9 +1,11 @@
 /**
- * The game menu under the top bar's menu button: New game, Save and Load, Playback and Metrics, Offer tactical battles,\n * How to play, and Quit.
+ * The game menu under the top bar's menu button: New game, Save and Load, Playback and Metrics, Offer tactical battles,
+ * How to play, and Quit.
  *
  * The menu is a disclosure popup. The button's `aria-expanded` and the menu's `hidden` attribute always agree.
  * New game and Offer tactical battles keep their own handlers in `openRouterControls.ts`; this module opens and
- * closes the menu, disables New game while the new-game screen is open or a Ready is resolving, and handles How to play\n * and Quit.
+ * closes the menu, disables New game while the new-game screen is open or a Ready is resolving, and handles How to play
+ * and Quit.
  */
 import { rendererSharedState as S } from '../core/state';
 import { requestReplayLeave } from '../replay/replayState';

@@ -76,7 +76,7 @@ export interface MatchOptionsDeps {
    * The current turn number.
    *
    * Contract: 1 or more.
-   * When to use: A city-hexes limit must be later than this turn.
+   * When to use: A city-hexes limit cannot be earlier than this turn.
    * Expected outcome: The stored `turn_state.turn_number`.
    * Exceptions: None.
    */

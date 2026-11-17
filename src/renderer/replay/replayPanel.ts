@@ -177,6 +177,28 @@ let slide: Animation | null = null;
 let sliderDragging = false;
 
 /**
+ * How many slider releases are still showing their step.
+ *
+ * Purpose: Each replay change during a release redraws the panel, and a redraw that wrote the last preview's step into the slider would jump the thumb back until the released step shows.
+ * When to use: Raised on `change`, lowered when that release's step has shown or failed.
+ * Expected outcome: Zero except while a released step loads.
+ * Exceptions: None.
+ */
+let pendingSliderReleases = 0;
+
+/**
+ * Reports whether a redraw must leave the slider and the turn field alone.
+ *
+ * Purpose: A drag and a release that is still loading both own the thumb.
+ * When to use: `renderReplayPanel`.
+ * Expected outcome: True while the thumb is held or a released step is still loading.
+ * Exceptions: None.
+ */
+function sliderThumbPinned(): boolean {
+  return sliderDragging || pendingSliderReleases > 0;
+}
+
+/**
  * The slider's preview scheduler.
  *
  * Purpose: The replay-change listener cancels it when replay ends, so no preview starts after that.
@@ -338,12 +360,12 @@ export function renderReplayPanel(): void {
   if (slider) {
     slider.setAttribute('aria-label', unit);
     slider.max = String(Math.max(0, position.stepCount - 1));
-    if (!sliderDragging) slider.value = String(state.index);
+    if (!sliderThumbPinned()) slider.value = String(state.index);
     slider.disabled = !canSeek(position);
   }
   const field = byId<HTMLInputElement>('replay-turn-input');
   field?.setAttribute('aria-label', unit);
-  if (field && document.activeElement !== field && !sliderDragging) {
+  if (field && document.activeElement !== field && !sliderThumbPinned()) {
     field.value = shownNumberText(state);
     field.removeAttribute('aria-invalid');
   }
@@ -463,7 +485,7 @@ function endSliderDrag(): void {
  *
  * Purpose: Dragging previews the step under the thumb without its dialogs, through a scheduler that limits how often a step loads. Letting go shows the released step in full.
  * When to use: From `wireReplayPanel`.
- * Expected outcome: Input writes the turn under the thumb into the field and asks for a preview. Change ends the drag, settles the previews, waits for the step on screen to settle, shows the released step with its dialogs, and redraws the panel. Keyboard steps fire input and change together, so they preview and then show in full, and the dialogs open once. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
+ * Expected outcome: Input writes the turn under the thumb into the field and asks for a preview. Change ends the drag, settles the previews, waits for the step on screen to settle, shows the released step with its dialogs, and redraws the panel. The thumb stays pinned until the last pending release has shown or failed, so the redraws in between do not move it. Keyboard steps fire input and change together, so they preview and then show in full, and the dialogs open once. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
  * Exceptions: None.
  */
 function wireSlider(slider: HTMLInputElement): void {
@@ -494,9 +516,15 @@ function wireSlider(slider: HTMLInputElement): void {
   });
   slider.addEventListener('change', () => {
     sliderDragging = false;
-    void showReleasedReplayStep(Number(slider.value), () => scheduler.settle()).then(() => {
-      renderReplayPanel();
-    });
+    pendingSliderReleases += 1;
+    void showReleasedReplayStep(Number(slider.value), () => scheduler.settle())
+      .catch((error: unknown) => {
+        console.error('replay slider release failed', error);
+      })
+      .finally(() => {
+        pendingSliderReleases -= 1;
+        if (pendingSliderReleases === 0) renderReplayPanel();
+      });
   });
 }
 

@@ -49,7 +49,7 @@ While the new-game overlay is open, in New game and Game over, the bar is the ne
 ### Mouse
 
 - When the player clicks the game menu button, the game menu opens or closes. See [game-menu.md](game-menu.md).
-- When the player clicks Settings, the in-match Game Options dialog opens over a backdrop, unless another dialog, the game menu, or the charts are open.
+- When the player clicks Settings, the in-match Game Options dialog opens over a backdrop, unless the new-game screen, another dialog, or the charts are open. A click on Settings while the game menu is open closes the menu, since it is a press outside it, and the dialog opens.
 - The sides, the readouts, and the date block do not respond to clicks. View as changes which fog is drawn. It does not change the match.
 
 ### Keyboard

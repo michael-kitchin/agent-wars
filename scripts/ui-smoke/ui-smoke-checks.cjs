@@ -48,7 +48,7 @@ function probePage(selectors) {
    * When to use: For each selector passed to `probePage`.
    * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size, top
    *   border color, background color, and pointer events, its control tip sentence, and selected attributes, including
-   *   its accessible name, a select's value and option texts, and the trimmed text of every match, or null when the selector matches nothing.
+   *   its accessible name, its `data-mode`, a select's value and option texts, and the trimmed text of every match, or null when the selector matches nothing.
    * Exceptions: None.
    */
   const describe = (selector) => {
@@ -76,6 +76,7 @@ function probePage(selectors) {
       collapsed: el.getAttribute('data-collapsed'),
       expanded: el.getAttribute('aria-expanded'),
       pressed: el.getAttribute('aria-pressed'),
+      mode: el.getAttribute('data-mode'),
       checked: el instanceof HTMLInputElement ? el.checked : null,
       optionCount: el instanceof HTMLSelectElement ? el.options.length : null,
       selectValue: el instanceof HTMLSelectElement ? el.value : null,
@@ -236,6 +237,19 @@ const FRAME_CHECKS = Object.freeze([
       if (el('#game-menu-save-btn').disabled) return 'Save game… is disabled';
       if (el('#game-menu-load-btn').disabled) return 'Load game… is disabled';
       return null;
+    },
+  },
+  {
+    name: 'game-menu-playback-metrics-and-how-to-play',
+    scenes: [SCENES.gameMenuOpen],
+    needs: ['#game-menu-playback-btn', '#game-menu-metrics-btn', '#game-menu-playback-btn kbd', '#game-menu-metrics-btn kbd', '#game-menu-how-to-play-btn'],
+    run: (p, el) => {
+      const items = [['#game-menu-playback-btn', 'Playback…', 'P'], ['#game-menu-metrics-btn', 'Metrics…', 'C']];
+      for (const [selector, name, key] of items) {
+        if (!el(selector).shown || el(selector).disabled) return `${name} is not shown and enabled`;
+        if (el(`${selector} kbd`).text !== key) return `${name} shows the key "${el(`${selector} kbd`).text}", expected "${key}"`;
+      }
+      return el('#game-menu-how-to-play-btn').disabled ? 'How to play is disabled' : null;
     },
   },
   {
@@ -408,6 +422,45 @@ const FRAME_CHECKS = Object.freeze([
     run: (p, el) => (el('#charts-overlay').shown ? 'Escape left the charts dialog open' : null),
   },
   {
+    name: 'settings-button-opens-game-options-centered-with-locked-controls',
+    scenes: [SCENES.matchOptionsOpen],
+    needs: [
+      '#new-game-options-popover',
+      '#match-options-backdrop',
+      '#new-game-human-nickname',
+      '#new-game-fog-checkbox',
+      '#new-game-auto-start-checkbox',
+      '#new-game-victory-select',
+      '#match-options-apply',
+      '#match-options-cancel',
+    ],
+    run: (p, el) => {
+      const popover = el('#new-game-options-popover');
+      if (!popover.shown || popover.mode !== 'match') return `Game Options is ${popover.shown ? 'shown' : 'hidden'} with data-mode "${popover.mode}", expected shown in match mode`;
+      if (Math.abs(popover.x + popover.w / 2 - p.viewport.w / 2) > 2 || Math.abs(popover.y + popover.h / 2 - p.viewport.h / 2) > 2) {
+        return `Game Options is at ${fmt(popover)}, expected centered in the ${p.viewport.w}x${p.viewport.h} window`;
+      }
+      if (!el('#match-options-backdrop').shown) return 'the backdrop is not shown behind Game Options';
+      const unlocked = ['#new-game-human-nickname', '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'].filter((selector) => !el(selector).disabled);
+      if (unlocked.length > 0) return `controls that should be locked during a match: ${unlocked.join(', ')}`;
+      if (el('#new-game-victory-select').disabled) return 'the victory rule is locked during world-map planning';
+      if (!el('#match-options-apply').shown) return 'Apply is not shown during world-map planning';
+      return el('#match-options-cancel').text === 'Cancel' ? null : `the cancel button reads "${el('#match-options-cancel').text}"`;
+    },
+  },
+  {
+    name: 'game-options-cancel-closes-and-returns-focus',
+    scenes: [SCENES.matchOptionsClosed],
+    needs: ['#new-game-options-popover', '#match-options-backdrop'],
+    run: (p, el) => {
+      const popover = el('#new-game-options-popover');
+      if (popover.shown) return 'Cancel left Game Options open';
+      if (popover.mode !== null) return `Game Options keeps data-mode "${popover.mode}" after Cancel`;
+      if (el('#match-options-backdrop').shown) return 'Cancel left the backdrop shown';
+      return p.activeElementId === 'topbar-settings-btn' ? null : `focus is on "${p.activeElementId}", expected the settings button`;
+    },
+  },
+  {
     name: 'replay-key-shows-the-replay-panel-in-place-of-the-live-panels',
     scenes: [SCENES.replayOpen],
     needs: ['#replay-panel', '#selection-panel', '#chat-panel'],
@@ -416,6 +469,17 @@ const FRAME_CHECKS = Object.freeze([
       if (!el('#replay-panel').shown) return 'the replay panel is not shown after p';
       if (el('#selection-panel').shown) return 'the selection panel is still shown in replay';
       return el('#chat-panel').shown ? 'the chat panel is still shown in replay' : null;
+    },
+  },
+  {
+    name: 'replay-panel-shows-the-follow-units-toggle-off',
+    scenes: [SCENES.replayOpen],
+    needs: ['#replay-follow-units'],
+    run: (p, el) => {
+      const toggle = el('#replay-follow-units');
+      if (!toggle.shown || toggle.disabled) return 'the follow-units toggle is not shown and enabled in replay';
+      if (toggle.label !== 'Follow units') return `the follow-units toggle is named "${toggle.label}"`;
+      return toggle.pressed === 'false' ? null : `the follow-units toggle has aria-pressed "${toggle.pressed}", expected "false" before any click`;
     },
   },
   {

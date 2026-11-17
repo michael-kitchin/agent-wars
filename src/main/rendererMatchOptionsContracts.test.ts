@@ -76,6 +76,12 @@ test('Nickname, Fog of war, and Auto-start AI are always locked', () => {
   assert.equal(always < lock.indexOf('if (!editable)'), true, 'the locked controls are disabled before the editable check');
 });
 
+test('a turn limit equal to the current turn stays offered, since the match ends after that turn resolves', () => {
+  const controls = readRendererSource('gameplay', 'matchOptionsControls.ts');
+  assert.equal(getFunctionSource(controls, 'lockOptionControls').includes('TURN_LIMIT_OPTIONS.filter((turns) => turns >= currentTurn)'), true);
+  assert.equal(getFunctionSource(controls, 'lockTurnLimit').includes('option.disabled = !(Number(option.value) >= currentTurn);'), true);
+});
+
 test('the new-game popover close paths leave match mode alone', () => {
   const popover = readRendererSource('gameplay', 'newGameOptionsPopover.ts');
   assert.equal(getFunctionSource(popover, 'popoverInMatchMode').includes("dataset.mode === 'match'"), true);

@@ -60,12 +60,12 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 ### During a Match
 
-The top bar's Settings button opens the same Game Options popover as a dialog centered over the window, over a dimmed backdrop (`data-mode="match"` on `#new-game-options-popover`, opened by `openMatchOptionsDialog`). It shows the live match's settings, read with `fetchMatchSnapshot`. It does not open while the new-game screen, the game menu, the charts, or another dialog is open.
+The top bar's Settings button opens the same Game Options popover as a dialog centered over the window, over a dimmed backdrop (`data-mode="match"` on `#new-game-options-popover`, opened by `openMatchOptionsDialog`). It shows the live match's settings, read with `fetchMatchSnapshot`. It does not open while the new-game screen, the charts, or another dialog is open. A press on Settings while the game menu is open closes the menu and opens the dialog.
 
 - **What can change:** Victory rule, Turn limit, AI-only battles, Beat limit, Sight cues, and the four bonuses: Origin, Tech, Terrain, and Weather.
 - **What stays locked:** Nickname, Fog of war, and Auto-start AI show the match's values, disabled. Nickname shows the human seat's name (`sideDisplayName`). Auto-start AI shows whether commander planning is on now, and its tip says to use the Commanders Start/Stop button.
 - **When they can change:** only while the live match is in world-map planning, with no battle open, no Ready being sent, no replay, and the match not over. Otherwise every control is disabled, the note reads "These are the settings in force. They can be changed while you plan a turn on the world map.", Apply is hidden, and Cancel reads Close.
-- **Turn limit:** only limits later than the current turn are offered (`TURN_LIMIT_OPTIONS` in `src/shared/victoryRules.ts`). When none is left, the city-hexes rule is disabled. Deathmatch shows Unlimited, disabled.
+- **Turn limit:** only limits not earlier than the current turn are offered (`TURN_LIMIT_OPTIONS` in `src/shared/victoryRules.ts`). A limit equal to the current turn ends the match after this turn resolves (`turnLimitReached` in `src/main/gameActions/endOfTurnOutcomeRules.ts`). When none is left, the city-hexes rule is disabled. Deathmatch shows Unlimited, disabled.
 - **Apply and Cancel:** Apply sends the editable set through `setMatchOptions` and closes the dialog after the screen re-reads the match. A refusal shows its reason in the note and keeps the dialog open. Cancel, the close control, Escape, and a press and release on the backdrop close it without writing. A new match or a loaded save since the dialog opened closes it without writing.
 - **When a change takes effect:** from the next turn's resolution. An AI consult that is already running keeps the old rules.
 - **During replay:** the dialog shows the live match's settings, read-only, not the replayed turn's.

@@ -100,7 +100,7 @@ Each opponent's name starts as that side's short home name, and you change it on
 
 Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Beat limit, 30 by default, is the most beats one of those battles can run. Unlimited removes it. None turns it off. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
 
-During a match, the Settings button on the top bar shows these options for the match you're playing. While you plan a turn on the world map, you can change the victory rule, a turn limit later than the current turn, AI-only battles, Beat limit, Sight cues, and the four bonuses, and the change takes effect from the next turn's resolution; Nickname, Fog of war, and Auto-start AI stay as they are.
+During a match, the Settings button on the top bar shows these options for the match you're playing. While you plan a turn on the world map, you can change the victory rule, a turn limit no earlier than the current turn (a limit equal to it ends the match after this turn), AI-only battles, Beat limit, Sight cues, and the four bonuses, and the change takes effect from the next turn's resolution; Nickname, Fog of war, and Auto-start AI stay as they are.
 
 ## Saving and Loading
 
@@ -476,11 +476,11 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 ## Charts
 
-Press **C** during a match, or at game over, to open the charts. Press **C** again, press Escape, or click outside the dialog to close it. The key does nothing while you type in a field, and the charts do not open over a dialog that needs your choice.
+Press **C** during a match, or at game over, to open the charts, or choose **Metrics…** in the game menu. Press **C** again, press Escape, or click outside the dialog to close it. The key does nothing while you type in a field, and the charts do not open over a dialog that needs your choice.
 
 The charts show every side and every turn, whatever fog of war is set to, so you can see credits and units you could not see on the map. No AI commander is shown them.
 
-- **Relationships:** one card for each side. The graph shows how each AI commander regards that side: the line's color is its stance, its width is trust, and a dashed line is an old report or none. The table under it gives the stance, trust, threat, the hexes that commander took from that side in the last five turns, and the turn it last reported. A commander that has never reported shows "no report".
+- **Relationships:** one card for each side an AI commander reports on. A commander never reports on its own side, so with one AI opponent only your side has a card. The graph shows how each AI commander regards that side: the line's color is its stance, its width is trust, and a dashed line is an old report or none. The table under it gives the stance, trust, threat, the hexes that commander took from that side in the last five turns, and the turn it last reported. A commander that has never reported shows "no report".
 - **Stance over time:** one strip for the side you choose, with a row for each commander. A solid cell is a stance the commander reported that turn. A lighter cell carries an earlier stance forward. An empty outline is no report.
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep per turn, units lost per turn, and model cost so far. Built units and mercenary units have a dropdown for the total or one unit type.
 
@@ -488,7 +488,9 @@ Hover a chart for each side's value at that turn and their total. Scroll over a 
 
 ## Replay
 
-Press **P** during a match to look back at the turns already played. A panel opens at the map's bottom-left with a label such as "Replay · Turn 3 of 7", Step back and Step forward buttons, and a Play button. The arrow at its left shows a slider and a turn field, so you can jump to a turn. Press **P** again or Escape to return to the present.
+Press **P** during a match, or choose **Playback…** in the game menu, to look back at the turns already played. A panel opens at the map's bottom-left with a label such as "Replay · Turn 3 of 7", Step back and Step forward buttons, and a Play button. The arrow at its left shows a slider and a turn field, so you can jump to a turn. While you drag the slider, the map follows the turn under it, and that turn's messages open when you let go. Press **P** again or Escape to return to the present.
+
+The magnifying glass beside the arrow turns on follow units: the map then fits the units on screen at every turn replay shows, until you click it again. It stays as you left it until you close the app.
 
 Each step shows the map as you saw it when that turn began, with the update and commander messages that turn showed. In a match you are watching, or after the match ends, replay shows every side. Replay changes nothing in the match. Ready, the Orders tab, and map clicks do nothing while it is on. It does not start while a turn is resolving.
 
