@@ -10,6 +10,7 @@
 'use strict';
 
 const h3 = require('h3-js');
+const { attemptUnitMarch } = require('./ui-smoke-march-attempt.cjs');
 
 /**
  * Name of the page global that holds the main Leaflet map after `captureMainMap`.
@@ -525,22 +526,26 @@ function stackedHumanLandUnits(units, unitTypes) {
  * When to use: After `captureMainMap`, while nothing is queued. Armor is tried first, then infantry. A unit that
  *   stands alone is clicked in its hex; a unit that shares its hex is selected from the unit list.
  * Expected outcome: The Movement count reads 1. Returns the unit.
- * Exceptions: Throws when no land unit has a neighbor that takes the order. A lone unit whose hex click does not select it (a label or marker can sit over it after a played turn) is skipped like one with no free neighbor.
+ * Exceptions: Throws when no land unit has a neighbor that takes the order, naming how many units were skipped. A unit
+ *   whose selection times out (a label or marker can sit over it after a played turn) is skipped with a note through
+ *   `attemptUnitMarch`. Any other error is thrown at once.
  */
 async function queueLoneUnitMarch(page, unitTypes = LAND_UNIT_TYPES) {
   const state = await readGameState(page);
   const lone = loneHumanUnits(state.units, unitTypes);
+  const skipped = [];
   for (const unit of lone) {
-    const queued = await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index)).catch(() => false);
+    const queued = await attemptUnitMarch(() => queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index)), unit, skipped);
     if (queued) return unit;
   }
   const stacked = stackedHumanLandUnits(state.units, unitTypes);
   for (const unit of stacked) {
-    const queued = await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index), selectOneHumanFromStack)
-      .catch(() => false);
+    const queued = await attemptUnitMarch(
+      () => queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index), selectOneHumanFromStack), unit, skipped);
     if (queued) return unit;
   }
-  throw new Error(`no land unit could queue a one-hex march (${lone.length} lone, ${stacked.length} stacked)`);
+  throw new Error(`no land unit could queue a one-hex march (${lone.length} lone, ${stacked.length} stacked; `
+    + `${skipped.length} skipped because their selection timed out)`);
 }
 
 /**

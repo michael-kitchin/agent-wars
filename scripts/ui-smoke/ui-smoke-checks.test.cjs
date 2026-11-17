@@ -4,7 +4,7 @@
 /**
  * Unit tests for the UI smoke checks, the battle-status pattern the scenes wait on, and the observed battle's hex edit.
  *
- * Purpose: Covers how a check result is decided, which battle header lines a beat wait accepts, which hex the observed battle is set up on, and what a missing battle reports, without starting Electron.
+ * Purpose: Covers how a check result is decided, which battle header lines a beat wait accepts, which hex the observed battle is set up on, what a missing battle reports, and which march attempts skip a unit, without starting Electron.
  * When to use: Discovered by `scripts/run-main-node-tests.cjs` as an extra CJS test.
  * Expected outcome: Exits 0 when the pass, missing-element, and thrown-check contracts hold.
  * Exceptions: Assertion failures abort the process via node:test.
@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
 const { aiContestedHexStatements, battleStatusPattern, missingBattleMessage } = require('./ui-smoke-beat-limit.cjs');
+const { attemptUnitMarch } = require('./ui-smoke-march-attempt.cjs');
 
 /**
  * A one-row check table for these tests.
@@ -93,4 +94,15 @@ test('a battle that was not offered names the turns and the hex', () => {
   const state = { turnNumber: 5, gameOver: false, units: [{ player: 'ai-1', h3Index: 'hex' }, { player: 'ai-1', h3Index: 'hex' }, { player: 'ai-2', h3Index: 'other' }] };
   assert.equal(missingBattleMessage(4, state, 'hex'), 'Ready resolved turn 4 without offering a battle (now turn 5); hex hex holds ai-1 2');
   assert.match(missingBattleMessage(4, { ...state, gameOver: true, units: [] }, 'hex'), /, and the match ended\); hex hex holds no units$/);
+});
+
+test('a unit whose selection times out is skipped, and any other error still fails the march search', async () => {
+  const unit = { id: 'u1', unitType: 'armor', h3Index: 'hex' };
+  const timeout = Object.assign(new Error('waiting for the selection'), { name: 'TimeoutError' });
+  const skipped = [];
+  assert.equal(await attemptUnitMarch(async () => { throw timeout; }, unit, skipped), false);
+  assert.deepEqual(skipped, ['u1']);
+  assert.equal(await attemptUnitMarch(async () => true, unit, skipped), true);
+  await assert.rejects(attemptUnitMarch(async () => { throw new TypeError('broken'); }, unit, skipped), /broken/);
+  assert.deepEqual(skipped, ['u1']);
 });

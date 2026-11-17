@@ -293,10 +293,10 @@ export function listMatchRecords(ops: BasicDbOps): MatchRecord[] {
 }
 
 /**
- * Lists the events of one type in write order.
+ * Lists the events of one type in write order, failing on the first bad payload.
  *
- * Purpose: Reading the statistics series must not decode a frame.
- * When to use: When a caller wants one event type, such as the match charts.
+ * Purpose: A strict read of one event type that does not decode frames or other types.
+ * When to use: Tests, and a reader for which one bad row must fail the whole read. The match charts use `listReadableMatchEventsOfType`.
  * Expected outcome: Only rows with that `record_type`, ordered by `record_id`, payloads decoded.
  * Exceptions: Throws when a payload cannot be decoded.
  */
@@ -483,10 +483,10 @@ export function readMatchRecord(ops: BasicDbOps, recordId: number): MatchRecord 
 }
 
 /**
- * Lists the events of one type at one step, in write order.
+ * Lists the events of one type at one step, in write order, failing on the first bad payload.
  *
- * Purpose: Replay reads the strategy, messages, and result of a single step.
- * When to use: When the caller has a step key text.
+ * Purpose: A strict read of one step's events of one type.
+ * When to use: Tests, and a reader for which one bad row must fail the whole read. Replay's dialog readers use `listReadableMatchEventsAtStep`.
  * Expected outcome: Only events with that `record_type` and `step_key`, ordered by `record_id`, payloads decoded.
  * Exceptions: Throws when a payload cannot be decoded.
  */

@@ -8,7 +8,7 @@ Show the player what the map, the update dialog, and the commanders' messages lo
 
 ## Availability
 
-The P key turns replay on and off. It starts only with a match loaded, no dialog open that needs the player's choice, and the new-game overlay closed or not open over a live match. It does not start while a turn is resolving or its playback is running, and that refusal toasts one sentence (`REPLAY_BUSY_REASON` in `src/shared/replayNavigation.ts`). It does start inside a tactical battle, where it covers that battle's beats and nothing else. A match with no recorded turn toasts `REPLAY_NO_TURNS_REASON` in `src/renderer/replay/replayMode.ts`. See [modes-and-transitions.md](modes-and-transitions.md).
+The P key turns replay on and off. It starts only with a match loaded, no dialog open that needs the player's choice, and the new-game overlay closed or not open over a live match. It does not start while a turn is resolving or its playback is running, and that refusal toasts one sentence (`REPLAY_BUSY_REASON` in `src/shared/replayNavigation.ts`). It does start inside a tactical battle, where it covers that battle's beats and nothing else. A match with no recorded turn toasts `REPLAY_NO_TURNS_REASON` in `src/renderer/replay/replayMode.ts`. When the last recorded turn cannot be put on screen, P toasts `REPLAY_STEP_FAILED_REASON`, logs the failure, and leaves replay again, so the present is shown (`toggleReplay`). See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
@@ -17,7 +17,7 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Above the bar, while the panel is expanded: a turn field and a slider. The slider runs over the recorded turns. The panel opens compact.
 - One step is one turn, or inside a battle one beat. A step shows the snapshot recorded when that turn or beat began. The last step shows the snapshot recorded at its end.
 - A player with a human seat sees what that seat could see at that moment. An observer sees every side, and so does anyone after the match is over (`replayViewFor`).
-- Each step shows the update dialog and the commanders' message dialog that turn showed. The update dialog is rebuilt from the recorded result with that turn's viewer and fog. The fog is what the viewer could see at the end of the step before, after any battle that turn had, as the live dialog had it (`readBeforeStep` in `src/main/replay/replayReading.ts`). A recorded strategy, message, consult, or result that cannot be read is left out and logged, and the step still shows (`listReadableMatchEventsAtStep`). For a battle beat it is shown only when the beat had movement, fire, melee, kills, air strikes, or dice, as the live beat showed it (`tacticalPlaybackNeeded`). A step shows neither dialog of the step before it.
+- Each step shows the update dialog and the commanders' message dialog that turn showed. The update dialog is rebuilt from the recorded result with that turn's viewer and fog. The fog is what the viewer could see at the end of the step before, after any battle that turn had, as the live dialog had it (`readBeforeStep` in `src/main/replay/replayReading.ts`). When that later snapshot cannot be read, the fog of the turn's first snapshot is used, and when that cannot be read either, the dialog describes no moves; each failed read is logged and the step still shows (`readEarlierSnapshot`). A recorded strategy, message, consult, or result that cannot be read is left out and logged, and the step still shows (`listReadableMatchEventsAtStep`). For a battle beat it is shown only when the beat had movement, fire, melee, kills, air strikes, or dice, as the live beat showed it (`tacticalPlaybackNeeded`). A step shows neither dialog of the step before it.
 - Control tips for the expand control, the three buttons, and Pause are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
@@ -31,7 +31,7 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Play is enabled only when a turn after the one showing exists (`canPlay`). Playback stops by itself at the last recorded turn, which leaves Play disabled.
 - Clicking Pause while playback runs stops it after the turn that is animating. The turn finishes first, so a click during the one-second hold takes effect when the hold ends.
 - While playback runs, Step back, Step forward, the slider, and the turn field are disabled (`canStepBack`, `canStepForward`, `canSeek`).
-- While a step loads, Step back and Step forward are disabled, but the slider and the turn field stay enabled so a focused one keeps focus (`canSeek`). A slider release made then is ignored and the thumb returns to the turn on screen. A turn entry committed then is ignored and stays as typed.
+- While a step loads, Step back and Step forward are disabled, but the slider and the turn field stay enabled so a focused one keeps focus (`canSeek`). A focused Step back, Step forward, or Play that becomes disabled, while a step loads or at the first or last turn, hands its focus to the slider when the panel is expanded, otherwise to another enabled bar button or the expand control (`keepFocusInPanel` in `src/renderer/replay/replayPanel.ts`). Focus elsewhere is not moved. A slider release made then is ignored and the thumb returns to the turn on screen. A turn entry committed then is ignored and stays as typed.
 - A step that cannot be loaded during playback ends playback and toasts `REPLAY_STEP_FAILED_REASON` (`That turn could not be loaded.`).
 - Play does nothing while a live turn's end-of-animation notification is still queued, so a replay animation can never send it. Replay sends nothing to the main process except reads of recorded steps.
 - Map clicks, double-clicks, and right-clicks do nothing. Dragging and the wheel still pan and zoom the map. The build entry buttons and the tactical entry markers are hidden.
@@ -42,14 +42,15 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Escape leaves replay and shows the present.
 - P or Escape while playback runs stops it at once, cancels the animation, and leaves replay. The present is shown.
 - P or Escape while a step loads waits for that step to finish loading, then leaves replay.
+- Leaving shows the last recorded turn first. When that turn cannot be put on screen, the failure is logged and the present is shown anyway (`runLeaveReplay`).
 - P while replay is being left waits for the leave to finish and does not turn replay on again.
-- With the slider focused, the Left and Right arrow keys move it one turn and show that turn, and P and Escape still leave replay (`isRangeInputTarget` in `src/renderer/map/mapHelpers.ts`).
+- With the slider focused, the arrow keys move it one turn and show that turn, and Home, End, Page Up, and Page Down move it too. Every other map key still acts: P and Escape leave replay, C opens the charts dialog, and the zoom keys, W, A, S, D, and T work as they do on the map (`isRangeInputTarget` in `src/renderer/map/mapHelpers.ts`, `rangeInputOwnsKey` in `src/shared/mapKeyboardPanLogic.ts`).
 - In the turn field, which takes a beat number inside a battle and is named Beat there, a valid recorded turn number is accepted as it is typed, Enter and leaving the field show it, and anything else marks the field invalid with a red border (`aria-invalid`, `parseTurnEntry`). Escape in the field puts the last shown turn back and does not leave replay.
-- C opens the charts dialog during replay, as it does at any other time.
+- C opens the charts dialog during replay, as it does at any other time, including while the slider has focus.
 
 ### Other
 
-- Opening the game menu leaves replay first. Starting a new match drops replay without applying anything. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
+- Opening the game menu leaves replay first. Starting a new match drops replay without applying anything. Replay can be on over a finished match's standings, so it is dropped as soon as Start game is clicked, and a start that fails leaves replay off. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
 - Ready is disabled and does nothing. The Orders tab is disabled, and a selected Orders tab returns after replay ends. A collapsed console stays collapsed when replay starts and when it ends. Committed order lines are not drawn, and neither are the draft orders: queued battle marches, the march hover preview, and pending ranged, air strike, air drop, missile, and ferry lines (`shouldDrawPendingOrderOverlays` in `src/renderer/rendering/canvasPreviewPolicy.ts`).
 - The commander cards on the Commanders tab are inert. Their summary buttons are disabled, so no commander popover opens and no commander is saved. A seat-cost refresh leaves the past snapshot's seats alone. Leaving replay applies the live match, seats included.
 - Entering replay clears the unit selection. Leaving puts it back, without any unit that no longer exists in the present.

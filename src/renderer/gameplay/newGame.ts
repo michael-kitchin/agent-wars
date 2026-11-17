@@ -289,7 +289,8 @@ function stopMatchWaitingUnderNewGame(): void {
  * When to use: Once at renderer startup.
  * Expected outcome: The randomize buttons, the game-size caps, the panel's grip, and its close control are live. Close
  *   goes back to a match waiting under the screen. When no AI row has a model, Start asks first. No, Escape, and the
- *   backdrop leave the screen open and do not advance the match epoch. Clicking Start stops that match, if any, then sends
+ *   backdrop leave the screen open and do not advance the match epoch. Clicking Start drops replay, which can be on over a
+ *   finished match, and stops that match, if any, then sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`. Auto-start AI is not sent.
  *   A successful start then applies that click-time choice: planning turns on and the Commanders button reads Stop, or
  *   planning stays off and that button reads Start. Either way the console collapses. A failure leaves that button and the
@@ -329,6 +330,9 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       if (!startAnyway) return;
     }
     const matchEpoch = advanceRendererMatchEpoch();
+    // Replay can be on over a finished match's standings. The new epoch makes its steps unreadable, so it is dropped now
+    // rather than after the reply, which a failed start never reaches.
+    abandonReplayForNewMatch();
     stopMatchWaitingUnderNewGame();
     const cameraHold = holdNewGameMapPreviewCamera();
     try {
@@ -347,6 +351,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         ...(humanNickname === undefined ? {} : { humanNickname }),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      // Replay can open again over the finished match while the reply is awaited.
       abandonReplayForNewMatch();
       installRendererGameMap(state);
       await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });

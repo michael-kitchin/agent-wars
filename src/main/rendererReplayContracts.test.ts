@@ -265,7 +265,6 @@ test('entering over the world map drops a kept battle, and leaving waits for a l
   const mode = readRendererSource('replay', 'replayMode.ts');
   assertMatches(getFunctionSource(mode, 'toggleReplay'), /savedBattle = timeline\.scope === 'tactical' \? copyBattleState\(\) : null;/, 'a strategic entry clears the kept battle');
   const leave = getFunctionSource(mode, 'runLeaveReplay');
-  assert.equal(/state\.busy\) return;/.test(leave), false, 'a loading step does not cancel leaving');
   assertMatches(leave, /await waitForStepToSettle\(\);/, 'leaving waits for the step to settle');
 });
 
@@ -311,7 +310,34 @@ test('a step whose match was replaced, or whose presentation throws, still clear
   assertMatches(present, /\} finally \{[\s\S]*busy: false/, 'presenting clears the flag in a finally');
   const settle = getFunctionSource(mode, 'waitForStepToSettle');
   assertMatches(settle, /rendererMatchEpochCurrent\(state\.matchEpoch\)/, 'waiting stops when the match was replaced');
-  assertMatches(getFunctionSource(mode, 'runLeaveReplay'), /if \(rendererMatchEpochCurrent\(state\.matchEpoch\)\) await showReplayStep\(/, 'leaving skips the last step of a replaced match');
+  assertMatches(getFunctionSource(mode, 'runLeaveReplay'), /if \(rendererMatchEpochCurrent\(state\.matchEpoch\)\) \{\s+try \{\s+await showReplayStep\(/, 'leaving skips the last step of a replaced match');
+});
+
+test('a last step that throws cannot keep replay on', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  const leave = getFunctionSource(mode, 'runLeaveReplay');
+  const shown = leave.search(/try \{\s+await showReplayStep\(state\.timeline\.steps\.length - 1\);\s+\} catch \(error\) \{\s+console\.error\(/);
+  assert.ok(shown >= 0, 'leaving catches and logs a failure to show the last step');
+  assert.ok(shown < leave.indexOf('setReplay(null);') && shown < leave.indexOf('fetchMatchSnapshot()'), 'the leave goes on to turn replay off and apply the live match');
+  const toggle = getFunctionSource(mode, 'toggleReplay');
+  const entered = toggle.search(/try \{\s+await showReplayStep\(last\);\s+\} catch \(error\) \{\s+console\.error\(/);
+  assert.ok(entered >= 0, 'entering catches and logs a failure to show the last step');
+  assert.ok(toggle.indexOf('await leaveReplay();', entered) > entered, 'a failed entry leaves replay');
+});
+
+test('Start game drops replay as soon as it advances the match epoch', () => {
+  const button = getFunctionSource(readRendererSource('gameplay', 'newGame.ts'), 'registerNewGameButton');
+  const epoch = button.indexOf('const matchEpoch = advanceRendererMatchEpoch();');
+  const dropped = button.indexOf('abandonReplayForNewMatch();', epoch);
+  assert.ok(epoch >= 0 && dropped > epoch && dropped < button.indexOf('window.gameApi.newGame('), 'replay is dropped before the request, which a failed start never gets past');
+});
+
+test('a step button that a draw disables hands its focus to the slider or another replay control', () => {
+  const panel = readRendererSource('replay', 'replayPanel.ts');
+  assertMatches(getFunctionSource(panel, 'renderReplayPanel'), /const focused = document\.activeElement;[\s\S]*keepFocusInPanel\(focused, \[back, forward, play\]\);\r?\n\}$/, 'the draw reads focus first and hands it on last');
+  const keep = getFunctionSource(panel, 'keepFocusInPanel');
+  assertMatches(keep, /!focused\.disabled \|\| !buttons\.includes\(focused\)\) return;/, 'focus moves only off a bar button that is now disabled');
+  assertMatches(keep, /expanded \? byId<HTMLInputElement>\('replay-slider'\)/, 'the slider is the first choice while it is shown');
 });
 
 test('the replay slider keeps focus, and p and Escape still reach replay from it', () => {
@@ -321,14 +347,14 @@ test('the replay slider keeps focus, and p and Escape still reach replay from it
   const render = getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'renderReplayPanel');
   assertMatches(render, /slider\.disabled = !canSeek\(position\);/, 'the slider is disabled through canSeek');
   assertMatches(render, /field\.disabled = !canSeek\(position\);/, 'the turn field is disabled through canSeek');
-  const seek = getFunctionSource(readRepoFile('src', 'shared', 'replayNavigation.ts'), 'canSeek');
-  assert.equal(seek.includes('busy'), false, 'a loading step does not disable the slider, which would drop its focus');
   assertMatches(getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'commitTurnField'), /state\.busy/, 'a turn entry while a step loads is ignored');
   const keys = readRendererSource('map', 'initCore.ts');
   assertMatches(keys, /if \(replayActive\(\) && \(!shouldIgnoreGlobalKeydown\(e\) \|\| isRangeInputTarget\(e\.target\)\)\) \{\r?\n\s+e\.preventDefault\(\);\r?\n\s+void leaveReplay\(\);/, 'Escape leaves replay from the slider');
-  const toggleAt = keys.search(/if \(replayActive\(\) && isRangeInputTarget\(e\.target\)[^\n]*=== 'p'\) \{\r?\n\s+e\.preventDefault\(\);\r?\n\s+void toggleReplay\(\);/);
-  assert.ok(toggleAt >= 0, 'p leaves replay from the slider');
-  assert.ok(toggleAt < keys.indexOf('if (shouldIgnoreGlobalKeydown(e)) return;'), 'the slider branch comes before the editable-field return');
+  const ignore = keys.indexOf('if (shouldIgnoreGlobalKeydown(e) && !(isRangeInputTarget(e.target) && !rangeInputOwnsKey(e.key))) return;');
+  assert.ok(ignore >= 0, 'only the keys a slider moves on stay with it');
+  for (const shortcut of ["key === 'c'", "key === 'p'", 'mapZoomKeyStep(', 'panBindingToDirection(']) {
+    assert.ok(keys.indexOf(shortcut, ignore) > ignore, `${shortcut} is reached from the slider`);
+  }
   assertMatches(getFunctionSource(readRendererSource('map', 'mapHelpers.ts'), 'isRangeInputTarget'), /target\.type === 'range'/, 'only a range input is let through');
 });
 

@@ -294,8 +294,8 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     ensureSeatAddedColumns(gameDbOps);
     ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
     ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
-  ensureSideMessageTables((sql) => gameDbOps.run(sql));
-  ensureSideStanceScoreColumns(gameDbOps);
+    ensureSideMessageTables((sql) => gameDbOps.run(sql));
+    ensureSideStanceScoreColumns(gameDbOps);
     runInfrastructureStartupConsistencyPass();
   } catch (err) {
     if (d) {
@@ -500,8 +500,8 @@ export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingG
     ensureSeatAddedColumns(gameDbOps);
     ensurePendingAirDropOrdersTable((sql) => gameDbOps.run(sql));
     ensureMatchRecordsTable((sql) => gameDbOps.run(sql));
-  ensureSideMessageTables((sql) => gameDbOps.run(sql));
-  ensureSideStanceScoreColumns(gameDbOps);
+    ensureSideMessageTables((sql) => gameDbOps.run(sql));
+    ensureSideStanceScoreColumns(gameDbOps);
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
     repairStrandedStrategicResolutionPhaseOnDbBootstrap();

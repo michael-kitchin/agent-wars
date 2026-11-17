@@ -196,7 +196,7 @@ function entryDecision(): ReturnType<typeof replayMayEnter> {
  *
  * Purpose: The `p` key does both.
  * When to use: From the window key handler.
- * Expected outcome: Replay opens on the current step, or closes. A refusal shows its sentence when it has one.
+ * Expected outcome: Replay opens on the current step, or closes. A refusal shows its sentence when it has one. When the last step cannot be put on screen, the failure is logged, `REPLAY_STEP_FAILED_REASON` is shown, and replay is left through `leaveReplay`, so the present comes back and the next `p` can try again.
  * Exceptions: None. A failed timeline read is logged and shown as a sentence.
  */
 export async function toggleReplay(): Promise<void> {
@@ -241,7 +241,13 @@ export async function toggleReplay(): Promise<void> {
   document.body.dataset.replay = 'on';
   refreshConsoleHeader();
   syncTacticalExitButtonElementVisibility();
-  await showReplayStep(last);
+  try {
+    await showReplayStep(last);
+  } catch (error) {
+    console.error('entering replay could not show the last recorded step', error);
+    showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+    await leaveReplay();
+  }
 }
 
 /**
@@ -534,7 +540,7 @@ export function abandonReplayForNewMatch(): void {
  * Purpose: Leaving shows the current turn as if the player had stepped forward to it, then applies the live state. Playback that is running is stopped and its animation cancelled first, and a step that is loading is allowed to settle.
  * When to use: Only through `leaveReplay`, so two leaves never run together.
  * Expected outcome: Replay is off, the last-seen markers and, over a battle, the battle's own state are back, the selection from before replay is back without the units that no longer exist, the console shows the Orders tab again when it was selected on entry and stays collapsed or expanded as it is, the live snapshot is on screen, and a watch that was waiting presses Ready.
- * Exceptions: None. A failed live read is logged and the last recorded step stays on screen.
+ * Exceptions: None. A last step that cannot be put on screen is logged and the leave goes on to the live snapshot, so a step that always fails cannot keep replay on. A failed live read is logged and the last recorded step stays on screen.
  */
 async function runLeaveReplay(): Promise<void> {
   let state = currentReplay();
@@ -547,7 +553,13 @@ async function runLeaveReplay(): Promise<void> {
     state = currentReplay();
   }
   if (!state) return;
-  if (rendererMatchEpochCurrent(state.matchEpoch)) await showReplayStep(state.timeline.steps.length - 1);
+  if (rendererMatchEpochCurrent(state.matchEpoch)) {
+    try {
+      await showReplayStep(state.timeline.steps.length - 1);
+    } catch (error) {
+      console.error('leaving replay could not show the last recorded step', error);
+    }
+  }
   if (!replayActive()) return;
   setReplay(null);
   delete document.body.dataset.replay;

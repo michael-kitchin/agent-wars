@@ -175,6 +175,28 @@ test('a turn with two snapshots gives the next step the fog of its newest one, w
   });
 });
 
+test('a damaged newest snapshot gives the next step the fog of the timeline snapshot, and with that damaged too, no fog', () => {
+  withHumanMatch(() => {
+    playTurn(1);
+    const firstPlayer = listMatchEventsOfType(gameDbOps, 'view_snapshot').find((row) => row.visibility !== 'engine');
+    const stored = firstPlayer!.payload as { snapshot: Record<string, unknown> };
+    recordMatchEvent({
+      type: 'view_snapshot',
+      step: strategicStep(1),
+      visibility: { seats: [HUMAN_SEAT_ID] },
+      payload: { ...stored, snapshot: { ...stored.snapshot, visibleHexes: ['after-the-battle'] } },
+    });
+    gameDbOps.run(
+      `UPDATE match_records SET payload = X'00FF' WHERE record_id = (SELECT MAX(record_id) FROM match_records WHERE record_type = 'view_snapshot')`
+    );
+    playTurn(2);
+    const second = readReplayTimeline().steps[1]!;
+    assert.deepEqual(readReplayStep(second.recordId)?.visibleHexesBefore, stored.snapshot.visibleHexes);
+    gameDbOps.run(`UPDATE match_records SET payload = X'00FF' WHERE record_id = ?`, [firstPlayer!.recordId]);
+    assert.deepEqual(readReplayStep(second.recordId)?.visibleHexesBefore, []);
+  });
+});
+
 test('dispatches hold the strategy and every message, before and after the match ends', () => {
   withHumanMatch(() => {
     playTurn(1);

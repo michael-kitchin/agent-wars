@@ -37,11 +37,11 @@ export interface ReplayState {
    */
   readonly index: number;
   /**
-   * Whether a step is loading.
+   * Whether a step is loading or being put on screen.
    *
-   * Contract: True from the request until the reply.
+   * Contract: True from the request until the reply, and again while `presentReplayStep` shows the loaded step's snapshot and dialogs.
    * When to use: Disabling the step buttons.
-   * Expected outcome: True while a request is in flight.
+   * Expected outcome: True while a request is in flight or a loaded step is being shown.
    * Exceptions: None.
    */
   readonly busy: boolean;

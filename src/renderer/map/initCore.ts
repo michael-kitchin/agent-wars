@@ -1,7 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { isAirStrikeTargetType } from '../../shared/airStrikeTarget';
 import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
-import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
+import { panBindingToDirection, panPhysicalKeyId, rangeInputOwnsKey } from '../../shared/mapKeyboardPanLogic';
 import { mapZoomKeyStep } from '../../shared/mapKeyboardZoom';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
 import { observeMapContainerResize } from './mapContainerResize';
@@ -511,13 +511,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
         return;
       }
     }
-    // The replay slider keeps focus after a step, so `p` still leaves replay from it. Its arrow keys stay with the slider.
-    if (replayActive() && isRangeInputTarget(e.target) && !e.repeat && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'p') {
-      e.preventDefault();
-      void toggleReplay();
-      return;
-    }
-    if (shouldIgnoreGlobalKeydown(e)) return;
+    // The replay slider keeps focus after a step, so P, C, zoom, and pan still reach past it. The keys it moves on stay with it.
+    if (shouldIgnoreGlobalKeydown(e) && !(isRangeInputTarget(e.target) && !rangeInputOwnsKey(e.key))) return;
     if (chartsDialogIsOpen()) {
       if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c') {
         e.preventDefault();

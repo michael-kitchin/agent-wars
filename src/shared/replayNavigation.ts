@@ -118,7 +118,7 @@ export function replayMayEnter(input: ReplayEntryState): { ok: true } | { ok: fa
  *
  * Purpose: The three button rules read the same position.
  * When to use: Drawing the panel.
- * Expected outcome: The step count, the current index, and whether a step is loading.
+ * Expected outcome: The step count, the current index, whether a step is loading or being shown, and whether Play is running.
  * Exceptions: None.
  */
 export interface ReplayPosition {
@@ -141,9 +141,9 @@ export interface ReplayPosition {
    */
   readonly index: number;
   /**
-   * Whether a step is loading.
+   * Whether a step is loading or being put on screen.
    *
-   * Contract: True from the request until the reply.
+   * Contract: True from the request until the reply, and again while the loaded step's snapshot and dialogs are shown.
    * When to use: Disabling every step button.
    * Expected outcome: True disables them.
    * Exceptions: None.

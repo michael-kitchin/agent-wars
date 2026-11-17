@@ -273,16 +273,32 @@ function syncPlayButton(play: HTMLButtonElement, position: ReplayPosition): void
 }
 
 /**
+ * Moves focus off a replay button that a draw has just disabled.
+ *
+ * Purpose: A disabled button drops its focus to the page, so the next arrow key would pan the map and the next Tab would start from the top. Focus stays in the panel instead.
+ * When to use: At the end of `renderReplayPanel`, with the element that had focus before the draw and the three bar buttons.
+ * Expected outcome: When `focused` is one of `buttons` and is now disabled, focus moves to the slider when the panel is expanded and the slider is enabled, else to the first enabled bar button, else to the expand control. Nothing moves otherwise, so a draw never takes focus from elsewhere.
+ * Exceptions: None. Missing elements are skipped.
+ */
+function keepFocusInPanel(focused: Element | null, buttons: readonly (HTMLButtonElement | null)[]): void {
+  if (!(focused instanceof HTMLButtonElement) || !focused.disabled || !buttons.includes(focused)) return;
+  const slider = expanded ? byId<HTMLInputElement>('replay-slider') : null;
+  const candidates = [slider, ...buttons, byId<HTMLButtonElement>('replay-panel-expand')];
+  candidates.find((control) => control !== null && !control.disabled)?.focus({ preventScroll: true });
+}
+
+/**
  * Draws the panel from the replay state.
  *
  * Purpose: Every change to replay redraws the panel through one function.
  * When to use: Subscribed with `onReplayChange`, and called after a request that changed nothing.
- * Expected outcome: The panel shows while replay is on and hides otherwise. The label, the slider, the turn field, and the three buttons match the state. A field with focus keeps what the player typed.
+ * Expected outcome: The panel shows while replay is on and hides otherwise. The label, the slider, the turn field, and the three buttons match the state. A field with focus keeps what the player typed. A focused button this draw disables hands its focus on through `keepFocusInPanel`.
  * Exceptions: None. Missing elements are skipped.
  */
 export function renderReplayPanel(): void {
   const panel = byId('replay-panel');
   if (!panel) return;
+  const focused = document.activeElement;
   const state = currentReplay();
   const position = currentPosition();
   if (!state || !position) {
@@ -313,6 +329,7 @@ export function renderReplayPanel(): void {
   if (back) back.disabled = !canStepBack(position);
   if (forward) forward.disabled = !canStepForward(position);
   if (play) syncPlayButton(play, position);
+  keepFocusInPanel(focused, [back, forward, play]);
 }
 
 /**

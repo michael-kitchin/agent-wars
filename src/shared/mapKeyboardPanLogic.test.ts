@@ -17,6 +17,7 @@ import {
   panCodeToDirection,
   panKeyToDirection,
   panPhysicalKeyId,
+  rangeInputOwnsKey,
   resolveNetPanAxes,
   scoreNeighborForPanAxes,
   type PanAxisKey,
@@ -49,6 +50,15 @@ test('panCodeToDirection and panBindingToDirection prefer physical codes', () =>
   assert.equal(panBindingToDirection('', 'w'), 'north');
   assert.equal(panPhysicalKeyId('KeyW', 'w'), 'KeyW');
   assert.equal(panPhysicalKeyId('', 'w'), 'w');
+});
+
+test('a focused slider keeps its own keys and lets the map shortcuts through', () => {
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']) {
+    assert.equal(rangeInputOwnsKey(key), true, key);
+  }
+  for (const key of ['c', 'p', 'w', 'a', 's', 'd', 't', '+', '-', 'Escape']) {
+    assert.equal(rangeInputOwnsKey(key), false, key);
+  }
 });
 
 test('resolveNetPanAxes cancels opposites and allows diagonals', () => {

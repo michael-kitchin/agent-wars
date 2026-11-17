@@ -157,6 +157,28 @@ export function panPhysicalKeyId(code: string, key: string): string {
 }
 
 /**
+ * Keys a focused slider acts on by itself.
+ *
+ * Purpose: A browser moves an `<input type="range">` on these keys, so the window's map shortcuts must leave them to it.
+ * When to use: Read through `rangeInputOwnsKey`.
+ * Expected outcome: The four arrow keys, Home, End, Page Up, and Page Down, as `KeyboardEvent.key` values.
+ * Exceptions: None.
+ */
+const RANGE_INPUT_KEYS: ReadonlySet<string> = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+
+/**
+ * Whether a focused slider uses this key itself.
+ *
+ * Purpose: The replay slider keeps focus after a step. Its own keys move it, and every other key still reaches the map's shortcuts.
+ * When to use: In the window key handler, when the event target is an `<input type="range">`.
+ * Expected outcome: True for a key in `RANGE_INPUT_KEYS`, false for any other `KeyboardEvent.key`, such as `c`, `w`, or `+`.
+ * Exceptions: None.
+ */
+export function rangeInputOwnsKey(key: string): boolean {
+  return RANGE_INPUT_KEYS.has(key);
+}
+
+/**
  * Resolves held cardinal directions into signed net axes (opposites cancel).
  *
  * Purpose: Supports diagonals and opposite-key cancel without the renderer encoding the rules.

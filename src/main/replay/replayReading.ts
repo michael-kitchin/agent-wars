@@ -22,7 +22,7 @@ import {
 } from '../recorder/matchRecordStore';
 import type { CommanderDispatch, CommanderDispatchMessage } from '../../shared/commanderStatus';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { stepKeyText, strategicStep, tacticalStep, type StepKey } from '../../shared/matchRecording';
+import { stepKeyText, strategicStep, tacticalStep, type MatchRecord, type StepKey } from '../../shared/matchRecording';
 import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { replayViewFor } from '../../shared/replayNavigation';
 import type { ReplayStepRef, ReplayStepView, ReplayTimeline, ReplayView } from '../../shared/replayTypes';
@@ -192,15 +192,34 @@ function newestSnapshotIdOf(previous: ReplayStepRef, view: ReplayView): number {
 }
 
 /**
+ * Reads one earlier snapshot, treating a damaged row as missing.
+ *
+ * Purpose: One payload that cannot be decoded must not fail the step that only borrows its fog.
+ * When to use: From `readBeforeStep`.
+ * Expected outcome: The record, or null when the id is not in the table or its payload cannot be decoded. A decode failure is logged.
+ * Exceptions: None.
+ */
+function readEarlierSnapshot(recordId: number): MatchRecord | null {
+  try {
+    return readMatchRecord(gameDbOps, recordId);
+  } catch (err) {
+    logError('replayReading readEarlierSnapshot unreadable snapshot', { recordId, err });
+    return null;
+  }
+}
+
+/**
  * Reads what the viewer had before an earlier step.
  *
  * Purpose: The update dialog describes only the moves the viewer could see, and a battle beat needs its sub-units from before the commit.
  * When to use: For a step that has an earlier step in the timeline.
- * Expected outcome: The `visibleHexes` of the earlier step's newest snapshot (every hex for the all-sides view), so a turn with a battle gives the picture after it, and for a beat its battle session's sub-units.
- * Exceptions: Propagates a database error.
+ * Expected outcome: The `visibleHexes` of the earlier step's newest snapshot (every hex for the all-sides view), so a turn with a battle gives the picture after it, and for a beat its battle session's sub-units. When that snapshot cannot be read, the timeline ref's own snapshot is used, and when that cannot be read either, no hexes and no sub-units (`readEarlierSnapshot`).
+ * Exceptions: Propagates a SQLite error from finding the newest snapshot.
  */
 function readBeforeStep(previous: ReplayStepRef, view: ReplayView): StepBefore {
-  const record = readMatchRecord(gameDbOps, newestSnapshotIdOf(previous, view));
+  const newestId = newestSnapshotIdOf(previous, view);
+  const record =
+    readEarlierSnapshot(newestId) ?? (newestId === previous.recordId ? null : readEarlierSnapshot(previous.recordId));
   const snapshot = (
     record?.payload as
       | { snapshot?: { visibleHexes?: string[]; tacticalBattleSession?: { subUnits?: TacticalSubUnitSnapshot[] } } }

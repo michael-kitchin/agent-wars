@@ -49,15 +49,55 @@ test('the later event for a turn wins, the series is in turn order, and a broken
   });
 });
 
+/**
+ * Builds one side entry with every field the charts read.
+ *
+ * Purpose: The shape cases change one field of an otherwise complete side.
+ * When to use: Any case that needs a side the reader accepts, or one with a single field broken.
+ * Expected outcome: A side entry for `seatId`, with `overrides` applied last.
+ * Exceptions: None.
+ */
+function completeSide(seatId: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    seatId,
+    out: false,
+    builtUnits: { infantry: 1 },
+    mercenaryUnits: {},
+    hexes: 3,
+    productionPerTurn: 2,
+    storedPoints: 0,
+    treasury: 5,
+    upkeepPerTurn: 1,
+    unitsLost: null,
+    costUsd: 0,
+    ...overrides,
+  };
+}
+
 test('a payload missing the relationship list, with a bad hexes-taken list, or with a side or report without seat ids is skipped', () => {
   withTempGameDb('aw-statistics-history-shape-', () => {
-    insertStatistics(1, { turnNumber: 1, sides: [{ seatId: 'human' }], relationships: [{ seatId: 'ai1', towardSeatId: 'human' }], hexesTaken: [] });
+    insertStatistics(1, { turnNumber: 1, sides: [completeSide('human')], relationships: [{ seatId: 'ai1', towardSeatId: 'human' }], hexesTaken: [] });
     insertStatistics(2, { turnNumber: 2, sides: [] });
     insertStatistics(3, { turnNumber: 3, sides: [], relationships: [], hexesTaken: 'none' });
     insertStatistics(4, { turnNumber: 4, sides: [{ hexes: 3 }], relationships: [], hexesTaken: null });
     insertStatistics(5, { turnNumber: 5, sides: [], relationships: [{ seatId: 'ai1' }], hexesTaken: null });
     insertStatistics(6, { turnNumber: 6, sides: [], relationships: [], hexesTaken: [null] });
     assert.deepEqual(readStatisticsHistory(gameDbOps).map((turn) => turn.turnNumber), [1]);
+  });
+});
+
+test('a side without unit count records or with a chart number that is not a number is skipped', () => {
+  withTempGameDb('aw-statistics-history-side-', () => {
+    const shape = { relationships: [], hexesTaken: null };
+    insertStatistics(1, { turnNumber: 1, sides: [completeSide('human', { unitsLost: 2 })], ...shape });
+    insertStatistics(2, { turnNumber: 2, sides: [{ seatId: 'human' }], ...shape });
+    insertStatistics(3, { turnNumber: 3, sides: [completeSide('human', { builtUnits: null })], ...shape });
+    insertStatistics(4, { turnNumber: 4, sides: [completeSide('human', { mercenaryUnits: 'none' })], ...shape });
+    insertStatistics(5, { turnNumber: 5, sides: [completeSide('human', { treasury: '5' })], ...shape });
+    insertStatistics(6, { turnNumber: 6, sides: [completeSide('human', { unitsLost: 'many' })], ...shape });
+    insertStatistics(7, { turnNumber: 7, sides: [completeSide('human', { costUsd: undefined })], ...shape });
+    insertStatistics(8, { turnNumber: 8, sides: [completeSide('human')], ...shape });
+    assert.deepEqual(readStatisticsHistory(gameDbOps).map((turn) => turn.turnNumber), [1, 8]);
   });
 });
 
