@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import type { TurnRange } from './matchChartSeries';
+import { zoomedTurnRange, type TurnRange } from './matchChartSeries';
 
 /**
  * How many turns a chart shows when the charts dialog opens.
@@ -74,4 +74,69 @@ export function zoomExtentTurnRange(turns: readonly number[]): TurnRange {
  */
 export function sameTurnRange(a: TurnRange, b: TurnRange): boolean {
   return a.min === b.min && a.max === b.max;
+}
+
+/**
+ * What a chart knew before a refresh and what it knows now.
+ *
+ * Purpose: `refreshedTurnView` needs the old and new turns to tell a full zoom-out from a narrower zoom.
+ * When to use: The argument of `refreshedTurnView`.
+ * Expected outcome: A plain record.
+ * Exceptions: None.
+ */
+export interface RefreshedTurnViewArgs {
+  /**
+   * The zoomed or panned range before the refresh.
+   *
+   * Contract: Null while the chart follows the opening window.
+   * When to use: The range the player left.
+   * Expected outcome: A range or null.
+   * Exceptions: None.
+   */
+  readonly view: TurnRange | null;
+  /**
+   * The recorded turns before the refresh, oldest first.
+   *
+   * Contract: The turns `view` was chosen over.
+   * When to use: Telling whether `view` was every turn.
+   * Expected outcome: A list of turn numbers.
+   * Exceptions: None.
+   */
+  readonly previousTurns: readonly number[];
+  /**
+   * The recorded turns after the refresh, oldest first.
+   *
+   * Contract: The turns the chart now draws.
+   * When to use: The new extent and opening window.
+   * Expected outcome: A list of turn numbers.
+   * Exceptions: None.
+   */
+  readonly nextTurns: readonly number[];
+  /**
+   * The narrowest span a zoom may reach.
+   *
+   * Contract: The chart's own minimum, `MIN_ZOOM_SPAN_TURNS` in the charts dialog.
+   * When to use: Keeping a narrow zoom inside the new extent.
+   * Expected outcome: A positive number of turns.
+   * Exceptions: None.
+   */
+  readonly minSpan: number;
+}
+
+/**
+ * Gives the range a chart keeps after its turns are refreshed.
+ *
+ * Purpose: A chart the player has not zoomed follows the opening window. A chart zoomed all the way out keeps showing every turn as turns arrive. Any other zoom stays where the player left it.
+ * When to use: The line charts and the stance strip, each time new data arrives.
+ * Expected outcome: Null to follow the opening window. Otherwise the new zoom extent when the old view covered the old extent, or the old view moved inside the new extent. A result equal to the new opening window is null.
+ * Exceptions: None.
+ */
+export function refreshedTurnView(args: RefreshedTurnViewArgs): TurnRange | null {
+  const { view, previousTurns, nextTurns, minSpan } = args;
+  if (view === null) return null;
+  const full = zoomExtentTurnRange(nextTurns);
+  const kept = sameTurnRange(view, zoomExtentTurnRange(previousTurns))
+    ? full
+    : zoomedTurnRange({ range: view, full, anchor: view.min, factor: 1, minSpan });
+  return sameTurnRange(kept, initialTurnWindow(nextTurns)) ? null : kept;
 }

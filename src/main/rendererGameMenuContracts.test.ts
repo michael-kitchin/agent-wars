@@ -85,9 +85,41 @@ test('the menu gets replay and the charts by injection, so it adds no import cyc
 test('the checkboxes close the menu before they act, and opening the menu no longer leaves replay', () => {
   const menu = readRendererSource('chrome', 'gameMenu.ts');
   const wire = menu.slice(menu.indexOf('const wireViewCheckbox'));
-  assert.equal(wire.indexOf('closeGameMenu()') < wire.indexOf('open()'), true);
+  const close = wire.indexOf('closeGameMenu({ restoreFocus: true })');
+  assert.notEqual(close, -1, 'a checkbox returns focus to the menu button, so a dialog it opens remembers a visible element');
+  assert.equal(close < wire.indexOf('open()'), true);
   const opener = menu.slice(menu.indexOf('export function openGameMenu'), menu.indexOf('export function closeGameMenu'));
   assert.equal(opener.includes('requestReplayLeave'), false);
   assert.equal(opener.includes('syncGameMenuViewItems()'), true);
   assert.equal(menu.includes('REPLAY_SAFE_BUTTON_IDS'), true);
+});
+
+test('a click held while replay leaves runs once, only on an item still enabled and attached, and logs a failed leave', () => {
+  const menu = readRendererSource('chrome', 'gameMenu.ts');
+  assert.equal(menu.slice(0, menu.indexOf('export function wireGameMenu')).includes('let heldMenuClickPending = false;'), true);
+  const listener = menu.slice(menu.indexOf('let replayingClick'), menu.indexOf('// A disabled button gets no clicks'));
+  assert.equal(listener.indexOf('if (heldMenuClickPending)') < listener.indexOf('requestReplayLeave()'), true);
+  assert.equal(listener.includes('heldMenuClickPending = true;'), true);
+  assert.equal(listener.includes('heldMenuClickPending = false;'), true);
+  const after = listener.slice(listener.indexOf('requestReplayLeave()'));
+  assert.equal(after.indexOf('item.disabled || !item.isConnected') < after.indexOf('item.click()'), true);
+  assert.equal(after.includes('.catch('), true);
+  assert.equal(after.includes('console.error('), true);
+});
+
+test('the checkboxes follow replay while the menu stays open', () => {
+  const menu = readRendererSource('chrome', 'gameMenu.ts');
+  assert.equal(menu.includes("import { onReplayChange, replayActive, requestReplayLeave } from '../replay/replayState';"), true);
+  const wiring = menu.slice(menu.indexOf('export function wireGameMenu'));
+  assert.equal(wiring.includes('onReplayChange(syncGameMenuViewItems)'), true);
+});
+
+test('How to play reports a guide that could not be opened', () => {
+  const menu = readRendererSource('chrome', 'gameMenu.ts');
+  const handler = menu.slice(menu.indexOf("'game-menu-how-to-play-btn')?.addEventListener"), menu.indexOf("'game-menu-quit-btn')?.addEventListener"));
+  assert.equal(handler.includes('void window.gameApi'), false);
+  assert.equal(handler.includes('reportHowToPlayFailure'), true);
+  const report = menu.slice(menu.indexOf('function reportHowToPlayFailure'));
+  assert.equal(report.includes('console.error('), true);
+  assert.equal(report.includes('showMapToast('), true);
 });

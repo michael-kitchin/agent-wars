@@ -13,6 +13,7 @@ import { formatHumanKnockoutDialog } from '../../shared/knockoutDialogCopy';
 import { isHumanSeatId } from '../../shared/seatIds';
 import { sideDisplayName } from '../../shared/sideNicknames';
 import { setMainUIControlsEnabled } from '../core/uiState';
+import { closeMatchOptionsDialogIfOpen } from './matchOptionsDialogState';
 import { chooseWatchTheRest } from './observeIntent';
 
 /**
@@ -84,7 +85,7 @@ export async function offerHumanKnockoutChoice(
  *
  * Purpose: The two buttons are the only way out.
  * When to use: `offerHumanKnockoutChoice`.
- * Expected outcome: `'watch'` or `'end'`. A missing dialog resolves `'watch'`.
+ * Expected outcome: Any open Game Options dialog is closed first. `'watch'` or `'end'`. A missing dialog resolves `'watch'`.
  * Exceptions: None.
  */
 function openHumanKnockoutDialog(copy: { title: string; lead: string; placeLine: string }): Promise<'watch' | 'end'> {
@@ -96,6 +97,8 @@ function openHumanKnockoutDialog(copy: { title: string; lead: string; placeLine:
   title.textContent = copy.title;
   lead.textContent = copy.lead;
   place.textContent = copy.placeLine;
+  // The choice must not sit under Game Options, whose key listener would take its keys.
+  closeMatchOptionsDialogIfOpen();
   dialog.classList.remove('hidden');
   setMainUIControlsEnabled(false);
   return new Promise((resolve) => {

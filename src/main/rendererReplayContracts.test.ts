@@ -375,7 +375,7 @@ test('the slider previews steps while it is dragged and shows the released step 
   const panel = readRendererSource('replay', 'replayPanel.ts');
   const slider = getFunctionSource(panel, 'wireSlider');
   assertMatches(slider, /createSliderPreviewScheduler\(\{[\s\S]*show: previewReplayStep,/, 'the slider builds one preview scheduler');
-  assertMatches(slider, /scheduler\.request\(Number\(slider\.value\)\)/, 'input asks for a preview');
+  assertMatches(slider, /if \(sliderDragging\) scheduler\.request\(Number\(slider\.value\)\)/, 'input asks for a preview only during a pointer drag, so a key step frames and applies once');
   assert.equal(slider.includes('currentReplay()?.busy'), false, 'a release is no longer dropped while a step loads');
   const render = getFunctionSource(panel, 'renderReplayPanel');
   assertMatches(render, /if \(!sliderThumbPinned\(\)\) slider\.value = String\(state\.index\);/, 'a drag keeps the thumb where the pointer put it');

@@ -25,6 +25,7 @@ import {
 import { dropHeldBattleTurnUpdate, hasPendingDestroyedBattleParents } from './heldBattleTurnUpdate';
 import { announceKnockouts } from './knockoutNotices';
 import { closeChartsDialogIfOpen, refreshChartsDialogIfOpen } from '../charts/chartsDialog';
+import { closeMatchOptionsDialogIfOpen, refreshMatchOptionsDialogIfOpen } from './matchOptionsDialogState';
 import { isHumanSeatId } from '../../shared/seatIds';
 import { offerHumanKnockoutChoice } from './knockoutDialog';
 import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
@@ -197,8 +198,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (readyResult.aiOnlyBattleH3Index && S.autoAdvance) {
         outcome = { decision: 'fight', selectedH3Index: readyResult.aiOnlyBattleH3Index };
       } else if (readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()) {
-        // The battles list needs the player's choice, so the charts dialog must not stay open over it.
+        // The battles list needs the player's choice, so the charts and Game Options dialogs must not stay open over it.
         closeChartsDialogIfOpen();
+        closeMatchOptionsDialogIfOpen();
         outcome = await deps.openMeleeInterceptModal({
           candidates: readyResult.meleeInterceptCandidates ?? [],
           buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
@@ -231,7 +233,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     await deps.refreshTacticalTerrainOverridesForRenderer();
     const nextState = await fetchMatchSnapshot();
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    if ((readyResult.knockouts ?? []).some((knockout) => isHumanSeatId(knockout.seatId))) closeChartsDialogIfOpen();
+    if ((readyResult.knockouts ?? []).some((knockout) => isHumanSeatId(knockout.seatId))) {
+      closeChartsDialogIfOpen();
+      closeMatchOptionsDialogIfOpen();
+    }
     announceKnockouts(readyResult.knockouts ?? [], S.gameState, nextState.seats, readyResult.removedUnitIdsBySeat);
     const state = nextState;
     await deps.applyGameStateSnapshot(state, {
@@ -375,6 +380,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     holdObserveAutoAdvanceForBattleEntry(false);
     if (rendererMatchEpochCurrent(matchEpoch)) {
       S.readyRequestInFlight = false;
+      // A Game Options dialog opened while the turn resolved was read-only; it becomes editable if planning resumed.
+      refreshMatchOptionsDialogIfOpen();
       void readCommanderPoolAndApply(true);
       deps.updateReadyButtonState();
       setTimeout(() => { void maybeObserveAutoAdvance(); }, 0);

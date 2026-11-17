@@ -21,7 +21,7 @@ import {
   restoreOptionControls,
   type OptionControlsMemo,
 } from './matchOptionsControls';
-import { matchOptionsDialogIsOpen, registerMatchOptionsDialogCloser } from './matchOptionsDialogState';
+import { matchOptionsDialogIsOpen, registerMatchOptionsDialogCloser, registerMatchOptionsDialogRefresher } from './matchOptionsDialogState';
 import { newGameOverlayIsOpen } from './newGameDialogCollapse';
 import { maybeObserveAutoAdvance } from './observeChrome';
 
@@ -133,6 +133,28 @@ let openEpoch = 0;
 let openCounter = 0;
 
 /**
+ * The `openCounter` of the dialog whose Apply is waiting on the main process, or null.
+ *
+ * Purpose: While the write is in flight the player cannot close the dialog, so a stored change is never left off the screen. Tying it to the counter keeps a forced close and a reopen from inheriting the old wait.
+ * When to use: Set and cleared by `applyMatchOptions`, read by `applyIsPending`.
+ * Expected outcome: Null when no Apply is waiting.
+ * Exceptions: None.
+ */
+let pendingApplyCounter: number | null = null;
+
+/**
+ * Whether the open dialog's Apply is waiting on the main process.
+ *
+ * Purpose: The player's close paths and a second Apply check it.
+ * When to use: Before closing at the player's request, and at the start of Apply.
+ * Expected outcome: True only while this dialog's own Apply is in flight.
+ * Exceptions: None.
+ */
+function applyIsPending(): boolean {
+  return pendingApplyCounter === openCounter;
+}
+
+/**
  * Whether the last press on the backdrop started there.
  *
  * Purpose: A text selection dragged out of the dialog must not close it.
@@ -236,14 +258,14 @@ function trapTabKey(event: KeyboardEvent, popover: HTMLElement): void {
  *
  * Purpose: Escape closes, Tab stays inside, and no key reaches the map's window handler.
  * When to use: The popover's `keydown` listener, and the window capture listener for keys aimed outside the popover.
- * Expected outcome: The event stops propagating. Escape also closes the dialog and prevents its default.
+ * Expected outcome: The event stops propagating. Escape also prevents its default and closes the dialog unless Apply is pending.
  * Exceptions: None.
  */
 function handleDialogKey(event: KeyboardEvent, popover: HTMLElement): void {
   event.stopPropagation();
   if (event.key === 'Escape') {
     event.preventDefault();
-    closeMatchOptionsDialog();
+    closeMatchOptionsDialogByPlayer();
   } else if (event.key === 'Tab') {
     trapTabKey(event, popover);
   }
@@ -265,11 +287,72 @@ function onWindowKeydown(event: KeyboardEvent): void {
 }
 
 /**
+ * Enables or disables Cancel and the ×.
+ *
+ * Purpose: While Apply is pending, the buttons that close the dialog must not look usable.
+ * When to use: Apply disables them; Apply's end, open, and close enable them.
+ * Expected outcome: Both buttons carry `disabled` equal to `disabled`.
+ * Exceptions: None.
+ */
+function setCloseButtonsDisabled(disabled: boolean): void {
+  const buttons = [part('match-options-cancel'), part('new-game-options-popover')?.querySelector('.commander-popover-close') ?? null];
+  for (const button of buttons) {
+    if (button instanceof HTMLButtonElement) button.disabled = disabled;
+  }
+}
+
+/**
+ * Fills the controls from the live match and sets whether they can change.
+ *
+ * Purpose: Open and the re-check after Ready share one step.
+ * When to use: With a snapshot just read from the main process, while the dialog's controls are saved.
+ * Expected outcome: The controls show `live` and are locked for it. The read-only dialog shows a note, hides Apply, and labels Cancel "Close"; the editable one hides the note, shows Apply enabled, and labels Cancel "Cancel".
+ * Exceptions: None.
+ */
+function showLiveSettings(live: GameStateSnapshot): void {
+  fillOptionControlsFromMatch(live, S.runButtonOn);
+  editable = !replayActive() && live.phase === 'planning' && !S.tacticalBattleSnapshot && !S.readyRequestInFlight && !live.gameOver;
+  liveTurn = live.turnNumber;
+  lockOptionControls(editable, liveTurn);
+  setNote(editable ? null : READ_ONLY_NOTE);
+  const apply = part('match-options-apply');
+  if (apply instanceof HTMLButtonElement) {
+    apply.hidden = !editable;
+    apply.disabled = false;
+  }
+  const cancel = part('match-options-cancel');
+  if (cancel) cancel.textContent = editable ? 'Cancel' : 'Close';
+  setCloseButtonsDisabled(false);
+}
+
+/**
+ * Re-reads the live match for a read-only dialog.
+ *
+ * Purpose: A dialog opened while a turn resolved becomes editable once the player plans again.
+ * When to use: Registered as the dialog's refresher; `refreshMatchOptionsDialogIfOpen` calls it when a Ready request finishes.
+ * Expected outcome: Does nothing for an editable dialog. Otherwise, when the same dialog is still open for the same match after the read, the controls are refilled and unlocked if planning resumed. The saved new-game controls are kept.
+ * Exceptions: None. A failed read is logged and the dialog stays read-only.
+ */
+async function refreshMatchOptionsDialog(): Promise<void> {
+  if (!matchOptionsDialogIsOpen() || editable) return;
+  const counter = openCounter;
+  let live: GameStateSnapshot;
+  try {
+    live = await fetchMatchSnapshot();
+  } catch (error) {
+    console.error('Game Options could not re-read the live match', error);
+    return;
+  }
+  if (counter !== openCounter || !matchOptionsDialogIsOpen() || !rendererMatchEpochCurrent(openEpoch) || live.hexes.length === 0) return;
+  showLiveSettings(live);
+}
+
+/**
  * Opens the dialog over the running match.
  *
  * Purpose: Shows the live match's settings, editable only while the player plans a turn on the world map.
  * When to use: The settings button's click.
- * Expected outcome: Refuses while the dialog is open, the new-game screen shows, another blocking dialog or the charts show, or the match changes while it reads. Otherwise the controls are saved, filled from the live match, and locked; the read-only dialog shows a note, hides Apply, and labels Cancel "Close". The popover is centered over the backdrop, and focus moves to the first enabled control or to Cancel.
+ * Expected outcome: Refuses while the dialog is open, the new-game screen shows, another blocking dialog or the charts show, or the match changes while it reads. Otherwise the controls are saved, then `showLiveSettings` fills and locks them. The popover is centered over the backdrop, and focus moves to the first enabled control or to Cancel.
  * Exceptions: None. A failed read is logged and nothing opens.
  */
 export async function openMatchOptionsDialog(): Promise<void> {
@@ -288,18 +371,8 @@ export async function openMatchOptionsDialog(): Promise<void> {
   if (!popover || counter !== openCounter || !rendererMatchEpochCurrent(epoch) || openIsRefused() || live.hexes.length === 0) return;
   openEpoch = epoch;
   savedControls = captureOptionControls();
-  fillOptionControlsFromMatch(live, S.runButtonOn);
-  editable = !replayActive() && live.phase === 'planning' && !S.tacticalBattleSnapshot && !S.readyRequestInFlight && !live.gameOver;
-  liveTurn = live.turnNumber;
-  lockOptionControls(editable, liveTurn);
-  setNote(editable ? null : READ_ONLY_NOTE);
-  const apply = part('match-options-apply');
-  if (apply instanceof HTMLButtonElement) {
-    apply.hidden = !editable;
-    apply.disabled = false;
-  }
+  showLiveSettings(live);
   const cancel = part('match-options-cancel');
-  if (cancel) cancel.textContent = editable ? 'Cancel' : 'Close';
   popover.dataset.mode = 'match';
   popover.setAttribute('aria-modal', 'true');
   for (const side of ['left', 'top', 'right', 'bottom']) popover.style.removeProperty(side);
@@ -316,9 +389,9 @@ export async function openMatchOptionsDialog(): Promise<void> {
 /**
  * Closes the dialog and puts the new-game controls back.
  *
- * Purpose: Cancel, Close, the ×, Escape, the backdrop, a successful Apply, and the new-game screen share one exit.
- * When to use: Those actions. A call while the dialog is not open does nothing.
- * Expected outcome: The saved controls are restored, `data-mode` is removed, the backdrop, footer, note, and popover are hidden, focus returns to the settings button, and auto-advance may press Ready again.
+ * Purpose: The player's close paths, a successful Apply, the new-game screen, and a prompt that needs the player share one exit.
+ * When to use: Those actions. The player's paths go through `closeMatchOptionsDialogByPlayer`. A call while the dialog is not open does nothing.
+ * Expected outcome: The saved controls are restored, Cancel and the × are enabled, `data-mode` is removed, the backdrop, footer, note, and popover are hidden, focus returns to the settings button, and auto-advance may press Ready again. A pending Apply still puts a stored change on screen.
  * Exceptions: None.
  */
 export function closeMatchOptionsDialog(): void {
@@ -329,6 +402,7 @@ export function closeMatchOptionsDialog(): void {
   if (savedControls) restoreOptionControls(savedControls);
   savedControls = null;
   editable = false;
+  setCloseButtonsDisabled(false);
   delete popover.dataset.mode;
   popover.removeAttribute('aria-modal');
   for (const id of ['match-options-backdrop', 'match-options-footer']) {
@@ -342,46 +416,86 @@ export function closeMatchOptionsDialog(): void {
 }
 
 /**
+ * Closes the dialog at the player's request.
+ *
+ * Purpose: Cancel, Close, the ×, Escape, and the backdrop must not close the dialog while Apply waits, or a stored change could miss the screen's refresh.
+ * When to use: Those five paths.
+ * Expected outcome: Nothing while Apply is pending; otherwise `closeMatchOptionsDialog`.
+ * Exceptions: None.
+ */
+function closeMatchOptionsDialogByPlayer(): void {
+  if (applyIsPending()) return;
+  closeMatchOptionsDialog();
+}
+
+/**
+ * Puts the re-read live match on screen after a stored change.
+ *
+ * Purpose: The top bar and the panels must show the new settings even when the dialog was closed while the write was in flight.
+ * When to use: After `setMatchOptions` succeeded, with the epoch captured when Apply started.
+ * Expected outcome: When the match is still the one Apply wrote to, a fresh snapshot is applied. Otherwise nothing happens.
+ * Exceptions: None. A failed read or apply is logged with `console.error`.
+ */
+async function showStoredMatchOptions(epoch: number): Promise<void> {
+  try {
+    const live = await fetchMatchSnapshot();
+    if (rendererMatchEpochCurrent(epoch)) await dialogDeps?.applySnapshot(live, LIVE_SNAPSHOT_APPLY_OPTIONS);
+  } catch (error) {
+    console.error('Game Options could not show the new settings', error);
+  }
+}
+
+/**
  * Stores the editable settings and closes the dialog.
  *
  * Purpose: The main process checks and stores the choices; the screen then re-reads the live match.
  * When to use: The Apply button.
- * Expected outcome: A match that changed since opening closes the dialog without writing. Success applies a fresh snapshot, then closes. A refusal or a failed call shows the reason, re-enables Apply, and keeps the dialog open.
+ * Expected outcome: A match that changed since opening closes the dialog without writing. While the write waits, Apply, Cancel, and the × are disabled, and Escape and the backdrop do nothing. Success applies a fresh snapshot whenever the match is unchanged, even if a prompt closed the dialog meanwhile, then closes the dialog if it is still the same one. A refusal or a failed call shows the reason, re-enables the buttons, and keeps the dialog open.
  * Exceptions: None. A thrown call is logged with `console.error`.
  */
 async function applyMatchOptions(): Promise<void> {
-  if (!matchOptionsDialogIsOpen() || !editable) return;
-  if (!rendererMatchEpochCurrent(openEpoch)) {
+  if (!matchOptionsDialogIsOpen() || !editable || applyIsPending()) return;
+  const epoch = openEpoch;
+  if (!rendererMatchEpochCurrent(epoch)) {
     closeMatchOptionsDialog();
     return;
   }
   const apply = part('match-options-apply');
-  if (apply instanceof HTMLButtonElement) apply.disabled = true;
   const counter = openCounter;
-  const showFailure = (reason: string): void => {
+  pendingApplyCounter = counter;
+  if (apply instanceof HTMLButtonElement) apply.disabled = true;
+  setCloseButtonsDisabled(true);
+  /**
+   * Ends this Apply's wait.
+   *
+   * Purpose: Every way out of Apply clears the pending mark it set, and only the same dialog gets its buttons back.
+   * When to use: After the write's answer, before showing a refusal or closing.
+   * Expected outcome: The pending mark is cleared when it is still this Apply's; Apply, Cancel, and the × are enabled when the dialog was not closed meanwhile.
+   * Exceptions: None.
+   */
+  const endPending = (): void => {
+    if (pendingApplyCounter === counter) pendingApplyCounter = null;
     if (counter !== openCounter) return;
-    setNote(reason);
     if (apply instanceof HTMLButtonElement) apply.disabled = false;
+    setCloseButtonsDisabled(false);
   };
   try {
     const api = window.gameApi;
     if (!api?.setMatchOptions) throw new Error('setMatchOptions is unavailable');
     const result = await api.setMatchOptions(readMatchOptionsUpdate());
     if (!result.ok) {
-      showFailure(result.reason);
+      endPending();
+      if (counter === openCounter) setNote(result.reason);
       return;
     }
   } catch (error) {
     console.error('Game Options could not be applied', error);
-    showFailure(SAVE_FAILED_NOTE);
+    endPending();
+    if (counter === openCounter) setNote(SAVE_FAILED_NOTE);
     return;
   }
-  try {
-    const live = await fetchMatchSnapshot();
-    if (counter === openCounter && rendererMatchEpochCurrent(openEpoch)) await dialogDeps?.applySnapshot(live, LIVE_SNAPSHOT_APPLY_OPTIONS);
-  } catch (error) {
-    console.error('Game Options could not show the new settings', error);
-  }
+  await showStoredMatchOptions(epoch);
+  endPending();
   if (counter === openCounter) closeMatchOptionsDialog();
 }
 
@@ -390,22 +504,25 @@ async function applyMatchOptions(): Promise<void> {
  *
  * Purpose: One setup point, after the page markup exists.
  * When to use: Once from renderer start-up, next to the game menu's wiring.
- * Expected outcome: The closer is registered for the new-game screen. The settings button opens the dialog. Apply, Cancel, the ×, Escape, and a press and release on the backdrop act only in match mode. A victory or AI-only change re-locks the turn limits after those selects' own listeners rebuild them.
+ * Expected outcome: The closer and the re-check are registered for the new-game screen and the Ready handler. The settings button opens the dialog. Apply, Cancel, the ×, Escape, and a press and release on the backdrop act only in match mode, and the close paths do nothing while Apply is pending. A victory or AI-only change re-locks the turn limits after those selects' own listeners rebuild them.
  * Exceptions: None. A missing element is skipped.
  */
 export function wireMatchOptionsDialog(deps: MatchOptionsDialogDeps): void {
   dialogDeps = deps;
   registerMatchOptionsDialogCloser(closeMatchOptionsDialog);
+  registerMatchOptionsDialogRefresher(() => {
+    void refreshMatchOptionsDialog();
+  });
   part('topbar-settings-btn')?.addEventListener('click', () => {
     void openMatchOptionsDialog();
   });
   part('match-options-apply')?.addEventListener('click', () => {
     void applyMatchOptions();
   });
-  part('match-options-cancel')?.addEventListener('click', closeMatchOptionsDialog);
+  part('match-options-cancel')?.addEventListener('click', closeMatchOptionsDialogByPlayer);
   const popover = part('new-game-options-popover');
   popover?.querySelector('.commander-popover-close')?.addEventListener('click', () => {
-    if (matchOptionsDialogIsOpen()) closeMatchOptionsDialog();
+    if (matchOptionsDialogIsOpen()) closeMatchOptionsDialogByPlayer();
   });
   popover?.addEventListener('keydown', (event) => {
     if (matchOptionsDialogIsOpen()) handleDialogKey(event, popover);
@@ -424,7 +541,7 @@ export function wireMatchOptionsDialog(deps: MatchOptionsDialogDeps): void {
     event.stopPropagation();
     const fromBackdrop = pressStartedOnBackdrop;
     pressStartedOnBackdrop = false;
-    if (event.target === backdrop && fromBackdrop) closeMatchOptionsDialog();
+    if (event.target === backdrop && fromBackdrop) closeMatchOptionsDialogByPlayer();
   });
   for (const type of ['pointerdown', 'mousedown', 'dblclick', 'wheel']) {
     backdrop.addEventListener(type, (event) => event.stopPropagation());

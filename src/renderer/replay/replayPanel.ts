@@ -485,7 +485,7 @@ function endSliderDrag(): void {
  *
  * Purpose: Dragging previews the step under the thumb without its dialogs, through a scheduler that limits how often a step loads. Letting go shows the released step in full.
  * When to use: From `wireReplayPanel`.
- * Expected outcome: Input writes the turn under the thumb into the field and asks for a preview. Change ends the drag, settles the previews, waits for the step on screen to settle, shows the released step with its dialogs, and redraws the panel. The thumb stays pinned until the last pending release has shown or failed, so the redraws in between do not move it. Keyboard steps fire input and change together, so they preview and then show in full, and the dialogs open once. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
+ * Expected outcome: Input writes the turn under the thumb into the field, and during a pointer drag asks for a preview. Change ends the drag, settles the previews, waits for the step on screen to settle, shows the released step with its dialogs, and redraws the panel. The thumb stays pinned until the last pending release has shown or failed, so the redraws in between do not move it. Keyboard steps fire input and change together and request no preview, so each key step is framed and applied once, by the full show with its dialogs. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
  * Exceptions: None.
  */
 function wireSlider(slider: HTMLInputElement): void {
@@ -512,7 +512,8 @@ function wireSlider(slider: HTMLInputElement): void {
     if (turn === undefined || !field) return;
     field.value = String(turn);
     field.removeAttribute('aria-invalid');
-    scheduler.request(Number(slider.value));
+    // A key step fires change right after input and shows in full there, so only a pointer drag previews.
+    if (sliderDragging) scheduler.request(Number(slider.value));
   });
   slider.addEventListener('change', () => {
     sliderDragging = false;

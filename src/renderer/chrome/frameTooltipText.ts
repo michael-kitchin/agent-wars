@@ -35,8 +35,8 @@ export const commandersTabTooltipText =
  * Builds the tip for a control this version does not offer.
  *
  * Purpose: Says a disabled placeholder is not a broken control.
- * When to use: The tip host around each disabled placeholder, with the control's visible name, such as "Settings".
- * Expected outcome: For example "Settings is not available in this version."
+ * When to use: The tip host around each disabled placeholder, with the control's visible name, such as "Replay" on a console report.
+ * Expected outcome: For example "Replay is not available in this version."
  * Exceptions: None.
  */
 export function unavailableTooltipText(name: string): string {

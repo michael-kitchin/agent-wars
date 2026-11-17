@@ -8,9 +8,10 @@
  * and Quit.
  */
 import { rendererSharedState as S } from '../core/state';
-import { replayActive, requestReplayLeave } from '../replay/replayState';
+import { onReplayChange, replayActive, requestReplayLeave } from '../replay/replayState';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { syncSaveLoadItems } from '../gameplay/saveLoadMenu';
+import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { dismissStaleControlTooltip } from './controlTooltip';
 import { newGameItemBusyTooltipText, newGameItemOpenTooltipText } from './controlTooltipText';
 
@@ -66,6 +67,41 @@ const REPLAY_SAFE_BUTTON_IDS: ReadonlySet<string> = new Set(['game-menu-how-to-p
 let menuActions: GameMenuActions | null = null;
 
 /**
+ * Whether a menu button click is held while replay leaves.
+ *
+ * Purpose: A second click during the leave would be held too and run its button twice, opening Save or Load twice.
+ * When to use: The capture listener in `wireGameMenu` sets it while a held click waits and ignores menu button clicks
+ *   until it clears.
+ * Expected outcome: True from the held click until the leave settles and the click has run or been dropped.
+ * Exceptions: None.
+ */
+let heldMenuClickPending = false;
+
+/**
+ * The sentence the map toast shows when the guide does not open.
+ *
+ * Purpose: The player learns that How to play did nothing, rather than waiting for a browser that never opens.
+ * When to use: `reportHowToPlayFailure`.
+ * Expected outcome: One short sentence.
+ * Exceptions: None.
+ */
+const HOW_TO_PLAY_FAILED_TEXT = 'The How to play guide could not be opened in the browser.';
+
+/**
+ * Reports that How to play did not open the guide.
+ *
+ * Purpose: Main resolves false when the browser cannot be opened, and the call itself can reject. Neither may pass
+ *   silently.
+ * When to use: When `openHowToPlay` resolves false or rejects.
+ * Expected outcome: The failure is logged with `console.error` and the map toast shows `HOW_TO_PLAY_FAILED_TEXT`.
+ * Exceptions: None.
+ */
+function reportHowToPlayFailure(error?: unknown): void {
+  console.error('How to play: the guide could not be opened', error ?? 'main reported false');
+  showMapToast(HOW_TO_PLAY_FAILED_TEXT, { isError: true });
+}
+
+/**
  * Reports whether the game menu is open.
  *
  * Purpose: Key and pointer handlers act only while the menu shows.
@@ -102,7 +138,7 @@ export function syncGameMenuNewGameItem(): void {
  * Checks or unchecks the Playback… and Charts… items to match what is showing.
  *
  * Purpose: Each item is a checkbox that says whether its surface is visible.
- * When to use: When the menu opens.
+ * When to use: When the menu opens, and after each replay change, so `p` with the menu open leaves the box right.
  * Expected outcome: Playback… is checked while replay is on, and Charts… while the charts dialog is open. Nothing
  *   changes before `wireGameMenu` has run.
  * Exceptions: None; does nothing when an item is missing.
@@ -140,7 +176,7 @@ export function openGameMenu(): void {
  *
  * Purpose: Every way of leaving the menu ends here, so the button and the menu never disagree.
  * When to use: After a menu item runs, on Escape, on a press outside the menu, and when pointer input is switched off.
- *   Pass `restoreFocus` only for Escape.
+ *   Pass `restoreFocus` for Escape and the Playback… and Charts… checkboxes.
  * Expected outcome: The menu hides, the button reports `aria-expanded="false"`, and a tip for a hidden item is dismissed.
  *   With `restoreFocus`, focus returns to the menu button. Calling it while the menu is closed changes nothing.
  * Exceptions: None.
@@ -226,12 +262,15 @@ export interface GameMenuActions {
  * Purpose: One bootstrap for the menu's own behavior.
  * When to use: Once during renderer startup, after the page markup exists.
  * Expected outcome: The button toggles the menu. It does not open while the top bar ignores the pointer. An enabled
- *   menu button closes it after its own handler runs; the checkbox leaves it open. Escape closes it first, before
- *   the map's Escape handling, and returns focus to the button. A press outside the menu and its button closes it.
- *   Checking or unchecking Playback… or Charts… closes the menu first, so the charts are not blocked by it, and then
- *   runs `actions` to open or close replay or the charts. A button that changes or saves the match takes the player out
- *   of replay before it runs. How to play asks main to open the guide on GitHub in the system browser. Quit closes the
- *   window.
+ *   menu button closes it after its own handler runs; the Offer tactical battles checkbox leaves it open. Escape
+ *   closes it first, before the map's Escape handling, and returns focus to the button. A press outside the menu and
+ *   its button closes it.
+ *   Checking or unchecking Playback… or Charts… closes the menu first, so the charts are not blocked by it, and returns
+ *   focus to the menu button, then runs `actions` to open or close replay or the charts. Both checkboxes follow replay
+ *   changes while the menu stays open. A button that changes or saves the match takes the player out of replay before
+ *   it runs, once per click: other menu button clicks are ignored until the leave settles, and the held click is
+ *   dropped when its button is then disabled or gone. How to play asks main to open the guide on GitHub in the system
+ *   browser and shows a toast when it cannot. Quit closes the window.
  * Exceptions: None; does nothing when the markup is missing.
  *
  * @param actions The replay and charts actions, injected so this module imports neither.
@@ -241,6 +280,7 @@ export function wireGameMenu(actions: GameMenuActions): void {
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
   menuActions = actions;
+  onReplayChange(syncGameMenuViewItems);
 
   button.addEventListener('click', () => {
     const topbar = document.getElementById('app-topbar');
@@ -250,24 +290,40 @@ export function wireGameMenu(actions: GameMenuActions): void {
   });
 
   // Replay no longer ends when the menu opens, so a button that changes or saves the match leaves it first. The click
-  // is held, replay leaves, and the same button is clicked again. The second click skips this listener.
+  // is held, replay leaves, and the same button is clicked again. The second click skips this listener. Other button
+  // clicks while one is held are dropped, so two quick clicks cannot both run.
   let replayingClick = false;
   menu.addEventListener(
     'click',
     (event) => {
       const target = event.target instanceof Element ? event.target : null;
       const item = target?.closest('button');
-      if (replayingClick || !item || item.disabled || REPLAY_SAFE_BUTTON_IDS.has(item.id) || !replayActive()) return;
+      if (replayingClick || !item) return;
+      if (heldMenuClickPending) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        return;
+      }
+      if (item.disabled || REPLAY_SAFE_BUTTON_IDS.has(item.id) || !replayActive()) return;
       event.stopImmediatePropagation();
       event.preventDefault();
-      void requestReplayLeave().then(() => {
-        replayingClick = true;
-        try {
-          item.click();
-        } finally {
-          replayingClick = false;
-        }
-      });
+      heldMenuClickPending = true;
+      requestReplayLeave()
+        .then(() => {
+          if (item.disabled || !item.isConnected) return;
+          replayingClick = true;
+          try {
+            item.click();
+          } finally {
+            replayingClick = false;
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('game menu: leaving replay before a menu item failed', error);
+        })
+        .finally(() => {
+          heldMenuClickPending = false;
+        });
     },
     true
   );
@@ -284,7 +340,7 @@ export function wireGameMenu(actions: GameMenuActions): void {
     document.getElementById(id)?.addEventListener('change', (event) => {
       const box = event.target instanceof HTMLInputElement ? event.target : null;
       if (box === null) return;
-      closeGameMenu();
+      closeGameMenu({ restoreFocus: true });
       if (box.checked) open();
       else close();
     });
@@ -293,7 +349,11 @@ export function wireGameMenu(actions: GameMenuActions): void {
   wireViewCheckbox('game-menu-charts-check', actions.openCharts, actions.closeCharts);
 
   document.getElementById('game-menu-how-to-play-btn')?.addEventListener('click', () => {
-    void window.gameApi?.openHowToPlay();
+    const opening = window.gameApi?.openHowToPlay();
+    if (opening === undefined) return;
+    opening.then((opened) => {
+      if (!opened) reportHowToPlayFailure();
+    }, reportHowToPlayFailure);
   });
 
   document.getElementById('game-menu-quit-btn')?.addEventListener('click', () => {

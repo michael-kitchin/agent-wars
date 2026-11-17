@@ -153,6 +153,7 @@ On the map, tactical play limits orders to the battle area and shows the battle 
 - A click outside the battle area during tactical planning never issues a strategic order.
 - Replay never changes the mode, the match, or the draft orders. A new match ends it.
 - The charts dialog never changes the mode, the selection, the draft orders, or the match. It closes before the melee intercept list or the knockout dialog opens.
+- The in-match Game Options dialog closes without writing before a dialog that needs the player's choice, and before the new-game screen resets its controls. A Ready that finishes with it still open re-reads the match. The list is in [new-game-dialog.md](new-game-dialog.md).
 - Observe never selects a unit, never queues an order, and never shows a magnifier. View as changes which fog is drawn. It does not change the match.
 
 ## Open Questions

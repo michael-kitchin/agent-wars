@@ -100,7 +100,7 @@ Each opponent's name starts as that side's short home name, and you change it on
 
 Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Beat limit, 30 by default, is the most beats one of those battles can run. Unlimited removes it. None turns it off. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
 
-During a match, the Settings button on the top bar shows these options for the match you're playing. While you plan a turn on the world map, you can change the victory rule, a turn limit no earlier than the current turn (a limit equal to it ends the match after this turn), AI-only battles, Beat limit, Sight cues, and the four bonuses, and the change takes effect from the next turn's resolution; Nickname, Fog of war, and Auto-start AI stay as they are.
+During a match, the Settings button on the top bar shows these options for the match you're playing. While you plan a turn on the world map, you can change the victory rule, a turn limit no earlier than the current turn (a limit equal to it ends the match after this turn; a limit that has already passed is replaced by the first one still offered), AI-only battles, Beat limit, Sight cues, and the four bonuses, and the change takes effect from the next turn's resolution; Nickname, Fog of war, and Auto-start AI stay as they are.
 
 ## Saving and Loading
 
@@ -484,7 +484,7 @@ The charts show every side and every turn, whatever fog of war is set to, so you
 - **Stance over time:** one strip for the side you choose, with a row for each commander. A solid cell is a stance the commander reported that turn. A lighter cell carries an earlier stance forward. An empty outline is no report.
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep per turn, units lost per turn, and model cost so far. Built units and mercenary units have a dropdown for the total or one unit type.
 
-Hover a chart for each side's value at that turn and their total. Scroll over a chart to zoom the turns, drag to move along a zoomed chart, and double-click to show every turn again. Charts begin at the first turn the game recorded, so a save from an earlier version shows "No turns have been recorded yet." until you play a turn.
+Hover a chart for each side's value at that turn and their total. Scroll over a chart to zoom the turns, drag to move along a zoomed chart, and double-click to show every turn again. Once a chart shows every recorded turn, later turns stay in view. A tighter zoom stays where you left it. Charts begin at the first turn the game recorded, so a save from an earlier version shows "No turns have been recorded yet." until you play a turn.
 
 ## Replay
 

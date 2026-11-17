@@ -7,6 +7,8 @@
  * Exceptions: None. A missing dialog logs `console.error` and resolves false.
  */
 
+import { closeMatchOptionsDialogIfOpen } from '../gameplay/matchOptionsDialogState';
+
 /**
  * The elements and the button that takes focus.
  *
@@ -59,7 +61,7 @@ export interface ConfirmDialogIds {
  *
  * Purpose: The question, its pending answer, and its listeners stay with that dialog.
  * When to use: Once per dialog, at module level.
- * Expected outcome: A function that shows the dialog and resolves true only for the confirm button. An already-open question resolves false before the new one is asked. Escape does not reach the map or the game menu.
+ * Expected outcome: A function that closes any open Game Options dialog, shows this one, and resolves true only for the confirm button. An already-open question resolves false before the new one is asked. Escape does not reach the map or the game menu.
  * Exceptions: None.
  */
 export function createConfirmDialog(ids: ConfirmDialogIds): () => Promise<boolean> {
@@ -126,6 +128,8 @@ export function createConfirmDialog(ids: ConfirmDialogIds): () => Promise<boolea
       previous(false);
     }
     bind(dialog);
+    // The question sits below Game Options and would lose its keys to it.
+    closeMatchOptionsDialogIfOpen();
     dialog.classList.remove('hidden');
     const focusId = ids.initialFocus === 'confirm' ? ids.confirmId : ids.cancelId;
     const focusTarget = document.getElementById(focusId);

@@ -17,7 +17,7 @@ import {
   type LineChartData,
   type TurnRange,
 } from '../../shared/matchChartSeries';
-import { initialTurnWindow, sameTurnRange, zoomExtentTurnRange } from '../../shared/chartTurnWindow';
+import { initialTurnWindow, refreshedTurnView, sameTurnRange, zoomExtentTurnRange } from '../../shared/chartTurnWindow';
 import { MIN_ZOOM_SPAN_TURNS, WHEEL_ZOOM_IN_FACTOR } from './chartZoom';
 
 /**
@@ -419,13 +419,10 @@ export function createLineChart(args: CreateLineChartArgs): LineChartHandle {
 
   return {
     update(next: LineChartData): void {
+      const kept = refreshedTurnView({ view, previousTurns: data.turns, nextTurns: next.turns, minSpan: MIN_ZOOM_SPAN_TURNS });
       data = next;
       plot.setData(toUplotData(next), false);
-      if (view === null) {
-        showRange(openingRange());
-        return;
-      }
-      showRange(zoomedTurnRange({ range: view, full: fullTurnRange(next), anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }));
+      showRange(kept ?? openingRange());
     },
     resize(width: number, height: number): void {
       plot.setSize({ width, height });

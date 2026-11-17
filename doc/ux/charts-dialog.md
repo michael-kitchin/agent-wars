@@ -61,7 +61,7 @@ Hovering a turn shows "Turn {n}" and one line per commander: "{name}: {stance} (
 - Hovering a line chart shows a tooltip: "Turn {n}", one line per side with a color swatch and that side's value at the nearest turn, "no data" for a gap, and a "Total" over the values that exist. Model cost prints two decimals. Every other chart prints whole numbers.
 - The wheel over a line chart or the strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than three turns (`MIN_ZOOM_SPAN_TURNS` in `src/renderer/charts/chartZoom.ts` is the last turn shown minus the first). Scrolling down zooms out, to every recorded turn, or to the 12-turn opening window when fewer than 12 turns are recorded. Each wheel step scales the span by `WHEEL_ZOOM_IN_FACTOR` or its reciprocal. The strip always shows whole turns, so its cells fill its width and its turn labels stay under their cells after a zoom or a pan (`wholeTurnRange`). The wheel does not scroll the dialog while the pointer is over one of them.
 - Dragging a zoomed line chart or the strip left or right pans it. Dragging does not select a region.
-- A double-click on a line chart or the strip zooms all the way out: every recorded turn, or the 12-turn opening window when fewer than 12 turns are recorded.
+- A double-click on a line chart or the strip zooms all the way out: every recorded turn, or the 12-turn opening window when fewer than 12 turns are recorded. A chart zoomed all the way out, by a double-click or by the wheel, keeps showing every recorded turn as turns arrive (`refreshedTurnView` in `src/shared/chartTurnWindow.ts`). A narrower zoom or a pan stays where the player left it.
 - Changing a dropdown redraws that chart, or the strip, and keeps its zoom.
 - Every chart with turns on its X axis (the nine line charts and the stance strip) opens on a window of 12 turns (`INITIAL_VISIBLE_TURNS` and `initialTurnWindow` in `src/shared/chartTurnWindow.ts`), and every time the dialog opens it starts from that window again, whatever the player did before. Points fill in from the left edge, the first recorded turn. With fewer than 12 turns, blank space stays to the right of the last point, and it shrinks as turns arrive, until turn 12 fills the axis. With more than 12 turns, the window ends on the newest turn. While the player has not zoomed or panned, a refresh keeps following that window. A tooltip appears only over a recorded turn, not over the blank space.
 - A click, wheel, or drag on the dialog or its backdrop never reaches the map.
@@ -124,6 +124,6 @@ None.
 - `src/renderer/chrome/blockingDialogGuards.ts`
 - `src/renderer/map/initCore.ts` (the window `keydown` handler)
 - `src/renderer/gameplay/readyHandler.ts`
-- `src/shared/chartTurnWindow.ts` (`INITIAL_VISIBLE_TURNS`, `initialTurnWindow`, `zoomExtentTurnRange`)
+- `src/shared/chartTurnWindow.ts` (`INITIAL_VISIBLE_TURNS`, `initialTurnWindow`, `zoomExtentTurnRange`, `refreshedTurnView`)
 - `src/shared/matchChartSeries.ts` (`relationshipSubjectSeatIds`, `relationshipRows`, `relationshipStrip`)
 - `src/shared/chartsDialogState.ts`

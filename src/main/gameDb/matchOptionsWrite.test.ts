@@ -10,12 +10,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MatchOptionsUpdate } from '../../shared/ipc/matchOptionsTypes';
-import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY } from '../../shared/sightCueSettings';
+import { AI_ONLY_BEAT_LIMIT_CONFIG_KEY } from '../../shared/aiOnlyBeatLimit';
+import { bonusLevelOf } from '../../shared/bonusLevel';
+import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
+import { techBonusLevelOf } from '../../shared/techBonusRules';
+import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
+import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, SIGHT_CUES_CONFIG_KEY } from '../../shared/sightCueSettings';
 import { dbGetAll, dbRun, getGameState, getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../gameDb';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 import { gameDbOps } from './dbConnection';
 import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { validateMatchOptionsUpdate, writeMatchOptions } from './matchOptionsWrite';
+import { ORIGIN_BONUS_CONFIG_KEY, TECH_BONUS_CONFIG_KEY, TERRAIN_BONUS_CONFIG_KEY, WEATHER_BONUS_CONFIG_KEY } from './originBonusConfig';
 
 /**
  * The update every case starts from: the new-game defaults with every bonus off.
@@ -185,6 +191,52 @@ test('a bad value of any field is refused', () => {
     assertRefused({ ...BASE_UPDATE, sightCues: 'yes' });
     assertRefused({ ...BASE_UPDATE, weatherBonusLevel: 'extreme' });
     assertRefused(null);
+  });
+});
+
+test('a bonus set to off stores its flag off and reads back off', () => {
+  withMatch('aw-match-options-bonus-off-', () => {
+    const allHigh = { originBonusLevel: 'high', techBonusLevel: 'high', terrainBonusLevel: 'high', weatherBonusLevel: 'high' } as const;
+    assert.equal(applyUpdate({ ...BASE_UPDATE, ...allHigh }).ok, true);
+    assert.equal(getGameState().originBonusEnabled, true);
+    assert.equal(applyUpdate(BASE_UPDATE).ok, true);
+    for (const key of [ORIGIN_BONUS_CONFIG_KEY, TERRAIN_BONUS_CONFIG_KEY, WEATHER_BONUS_CONFIG_KEY, TECH_BONUS_CONFIG_KEY]) {
+      assert.equal(selectGameConfigValue(gameDbOps, key), '0', key);
+    }
+    const state = getGameState();
+    assert.equal(bonusLevelOf(state.originBonusEnabled, state.originBonusLevel), 'off');
+    assert.equal(bonusLevelOf(state.terrainBonusEnabled, state.terrainBonusLevel), 'off');
+    assert.equal(weatherBonusLevelOf(state), 'off');
+    assert.equal(techBonusLevelOf(originBonusSettingsFromSnapshot(state)), 'off');
+  });
+});
+
+test('a save without the sight cue and AI-only rows accepts the write and reads it back', () => {
+  withMatch('aw-match-options-missing-rows-', () => {
+    for (const key of [SIGHT_CUES_CONFIG_KEY, 'ai_only_battles', AI_ONLY_BEAT_LIMIT_CONFIG_KEY]) dbRun('DELETE FROM game_config WHERE key = ?', [key]);
+    assert.equal(applyUpdate({ ...BASE_UPDATE, aiOnlyBattles: 'random', aiOnlyBeatLimit: 50, sightCues: false }).ok, true);
+    const state = getGameState();
+    assert.equal(state.aiOnlyBattles, 'random');
+    assert.equal(state.aiOnlyBeatLimit, 50);
+    assert.equal(state.sightCues, false);
+  });
+});
+
+test('a write that fails partway rolls back, so no row changes', () => {
+  withMatch('aw-match-options-rollback-', () => {
+    const before = configRows();
+    dbRun(
+      "CREATE TEMP TRIGGER fail_sight_cues BEFORE INSERT ON game_config WHEN NEW.key = 'sight_cues' BEGIN SELECT RAISE(ABORT, 'forced failure'); END"
+    );
+    try {
+      const update = { ...BASE_UPDATE, victoryRule: 'most_city_hexes_at_turn_limit', turnLimit: 40, aiOnlyBattles: 'random' } as const;
+      const result = validateMatchOptionsUpdate(update, getGameState().turnNumber);
+      assert.equal(result.ok, true);
+      if (result.ok) assert.throws(() => writeMatchOptions(result.update), /forced failure/);
+    } finally {
+      dbRun('DROP TRIGGER fail_sight_cues');
+    }
+    assert.deepEqual(configRows(), before);
   });
 });
 

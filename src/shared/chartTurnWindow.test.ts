@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { INITIAL_VISIBLE_TURNS, initialTurnWindow, sameTurnRange, zoomExtentTurnRange } from './chartTurnWindow';
+import { INITIAL_VISIBLE_TURNS, initialTurnWindow, refreshedTurnView, sameTurnRange, zoomExtentTurnRange } from './chartTurnWindow';
 
 /**
  * Builds the turns `first` through `last`.
@@ -47,4 +47,23 @@ test('sameTurnRange compares both ends', () => {
   assert.equal(sameTurnRange({ min: 1, max: 12 }, { min: 1, max: 12 }), true);
   assert.equal(sameTurnRange({ min: 1, max: 12 }, { min: 2, max: 12 }), false);
   assert.equal(sameTurnRange({ min: 1, max: 12 }, { min: 1, max: 13 }), false);
+});
+
+test('a refresh keeps following the opening window when the player has not zoomed', () => {
+  assert.equal(refreshedTurnView({ view: null, previousTurns: turnsFrom(1, 30), nextTurns: turnsFrom(1, 31), minSpan: 2 }), null);
+});
+
+test('a refresh after a full zoom-out keeps every turn in view as turns arrive', () => {
+  const view = zoomExtentTurnRange(turnsFrom(1, 30));
+  assert.deepEqual(refreshedTurnView({ view, previousTurns: turnsFrom(1, 30), nextTurns: turnsFrom(1, 31), minSpan: 2 }), { min: 1, max: 31 });
+});
+
+test('a refresh keeps a narrower zoom where the player left it', () => {
+  const view = { min: 5, max: 10 };
+  assert.deepEqual(refreshedTurnView({ view, previousTurns: turnsFrom(1, 30), nextTurns: turnsFrom(1, 31), minSpan: 2 }), view);
+});
+
+test('a refresh that lands on the opening window follows the newest turns again', () => {
+  const view = { min: 19, max: 30 };
+  assert.equal(refreshedTurnView({ view, previousTurns: turnsFrom(1, 31), nextTurns: turnsFrom(1, 30), minSpan: 2 }), null);
 });

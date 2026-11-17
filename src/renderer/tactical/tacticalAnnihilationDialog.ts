@@ -10,6 +10,7 @@ import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
 import { syncTacticalExitButtonElementVisibility } from './tacticalExitButtonDom';
 import { aiOnlyResultOkTooltipText, annihilationExitTooltipText } from '../chrome/controlTooltipText';
 import { cancelAiOnlyResultAutoClose } from './aiOnlyResultAutoClose';
+import { closeMatchOptionsDialogIfOpen } from '../gameplay/matchOptionsDialogState';
 
 /** Neutral copy when both tactical sides have zero sub-units after the same beat. */
 const TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE = 'All units destroyed.';
@@ -33,7 +34,7 @@ function tacticalAnnihilationMessageForOutcome(outcome: TacticalAnnihilationOutc
  *
  * Purpose: Replaces the former annihilation toast + immediate auto-exit with an explicit confirmation step.
  * When to use: From `tacticalMaybeScheduleAnnihilationExit` when a planning-phase snapshot is terminal.
- * Expected outcome: Overlay visible, `S.tacticalAnnihilationOutcomeDialog` set, exit button hidden, Ready disabled.
+ * Expected outcome: Any open Game Options dialog is closed first, so the overlay is not covered. Overlay visible, `S.tacticalAnnihilationOutcomeDialog` set, exit button hidden, Ready disabled.
  * Stops in-flight commander planning so a consult cannot finish with a model call after the modal is shown.
  * Exceptions: None; idempotent if the same outcome is already displayed.
  */
@@ -43,6 +44,7 @@ export function openTacticalAnnihilationOutcomeDialog(outcome: TacticalAnnihilat
   const overlay = document.getElementById('tactical-annihilation-overlay');
   const messageEl = document.getElementById('tactical-annihilation-message');
   if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);
+  closeMatchOptionsDialogIfOpen();
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);
   syncTacticalExitButtonElementVisibility();
@@ -54,7 +56,7 @@ export function openTacticalAnnihilationOutcomeDialog(outcome: TacticalAnnihilat
  *
  * Purpose: The human win/loss kind cannot hold an idle or commander-exit sentence.
  * When to use: After playback when the checkbox is off, and when the header Exit Battle control is used then.
- * Expected outcome: The message is `sentence`. Ready stays blocked until Ok. The human dialog field stays null. `okTooltip` is the button tip, and it defaults to the manual-Ready sentence.
+ * Expected outcome: Any open Game Options dialog is closed first. The message is `sentence`. Ready stays blocked until Ok. The human dialog field stays null. `okTooltip` is the button tip, and it defaults to the manual-Ready sentence.
  * Exceptions: None.
  */
 export function openAiOnlyBattleResultDialog(sentence: string, okTooltip: string = aiOnlyResultOkTooltipText): void {
@@ -69,6 +71,7 @@ export function openAiOnlyBattleResultDialog(sentence: string, okTooltip: string
     button.textContent = 'Ok';
     button.setAttribute('data-control-tooltip', okTooltip);
   }
+  closeMatchOptionsDialogIfOpen();
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);
   syncTacticalExitButtonElementVisibility();

@@ -56,10 +56,11 @@ test('the controls are captured before they are filled, and put back on close', 
   const dialog = readRendererSource('gameplay', 'matchOptionsDialog.ts');
   const open = getFunctionSource(dialog, 'openMatchOptionsDialog');
   const capture = open.indexOf('captureOptionControls()');
-  const fill = open.indexOf('fillOptionControlsFromMatch(');
+  const fill = open.indexOf('showLiveSettings(');
   assert.notEqual(capture, -1);
   assert.notEqual(fill, -1);
   assert.equal(capture < fill, true);
+  assert.equal(getFunctionSource(dialog, 'showLiveSettings').includes('fillOptionControlsFromMatch('), true);
   assert.equal(getFunctionSource(dialog, 'closeMatchOptionsDialog').includes('restoreOptionControls('), true);
 });
 
@@ -76,10 +77,37 @@ test('Nickname, Fog of war, and Auto-start AI are always locked', () => {
   assert.equal(always < lock.indexOf('if (!editable)'), true, 'the locked controls are disabled before the editable check');
 });
 
-test('a turn limit equal to the current turn stays offered, since the match ends after that turn resolves', () => {
+test('the turn limits come from the shared turn-limit rule', () => {
   const controls = readRendererSource('gameplay', 'matchOptionsControls.ts');
-  assert.equal(getFunctionSource(controls, 'lockOptionControls').includes('TURN_LIMIT_OPTIONS.filter((turns) => turns >= currentTurn)'), true);
-  assert.equal(getFunctionSource(controls, 'lockTurnLimit').includes('option.disabled = !(Number(option.value) >= currentTurn);'), true);
+  assert.equal(getFunctionSource(controls, 'lockOptionControls').includes('matchTurnLimitChoice('), true);
+  assert.equal(controls.includes('TURN_LIMIT_OPTIONS'), false, 'the controls do not filter the limits themselves');
+});
+
+test('while Apply is pending, the player cannot close the dialog, and a stored change always reaches the screen', () => {
+  const dialog = readRendererSource('gameplay', 'matchOptionsDialog.ts');
+  const userClose = getFunctionSource(dialog, 'closeMatchOptionsDialogByPlayer');
+  assert.equal(userClose.includes('applyIsPending()'), true);
+  const wire = getFunctionSource(dialog, 'wireMatchOptionsDialog');
+  assert.equal(wire.includes("'click', closeMatchOptionsDialog)") || wire.includes('closeMatchOptionsDialog();'), false, 'every wired close goes through the player close');
+  assert.equal(getFunctionSource(dialog, 'handleDialogKey').includes('closeMatchOptionsDialogByPlayer()'), true);
+  const apply = getFunctionSource(dialog, 'applyMatchOptions');
+  assert.equal(apply.includes('setCloseButtonsDisabled(true)'), true);
+  const shown = apply.indexOf('await showStoredMatchOptions(epoch)');
+  assert.notEqual(shown, -1);
+  assert.equal(apply.slice(0, shown).includes('counter === openCounter) closeMatchOptionsDialog'), false, 'the snapshot is applied before the same-dialog check');
+  const show = getFunctionSource(dialog, 'showStoredMatchOptions');
+  assert.equal(show.includes('openCounter') || show.includes('matchOptionsDialogIsOpen'), false, 'the snapshot is applied even after the dialog closed');
+});
+
+test('a prompt that needs the player closes the dialog, and the end of Ready re-checks it', () => {
+  const ready = readRendererSource('gameplay', 'readyHandler.ts');
+  const handler = getFunctionSource(ready, 'handleReadyButtonClick');
+  assert.equal(handler.split('closeMatchOptionsDialogIfOpen()').length - 1 >= 2, true, 'battles list and knockout');
+  const finallyBlock = handler.slice(handler.lastIndexOf('finally'));
+  assert.equal(finallyBlock.includes('refreshMatchOptionsDialogIfOpen()'), true);
+  for (const [folder, file] of [['gameplay', 'knockoutDialog.ts'], ['tactical', 'tacticalAnnihilationDialog.ts'], ['chrome', 'confirmDialog.ts']]) {
+    assert.equal(readRendererSource(folder, file).includes('closeMatchOptionsDialogIfOpen()'), true, file);
+  }
 });
 
 test('the new-game popover close paths leave match mode alone', () => {

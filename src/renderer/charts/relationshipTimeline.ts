@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import { initialTurnWindow, sameTurnRange, zoomExtentTurnRange } from '../../shared/chartTurnWindow';
+import { initialTurnWindow, refreshedTurnView, sameTurnRange, zoomExtentTurnRange } from '../../shared/chartTurnWindow';
 import {
   pannedTurnRange,
   zoomedTurnRange,
@@ -365,7 +365,7 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
    * Applies a new visible range.
    *
    * Purpose: One place sets `view`, so the strip and its range agree. The range is rounded to whole turns, so cells fill the canvas and the turn labels stay on their cells after a zoom or a pan.
-   * When to use: Wheel, drag, and double-click.
+   * When to use: Wheel, drag, double-click, and update.
    * Expected outcome: `view` is null for the opening window, otherwise the range rounded by `wholeTurnRange`.
    * Exceptions: None.
    */
@@ -522,13 +522,9 @@ export function createRelationshipTimeline(args: CreateRelationshipTimelineArgs)
 
   return {
     update(next: RelationshipStrip): void {
+      const kept = refreshedTurnView({ view, previousTurns: strip.turns, nextTurns: next.turns, minSpan: MIN_ZOOM_SPAN_TURNS });
       strip = next;
-      if (view !== null) {
-        const full = fullRange();
-        const kept = wholeTurnRange(zoomedTurnRange({ range: view, full, anchor: view.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }), full);
-        view = sameTurnRange(kept, openingRange()) ? null : kept;
-      }
-      render();
+      showRange(kept ?? openingRange());
     },
     resize(width: number, height: number): void {
       size = { width, height };

@@ -258,7 +258,7 @@ async function enterReplay(): Promise<void> {
 /**
  * Enters replay, first waiting for a leave that is running.
  *
- * Purpose: The game menu's Playback… item. Opening the menu already starts a leave, so this waits for it and then enters.
+ * Purpose: The game menu's Playback… checkbox. A leave started by `p`, Escape, or the replay panel may still be running when the player checks it, so this waits for that leave and then enters.
  * When to use: From the game menu, through the action `renderer.ts` passes to `wireGameMenu`.
  * Expected outcome: Replay opens on the newest step, as `toggleReplay` enters. Does nothing when replay is already on.
  * Exceptions: None, as `enterReplay`.

@@ -15,7 +15,8 @@ import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { isHumanSeatId } from '../../shared/seatIds';
 import { HUMAN_NICKNAME_DEFAULT, sideDisplayName } from '../../shared/sideNicknames';
 import { techBonusLevelOf } from '../../shared/techBonusRules';
-import { DEFAULT_VICTORY_RULE, TURN_LIMIT_OPTIONS } from '../../shared/victoryRules';
+import { matchTurnLimitChoice, type MatchTurnLimitChoice } from '../../shared/matchTurnLimitRules';
+import { DEFAULT_VICTORY_RULE } from '../../shared/victoryRules';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { readNewGameAiOnlyBeatLimit } from './newGameBeatLimitUi';
 import { readNewGameOptionChoices } from './newGameOptionsUi';
@@ -306,7 +307,7 @@ export function fillOptionControlsFromMatch(live: GameStateSnapshot, runButtonOn
  *
  * Purpose: Nickname, Fog of war, and Auto-start AI never change mid-match, and a turn limit cannot be earlier than the current turn (a limit equal to it ends the match after this turn).
  * When to use: After filling the controls, and again after the victory rule or AI-only battles changes, since their own listeners rebuild the limit options.
- * Expected outcome: The three locked controls are disabled, and Auto-start AI's tip points at the Commanders button. Read-only disables every control. Editable enables the others, disables each turn limit before `currentTurn`, disables the city-hexes rule when no limit is left, moves a disabled limit choice to the first enabled one, and keeps the turn limit off for Deathmatch and the beat limit off for None.
+ * Expected outcome: The three locked controls are disabled, and Auto-start AI's tip points at the Commanders button. Read-only disables every control. Editable enables the others, and applies `matchTurnLimitChoice`: each turn limit before `currentTurn` is disabled, the city-hexes rule is disabled when no limit is left, and a passed limit choice moves to the first open one. The turn limit stays off for Deathmatch and the beat limit off for None.
  * Exceptions: None.
  */
 export function lockOptionControls(editable: boolean, currentTurn: number): void {
@@ -324,11 +325,12 @@ export function lockOptionControls(editable: boolean, currentTurn: number): void
     if (control instanceof HTMLSelectElement || control instanceof HTMLInputElement) control.disabled = false;
   }
   const victory = selectById(VICTORY_SELECT_ID);
-  const openLimits = TURN_LIMIT_OPTIONS.filter((turns) => turns >= currentTurn);
-  const cityOption = victory ? Array.from(victory.options).find((option) => option.value === CITY_HEXES_RULE) : undefined;
-  if (cityOption) cityOption.disabled = openLimits.length === 0;
   const limit = selectById(TURN_LIMIT_SELECT_ID);
-  if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, currentTurn);
+  const shownLimit = limit && limit.value !== '' && Number.isFinite(Number(limit.value)) ? Number(limit.value) : null;
+  const choice = matchTurnLimitChoice(currentTurn, shownLimit);
+  const cityOption = victory ? Array.from(victory.options).find((option) => option.value === CITY_HEXES_RULE) : undefined;
+  if (cityOption) cityOption.disabled = !choice.cityHexesAvailable;
+  if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, choice);
   const beatLimit = selectById(BEAT_LIMIT_SELECT_ID);
   if (beatLimit) beatLimit.disabled = selectById(AI_ONLY_SELECT_ID)?.value === 'none';
 }
@@ -337,19 +339,15 @@ export function lockOptionControls(editable: boolean, currentTurn: number): void
  * Locks the turn-limit select for the chosen rule.
  *
  * Purpose: A city-hexes match can only end on this turn or one still to come. Deathmatch shows Unlimited, disabled.
- * When to use: `lockOptionControls` when the dialog is editable.
- * Expected outcome: For city hexes, each limit before `currentTurn` is disabled, and a disabled choice moves to the first enabled limit. Otherwise the select is disabled.
+ * When to use: `lockOptionControls` when the dialog is editable, with the `matchTurnLimitChoice` answer for the current turn.
+ * Expected outcome: For city hexes, each limit outside `choice.openLimits` is disabled, and the select shows `choice.selectedLimit`. Otherwise the select is disabled.
  * Exceptions: None.
  */
-function lockTurnLimit(limit: HTMLSelectElement, cityHexes: boolean, currentTurn: number): void {
+function lockTurnLimit(limit: HTMLSelectElement, cityHexes: boolean, choice: MatchTurnLimitChoice): void {
   limit.disabled = !cityHexes;
   if (!cityHexes) return;
-  const options = Array.from(limit.options);
-  for (const option of options) option.disabled = !(Number(option.value) >= currentTurn);
-  if (limit.selectedOptions[0]?.disabled !== false) {
-    const firstOpen = options.find((option) => !option.disabled);
-    if (firstOpen) limit.value = firstOpen.value;
-  }
+  for (const option of Array.from(limit.options)) option.disabled = !choice.openLimits.includes(Number(option.value));
+  if (choice.selectedLimit !== null) limit.value = String(choice.selectedLimit);
 }
 
 /**
