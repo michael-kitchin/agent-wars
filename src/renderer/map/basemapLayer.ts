@@ -9,7 +9,7 @@
 
 import { DEFAULT_MAP_THEME_ID, type MapTheme, mapThemeById } from '../../shared/mapThemes';
 import { WEB_MERCATOR_MAX_ABS_LAT } from '../../shared/webMercator';
-import { showMapToast } from '../openRouter/openRouterUiHelpers';
+import { showMapToast } from '../chrome/mapToasts';
 import { landTileFilterCss } from './mapThemeFilters';
 
 /**

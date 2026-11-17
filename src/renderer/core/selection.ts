@@ -1,6 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
-import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
+import { hidePlanningChromeToasts } from '../chrome/mapToasts';
 import { rendererSharedState as S } from './state';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { isLandUnitType } from '../../shared/landUnitType';

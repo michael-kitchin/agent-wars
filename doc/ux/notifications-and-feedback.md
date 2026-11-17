@@ -92,7 +92,8 @@ None.
 
 - `static/index.html` (`#map-toast-band`, `#map-toast`, `#map-toast-text`, `#map-toast-dismiss`, `#ai-strategy-toast`, `#ai-strategy-toast-text`, `#ai-strategy-toast-dismiss`, `#sidebar-error`)
 - `static/feedbackChrome.css` (`.map-toast-band`, `#map-toast`, `#ai-strategy-toast`)
-- `src/renderer/openRouter/openRouterUiHelpers.ts`
+- `src/renderer/chrome/mapToasts.ts` (the map toast and the AI strategy toast)
+- `src/renderer/openRouter/openRouterUiHelpers.ts` (re-exports the toast names)
 - `src/renderer/openRouter/commanderMessageTabsUi.ts` (`showCommanderMessageTabs`)
 - `src/shared/commanderMessageTabs.ts` (`initialCommanderMessageTabs`, `applyCommanderMessage`, `commanderDispatchHasProse`)
 - `src/renderer/openRouter/commanderPoolClient.ts` (`readCommanderPoolAndApply`)

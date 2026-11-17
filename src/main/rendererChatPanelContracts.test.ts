@@ -98,7 +98,7 @@ test('a snapshot repaints and syncs the chat panel after the state is stored', (
 });
 
 test('the map toast show and hide both sync the chat panel', () => {
-  const source = readRendererSource('openRouter', 'openRouterUiHelpers.ts');
+  const source = readRendererSource('chrome', 'mapToasts.ts');
   for (const name of ['showMapToast', 'hideMapToast']) {
     const body = getFunctionSource(source, name);
     assert.equal(body.includes('syncChatPanelVisibility'), true, name);

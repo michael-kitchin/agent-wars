@@ -81,7 +81,7 @@ None.
 - `src/shared/consoleReportLog.ts` (`consoleReportVisible`)
 - `src/shared/knockoutNotice.ts` (`formatKnockoutNotice`)
 - `src/renderer/gameplay/knockoutNotices.ts` (`announceKnockouts`)
-- `src/renderer/openRouter/openRouterUiHelpers.ts` (`showMapToast`, `showFilledAiStrategyToast`) and `src/renderer/openRouter/commanderMessageTabsUi.ts` (`showCommanderMessageTabs`)
+- `src/renderer/chrome/mapToasts.ts` (`showMapToast`, `showFilledAiStrategyToast`) and `src/renderer/openRouter/commanderMessageTabsUi.ts` (`showCommanderMessageTabs`)
 - `src/shared/turnLossSections.ts` (`buildTurnLossSections`)
 - `src/renderer/gameplay/readyResolutionAnnouncements.ts` (`announceResolutionTurnUpdate`, `deriveCombatVisibilityClassification`, `reportViewerSeatId`)
 - `src/shared/unknownBattleAnnouncement.ts` (`formatUnknownBattleAnnouncement`)

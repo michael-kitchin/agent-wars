@@ -9,6 +9,7 @@ import { buildOpeningUserMessage } from './promptSpec/consultationText';
 import { SECTION_TITLE_TOOL_USAGE_GUIDANCE, subHeading } from './promptSpec/sectionHeadings';
 
 export { buildProductionSubmitClause } from './promptSpec/productionSubmitText';
+export { formatLatLng } from './latLngText';
 
 /**
  * Documents the `PromptToolFlags` interface as a named contract surface (export interface PromptToolFlags).
@@ -141,18 +142,6 @@ Final JSON: use tactical briefing hex codes for cells and enemy sub-unit ids for
  */
 export function formatControlProgressLine(label: string, controlled: number, total: number, subjectLabel = 'hexes'): string {
   return `- ${label}: ${controlled} of ${total} ${subjectLabel} (${computeRoundedPercentage(controlled, total)}%)`;
-}
-
-/**
- * Defines the `formatLatLng` function shape (export function formatLatLng(ll: [number, number], decimalPlaces: number): string).
-
- * Purpose: Supports maintainability by documenting why `formatLatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function formatLatLng(ll: [number, number], decimalPlaces: number): string {
-  return `[${ll[0].toFixed(decimalPlaces)}, ${ll[1].toFixed(decimalPlaces)}]`;
 }
 
 /**

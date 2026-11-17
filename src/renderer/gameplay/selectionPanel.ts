@@ -25,7 +25,7 @@ import { setUnitNameContent } from '../core/unitOriginFlags';
 import { getCachedNamingLineForTarget } from '../map/terrainTooltipStrategicState';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
-import { unitIconPathForUnitType } from '../rendering/unitDrawing';
+import { unitIconPathForUnitType } from '../rendering/unitIconPaths';
 import { onQueuedOrdersChanged, queuedOrderForUnit } from './queuedOrderRows';
 import { renderSelectionBarState } from './selectionBar';
 import {

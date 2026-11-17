@@ -1,6 +1,6 @@
 # Lint and test Agent Wars on every push and pull request to main, and on demand.
 # Runs `npm run test`, which builds the main process and then runs ESLint, the
-# naming check, the renderer type check, the main-process tests, and the
+# naming check, the renderer type check, the import-cycle check, the main-process tests, and the
 # third-party notices check (see package.json).
 # Pushes that only change documentation skip this workflow.
 # The three-platform packaging build stays on demand in build.yml.

@@ -12,7 +12,7 @@ import { createSideNumberFlag } from './sideNumberFlag';
 
 export { createSideNumberFlag };
 import { miniTokenColors, paletteForOwner } from '../../shared/seatPalette';
-import { unitIconPathForUnitType } from '../rendering/unitDrawing';
+import { unitIconPathForUnitType } from '../rendering/unitIconPaths';
 
 /**
  * A roster row enough to color a side.

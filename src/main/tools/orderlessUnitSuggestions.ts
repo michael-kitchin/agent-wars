@@ -20,7 +20,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { enemyHomeHexes } from '../briefing/briefingPerspective';
 import { collectAggregatedPossibleActionRows } from '../openRouter/possibleUnitActions';
-import { formatLatLng } from '../openRouter/promptText';
+import { formatLatLng } from '../openRouter/latLngText';
 import {
   landMassRecordsShareId,
   landUnitCanOccupyHex,

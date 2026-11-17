@@ -1,4 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { UNIT_ICON_FILE_BY_TYPE, iconPathForType, type UnitIconType } from './unitIconPaths';
+export { unitIconPathForUnitType } from './unitIconPaths';
 import { NEUTRAL_PALETTE } from '../../shared/seatPalette';
 import { staleIntelViewer } from '../../shared/observeModeControls';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
@@ -31,71 +33,6 @@ import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
  */
 const TOKEN_ICON_FIT_RATIO = 0.9;
 /**
- * Documents the `UnitIconType` type alias (type UnitIconType).
-
- * Purpose: Supports maintainability by documenting why `UnitIconType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type UnitIconType = 'infantry' | 'armor' | 'naval' | 'air' | 'missile' | 'mixed';
-/**
- * Documents the module-scope binding `UNIT_ICON_FILE_BY_TYPE` (UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string>).
-
- * Purpose: Supports maintainability by documenting why `UNIT_ICON_FILE_BY_TYPE` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string> = {
-    /**
-   * Documents the object literal property `infantry` (infantry: 'infantry.svg').
-
-   * Purpose: Supports maintainability by documenting why `infantry` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-infantry: 'infantry.svg',
-    /**
-   * Documents the object literal property `armor` (armor: 'armor.svg').
-
-   * Purpose: Supports maintainability by documenting why `armor` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-armor: 'armor.svg',
-    /**
-   * Documents the object literal property `naval` (naval: 'naval.svg').
-
-   * Purpose: Supports maintainability by documenting why `naval` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-naval: 'naval.svg',
-    /**
-   * Documents the object literal property `air` (air: 'air.svg').
-
-   * Purpose: Supports maintainability by documenting why `air` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-air: 'air.svg',
-  missile: 'missile.svg',
-    /**
-   * Documents the object literal property `mixed` (mixed: 'mixed.svg').
-
-   * Purpose: Supports maintainability by documenting why `mixed` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-mixed: 'mixed.svg',
-};
-/**
  * Documents the module-scope binding `unitIconCache` (unitIconCache).
 
  * Purpose: Supports maintainability by documenting why `unitIconCache` exists.
@@ -104,31 +41,6 @@ mixed: 'mixed.svg',
  * Exceptions: None.
  */
 const unitIconCache = new Map<UnitIconType, HTMLImageElement | null>();
-
-/**
- * Path of the glyph for one unit type.
- *
- * Purpose: The map token and the image loader share one URL.
- * When to use: When starting an icon load.
- * Expected outcome: `units/<file>.svg`, resolved from `static/index.html`, the same way weather icons resolve.
- * Exceptions: None.
- */
-function iconPathForType(unitType: UnitIconType): string {
-  return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
-}
-
-/**
- * Path of the glyph for a unit type, for page elements that show a unit's type.
- *
- * Purpose: A list row and the map token use the same glyph.
- * When to use: As an `<img>` source in panel markup.
- * Expected outcome: `units/<type>.svg`; a type with no glyph of its own uses the mixed glyph.
- * Exceptions: None.
- */
-export function unitIconPathForUnitType(unitType: string): string {
-  const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
-  return iconPathForType(known ? (unitType as UnitIconType) : 'mixed');
-}
 
 /**
  * Defines the `getOrStartUnitIconLoad` function shape (function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null).
