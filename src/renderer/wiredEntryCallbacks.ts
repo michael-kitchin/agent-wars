@@ -350,10 +350,6 @@ export function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
       movingIds: undefined,
     };
   }
-  // Contract anchors retained for rendererConsolidation tests after extraction:
-  // phase.inAirStrikeLightning || phase.inAirStrikeCasualty
-  // h3Index: move.toH3Index
-  // movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));
   return getUnitsForDrawWithMovingIdsFromModule(state, {
     backgroundColor: BACKGROUND_COLOR,
     buildResolutionPlaybackState,

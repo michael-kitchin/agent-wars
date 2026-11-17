@@ -339,8 +339,6 @@ export function bindGameSceneHost(host: GameSceneHost): void {
  * Exceptions: None.
  */
 function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
-  // Contract anchor retained after extraction:
-  // if (tacticalActive) return;
   return drawTerrainHexesFromModule(ctx, {
     getExploredHexSet,
     getStrategicDominantTerrainKind,

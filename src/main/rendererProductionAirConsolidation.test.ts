@@ -176,16 +176,20 @@ function testInfrastructureGlyphSetsComeFromTacticalOverrides(): void {
  * Exceptions: None.
  */
 function testAirFerryDoubleClickContracts(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const orderDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderDrawing.ts');
-  const source = fs.readFileSync(rendererPath, 'utf8');
   const gameSceneSource = fs.readFileSync(
     path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts'),
     'utf8'
   );
   const orderDrawingSource = fs.readFileSync(orderDrawingPath, 'utf8');
-  const initFn = getFunctionSource(source, 'init');
-  const pendingOrdersFn = getFunctionSource(source, 'updatePendingOrdersSidebar');
+  const doubleClickSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapDoubleClickHandler.ts'),
+    'utf8'
+  );
+  const planningGestureSource = fs.readFileSync(path.resolve(process.cwd(), 'src', 'shared', 'mapPlanningGesture.ts'), 'utf8');
+  const readyHandlerSource = fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'readyHandler.ts'), 'utf8');
+  const sidebarSupportForFerry = fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'sidebarSupport.ts'), 'utf8');
+  const pendingOrdersFn = getFunctionSource(sidebarSupportForFerry, 'updatePendingOrdersSidebar');
   const orderLabelFormattingPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'orderLabelFormatting.ts');
   const orderLabelFormattingSource = fs.readFileSync(orderLabelFormattingPath, 'utf8');
   const formatPendingFerryOrderSidebarLabelFn = getFunctionSource(
@@ -194,18 +198,18 @@ function testAirFerryDoubleClickContracts(): void {
   );
 
   assert.ok(
-    initFn.includes('const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === \'air\');') &&
-      initFn.includes('const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== \'air\');') &&
-      initFn.includes('Cannot issue grouped movement for mixed air and non-air units.'),
+    planningGestureSource.includes("return { kind: 'rejectMixed' };") &&
+      doubleClickSource.includes("case 'rejectMixed':") &&
+      doubleClickSource.includes('Cannot issue grouped movement for mixed air and non-air units.'),
     'double-click movement should reject mixed air and non-air selections with a toast'
   );
   assert.ok(
-    initFn.includes('window.gameApi?.validateGroupFerryTarget') &&
-      initFn.includes('replacePendingFerryOrdersForSelected(selectedIds, destinationH3);'),
+    doubleClickSource.includes('window.gameApi?.validateGroupFerryTarget') &&
+      doubleClickSource.includes('deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3, ferryPathsByUnitId);'),
     'double-click movement should validate grouped ferry destinations through main-process API and queue ferry orders for air selections'
   );
   assert.ok(
-    source.includes('ferryOrders: S.pendingFerryOrders,'),
+    readyHandlerSource.includes('ferryOrders: S.pendingFerryOrders,'),
     'ready submit payload should include pending ferry orders'
   );
   assert.ok(
@@ -273,6 +277,12 @@ function testAirStrikeAndAirGlyphContracts(): void {
     path.resolve(process.cwd(), 'src', 'renderer', 'wiredEntryCallbacks.ts'),
     'utf8'
   );
+  const drawInteractionSource = fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'map', 'drawInteraction.ts'), 'utf8');
+  const resolutionAnimationStartSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'resolutionAnimationStart.ts'),
+    'utf8'
+  );
+  const doubleClickHandlerSource = fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapDoubleClickHandler.ts'), 'utf8');
   const inferUnitTypeLabelFromIdFn = getFunctionSource(unitTypeLabelSource, 'inferUnitTypeLabelFromId');
   assert.ok(inferUnitTypeLabelFromIdFn.length > 0, 'inferUnitTypeLabelFromId must remain declared in unitTypeLabel.ts');
 
@@ -309,27 +319,27 @@ function testAirStrikeAndAirGlyphContracts(): void {
   );
   assert.ok(
     source.includes('function formatTargetingValidationReason(') &&
-      source.includes("formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.')") &&
-      source.includes("formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.')"),
+      doubleClickHandlerSource.includes("formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.')") &&
+      doubleClickHandlerSource.includes("formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.')"),
     'grouped strike and ranged targeting toasts should format unit IDs as display names'
   );
   assert.ok(
-    source.includes('airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined') &&
-      source.includes('airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined') &&
+    resolutionAnimationStartSource.includes('airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined') &&
+      resolutionAnimationStartSource.includes('airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined') &&
       gameSceneSource.includes('inAirStrikeOutbound') &&
       gameSceneSource.includes('inAirStrikeReturn'),
     'resolution playback should include outbound/return air-strike movement phases'
   );
   assert.ok(
-    source.includes('const knownHumanAirStrikeTargetHexes = new Set(') &&
-      source.includes(".filter((move) => move.player === 'human')") &&
-      source.includes('.filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3))'),
+    readyAnnouncementsSource.includes('const knownHumanAirStrikeTargetHexes = new Set(') &&
+      readyAnnouncementsSource.includes('.filter((move) => viewerInvolved(move.player))') &&
+      readyAnnouncementsSource.includes('.filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3))'),
     'unknown battle announcements should not include known human air-strike target hexes'
   );
   assert.ok(
-    wiredEntrySource.includes('phase.inAirStrikeLightning || phase.inAirStrikeCasualty') &&
-      wiredEntrySource.includes('h3Index: move.toH3Index') &&
-      wiredEntrySource.includes('movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));'),
+    drawInteractionSource.includes('phase.inAirStrikeLightning || phase.inAirStrikeCasualty') &&
+      drawInteractionSource.includes('h3Index: move.toH3Index') &&
+      drawInteractionSource.includes('movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));'),
     'air strike playback should pin strikers at target during combat/casualty and hide survivors at base until return animation completes'
   );
   assert.ok(
@@ -338,9 +348,9 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'resolution playback phase derivation should be centralized for all unit/scenario animation paths'
   );
   assert.ok(
-    source.includes('if (!validation.success) {') &&
-      source.includes('airStrikeModeActive = false;') &&
-      source.includes('rangedModeActive = false;'),
+    doubleClickHandlerSource.includes('if (!validation.success) {') &&
+      doubleClickHandlerSource.includes('S.airStrikeModeActive = false;') &&
+      doubleClickHandlerSource.includes('S.rangedModeActive = false;'),
     'invalid ranged/strike target clicks should cancel planning mode'
   );
   assert.ok(
@@ -390,8 +400,9 @@ function testTacticalRubbleTooltipAndTerrainVariantContracts(): void {
   const terrainStateForPointerFn = getFunctionSource(terrainTooltipStateSource, 'terrainStateForPointer');
   const formatTerrainTooltipHtmlFn = getFunctionSource(terrainTooltipHtmlSource, 'formatTerrainTooltipHtml');
 
+  const terrainRenderingSource = fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainRendering.ts'), 'utf8');
   assert.ok(
-    drawTerrainHexesFn.includes('if (tacticalActive) return;'),
+    drawTerrainHexesFn.length > 0 && terrainRenderingSource.includes('if (tacticalActive) return;'),
     'res1 terrain fills/styles should be suppressed while res4 child hex rendering is active'
   );
   assert.ok(

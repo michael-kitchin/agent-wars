@@ -641,10 +641,6 @@ function buildKillToastFormatterBundle(
  * Exceptions: None.
  */
 function updateRangedSidebar(): void {
-  // Contract anchors retained for rendererConsolidation tests after extraction:
-  // formatPendingRangedAttackSidebarLabel(S.gameState, r, battle)
-  // formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle)
-  // formatPendingFerryOrderSidebarLabel(S.gameState, ferry)
   return updateRangedSidebarFromModule(createTacticalSidebarDeps());
 }
 
@@ -657,8 +653,6 @@ function updateRangedSidebar(): void {
  * Exceptions: None.
  */
 function updatePendingOrdersSidebar(): void {
-  // Contract anchor retained after extraction:
-  // formatPendingFerryOrderSidebarLabel(S.gameState, ferry)
   return updatePendingOrdersSidebarFromModule({
     isPendingMovementOrderForDisplay,
     formatPendingOrderSidebarLabel,
@@ -746,9 +740,6 @@ function init(): void {
   wireChartsDialog();
   wireReplayPanel();
   wireSaveLoadMenu();
-  // Contract anchors retained after extraction:
-  // applyModifierDrivenPopoverCloseRules('shift_pressed');
-  // applyModifierDrivenPopoverCloseRules('shift_released');
   wireInitCoreFromModule({
     requestRedraw,
     resizeAndRedraw,
@@ -789,17 +780,6 @@ function init(): void {
   });
   tacticalUpdateExitButtonVisibility();
 
-  // Contract anchors retained after extraction:
-  // const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === 'air');
-  // const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== 'air');
-  // Cannot issue grouped movement for mixed air and non-air units.
-  // window.gameApi?.validateGroupFerryTarget
-  // replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
-  // formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.')
-  // formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.')
-  // if (!validation.success) {}
-  // airStrikeModeActive = false;
-  // rangedModeActive = false;
   wireMainMapInteractionsFromModule({
     clearTerrainTooltipTimer,
     hideTerrainTooltipVisual,
@@ -857,15 +837,6 @@ function init(): void {
   const readyBtn = document.getElementById('ready-btn');
   if (readyBtn) {
     readyBtn.addEventListener('click', async () => {
-      // Contract anchors retained after extraction:
-      // const knownHumanAirStrikeTargetHexes = new Set(
-      // .filter((move) => move.player === 'human')
-      // .filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3))
-      // airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined
-      // airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined
-      // buildConsolidatedTurnUpdateToastMessage({})
-      // formatKillLine: killToastFormatter.formatKillLine
-      // ferryOrders: S.pendingFerryOrders,
       await handleReadyButtonClickFromModule(createReadyHandlerDeps());
     });
   }
