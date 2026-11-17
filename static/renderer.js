@@ -17933,6 +17933,10 @@
   function panPhysicalKeyId(code, key) {
     return code || key;
   }
+  var RANGE_INPUT_KEYS = /* @__PURE__ */ new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+  function rangeInputOwnsKey(key) {
+    return RANGE_INPUT_KEYS.has(key);
+  }
   function resolveNetPanAxes(held2) {
     const north = held2.has("north");
     const south = held2.has("south");
@@ -45393,7 +45397,13 @@ ${bonuses}`;
     document.body.dataset.replay = "on";
     refreshConsoleHeader();
     syncTacticalExitButtonElementVisibility();
-    await showReplayStep(last);
+    try {
+      await showReplayStep(last);
+    } catch (error) {
+      console.error("entering replay could not show the last recorded step", error);
+      showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+      await leaveReplay();
+    }
   }
   function setAsideLastSeenMarkers() {
     savedMarkers = {
@@ -45535,7 +45545,13 @@ ${bonuses}`;
       state = currentReplay();
     }
     if (!state) return;
-    if (rendererMatchEpochCurrent(state.matchEpoch)) await showReplayStep(state.timeline.steps.length - 1);
+    if (rendererMatchEpochCurrent(state.matchEpoch)) {
+      try {
+        await showReplayStep(state.timeline.steps.length - 1);
+      } catch (error) {
+        console.error("leaving replay could not show the last recorded step", error);
+      }
+    }
     if (!replayActive()) return;
     setReplay(null);
     delete document.body.dataset.replay;
@@ -45624,6 +45640,7 @@ ${bonuses}`;
         if (!startAnyway) return;
       }
       const matchEpoch = advanceRendererMatchEpoch();
+      abandonReplayForNewMatch();
       stopMatchWaitingUnderNewGame();
       const cameraHold = holdNewGameMapPreviewCamera();
       try {
@@ -51147,12 +51164,7 @@ ${bonuses}`;
           return;
         }
       }
-      if (replayActive() && isRangeInputTarget(e.target) && !e.repeat && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        void toggleReplay();
-        return;
-      }
-      if (shouldIgnoreGlobalKeydown(e)) return;
+      if (shouldIgnoreGlobalKeydown(e) && !(isRangeInputTarget(e.target) && !rangeInputOwnsKey(e.key))) return;
       if (chartsDialogIsOpen()) {
         if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "c") {
           e.preventDefault();
@@ -51480,9 +51492,16 @@ ${bonuses}`;
     play.querySelector("path")?.setAttribute("d", playing ? PAUSE_GLYPH_PATH : PLAY_GLYPH_PATH);
     play.disabled = !canPlay(position);
   }
+  function keepFocusInPanel(focused, buttons) {
+    if (!(focused instanceof HTMLButtonElement) || !focused.disabled || !buttons.includes(focused)) return;
+    const slider = expanded4 ? byId("replay-slider") : null;
+    const candidates = [slider, ...buttons, byId("replay-panel-expand")];
+    candidates.find((control) => control !== null && !control.disabled)?.focus({ preventScroll: true });
+  }
   function renderReplayPanel() {
     const panel = byId("replay-panel");
     if (!panel) return;
+    const focused = document.activeElement;
     const state = currentReplay();
     const position = currentPosition();
     if (!state || !position) {
@@ -51513,6 +51532,7 @@ ${bonuses}`;
     if (back) back.disabled = !canStepBack(position);
     if (forward) forward.disabled = !canStepForward(position);
     if (play) syncPlayButton(play, position);
+    keepFocusInPanel(focused, [back, forward, play]);
   }
   function shownNumberText(state) {
     const step = state.timeline.steps[state.index];
