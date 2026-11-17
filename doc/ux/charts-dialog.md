@@ -1,6 +1,6 @@
 # Charts Dialog
 
-The dialog the charts key opens: a relationship stack for each side, a stance timeline, and nine line charts of every side over every turn.
+The dialog the charts key opens: a relationship stack for each side an AI commander reports on, a stance timeline, and nine line charts of every side over every turn.
 
 ## Purpose
 
@@ -12,16 +12,20 @@ The charts key (C) opens the dialog while a match is loaded, in Strategic planni
 
 The dialog does not open while another dialog is showing that needs the player's choice: the tactical battles list, the melee intercept list, "You're out", the start and load confirmations, the annihilation dialog, the Game Options popover, the game menu, or a commander popover (`blockingDialogIsOpen` in `src/renderer/chrome/blockingDialogGuards.ts`). The new-game screen is not on that list, because it shows the standings at game over.
 
+The game menu's Metrics… item opens the dialog under the same conditions as the C key. It never closes an open dialog (`openChartsDialog`).
+
 A match that began in an earlier build has no recorded turns before the turn it was loaded on. Until a turn is played, the dialog shows "No turns have been recorded yet." A failed read when the dialog opens shows "The charts could not be loaded." A database error in the main process is a failed read: `buildMatchChartsSnapshot` throws and the channel rejects, rather than returning an empty snapshot. A failed read while charts are already showing leaves them as they were.
 
 ## Information Displayed
 
 One modal dialog, centered, 90% of the window's width and height, over the top bar, the console, and every panel. A dimmed backdrop covers the rest. The header holds the title "Charts" and a close control. The body scrolls vertically and never horizontally. In order, it shows:
 
-1. **Relationships.** One stack per side, in side order, in one row of equal columns, up to four. The human seat is a subject like any other. Each stack is headed "How they see you" for the human seat and "How they see {flag} {name}" for the others. It holds a spoke graph over a row card, and both show how the AI commanders regard that side. A side no AI commander can report on shows one sentence, "No AI commander reports on this side.", in place of the graph.
-2. **Stance over time.** A strip of cells, one row per reporting commander and one cell per turn, as wide as a line chart. A `How they see` dropdown names the side the strip is about, and lists every side in side order, the first selected.
+1. **Relationships.** One stack per side that at least one AI commander reports on, in side order (`relationshipSubjectSeatIds` in `src/shared/matchChartSeries.ts`). A commander never reports on its own side, so a side whose only possible reporter is itself has no stack: with the human and one AI opponent, only the human's stack shows. The human seat is a subject like any other. Each stack is a column as wide as its content, with its graph and row card centered in it. The columns are spread evenly across the row, a single stack sits centered, and a dialog too narrow for every column wraps them onto another row. Each stack is headed "How they see you" for the human seat and "How they see {flag} {name}" for the others. It holds a spoke graph over a row card, and both show how the AI commanders regard that side. A snapshot with no AI seat, which a real match never has, shows "No AI commander reports on any side." in place of the stacks.
+2. **Stance over time.** A strip of cells, one row per reporting commander and one cell per turn, as wide as a line chart. A `How they see` dropdown names the side the strip is about, and lists the sides that have a stack, in side order, the first selected. A side with no stack is not offered.
 3. **A legend.** Each side's color swatch, flag, and name, once, above the line charts.
 4. **Nine line charts,** in this order: Built units, Mercenary units, Hexes held, Production per turn, Stored production points, Credits, Upkeep per turn, Units lost per turn, and Model cost so far (USD). The X axis is the strategic turn and the Y axis is the count. Each side has one line in its `--seat-N-bar` color. Model cost lists AI sides only. A turn with no value for a side is a gap in its line. Built units has a dropdown for Total, Infantry, Armor, Naval, Air, or Missile. Mercenary units has one for Total, Infantry, Armor, Naval, or Air. The numbers are the ones recorded at each turn boundary (`TurnStatistics` in `src/shared/matchStatistics.ts`). The chart rules are in `src/shared/matchChartSeries.ts`.
+
+Every dropdown in the dialog uses the field colors of the top bar's View as select (`--field-text` on `--field-bg` with a `--field-border` edge), so its text is readable both on the closed control and in the open list.
 
 A line chart, with its title row, axes, and labels, is at most a quarter of the dialog's height (`chartBlockHeight` in `src/shared/chartsDialogState.ts`). So is the stance strip. The relationship stacks are not held to that rule.
 
@@ -72,7 +76,7 @@ Hovering a turn shows "Turn {n}" and one line per commander: "{name}: {stance} (
 - The dialog reads the charts when it opens, and again after each strategic turn resolves while it is open. A battle beat does not refresh it. Every chart gains the new turn and keeps its zoom, each dropdown keeps its choice, and the body keeps its scroll position. There is no timer.
 - When Ready opens the melee intercept list, or knocks the human seat out, the dialog closes first, so that dialog is not hidden under it.
 - A refresh that finds a new match has started, or a save has been loaded, closes the dialog instead of drawing the old match (`currentRendererMatchEpoch`). A refresh whose read fails is logged and keeps the charts on screen.
-- Resizing the window resizes every chart. Nothing overflows the dialog horizontally at the smallest window the app allows. The four stacks stay in one row, and their text wraps or ends in an ellipsis.
+- Resizing the window resizes every chart. Nothing overflows the dialog horizontally at the smallest window the app allows. The stacks wrap onto more rows when they do not fit side by side. A long heading wraps, and a long side name in a row card ends in an ellipsis.
 
 ## States
 
@@ -111,6 +115,7 @@ None.
 - `static/index.html` (`#charts-overlay`, `#charts-dialog`, `#charts-dialog-close`, `#charts-dialog-body`)
 - `static/chartsChrome.css`
 - `src/renderer/charts/chartsDialog.ts` (`wireChartsDialog`, `toggleChartsDialog`, `refreshChartsDialogIfOpen`, `closeChartsDialogIfOpen`)
+- `src/renderer/chrome/gameMenuActions.ts` (`openChartsDialog`, the game menu's Metrics… item)
 - `src/renderer/charts/lineChart.ts`
 - `src/renderer/charts/relationshipStack.ts`
 - `src/renderer/charts/relationshipTimeline.ts`
@@ -118,5 +123,5 @@ None.
 - `src/renderer/chrome/blockingDialogGuards.ts`
 - `src/renderer/map/initCore.ts` (the window `keydown` handler)
 - `src/renderer/gameplay/readyHandler.ts`
-- `src/shared/matchChartSeries.ts`
+- `src/shared/matchChartSeries.ts` (`relationshipSubjectSeatIds`, `relationshipRows`, `relationshipStrip`)
 - `src/shared/chartsDialogState.ts`

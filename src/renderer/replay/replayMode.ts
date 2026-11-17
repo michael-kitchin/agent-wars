@@ -208,6 +208,18 @@ export async function toggleReplay(): Promise<void> {
     await leaveReplay();
     return;
   }
+  await enterReplay();
+}
+
+/**
+ * Enters replay on the newest recorded step from the present.
+ *
+ * Purpose: One entry path for the `p` key and the game menu's Playback… item.
+ * When to use: From `toggleReplay` and `openReplay`, only when replay is off and not leaving.
+ * Expected outcome: Replay opens on the last step, or a refusal or failure shows its sentence, as `toggleReplay` describes.
+ * Exceptions: None. A failed timeline read or a failed first step is logged and shown as a sentence.
+ */
+async function enterReplay(): Promise<void> {
   const decision = entryDecision();
   if (!decision.ok) {
     if (decision.reason !== null) showMapToast(decision.reason, { isError: false, skipReport: true });
@@ -248,6 +260,20 @@ export async function toggleReplay(): Promise<void> {
     showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
     await leaveReplay();
   }
+}
+
+/**
+ * Enters replay, first waiting for a leave that is running.
+ *
+ * Purpose: The game menu's Playback… item. Opening the menu already starts a leave, so this waits for it and then enters.
+ * When to use: From the game menu, through the action `renderer.ts` passes to `wireGameMenu`.
+ * Expected outcome: Replay opens on the newest step, as `toggleReplay` enters. Does nothing when replay is already on.
+ * Exceptions: None, as `enterReplay`.
+ */
+export async function openReplay(): Promise<void> {
+  if (replayLeaving !== null) await replayLeaving;
+  if (replayActive()) return;
+  await enterReplay();
 }
 
 /**
@@ -493,7 +519,7 @@ let ordersTabWasSelected = false;
  * The leave that is running, if any.
  *
  * Purpose: Leaving turns replay off before it reads and applies the live match. A `p` in that gap must not open a new replay that the old leave would then overwrite with the live state, the old selection, and the old console tab.
- * When to use: Set and cleared by `leaveReplay`. `toggleReplay` waits for it and does not enter while it is set.
+ * When to use: Set and cleared by `leaveReplay`. `toggleReplay` waits for it and does not enter while it is set. `openReplay` waits for it and then enters.
  * Expected outcome: Null unless a leave is running.
  * Exceptions: None.
  */

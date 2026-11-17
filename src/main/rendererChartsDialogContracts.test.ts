@@ -130,3 +130,20 @@ test('a backdrop click closes the dialog only when the press started on the back
   assert.equal(wire.includes('if (event.target === overlay && fromBackdrop) closeDialog(overlay);'), true);
   assert.equal(readRendererSource('gameplay', 'readyHandler.ts').includes('await (closeChartsDialogIfOpen(),'), false, 'no comma expression before the intercept list');
 });
+
+test('the stacks are drawn only for reported sides, in content-width flex columns', () => {
+  const dialog = readRendererSource('charts', 'chartsDialog.ts');
+  assert.equal(getFunctionSource(dialog, 'fillStacks').includes('relationshipSubjectSeatIds'), true);
+  assert.equal(getFunctionSource(dialog, 'buildBody').includes('relationshipSubjectSeatIds'), true, 'the strip select lists reported sides');
+  assert.equal(dialog.includes('gridTemplateColumns'), false);
+  const css = readRepoFile('static', 'chartsChrome.css');
+  assert.match(css, /\.charts-stack-grid \{[^}]*display: flex;/);
+});
+
+test('the dropdowns use the field colors of the top bar select', () => {
+  const css = readRepoFile('static', 'chartsChrome.css');
+  const rule = /\n\.charts-select \{([^}]*)\}/.exec(css)?.[1] ?? '';
+  assert.equal(rule.includes('color: var(--field-text)'), true);
+  assert.equal(rule.includes('background: var(--field-bg)'), true);
+  assert.match(css, /\.charts-select option \{[^}]*color: var\(--field-text\)/);
+});

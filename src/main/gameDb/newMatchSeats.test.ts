@@ -365,3 +365,16 @@ test('a start stores a beat limit, a stored unlimited value reads null, and an o
     assert.equal(read(), 30);
   });
 });
+
+test('a fresh match reports sight cues on in its snapshot', () => {
+  const regions = largestHomeRegions(2);
+  withSeatedTempGameDb('aw-sight-cues-snapshot-', {
+    gameMapId: 'global',
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    assert.equal(getGameState().sightCues, true);
+  });
+});

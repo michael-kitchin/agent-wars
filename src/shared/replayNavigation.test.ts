@@ -88,8 +88,8 @@ test('nextPlaybackIndex moves forward, and ends at the last step or on a stop re
   assert.equal(nextPlaybackIndex(middle, true), null);
 });
 
-test('Play holds each step for one second', () => {
-  assert.equal(REPLAY_PLAYBACK_DWELL_MS, 1000);
+test('Play holds each step for half a second', () => {
+  assert.equal(REPLAY_PLAYBACK_DWELL_MS, 500);
 });
 
 test('parseTurnEntry accepts a recorded whole turn and rejects everything else', () => {

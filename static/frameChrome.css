@@ -455,6 +455,14 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   background: transparent;
   color: var(--chrome-disabled);
 }
+/* The key that does the same thing as the item, pushed to the item's right edge. */
+.game-menu-shortcut {
+  margin-left: auto;
+  padding-left: 1.5rem;
+  font: inherit;
+  font-size: 11px;
+  color: var(--chrome-muted);
+}
 .game-menu-check input[type="checkbox"] {
   width: 15px;
   height: 15px;

@@ -408,6 +408,15 @@ aiOnlyBattles?: AiOnlyBattleMode;
    */
 aiOnlyBeatLimit?: number | null;
     /**
+   * Whether observed playback opens with the AI commanders' sight lines.
+   *
+   * Contract: Stored as `game_config.sight_cues`. A missing row, from an older save, reads as false.
+   * When to use: The Game Options dialog, to show the live match's setting.
+   * Expected outcome: The stored choice on every snapshot read from an open match.
+   * Exceptions: Absent on an empty snapshot and on one built before this field existed. Readers treat a missing value as on, the new-game default.
+   */
+sightCues?: boolean;
+    /**
    * Why the match ended.
    *
    * Contract: Absent while the match is still being played. One of last side standing, the turn limit, a mutual wipe, or the human ending the match.

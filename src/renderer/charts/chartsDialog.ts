@@ -11,6 +11,7 @@ import {
   lineChartData,
   relationshipRows,
   relationshipStrip,
+  relationshipSubjectSeatIds,
 } from '../../shared/matchChartSeries';
 import {
   LINE_CHART_DEFINITIONS,
@@ -19,7 +20,7 @@ import {
   type LineChartDefinition,
 } from '../../shared/chartsDialogState';
 import type { MatchChartsSnapshot } from '../../shared/matchStatistics';
-import { isHumanSeatId, MAX_SEATS } from '../../shared/seatIds';
+import { isHumanSeatId } from '../../shared/seatIds';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { rendererSharedState as S } from '../core/state';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
@@ -185,28 +186,26 @@ function appendBlock(parent: HTMLElement, title: string): { readonly titleRow: H
 }
 
 /**
- * Fills the stack grid with one stack per side.
+ * Fills the stack grid with one stack per side that at least one commander reports on.
  *
- * Purpose: The stacks sit in one row of equal columns, in side order.
+ * Purpose: The stacks sit in content-width columns, in side order. A side no commander reports on, such as the only AI seat, gets no stack.
  * When to use: Building the body and refreshing it.
- * Expected outcome: The host's children are replaced.
+ * Expected outcome: The host's children are replaced. With no reported side it holds `No AI commander reports on any side.`, which only a malformed snapshot reaches, because a real match always has an AI seat.
  * Exceptions: None.
  */
 function fillStacks(host: HTMLElement, snapshot: MatchChartsSnapshot, lookups: SeatLookups): void {
-  const seats = [...snapshot.seats].sort((a, b) => a.seatOrder - b.seatOrder);
-  host.style.gridTemplateColumns = `repeat(${Math.min(seats.length, MAX_SEATS)}, minmax(0, 1fr))`;
-  host.replaceChildren(
-    ...seats.map((seat) =>
-      buildRelationshipStack({
-        subjectSeatId: seat.seatId,
-        rows: relationshipRows(snapshot, seat.seatId),
-        nameOf: lookups.nameOf,
-        flagOf: lookups.flagOf,
-        seatNumberOf: lookups.seatNumberOf,
-        subjectIsViewer: isHumanSeatId(seat.seatId),
-      })
-    )
+  const stacks = relationshipSubjectSeatIds(snapshot).map((seatId) =>
+    buildRelationshipStack({
+      subjectSeatId: seatId,
+      rows: relationshipRows(snapshot, seatId),
+      nameOf: lookups.nameOf,
+      flagOf: lookups.flagOf,
+      seatNumberOf: lookups.seatNumberOf,
+      subjectIsViewer: isHumanSeatId(seatId),
+    })
   );
+  const empty = Object.assign(document.createElement('p'), { className: 'charts-empty', textContent: 'No AI commander reports on any side.' });
+  host.replaceChildren(...(stacks.length > 0 ? stacks : [empty]));
 }
 
 /**
@@ -295,10 +294,10 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
   subjectSelect.className = 'charts-select';
   subjectSelect.setAttribute('aria-label', 'How they see');
   subjectSelect.dataset.controlTooltip = 'Choose the side whose standing with each commander the strip shows.';
-  for (const seat of [...snapshot.seats].sort((a, b) => a.seatOrder - b.seatOrder)) {
+  for (const seatId of relationshipSubjectSeatIds(snapshot)) {
     const option = document.createElement('option');
-    option.value = seat.seatId;
-    option.textContent = seat.name;
+    option.value = seatId;
+    option.textContent = lookups.nameOf(seatId);
     subjectSelect.appendChild(option);
   }
   const subjectLabel = document.createElement('label');

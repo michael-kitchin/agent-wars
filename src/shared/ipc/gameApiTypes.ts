@@ -25,6 +25,7 @@ import type { ReplayStepView, ReplayTimeline } from '../replayTypes';
 import type { SideMessageThreadSnapshot } from '../sideMessageView';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
+import type { MatchOptionsResult, MatchOptionsUpdate } from './matchOptionsTypes';
 import type { AiSeatId } from '../seatIds';
 import type { ProviderSortChoice } from '../openRouterProviderSort';
 import type { DoctrineChoice, SeatSnapshot } from '../seatRoster';
@@ -319,6 +320,15 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    */
   setHumanNickname: (nickname: string) => Promise<void>;
   /**
+   * Changes the live match's editable options.
+   *
+   * Contract: The main process refuses unless the match is planning on the world map with no Ready in flight, no battle open, and the match not over. A refusal stores nothing.
+   * When to use: The Game Options dialog's Apply button.
+   * Expected outcome: `{ ok: true }` when every value was stored, or `{ ok: false, reason }` with a plain sentence. The caller re-reads the match state.
+   * Exceptions: Rejects when IPC transport fails.
+   */
+  setMatchOptions: (update: MatchOptionsUpdate) => Promise<MatchOptionsResult>;
+  /**
    * Saves one AI seat's model, effort, provider choice, doctrine choice, and nickname.
    *
    * Contract: `seatId` is an AI seat that is still active. `modelId` and `reasoningEffort` are null when unset. `providerSort` is one of the four stored choices. `apiKey`, when present, replaces that seat's key. `nickname`, when present, replaces that seat's name. An omitted nickname leaves the stored one.
@@ -427,6 +437,15 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    * Exceptions: Rejects when the IPC channel fails.
    */
   readReplayStep: (payload: { recordId: number }) => Promise<ReplayStepView | null>;
+  /**
+   * Opens the How to play guide on GitHub in the system browser.
+   *
+   * Contract: Main opens one fixed URL. The renderer passes nothing.
+   * When to use: When the player picks How to play in the game menu.
+   * Expected outcome: True when the browser accepted the page, false when it could not be opened.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  openHowToPlay: () => Promise<boolean>;
   /**
    * Stores one draft from the player to one side.
    *

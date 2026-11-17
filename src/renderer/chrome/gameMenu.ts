@@ -1,9 +1,9 @@
 /**
- * The game menu under the top bar's menu button: New game, the placeholders, Offer tactical battles, and Quit.
+ * The game menu under the top bar's menu button: New game, Save and Load, Playback and Metrics, Offer tactical battles,\n * How to play, and Quit.
  *
  * The menu is a disclosure popup. The button's `aria-expanded` and the menu's `hidden` attribute always agree.
  * New game and Offer tactical battles keep their own handlers in `openRouterControls.ts`; this module opens and
- * closes the menu, disables New game while the new-game screen is open or a Ready is resolving, and handles Quit.
+ * closes the menu, disables New game while the new-game screen is open or a Ready is resolving, and handles How to play\n * and Quit.
  */
 import { rendererSharedState as S } from '../core/state';
 import { requestReplayLeave } from '../replay/replayState';
@@ -116,17 +116,49 @@ export function closeGameMenu(options: { readonly restoreFocus?: boolean } = {})
 }
 
 /**
- * Wires the menu button, the menu items, Escape, outside presses, and Quit.
+ * The actions the menu's Playback… and Metrics… items run.
+ *
+ * Purpose: The menu cannot import replay or the charts dialog without an import cycle, so `renderer.ts` passes them in.
+ * When to use: The argument of `wireGameMenu`.
+ * Expected outcome: Each action opens its surface and never closes it.
+ * Exceptions: None.
+ */
+export interface GameMenuActions {
+  /**
+   * Enters replay, after any leave that is running.
+   *
+   * Contract: Does nothing when replay is already on. A refusal shows its own sentence.
+   * When to use: When the player clicks Playback….
+   * Expected outcome: Replay opens on the newest recorded step, or stays off with a sentence.
+   * Exceptions: None.
+   */
+  readonly openReplay: () => void;
+  /**
+   * Opens the charts dialog when it is closed.
+   *
+   * Contract: Never closes the dialog. Refuses as the charts key does.
+   * When to use: When the player clicks Metrics….
+   * Expected outcome: The charts dialog shows.
+   * Exceptions: None.
+   */
+  readonly openCharts: () => void;
+}
+
+/**
+ * Wires the menu button, the menu items, Escape, outside presses, How to play, and Quit.
  *
  * Purpose: One bootstrap for the menu's own behavior.
  * When to use: Once during renderer startup, after the page markup exists.
  * Expected outcome: The button toggles the menu. It does not open while the top bar ignores the pointer. An enabled
  *   menu button closes it after its own handler runs; the checkbox leaves it open. Escape closes it first, before
  *   the map's Escape handling, and returns focus to the button. A press outside the menu and its button closes it.
- *   Quit closes the window.
+ *   Playback… and Metrics… run `actions`, which open replay and the charts. How to play asks main to open the guide
+ *   on GitHub in the system browser. Quit closes the window.
  * Exceptions: None; does nothing when the markup is missing.
+ *
+ * @param actions The replay and charts openers, injected so this module imports neither.
  */
-export function wireGameMenu(): void {
+export function wireGameMenu(actions: GameMenuActions): void {
   const menu = document.getElementById(GAME_MENU_ID);
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
@@ -143,6 +175,18 @@ export function wireGameMenu(): void {
   menu.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest('button')) closeGameMenu();
+  });
+
+  document.getElementById('game-menu-playback-btn')?.addEventListener('click', () => {
+    actions.openReplay();
+  });
+
+  document.getElementById('game-menu-metrics-btn')?.addEventListener('click', () => {
+    actions.openCharts();
+  });
+
+  document.getElementById('game-menu-how-to-play-btn')?.addEventListener('click', () => {
+    void window.gameApi?.openHowToPlay();
   });
 
   document.getElementById('game-menu-quit-btn')?.addEventListener('click', () => {

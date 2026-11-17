@@ -256,6 +256,21 @@ export function relationshipRows(snapshot: MatchChartsSnapshot, subjectSeatId: s
 }
 
 /**
+ * Lists the sides that at least one commander reports on.
+ *
+ * Purpose: The charts show a relationship stack, and a "How they see" choice, only for a side that has relationship rows.
+ * When to use: Choosing which stacks to draw and which sides the stance strip's select offers.
+ * Expected outcome: Seat ids in side order whose `reporterSeatIds` list is not empty, so exactly the seats for which `relationshipRows` has a row. With one AI seat that is only the other sides; with no AI seat it is empty.
+ * Exceptions: None.
+ */
+export function relationshipSubjectSeatIds(snapshot: MatchChartsSnapshot): string[] {
+  return [...snapshot.seats]
+    .sort((a, b) => a.seatOrder - b.seatOrder)
+    .filter((seat) => reporterSeatIds(snapshot, seat.seatId).length > 0)
+    .map((seat) => seat.seatId);
+}
+
+/**
  * Builds the stance strip for one subject side.
  *
  * Purpose: The strip shows each commander's stance toward the subject over every recorded turn.

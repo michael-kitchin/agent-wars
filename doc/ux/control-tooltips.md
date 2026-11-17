@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Save game and Load game show the sentences in [save-and-load.md](save-and-load.md). Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls. So does a side chip that lists unit counts: the human seat's own chip, and each AI seat's chip while observing. The tip opens on the name or its dot.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, the Build and Forces tabs, and Replay on a turn report. Save game and Load game show the sentences in [save-and-load.md](save-and-load.md). Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls. So does a side chip that lists unit counts: the human seat's own chip, and each AI seat's chip while observing. The tip opens on the name or its dot.
 
 ## Information Displayed
 
@@ -64,7 +64,10 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
 - Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
-- Settings, Help, How to play, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Settings, Help, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- How to play, in the game menu: Open the How to play guide on GitHub in your web browser.
+- Playback…, in the game menu: Step through the turns already played. Same as the P key.
+- Metrics…, in the game menu: Open the match charts. Same as the C key.
 - Charts close control: Close the charts. You can also press C or Escape.
 - Built units and Mercenary units dropdowns, on the charts dialog: Show the total or one unit type for built units, or for mercenary units.
 - How they see dropdown, on the charts dialog: Choose the side whose standing with each commander the strip shows.

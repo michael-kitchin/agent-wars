@@ -223,7 +223,6 @@ const FRAME_CHECKS = Object.freeze([
       '#topbar-help-btn',
       '#console-tab-build',
       '#console-tab-forces',
-      '#game-menu-how-to-play-btn',
     ],
     run: (p, el) => {
       const enabled = Object.entries(p.elements).filter(([, e]) => e && !e.disabled).map(([selector]) => selector);

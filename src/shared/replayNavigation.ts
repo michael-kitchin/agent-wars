@@ -165,10 +165,10 @@ export interface ReplayPosition {
  *
  * Purpose: Each step is shown with its dialogs for a moment before the units move, so the player can read it.
  * When to use: The play loop's hold between steps.
- * Expected outcome: 1000 milliseconds.
+ * Expected outcome: 500 milliseconds, half a second per step.
  * Exceptions: None.
  */
-export const REPLAY_PLAYBACK_DWELL_MS = 1000;
+export const REPLAY_PLAYBACK_DWELL_MS = 500;
 
 /**
  * Whether step back is possible.

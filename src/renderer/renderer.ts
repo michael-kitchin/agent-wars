@@ -124,6 +124,7 @@ import { wireConsoleFrame } from './chrome/consoleFrame';
 import { fetchMatchSnapshot } from './core/matchSnapshotClient';
 import { wireObserveMode } from './gameplay/observeChrome';
 import { wireGameMenu } from './chrome/gameMenu';
+import { openChartsDialog } from './chrome/gameMenuActions';
 import { wireChartsDialog } from './charts/chartsDialog';
 import { showLoadedSaveToastAfterReload, wireSaveLoadMenu } from './gameplay/saveLoadMenu';
 import {
@@ -206,7 +207,7 @@ import {
 } from './gameplay/sidebarSupport';
 import { renderSelectionPanel, wireSelectionPanel } from './gameplay/selectionPanel';
 import { HUMAN_SEAT_ID } from '../shared/seatIds';
-import { bindReplayDeps } from './replay/replayMode';
+import { bindReplayDeps, openReplay } from './replay/replayMode';
 import { wireReplayPanel } from './replay/replayPanel';
 
 /**
@@ -731,7 +732,7 @@ function init(): void {
     redrawMap: redraw,
     redrawSelectionPanel: renderSelectionPanel,
   });
-  wireGameMenu();
+  wireGameMenu({ openReplay: () => { void openReplay(); }, openCharts: openChartsDialog });
   wireChartsDialog();
   wireReplayPanel();
   wireSaveLoadMenu();

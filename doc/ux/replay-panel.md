@@ -10,6 +10,8 @@ Show the player what the map, the update dialog, and the commanders' messages lo
 
 The P key turns replay on and off. It starts only with a match loaded, no dialog open that needs the player's choice, and the new-game overlay closed or not open over a live match. It does not start while a turn is resolving or its playback is running, and that refusal toasts one sentence (`REPLAY_BUSY_REASON` in `src/shared/replayNavigation.ts`). It does start inside a tactical battle, where it covers that battle's beats and nothing else. A match with no recorded turn toasts `REPLAY_NO_TURNS_REASON` in `src/renderer/replay/replayMode.ts`. When the last recorded turn cannot be put on screen, P toasts `REPLAY_STEP_FAILED_REASON`, logs the failure, and leaves replay again, so the present is shown (`toggleReplay`). See [modes-and-transitions.md](modes-and-transitions.md).
 
+The game menu's Playback… item also enters replay (`openReplay`), with the same conditions, refusals, and failure handling as P. It only enters. Opening the menu already starts leaving replay, so Playback… waits for that leave to finish and then enters on the newest recorded turn. When replay is already on, it does nothing. See [game-menu.md](game-menu.md).
+
 ## Information Displayed
 
 - The panel takes the selection panel's place, with the same position, width, and navy face. The selection panel and the chat panel are hidden while replay is on (`static/replayChrome.css`).
@@ -27,9 +29,9 @@ The P key turns replay on and off. It starts only with a match loaded, no dialog
 - Clicking the expand control shows or hides the turn field and the slider, sliding the bar as the selection panel does.
 - Clicking Step back or Step forward shows the previous or next recorded turn. Step back is disabled at the first turn and Step forward at the last (`canStepBack` and `canStepForward`).
 - Dragging the slider moves the field as it moves. Releasing it shows that turn. The slider keeps focus afterwards.
-- Clicking Play plays the recorded turns forward from the one showing. Each turn shows with its two dialogs for one second (`REPLAY_PLAYBACK_DWELL_MS` in `src/shared/replayNavigation.ts`). Then the animations that lead into the next turn run, built from that turn's recorded result the way the live turn built them, and playback moves to that turn. A turn with nothing to animate still shows for that second. A past turn's order arrows are not drawn.
+- Clicking Play plays the recorded turns forward from the one showing. Each turn shows with its two dialogs for half a second, 500 ms (`REPLAY_PLAYBACK_DWELL_MS` in `src/shared/replayNavigation.ts`). Then the animations that lead into the next turn run, built from that turn's recorded result the way the live turn built them, and playback moves to that turn. A turn with nothing to animate still shows for that half second. A past turn's order arrows are not drawn.
 - Play is enabled only when a turn after the one showing exists (`canPlay`). Playback stops by itself at the last recorded turn, which leaves Play disabled.
-- Clicking Pause while playback runs stops it after the turn that is animating. The turn finishes first, so a click during the one-second hold takes effect when the hold ends.
+- Clicking Pause while playback runs stops it after the turn that is animating. The turn finishes first, so a click during the half-second hold takes effect when the hold ends.
 - While playback runs, Step back, Step forward, the slider, and the turn field are disabled (`canStepBack`, `canStepForward`, `canSeek`).
 - While a step loads, Step back and Step forward are disabled, but the slider and the turn field stay enabled so a focused one keeps focus (`canSeek`). A focused Step back, Step forward, or Play that becomes disabled, while a step loads or at the first or last turn, hands its focus to the slider when the panel is expanded, otherwise to another enabled bar button or the expand control (`keepFocusInPanel` in `src/renderer/replay/replayPanel.ts`). Focus elsewhere is not moved. A slider release made then is ignored and the thumb returns to the turn on screen. A turn entry committed then is ignored and stays as typed.
 - A step that cannot be loaded during playback ends playback and toasts `REPLAY_STEP_FAILED_REASON` (`That turn could not be loaded.`).
@@ -100,7 +102,8 @@ None.
 - `static/index.html` (`#replay-panel`, `#replay-panel-seek`, `#replay-turn-input`, `#replay-slider`, `#replay-panel-bar`, `#replay-panel-expand`, `#replay-panel-label`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`)
 - `static/replayChrome.css`
 - `src/renderer/replay/replayPanel.ts`
-- `src/renderer/replay/replayMode.ts` (`toggleReplay`, `loadReplayStep`, `presentReplayStep`, `showReplayStep`, `leaveReplay`, `abandonReplayForNewMatch`)
+- `src/renderer/replay/replayMode.ts` (`toggleReplay`, `openReplay`, `loadReplayStep`, `presentReplayStep`, `showReplayStep`, `leaveReplay`, `abandonReplayForNewMatch`)
+- `src/renderer/chrome/gameMenu.ts` (the Playback… item, through `GameMenuActions`)
 - `src/renderer/chrome/consoleFrame.ts` (`selectedConsoleTabId`, `selectConsoleTabKeepingCollapse`)
 - `src/renderer/replay/replayPlayback.ts` (`startReplayPlayback`, `requestReplayPlaybackStop`)
 - `src/renderer/gameplay/resolutionAnimationStart.ts` (`buildStrategicResolutionAnimation`, `startResolutionAnimationFrames`)

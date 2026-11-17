@@ -24,7 +24,7 @@ import { readSeatHasApiKey } from './seatApiKeyFlags';
 import { activeSeats, toSeatSnapshot } from '../../shared/seatRoster';
 import type { SeatId } from '../../shared/seatIds';
 import { readPersistedGameSize } from './gameSizeConfig';
-import { readAiOnlyBattles, readAiOnlyBeatLimit, readGameEndReason, readVictorySettings } from './gameConfigKv';
+import { readAiOnlyBattles, readAiOnlyBeatLimit, readGameEndReason, readSightCuesEnabled, readVictorySettings } from './gameConfigKv';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
 import { formatGameDateForTurn, gameCalendarKindForMap, parseStartMonth } from '../../shared/gameCalendar';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
@@ -191,7 +191,8 @@ function getCurrentTurnNumberFromDb(ops: FogDbOps): number {
  *
  * Purpose: The base every player view, AI consultation, and renderer update starts from.
  * When to use: Through `getGameStateForPlayer` for player-facing views; directly only when omniscient state is intended.
- * Expected outcome: All hexes, units, turn, scenario, size, and both origin bonus flags. With the origin bonus on,
+ * Expected outcome: All hexes, units, turn, scenario, size, the stored match options (win rule, AI-only battles and beat limit,
+ *   sight cues), and the bonus flags. With the origin bonus on,
  *   each hex also carries its majority `countryName` (`null` when it has none).
  * Exceptions: Propagates SQLite errors from `deps.ops`.
  */
@@ -332,6 +333,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     victory: readVictorySettings(ops),
     aiOnlyBattles: readAiOnlyBattles(ops),
     aiOnlyBeatLimit,
+    sightCues: readSightCuesEnabled(ops),
     ...(gameEndReason ? { gameEndReason } : {}),
     ...originFlags,
     startMonth,

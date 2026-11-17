@@ -346,6 +346,7 @@ function buildRowCard(args: RelationshipStackArgs): HTMLTableElement {
     side.className = 'charts-row-side';
     const flag = args.flagOf(row.reporterSeatId);
     const name = document.createElement('span');
+    name.className = 'charts-row-side-name';
     name.textContent = args.nameOf(row.reporterSeatId);
     side.append(...(flag === null ? [name] : [flag, name]));
     const asOf =
@@ -363,7 +364,7 @@ function buildRowCard(args: RelationshipStackArgs): HTMLTableElement {
  * Builds one relationship stack.
  *
  * Purpose: One card per side shows how the AI commanders regard it.
- * When to use: The charts dialog, once per seat.
+ * When to use: The charts dialog, once per side that at least one commander reports on.
  * Expected outcome: A heading, then the spoke graph and the row card, or one sentence when no AI commander reports on the side.
  * Exceptions: None.
  */

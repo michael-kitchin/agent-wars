@@ -1,7 +1,7 @@
 /**
  * The chart data rules.
  *
- * Purpose: Series, tooltips, zoom and pan, relationship rows, the stance strip, and spoke positions follow their contracts.
+ * Purpose: Series, tooltips, zoom and pan, relationship rows and subjects, the stance strip, and spoke positions follow their contracts.
  * When to use: `npm run build:main`, then `node dist/shared/matchChartSeries.test.js`.
  * Expected outcome: Each rule gives the specified result on a hand-built three-seat snapshot.
  * Exceptions: None.
@@ -15,6 +15,7 @@ import {
   pannedTurnRange,
   relationshipRows,
   relationshipStrip,
+  relationshipSubjectSeatIds,
   spokePositions,
   zoomedTurnRange,
 } from './matchChartSeries';
@@ -159,6 +160,14 @@ test('hexes taken ignores turns outside the window', () => {
     ],
   };
   assert.equal(relationshipRows(far, 'human')[0].hexesTaken, 1);
+});
+
+test('relationship subjects are the sides at least one commander reports on', () => {
+  assert.deepEqual(relationshipSubjectSeatIds(snapshot), ['human', 'opponent', 'opponent2']);
+  const oneAi: MatchChartsSnapshot = { ...snapshot, seats: snapshot.seats.filter((seat) => seat.seatId !== 'opponent2') };
+  assert.deepEqual(relationshipSubjectSeatIds(oneAi), ['human']);
+  const noAi: MatchChartsSnapshot = { ...snapshot, seats: snapshot.seats.filter((seat) => seat.kind !== 'ai') };
+  assert.deepEqual(relationshipSubjectSeatIds(noAi), []);
 });
 
 test('the strip marks a report when its turn moves forward and carries it as not reported after', () => {

@@ -12,6 +12,7 @@ import type { BasemapVectorName } from '../shared/vectorPackTypes';
 import type { DismissMercenaryResult } from '../shared/mercenaryDismiss';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from '../shared/ipc/saveLoadTypes';
+import type { MatchOptionsResult, MatchOptionsUpdate } from '../shared/ipc/matchOptionsTypes';
 import type { AiSeatId } from '../shared/seatIds';
 import type { CommanderKeyMemoryView } from '../shared/commanderSetupCopy';
 import type { ProviderSortChoice } from '../shared/openRouterProviderSort';
@@ -93,6 +94,7 @@ const IPC_GAME = {
   setSeatCommander: 'game:setSeatCommander',
   getHumanNickname: 'game:getHumanNickname',
   setHumanNickname: 'game:setHumanNickname',
+  setMatchOptions: 'game:setMatchOptions',
   startCommanderPlanning: 'game:startCommanderPlanning',
   stopCommanderPlanning: 'game:stopCommanderPlanning',
   readCommanderPool: 'game:readCommanderPool',
@@ -100,6 +102,7 @@ const IPC_GAME = {
   readMatchCharts: 'game:readMatchCharts',
   readReplayTimeline: 'game:readReplayTimeline',
   readReplayStep: 'game:readReplayStep',
+  openHowToPlay: 'game:openHowToPlay',
   stageSideMessage: 'game:stageSideMessage',
   cancelStagedSideMessage: 'game:cancelStagedSideMessage',
   submitOrders: 'game:submitOrders',
@@ -376,6 +379,16 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    */
   setHumanNickname: (nickname: string): Promise<void> => ipcRenderer.invoke(IPC_GAME.setHumanNickname, nickname),
   /**
+   * Changes the live match's editable options.
+   *
+   * Purpose: The Game Options dialog applies its edits while the player plans a turn.
+   * When to use: The dialog's Apply button.
+   * Expected outcome: `{ ok: true }` when every value was stored, or `{ ok: false, reason }` when nothing was. Changes take effect from the next turn's resolution.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  setMatchOptions: (update: MatchOptionsUpdate): Promise<MatchOptionsResult> =>
+    ipcRenderer.invoke(IPC_GAME.setMatchOptions, update),
+  /**
    * Saves one AI seat's model, effort, provider choice, doctrine choice, and nickname.
    *
    * Purpose: The commander popover writes that seat without changing the other seats.
@@ -491,6 +504,15 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    */
   readReplayStep: (payload: { recordId: number }): Promise<ReplayStepView | null> =>
     ipcRenderer.invoke(IPC_GAME.readReplayStep, payload),
+  /**
+   * Opens the How to play guide on GitHub in the system browser.
+   *
+   * Purpose: The game menu's How to play item shows the guide outside the app. Main owns the URL, so nothing is sent.
+   * When to use: When the player picks How to play in the game menu.
+   * Expected outcome: True when the browser accepted the page, false when it could not be opened.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  openHowToPlay: (): Promise<boolean> => ipcRenderer.invoke(IPC_GAME.openHowToPlay),
   /**
    * Stores one draft from the player to one side.
    *

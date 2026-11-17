@@ -60,6 +60,8 @@ A new table has to be added to `MATCH_TABLE_RECORDING_POLICY` in the same change
 
 `FRAME_EXCLUDED_CONFIG_KEYS` is every `MACHINE_LOCAL_CONFIG_KEYS` entry plus `SAVE_APP_VERSION_CONFIG_KEY` and `SAVE_WRITTEN_AT_CONFIG_KEY`. Those `game_config` rows are never in a frame and never in a recording file. A new machine-local key has to be added to `MACHINE_LOCAL_CONFIG_KEYS` in the same change.
 
+When the player changes match options during a turn in the Game Options dialog (`writeMatchOptions`), the current turn's frame keeps the `game_config` rows it was recorded with, and the next frame records the new ones. No event records the change.
+
 ## Who may be shown a row
 
 The `visibility` column is `everyone`, `engine`, or `seats:` plus seat ids. `match_started` and `match_ended` are `everyone`. Frames, statistics, attributed losses, resolutions, both tactical events, the all-sides `view_snapshot`, `resolution_view`, and a consult with no seat are `engine`. The player's `view_snapshot` is `seats:` plus the human seat id. A strategic orders event, a strategy, and a consult that names a seat are `seats:` plus that owner's id. Text that is not one of those forms, including an empty seat list, reads back as `engine` (`parseVisibilityText`).

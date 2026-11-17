@@ -4,7 +4,7 @@
  */
 
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, protocol, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, screen, shell } from 'electron';
 import * as path from 'path';
 import { AI_SEAT_IDS, isAiSeatId, type SeatId } from '../shared/seatIds';
 import { activeHumanSeatId } from '../shared/observeModeControls';
@@ -72,8 +72,10 @@ import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
 import { registerMatchChartsIpcHandler } from './ipc/matchChartsIpcHandler';
 import { registerReplayIpcHandler } from './ipc/replayIpcHandler';
+import { registerHowToPlayIpcHandler } from './ipc/howToPlayIpcHandler';
 import { registerSideMessageIpcHandler } from './ipc/sideMessageIpcHandler';
 import { registerHumanNicknameIpcHandler } from './ipc/humanNicknameIpcHandler';
+import { registerMatchOptionsIpcHandler } from './ipc/matchOptionsIpcHandler';
 import { registerSeatCommanderIpcHandler } from './ipc/seatCommanderIpcHandler';
 import { registerMissileLaunchIpcHandler } from './ipc/missileLaunchIpcHandler';
 import { registerRangedTargetOddsIpcHandler } from './ipc/rangedTargetOddsIpc';
@@ -624,7 +626,9 @@ function registerIpcHandlers(): void {
   registerSideMessageIpcHandler(ipcMain);
   registerMatchChartsIpcHandler(ipcMain);
   registerReplayIpcHandler(ipcMain);
+  registerHowToPlayIpcHandler(ipcMain, (url) => shell.openExternal(url));
   registerHumanNicknameIpcHandler(ipcMain);
+  registerMatchOptionsIpcHandler(ipcMain);
   registerSeatCommanderIpcHandler(ipcMain);
   registerMissileLaunchIpcHandler(ipcMain);
   registerRangedTargetOddsIpcHandler(ipcMain);
