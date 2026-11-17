@@ -110,16 +110,18 @@ function stepRefsForView(view: ReplayView, battleId: string | null): ReplayStepR
  * Exceptions: None. A failed read is logged and returns an empty list.
  */
 export function readReplayTimeline(): ReplayTimeline {
-  const view = hasDbHandle() ? currentReplayView() : 'all';
-  const battleId = openBattleId();
-  const scope = battleId === null ? 'strategic' : 'tactical';
+  let view: ReplayView = 'all';
+  let battleId: string | null = null;
   try {
+    if (hasDbHandle()) view = currentReplayView();
+    battleId = openBattleId();
+    const scope = battleId === null ? 'strategic' : 'tactical';
     const steps = hasDbHandle() ? stepRefsForView(view, battleId) : [];
     logDebug('replayReading readReplayTimeline', { view, scope, battleId, stepCount: steps.length });
     return { view, scope, steps };
   } catch (err) {
-    logError('replayReading readReplayTimeline failed', { view, scope, battleId, err });
-    return { view, scope, steps: [] };
+    logError('replayReading readReplayTimeline failed', { view, battleId, err });
+    return { view, scope: battleId === null ? 'strategic' : 'tactical', steps: [] };
   }
 }
 

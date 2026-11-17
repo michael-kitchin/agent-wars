@@ -407,7 +407,7 @@ function wireTurnField(field: HTMLInputElement): void {
  *
  * Purpose: Dragging only moves the thumb and the field. The map changes when the thumb is released.
  * When to use: From `wireReplayPanel`.
- * Expected outcome: Input writes the turn under the thumb into the field. Change shows that step, then the slider gives focus back so `p` and Escape reach the map.
+ * Expected outcome: Input writes the turn under the thumb into the field. Change shows that step and redraws the panel. The slider keeps focus, so the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
  * Exceptions: None.
  */
 function wireSlider(slider: HTMLInputElement): void {
@@ -422,7 +422,6 @@ function wireSlider(slider: HTMLInputElement): void {
   });
   slider.addEventListener('change', () => {
     void showReplayStep(Number(slider.value)).then(() => {
-      slider.blur();
       renderReplayPanel();
     });
   });

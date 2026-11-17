@@ -21,6 +21,7 @@ import { setMainUIControlsEnabled, updateGameOverUI as updateGameOverUIFromModul
 import { openNewGameOverlayFromModelTab as openNewGameOverlayFromModelTabFromModule, refreshHumanStandingOrders } from './gameplay/newGame';
 
 import { rendererSharedState as S } from './core/state';
+import { replayActive } from './replay/replayState';
 import { rememberUnitOrigins } from './core/unitOriginFlags';
 import { activateRestoredTacticalBattleFromMainSnapshot, buildDefaultTacticalBattleActivationSideEffects, startTacticalBattleFromEntryHex as startTacticalBattleFromEntryHexFromModule } from './tactical/tacticalEntryFlow';
 import type { TacticalRendererStartBattleSideEffects } from './tactical/tacticalIpcHandlers';
@@ -315,12 +316,15 @@ export async function refreshGameStateAfterBuildQueueChange(): Promise<void> {
 }
 
 /**
- * Defines the `applyGameStateSnapshot` function shape (async function applyGameStateSnapshot( nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: bool).
-
- * Purpose: Supports maintainability by documenting why `applyGameStateSnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Applies a game snapshot with the renderer's own helpers bound.
+ *
+ * Purpose: Every caller in the entry wiring applies a snapshot the same way, with the map caches, the map-load toast,
+ *   and the planning toggle kept in step.
+ * When to use: Applying a snapshot from the main process, a turn result, or replay (`options.replay`).
+ * Expected outcome: While replay is on, only a replay step is applied, and anything else returns before any side
+ *   effect. Otherwise a new map resets the session caches, a new map-load error toasts once, the core applier runs, and
+ *   the planning toggle's interactable state is refreshed.
+ * Exceptions: Propagates a failure of the core applier.
  */
 export async function applyGameStateSnapshot(
   nextState: GameStateSnapshot,
@@ -335,6 +339,9 @@ export async function applyGameStateSnapshot(
     replay?: 'step' | 'leave';
   } = {}
 ): Promise<void> {
+  // A live snapshot that arrives during replay is dropped here, before the map caches, the map-load toast, or the
+  // planning toggle react to it. The core applier keeps the same guard for its other callers.
+  if (replayActive() && options.replay !== 'step') return;
   const previousMapId = S.gameState?.gameMap?.id;
   if (nextState.gameMap && previousMapId !== nextState.gameMap.id) {
     sessionStaticTacticalOverlaysLoaded = false;

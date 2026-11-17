@@ -250,6 +250,38 @@ export function showConsoleTab(tabId: string): void {
 }
 
 /**
+ * Says which console tab is selected.
+ *
+ * Purpose: Replay moves the console off a disabled Orders tab and needs to know whether it was there.
+ * When to use: Before an action that may move the console off Orders, such as entering replay.
+ * Expected outcome: The id of the selected tab, whether the console is collapsed or expanded.
+ * Exceptions: None.
+ */
+export function selectedConsoleTabId(): string {
+  return consoleState.activeTabId;
+}
+
+/**
+ * Selects one tab and leaves the console collapsed or expanded as it is.
+ *
+ * Purpose: Leaving replay puts the Orders tab back without opening a console the player had collapsed.
+ * When to use: Returning the console to a tab it was moved off. A rail click uses `nextConsoleTabState` instead.
+ * Expected outcome: The named tab is selected and the collapsed state is unchanged. While Orders is disabled,
+ *   `refreshConsoleHeader` moves a selected Orders tab to Commanders again. An unknown id is logged and the console
+ *   stays as it was.
+ * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
+ */
+export function selectConsoleTabKeepingCollapse(tabId: string): void {
+  if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
+    console.error('[agent-wars] selectConsoleTabKeepingCollapse unknown tab', tabId);
+    return;
+  }
+  console.debug('[agent-wars] selectConsoleTabKeepingCollapse', { tabId, collapsed: consoleState.collapsed });
+  consoleState = { activeTabId: tabId, collapsed: consoleState.collapsed };
+  applyConsoleState();
+}
+
+/**
  * Wires the rail's tabs.
  *
  * Purpose: One bootstrap for the console's own behavior.

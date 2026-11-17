@@ -12,7 +12,7 @@ import type { ReplayStepView } from '../../shared/replayTypes';
 import { chartsDialogIsOpen } from '../charts/chartsDialog';
 import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
-import { refreshConsoleHeader, showConsoleTab } from '../chrome/consoleFrame';
+import { refreshConsoleHeader, selectConsoleTabKeepingCollapse, selectedConsoleTabId } from '../chrome/consoleFrame';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { replaceSelection } from '../core/selection';
@@ -25,7 +25,7 @@ import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrc
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
 import { showReplayStepDialogs } from './replayDialogs';
-import { currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, waitForReplayIdle } from './replayState';
+import { abandonReplay, currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, waitForReplayIdle } from './replayState';
 
 /**
  * Sentence shown when the match has no recorded turns.
@@ -200,6 +200,10 @@ function entryDecision(): ReturnType<typeof replayMayEnter> {
  * Exceptions: None. A failed timeline read is logged and shown as a sentence.
  */
 export async function toggleReplay(): Promise<void> {
+  if (replayLeaving !== null) {
+    await replayLeaving;
+    return;
+  }
   if (replayActive()) {
     await leaveReplay();
     return;
@@ -218,7 +222,7 @@ export async function toggleReplay(): Promise<void> {
     showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
     return;
   }
-  if (!rendererMatchEpochCurrent(epoch) || replayActive() || !entryDecision().ok) return;
+  if (!rendererMatchEpochCurrent(epoch) || replayActive() || replayLeaving !== null || !entryDecision().ok) return;
   if ((timeline.scope === 'tactical') !== (S.tacticalBattleSnapshot != null)) return;
   if (timeline.steps.length === 0) {
     showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
@@ -231,7 +235,7 @@ export async function toggleReplay(): Promise<void> {
   clearSelectionLikeRightClick(deps.selectionDeps);
   setAsideLastSeenMarkers();
   savedBattle = timeline.scope === 'tactical' ? copyBattleState() : null;
-  ordersTabWasSelected = document.getElementById(ORDERS_TAB_ID)?.getAttribute('aria-selected') === 'true';
+  ordersTabWasSelected = selectedConsoleTabId() === ORDERS_TAB_ID;
   const last = timeline.steps.length - 1;
   setReplay({ timeline, index: last, busy: false, matchEpoch: epoch, playing: false, stopRequested: false, session: nextReplaySession() });
   document.body.dataset.replay = 'on';
@@ -324,7 +328,7 @@ function restoreLastSeenMarkers(): void {
  * Resolves once no step is loading or being presented.
  *
  * Purpose: A step clears the busy flag when its read returns and sets it again when its presentation starts in a later microtask. Leaving must wait past that gap, so it waits for idle and then for the next task before it checks again.
- * When to use: From `leaveReplay`, before it shows the last step.
+ * When to use: From `runLeaveReplay`, before it shows the last step.
  * Expected outcome: Resolves when replay is off or when the flag stays clear across a task boundary.
  * Exceptions: None.
  */
@@ -466,22 +470,67 @@ const ORDERS_TAB_ID = 'console-tab-orders';
 /**
  * Whether the Orders tab was the selected tab when replay opened.
  *
- * Purpose: Leaving replay returns the console to the tab the player was using.
- * When to use: Set on entry, read and cleared on leave.
+ * Purpose: Leaving replay returns the console to the tab the player was using. It reads the console's own state, so a collapsed console on Orders counts, and leaving keeps it collapsed.
+ * When to use: Set on entry, read and cleared on leave, and cleared when a new match drops replay.
  * Expected outcome: False outside replay.
  * Exceptions: None.
  */
 let ordersTabWasSelected = false;
 
 /**
+ * The leave that is running, if any.
+ *
+ * Purpose: Leaving turns replay off before it reads and applies the live match. A `p` in that gap must not open a new replay that the old leave would then overwrite with the live state, the old selection, and the old console tab.
+ * When to use: Set and cleared by `leaveReplay`. `toggleReplay` waits for it and does not enter while it is set.
+ * Expected outcome: Null unless a leave is running.
+ * Exceptions: None.
+ */
+let replayLeaving: Promise<void> | null = null;
+
+/**
+ * Leaves replay and brings the present back, once at a time.
+ *
+ * Purpose: `p`, Escape, and the game menu can ask to leave while a leave is already running. They share the one that is running.
+ * When to use: `p`, Escape, and the game menu.
+ * Expected outcome: Resolves when the running or new leave finishes. See `runLeaveReplay`.
+ * Exceptions: None. Failures inside the leave are logged there.
+ */
+export function leaveReplay(): Promise<void> {
+  if (replayLeaving !== null) return replayLeaving;
+  const leaving = runLeaveReplay().finally(() => {
+    replayLeaving = null;
+  });
+  replayLeaving = leaving;
+  return leaving;
+}
+
+/**
+ * Drops replay because a new match replaced the one it belongs to.
+ *
+ * Purpose: The new match's state is already applied, so nothing from the old match is put back. Playback that was animating must stop, or its frames keep running and its end runs the watch's listeners over the new match. The console and Exit Battle must stop treating replay as on.
+ * When to use: Where a new match's state is applied, before it is installed.
+ * Expected outcome: Nothing when replay is off. Otherwise the resolution animation is cancelled, replay is off, the kept selection and console tab are forgotten, the Orders tab is enabled again through `refreshConsoleHeader`, and Exit Battle follows.
+ * Exceptions: None.
+ */
+export function abandonReplayForNewMatch(): void {
+  if (!replayActive()) return;
+  clearResolutionPlaybackAnimationState();
+  abandonReplay();
+  savedSelection = [];
+  ordersTabWasSelected = false;
+  refreshConsoleHeader();
+  syncTacticalExitButtonElementVisibility();
+}
+
+/**
  * Leaves replay and brings the present back.
  *
  * Purpose: Leaving shows the current turn as if the player had stepped forward to it, then applies the live state. Playback that is running is stopped and its animation cancelled first, and a step that is loading is allowed to settle.
- * When to use: `p`, Escape, the game menu, and a new match.
- * Expected outcome: Replay is off, the last-seen markers and, over a battle, the battle's own state are back, the selection from before replay is back without the units that no longer exist, the console shows the Orders tab again when it was selected on entry, the live snapshot is on screen, and a watch that was waiting presses Ready.
+ * When to use: Only through `leaveReplay`, so two leaves never run together.
+ * Expected outcome: Replay is off, the last-seen markers and, over a battle, the battle's own state are back, the selection from before replay is back without the units that no longer exist, the console shows the Orders tab again when it was selected on entry and stays collapsed or expanded as it is, the live snapshot is on screen, and a watch that was waiting presses Ready.
  * Exceptions: None. A failed live read is logged and the last recorded step stays on screen.
  */
-export async function leaveReplay(): Promise<void> {
+async function runLeaveReplay(): Promise<void> {
   let state = currentReplay();
   if (state?.playing) {
     setReplay({ ...state, playing: false, stopRequested: true });
@@ -518,7 +567,7 @@ export async function leaveReplay(): Promise<void> {
   restoreSelection(selection);
   refreshConsoleHeader();
   syncTacticalExitButtonElementVisibility();
-  if (ordersTabWasSelected) showConsoleTab(ORDERS_TAB_ID);
+  if (ordersTabWasSelected) selectConsoleTabKeepingCollapse(ORDERS_TAB_ID);
   ordersTabWasSelected = false;
   syncChatPanelVisibility();
   void maybeObserveAutoAdvance();

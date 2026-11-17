@@ -5,7 +5,7 @@ import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboar
 import { mapZoomKeyStep } from '../../shared/mapKeyboardZoom';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
 import { observeMapContainerResize } from './mapContainerResize';
-import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
+import { isEditableKeyboardTarget, isRangeInputTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
@@ -489,7 +489,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
         toggleChartsDialog();
         return;
       }
-      if (replayActive() && !shouldIgnoreGlobalKeydown(e)) {
+      if (replayActive() && (!shouldIgnoreGlobalKeydown(e) || isRangeInputTarget(e.target))) {
         e.preventDefault();
         void leaveReplay();
         return;
@@ -510,6 +510,12 @@ export function wireInitCore(deps: InitCoreDeps): void {
         deps.hideStackCallout();
         return;
       }
+    }
+    // The replay slider keeps focus after a step, so `p` still leaves replay from it. Its arrow keys stay with the slider.
+    if (replayActive() && isRangeInputTarget(e.target) && !e.repeat && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      void toggleReplay();
+      return;
     }
     if (shouldIgnoreGlobalKeydown(e)) return;
     if (chartsDialogIsOpen()) {

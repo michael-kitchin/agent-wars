@@ -37,7 +37,7 @@ const { NEW_GAME_CHECKS } = require('./ui-smoke-new-game-checks.cjs');
  *   `minimapBorderWidth` is the computed top border width of `.minimap-overview::after`, such as `2px`, or `''` when
  *   the overview is missing. `minimapBorderColor` is that border's computed color, and `minimapToggleBackground` is
  *   the expand control's computed background, or `''` when that control is missing. `minimapHasZoom` is true when the
- *   overview itself has a zoom control.
+ *   overview itself has a zoom control. `bodyReplay` is the body's `data-replay` value, or `''` when it is not set.
  * Exceptions: None.
  */
 function probePage(selectors) {
@@ -102,6 +102,7 @@ function probePage(selectors) {
     viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
     scroll: { w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight },
     activeElementId: document.activeElement ? document.activeElement.id : '',
+    bodyReplay: document.body.dataset.replay ?? '',
     minimapBorderWidth,
     minimapBorderColor,
     minimapToggleBackground,
@@ -413,16 +414,21 @@ const FRAME_CHECKS = Object.freeze([
     scenes: [SCENES.replayOpen],
     needs: ['#replay-panel', '#selection-panel', '#chat-panel'],
     run: (p, el) => {
+      if (p.bodyReplay !== 'on') return `body data-replay is "${p.bodyReplay}" after p, expected "on"`;
       if (!el('#replay-panel').shown) return 'the replay panel is not shown after p';
       if (el('#selection-panel').shown) return 'the selection panel is still shown in replay';
       return el('#chat-panel').shown ? 'the chat panel is still shown in replay' : null;
     },
   },
   {
-    name: 'replay-escape-hides-the-replay-panel',
+    name: 'replay-escape-hides-the-replay-panel-and-brings-the-live-panels-back',
     scenes: [SCENES.replayClosed],
-    needs: ['#replay-panel'],
-    run: (p, el) => (el('#replay-panel').shown ? 'Escape left the replay panel shown' : null),
+    needs: ['#replay-panel', '#selection-panel'],
+    run: (p, el) => {
+      if (p.bodyReplay !== '') return `body data-replay is "${p.bodyReplay}" after Escape, expected it removed`;
+      if (el('#replay-panel').shown) return 'Escape left the replay panel shown';
+      return el('#selection-panel').shown ? null : 'the selection panel did not come back with the selection after Escape';
+    },
   },
 ]);
 

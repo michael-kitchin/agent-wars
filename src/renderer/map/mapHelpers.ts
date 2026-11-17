@@ -54,6 +54,19 @@ export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 }
 
 /**
+ * Returns true when the event target is a slider.
+ *
+ * Purpose: A focused slider takes no typed text, so a shortcut such as replay's `p` and Escape can still act while it has focus.
+ *   `shouldIgnoreGlobalKeydown` treats every input as editable, so callers ask this as well.
+ * When to use: In a window key handler, for a shortcut that should reach past a focused `<input type="range">`.
+ * Expected outcome: True for an `<input type="range">`, false for any other target.
+ * Exceptions: None.
+ */
+export function isRangeInputTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement && target.type === 'range';
+}
+
+/**
  * Picks the hex neighbor that best matches signed north/south and east/west pan axes.
  *
  * Purpose: One hex step toward a cardinal or diagonal net vector for hold-to-continue pan.

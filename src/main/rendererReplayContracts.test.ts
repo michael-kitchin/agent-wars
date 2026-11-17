@@ -139,9 +139,9 @@ test('the live turn takes its playback plan from the shared function, which only
 
 test('a watch waits during replay, the menu and a new match leave it, and the smoke run covers the key', () => {
   assertMatches(readRendererSource('gameplay', 'observeChrome.ts'), /if \(replayActive\(\) \|\| !autoAdvanceReady\(\)/, 'auto advance waits during replay');
-  assertMatches(getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'leaveReplay'), /maybeObserveAutoAdvance\(\)/, 'leaving asks the watch again');
+  assertMatches(getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'runLeaveReplay'), /maybeObserveAutoAdvance\(\)/, 'leaving asks the watch again');
   assertMatches(getFunctionSource(readRendererSource('chrome', 'gameMenu.ts'), 'openGameMenu'), /requestReplayLeave\(\)/, 'the menu leaves replay');
-  assertMatches(readRendererSource('gameplay', 'newGame.ts'), /abandonReplay\(\);/, 'a new match drops replay');
+  assertMatches(readRendererSource('gameplay', 'newGame.ts'), /abandonReplayForNewMatch\(\);/, 'a new match drops replay');
   assert.equal(readRepoFile('scripts', 'ui-smoke', 'ui-smoke-checks.cjs').includes('#replay-panel'), true);
 });
 
@@ -175,7 +175,7 @@ test('Play runs the recorded steps through the shared animation and never notifi
 
 test('leaving replay stops playback before showing the last step, and a played step applies without a redraw', () => {
   const mode = readRendererSource('replay', 'replayMode.ts');
-  const leave = getFunctionSource(mode, 'leaveReplay');
+  const leave = getFunctionSource(mode, 'runLeaveReplay');
   const cleared = leave.indexOf('playing: false');
   const cancelled = leave.indexOf('clearResolutionPlaybackAnimationState()');
   assert.ok(cleared >= 0 && cancelled > cleared, 'playing is cleared before the animation is cancelled');
@@ -185,7 +185,7 @@ test('leaving replay stops playback before showing the last step, and a played s
 
 test('inside a battle replay keeps the battle view out of full activation and Exit Battle off', () => {
   const mode = readRendererSource('replay', 'replayMode.ts');
-  assertMatches(getFunctionSource(mode, 'leaveReplay'), /restoreBattleState\(\)/, 'leaveReplay puts the battle state back');
+  assertMatches(getFunctionSource(mode, 'runLeaveReplay'), /restoreBattleState\(\)/, 'leaveReplay puts the battle state back');
   assertMatches(getFunctionSource(mode, 'restoreBattleState'), /S\.tacticalPendingMarches = savedBattle\.marches/, 'queued marches are restored');
   assertMatches(
     getFunctionSource(readRendererSource('tactical', 'tacticalExitButtonDom.ts'), 'syncTacticalExitButtonElementVisibility'),
@@ -241,7 +241,7 @@ test('replay keeps the selection from before it and puts it back on leaving', ()
   const toggle = getFunctionSource(mode, 'toggleReplay');
   const saved = toggle.indexOf('savedSelection = [...S.selectedUnitIds];');
   assert.ok(saved >= 0 && saved < toggle.indexOf('clearSelectionLikeRightClick('), 'the selection is copied before it is cleared');
-  const leave = getFunctionSource(mode, 'leaveReplay');
+  const leave = getFunctionSource(mode, 'runLeaveReplay');
   assert.ok(leave.indexOf('restoreSelection(selection)') > leave.indexOf('applyGameStateSnapshot(live'), 'the selection returns after the live snapshot');
   assertMatches(getFunctionSource(mode, 'restoreSelection'), /replaceSelection\(/, 'the restored ids are reconciled through replaceSelection');
 });
@@ -264,7 +264,59 @@ test('a played step starts no frames when replay was left while it was presented
 test('entering over the world map drops a kept battle, and leaving waits for a loading step', () => {
   const mode = readRendererSource('replay', 'replayMode.ts');
   assertMatches(getFunctionSource(mode, 'toggleReplay'), /savedBattle = timeline\.scope === 'tactical' \? copyBattleState\(\) : null;/, 'a strategic entry clears the kept battle');
-  const leave = getFunctionSource(mode, 'leaveReplay');
+  const leave = getFunctionSource(mode, 'runLeaveReplay');
   assert.equal(/state\.busy\) return;/.test(leave), false, 'a loading step does not cancel leaving');
   assertMatches(leave, /await waitForStepToSettle\(\);/, 'leaving waits for the step to settle');
+});
+
+test('a new match that drops replay stops its animation and gives the Orders tab and Exit Battle back', () => {
+  const abandon = getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'abandonReplayForNewMatch');
+  const cancelled = abandon.indexOf('clearResolutionPlaybackAnimationState()');
+  assert.ok(cancelled >= 0 && cancelled < abandon.indexOf('abandonReplay()'), 'the animation is cancelled before replay is dropped');
+  assertMatches(abandon, /refreshConsoleHeader\(\)/, 'the console header enables Orders again');
+  assertMatches(abandon, /syncTacticalExitButtonElementVisibility\(\)/, 'Exit Battle follows');
+  assertMatches(abandon, /ordersTabWasSelected = false;/, 'the kept console tab is forgotten');
+});
+
+test('leaving replay puts the Orders tab back without expanding a collapsed console', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  assertMatches(getFunctionSource(mode, 'toggleReplay'), /ordersTabWasSelected = selectedConsoleTabId\(\) === ORDERS_TAB_ID;/, 'entry reads the console state, not aria-selected');
+  const leave = getFunctionSource(mode, 'runLeaveReplay');
+  assertMatches(leave, /selectConsoleTabKeepingCollapse\(ORDERS_TAB_ID\)/, 'leaving selects Orders without expanding');
+  assert.equal(leave.includes('showConsoleTab('), false, 'leaving does not force the console open');
+  const keep = getFunctionSource(readRendererSource('chrome', 'consoleFrame.ts'), 'selectConsoleTabKeepingCollapse');
+  assertMatches(keep, /collapsed: consoleState\.collapsed/, 'the collapsed state is kept');
+});
+
+test('a leave that is running blocks a new entry until it finishes', () => {
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  const leave = getFunctionSource(mode, 'leaveReplay');
+  assertMatches(leave, /if \(replayLeaving !== null\) return replayLeaving;/, 'a second leave shares the running one');
+  assertMatches(leave, /runLeaveReplay\(\)\.finally\(/, 'the flag clears when the leave settles');
+  const toggle = getFunctionSource(mode, 'toggleReplay');
+  const waits = toggle.indexOf('await replayLeaving;');
+  assert.ok(waits >= 0 && waits < toggle.indexOf('entryDecision()'), 'p waits for the leave before deciding to enter');
+  assertMatches(toggle, /replayActive\(\) \|\| replayLeaving !== null \|\|/, 'entry is refused when a leave started while the timeline loaded');
+});
+
+test('the replay slider keeps focus, and p and Escape still reach replay from it', () => {
+  const slider = getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'wireSlider');
+  assert.equal(slider.includes('.blur()'), false, 'the slider does not drop focus after a step');
+  const keys = readRendererSource('map', 'initCore.ts');
+  assertMatches(keys, /if \(replayActive\(\) && \(!shouldIgnoreGlobalKeydown\(e\) \|\| isRangeInputTarget\(e\.target\)\)\) \{\r?\n\s+e\.preventDefault\(\);\r?\n\s+void leaveReplay\(\);/, 'Escape leaves replay from the slider');
+  const toggleAt = keys.search(/if \(replayActive\(\) && isRangeInputTarget\(e\.target\)[^\n]*=== 'p'\) \{\r?\n\s+e\.preventDefault\(\);\r?\n\s+void toggleReplay\(\);/);
+  assert.ok(toggleAt >= 0, 'p leaves replay from the slider');
+  assert.ok(toggleAt < keys.indexOf('if (shouldIgnoreGlobalKeydown(e)) return;'), 'the slider branch comes before the editable-field return');
+  assertMatches(getFunctionSource(readRendererSource('map', 'mapHelpers.ts'), 'isRangeInputTarget'), /target\.type === 'range'/, 'only a range input is let through');
+});
+
+test('the entry wrapper drops a live snapshot during replay before any side effect', () => {
+  const source = readRendererSource('entryCallbacks.ts');
+  const body = source.slice(source.indexOf('export async function applyGameStateSnapshot('));
+  const guard = body.indexOf("if (replayActive() && options.replay !== 'step') return;");
+  assert.ok(guard >= 0, 'the wrapper checks replay');
+  for (const effect of ['sessionStaticTacticalOverlaysLoaded = false', 'showMapToast(nextState.gameMapLoadError)', 'syncOpenRouterRunToggleInteractable()']) {
+    assert.ok(guard < body.indexOf(effect), `${effect} runs after the replay check`);
+  }
+  assertMatches(readRendererSource('core', 'stateSnapshot.ts'), /if \(replayActive\(\) && options\.replay !== 'step'\) return;/, 'the core applier keeps its guard');
 });

@@ -29,6 +29,7 @@ const { runMultiCommanderScenes } = require('./ui-smoke-multi.cjs');
 const {
   LAND_UNIT_TYPES,
   captureMainMap,
+  clearSelection,
   contestedHexEdit,
   dragGrip,
   dragSelectionPanelGrip,
@@ -233,12 +234,20 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.chartsClosed);
 
   // The replay key shows a past turn with its own panel in place of the selection and chat panels, and Escape leaves.
+  // A unit is selected first so the selection panel is on screen before replay hides it. Leaving puts the selection
+  // back last, so the panel showing again marks the end of the leave. The selection is then cleared for the scenes after.
+  await captureMainMap(page);
+  await selectLoneUnit(page, await readGameState(page), LAND_UNIT_TYPES);
+  await parkPointer(page);
   await page.keyboard.press('p');
-  await page.waitForTimeout(SETTLE_MS.click * 3);
+  await page.waitForFunction(() => document.body.dataset.replay === 'on' && document.getElementById('replay-panel')?.getClientRects().length > 0, null, { timeout: SETTLE_MS.overlay * 4 });
+  await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.replayOpen);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(SETTLE_MS.click * 3);
+  await page.waitForFunction(() => document.body.dataset.replay === undefined && document.getElementById('selection-panel')?.getClientRects().length > 0, null, { timeout: SETTLE_MS.overlay * 4 });
+  await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.replayClosed);
+  await clearSelection(page);
 
   // Show the map-mode tabs from the toggle on the overview's corner; they start hidden and stay shown until the toggle
   // hides them in the small window below. Turn Tech on and record it with the weather icons still on, then turn it

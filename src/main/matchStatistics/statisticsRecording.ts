@@ -63,7 +63,7 @@ export function recordTurnStatistics(
     const seatIds = seats.map((seat) => seat.seatId);
     const current = readTurnOwnership(gameDbOps, step.turnNumber, generation);
     const previous = rememberedTurnOwnership(step.turnNumber - 1, generation);
-    const lost = unitsLostBySeat(previous, current, seatIds, takeSpentMissileIds());
+    const lost = unitsLostBySeat(previous, current, seatIds, takeSpentMissileIds(step.turnNumber));
     const sides = readSideStatistics(gameDbOps, seats).map((side) => ({
       ...side,
       unitsLost: lost?.get(side.seatId) ?? null,
