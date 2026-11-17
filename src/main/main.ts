@@ -7,17 +7,13 @@ import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, protocol, screen, shell } from 'electron';
 import * as path from 'path';
 import { AI_SEAT_IDS, isAiSeatId, type SeatId } from '../shared/seatIds';
-import { activeHumanSeatId } from '../shared/observeModeControls';
-import { fallbackConsultModelId, type TacticalBeatConsultArgs } from './ipc/readyIpcResolutionMapping';
 import { readMatchSnapshot } from './ipc/matchViewSnapshot';
 import {
   initDatabase,
   getGameState,
   getGameStateForPlayer,
-  resetGameForNewMatch,
   getTacticalTerrainOverridesForRendererFromGame,
   listScenarioHomeRegions,
-  getSeatRoster,
 } from './gameDb';
 import { handleBasemapProtocol } from './basemap/basemapProtocolHandler';
 import { registerBasemapIpc } from './basemap/basemapIpc';
@@ -31,7 +27,6 @@ import {
   previewHumanMarchOrders,
   assignHumanMarchOrder,
   assignHumanMarchOrders,
-  commitHumanTacticalDraftOrders,
   validateGroupRangedTarget,
   validateGroupAirStrikeTarget,
   validateGroupAirDropTarget,
@@ -39,9 +34,7 @@ import {
   cancelHumanOrder,
   resolveMeleeIntercept,
 } from './gameActions';
-import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
 import {
-  endTacticalBattleSession,
   endTacticalBattleSessionForHumanVoluntaryExitBailout,
   endTacticalBattleSessionForTwoPartyVoluntaryExit,
   getActiveTacticalBattleSnapshot,
@@ -49,20 +42,11 @@ import {
 } from './tacticalBattle/tacticalBattleSession';
 import { restorePersistedTacticalBattleSession } from './tacticalBattle/tacticalBattleSession';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
-import { exportFinishedMatchRecordingIfNeeded } from './recorder/matchRecordingExport';
-import { recordTacticalBeat } from './recorder/matchRecordingEvents';
-import { recordResolutionView } from './replay/replayRecording';
-import { gameDbOps } from './gameDb/dbConnection';
-import { readSeatRoster } from './gameDb/seatRosterStore';
-import { sendStagedHumanSideMessages } from './sideMessages/humanSideMessages';
-import { battleHasPartySeat } from './tacticalBattle/opposingParty';
-import { currentStepKey } from './recorder/recorderStepKey';
 import {
   parseGroupedTargetPayload,
   parseGroupedStrikePayload,
   parseGroupedDestinationPayload,
   parseUnitIdList,
-  parseHumanTacticalCommitPayload,
 } from './ipcPayloadGuards';
 import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
 import { registerLoggedIpcHandler } from './ipc/loggedIpcHandler';
@@ -73,6 +57,8 @@ import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
 import { registerMatchChartsIpcHandler } from './ipc/matchChartsIpcHandler';
 import { registerReplayIpcHandler } from './ipc/replayIpcHandler';
 import { registerHowToPlayIpcHandler } from './ipc/howToPlayIpcHandler';
+import { registerNewGameIpcHandler } from './ipc/newGameIpcHandler';
+import { registerTacticalCommitIpcHandler } from './ipc/tacticalCommitIpcHandler';
 import { registerSideMessageIpcHandler } from './ipc/sideMessageIpcHandler';
 import { registerHumanNicknameIpcHandler } from './ipc/humanNicknameIpcHandler';
 import { registerMatchOptionsIpcHandler } from './ipc/matchOptionsIpcHandler';
@@ -80,26 +66,17 @@ import { registerSeatCommanderIpcHandler } from './ipc/seatCommanderIpcHandler';
 import { registerMissileLaunchIpcHandler } from './ipc/missileLaunchIpcHandler';
 import { registerRangedTargetOddsIpcHandler } from './ipc/rangedTargetOddsIpc';
 import { registerMercenaryIpcHandler } from './ipc/mercenaryIpcHandler';
-import { forgetAutoSaveTurnKey, rememberCurrentAutoSaveTurnKey, registerSaveLoadIpcHandler, runWithReadyInFlight, withAutoSaveAfter } from './ipc/saveLoadIpcHandler';
-import { resetCommanderPool } from './openRouter/commanderPool';
-import { storeNewMatchCommanderKeys } from './openRouter/commanderKeyMemory';
+import { rememberCurrentAutoSaveTurnKey, registerSaveLoadIpcHandler, runWithReadyInFlight, withAutoSaveAfter } from './ipc/saveLoadIpcHandler';
 import {
   hasKey,
-  loadKey,
   requestOrders,
-  applyAppWideCommanderToLegacySeat,
   getSelectedModel,
   getToolNamesForEnabledGroups,
   TOOL_GROUP_REGISTRY,
 } from './openRouter/openRouter';
 import { logDebug, logError } from './logger';
-import { getHumanNickname, setHumanNickname } from './humanNickname';
-import { HUMAN_NICKNAME_DEFAULT, normalizeSideNickname } from '../shared/sideNicknames';
 import { claimSingleInstanceLock } from './singleInstanceLock';
 import { applyUserDataDirOverride } from './userDataDirOverride';
-import { aiOnlyBeatLimitForRequest } from '../shared/aiOnlyBeatLimit';
-import { parseBonusLevel } from '../shared/bonusLevel';
-import { parseGameSize } from '../shared/gameSize';
 import {
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
@@ -108,18 +85,8 @@ import {
   getTacticalRoadRailOverlaysForRenderer,
   getTacticalTransportVectorOverlaysForRenderer,
 } from './terrainClassificationCache';
-import {
-  handleGameReady,
-  handleResolveMeleeIntercept,
-  POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-  type ReadyDeps,
-} from './gameIpcHandlers';
-import {
-  clearDeferredPlaybackConsultPending,
-  handleNotifyResolutionPlaybackComplete,
-  hasDeferredPlaybackConsultPending,
-  setPendingTacticalBeatConsult,
-} from './ipc/deferredResolutionPlaybackConsult';
+import { handleGameReady, handleResolveMeleeIntercept, type ReadyDeps } from './gameIpcHandlers';
+import { clearDeferredPlaybackConsultPending, handleNotifyResolutionPlaybackComplete, hasDeferredPlaybackConsultPending } from './ipc/deferredResolutionPlaybackConsult';
 import { stopModelWork } from './ipc/modelWorkCancellation';
 import { parseModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type { AirStrikeTargetType } from '../shared/ipc/ordersTypes';
@@ -127,7 +94,6 @@ import type {
   SubmitOrdersPayload,
   ReadyResult,
   GameReadyIpcPayload,
-  NewGameIpcPayload,
   NewGameMapPreviewRequest,
   ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
@@ -345,75 +311,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.newGameMapPreview, (_event, request: NewGameMapPreviewRequest) =>
     buildNewGameMapPreview(request)
   );
-  ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => withAutoSaveAfter(() => {
-    stopModelWork('new_game', sendActivityLog);
-    const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
-    const gameSize = parseGameSize(payload?.gameSize);
-    const originBonusLevel = parseBonusLevel(payload?.originBonusLevel, 'off');
-    const terrainBonusLevel = parseBonusLevel(payload?.terrainBonusLevel, 'off');
-    const weatherBonusLevel = parseBonusLevel(payload?.weatherBonusLevel, 'off');
-    const techBonusLevel = parseBonusLevel(payload?.techBonusLevel, 'off');
-    const startMonth = payload?.startMonth;
-    const humanNickname = payload?.humanNickname === undefined
-      ? getHumanNickname()
-      : normalizeSideNickname(payload.humanNickname) || HUMAN_NICKNAME_DEFAULT;
-    if (payload?.humanNickname !== undefined) setHumanNickname(humanNickname);
-    const aiOnlyBeatLimit = aiOnlyBeatLimitForRequest(payload?.aiOnlyBeatLimit);
-    if (getGameState().gameOver === true) {
-      exportFinishedMatchRecordingIfNeeded({
-        userDataDir: app.getPath('userData'),
-        appVersion: app.getVersion(),
-        now: () => new Date(),
-        deferredConsultPending: false,
-      });
-    }
-    logDebug('main game:newGame', {
-      fogOfWarEnabled,
-      gameSize,
-      originBonusLevel,
-      terrainBonusLevel,
-      weatherBonusLevel,
-      techBonusLevel,
-      startMonth,
-      gameMapId: payload?.gameMapId ?? null,
-      seatCount: payload?.seats?.length ?? null,
-      turnLimit: payload?.turnLimit ?? null,
-      victoryRule: payload?.victoryRule ?? null,
-      aiOnlyBattles: payload?.aiOnlyBattles ?? null,
-      aiOnlyBeatLimit,
-      sightCues: payload?.sightCues ?? null,
-      humanNicknameLength: humanNickname.length,
-    });
-    resetGameForNewMatch({
-      fogOfWarEnabled,
-      gameSize,
-      originBonusLevel,
-      terrainBonusLevel,
-      weatherBonusLevel,
-      techBonusLevel,
-      startMonth,
-      gameMapId: payload?.gameMapId,
-      seats: payload?.seats,
-      turnLimit: payload?.turnLimit,
-      victoryRule: payload?.victoryRule,
-      aiOnlyBattles: payload?.aiOnlyBattles,
-      aiOnlyBeatLimit,
-      sightCues: payload?.sightCues,
-      humanNickname,
-    });
-    forgetAutoSaveTurnKey();
-    storeNewMatchCommanderKeys(
-      payload?.seats,
-      loadKey(),
-      getSeatRoster().map((seat) => ({ seatId: seat.seatId, homeRegion: seat.homeRegion })),
-    );
-    if (!payload?.seats) applyAppWideCommanderToLegacySeat();
-    resetCommanderPool(getSeatRoster());
-    clearDeferredPlaybackConsultPending();
-    clearStrategicPreviousHexMemory();
-    endTacticalBattleSession();
-    return readMatchSnapshot(undefined);
-  }));
+  registerNewGameIpcHandler(ipcMain, { sendActivityLog });
   ipcMain.handle(IPC_GAME.submitOrders, (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
     const normalized: SubmitOrdersPayload = normalizeSubmitOrdersPayload(payload);
     return submitOrders(normalized);
@@ -463,82 +361,7 @@ function registerIpcHandlers(): void {
       return assignHumanMarchOrders(parsed.unitIds, parsed.destinationH3Index);
     }
   );
-  ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, async (_event, payload: unknown) => withAutoSaveAfter(async () => {
-    if (hasDeferredPlaybackConsultPending()) {
-      return { success: false, reason: 'Resolution playback consultation is still in progress.' };
-    }
-    const parsed = parseHumanTacticalCommitPayload(payload);
-    if (!parsed.ok) return { success: false, reason: parsed.reason };
-    const v = parsed.value;
-    const preBattle = getActiveTacticalBattleSnapshot();
-    const beatStep = currentStepKey();
-    const result = commitHumanTacticalDraftOrders({
-      movementOrders: v.movementOrders,
-      rangedAttacks: v.rangedAttacks,
-      airStrikes: v.airStrikes,
-      airDropOrders: v.airDropOrders,
-      ferryOrders: v.ferryOrders,
-      embarkOrders: v.embarkOrders,
-      opponentTacticalDraft: v.opponentTacticalDraft,
-    });
-    if (result.success && beatStep && result.tacticalResolutionPlayback) {
-      recordTacticalBeat({
-        step: beatStep,
-        orders: {
-          movementOrders: v.movementOrders,
-          rangedAttacks: v.rangedAttacks,
-          airStrikes: v.airStrikes,
-          airDropOrders: v.airDropOrders,
-          ferryOrders: v.ferryOrders,
-          embarkOrders: v.embarkOrders,
-          opponentTacticalDraft: v.opponentTacticalDraft,
-        },
-        playback: result.tacticalResolutionPlayback,
-      });
-      recordResolutionView(beatStep, 'tactical', result);
-      const humanSeatId = activeHumanSeatId(readSeatRoster(gameDbOps));
-      // An AI-only beat commits through this channel too. The player's drafts wait for their own commit.
-      if (preBattle && humanSeatId && battleHasPartySeat(preBattle, humanSeatId)) {
-        sendStagedHumanSideMessages(beatStep);
-      }
-    }
-    if (
-      !result.success ||
-      !result.tacticalBattle ||
-      !result.tacticalResolutionPlayback ||
-      !v.useEventDrivenConsultation ||
-      !v.aiPlanningRunEnabled
-    ) {
-      return result;
-    }
-    if (result.tacticalBattle.aiOnlyEndReason != null) {
-      logDebug('main commitHumanTacticalDraftOrders: no deferred consult after an ended AI-only beat', {
-        battleId: result.tacticalBattle.battleId,
-        aiOnlyEndReason: result.tacticalBattle.aiOnlyEndReason,
-      });
-      return result;
-    }
-    const modelId = fallbackConsultModelId(getSelectedModel);
-    const enabledToolNames = getToolNamesForEnabledGroups(TOOL_GROUP_REGISTRY.map((g) => g.id));
-    const battleId = result.tacticalBattle.battleId;
-    const consultArgs: TacticalBeatConsultArgs = {
-      useEventDrivenConsultation: v.useEventDrivenConsultation,
-      aiPlanningRunEnabled: v.aiPlanningRunEnabled,
-      tacticalBattle: result.tacticalBattle,
-      tacticalResolutionPlayback: result.tacticalResolutionPlayback,
-      modelId,
-      enabledToolNames,
-      hasKey,
-      requestOrders: requestOrdersWithLog,
-      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-      errorLogMessage: 'commitHumanTacticalDraftOrders: tactical after-beat consultation failed or timed out',
-    };
-    setPendingTacticalBeatConsult(battleId, consultArgs);
-    logDebug('main commitHumanTacticalDraftOrders: deferred tactical post-beat consult until playback notify', {
-      battleId,
-    });
-    return { ...result, tacticalPostBeatConsultDeferred: true };
-  }));
+  registerTacticalCommitIpcHandler(ipcMain, { requestOrders: requestOrdersWithLog });
   ipcMain.handle(
     IPC_GAME.validateGroupRangedTarget,
     (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
