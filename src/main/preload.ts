@@ -359,7 +359,7 @@ listGameMaps: (): Promise<GameMapListEntry[]> =>
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload),
+newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke(IPC_GAME.newGame, payload),
   /**
    * Reads the nickname stored for the human seat.
    *
@@ -406,7 +406,7 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
       apiKey?: string;
       nickname?: string;
     }
-  ): Promise<SeatSnapshot> => ipcRenderer.invoke('game:setSeatCommander', seatId, commander),
+  ): Promise<SeatSnapshot> => ipcRenderer.invoke(IPC_GAME.setSeatCommander, seatId, commander),
   /**
    * Ends the match by ranking the seats that are still active.
    *
