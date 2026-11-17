@@ -22,6 +22,7 @@ import {
 } from '../openRouter/resolutionPlaybackDeferral';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrchestration';
+import { frameReplayStepIfFollowing } from './replayCamera';
 import { REPLAY_STEP_FAILED_REASON, loadReplayStep, presentReplayStep, replayReadyDeps } from './replayMode';
 import { currentReplay, setReplay, type ReplayState } from './replayState';
 
@@ -113,14 +114,17 @@ function tacticalAnimationFor(view: ReplayStepView): NonNullable<typeof S.resolu
  *
  * Purpose: One pass of the loop: apply the step, show its dialogs, then run the animation that led into it.
  * When to use: From the play loop, after the hold and the load.
- * Expected outcome: The step is on screen and its animation, if it had one, has finished or was cancelled. When replay was left or the animation was replaced while the step was being presented, no frames start and the step's animation is cleared if it is still the one set.
+ * Expected outcome: The step is on screen and its animation, if it had one, has finished or was cancelled. With follow-units on, the camera fits the step's units once: after the animation ends, or right after the step is presented when it has none. When replay was left or the animation was replaced while the step was being presented, no frames start and the step's animation is cleared if it is still the one set.
  * Exceptions: Propagates a failure of the snapshot or the dialogs to the loop's catch.
  */
 async function playReplayStep(index: number, view: ReplayStepView, continues: () => boolean): Promise<void> {
   const animation = view.ref.scope === 'tactical' ? tacticalAnimationFor(view) : strategicAnimationFor(view);
   if (animation) S.resolutionMoveAnimation = animation;
-  await presentReplayStep(index, view, { forPlayback: animation !== null });
-  if (!animation) return;
+  await presentReplayStep(index, view, { forPlayback: animation !== null, showDialogs: true });
+  if (!animation) {
+    frameReplayStepIfFollowing();
+    return;
+  }
   if (!continues() || S.resolutionMoveAnimation !== animation) {
     if (S.resolutionMoveAnimation === animation) clearResolutionPlaybackAnimationState();
     return;
@@ -128,6 +132,7 @@ async function playReplayStep(index: number, view: ReplayStepView, continues: ()
   const finished = waitForNextResolutionPlaybackFinished();
   startResolutionAnimationFrames(replayReadyDeps().tickResolutionMoveAnimation);
   await finished;
+  frameReplayStepIfFollowing();
 }
 
 /**

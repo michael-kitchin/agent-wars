@@ -35,14 +35,27 @@ export function newGameOptionsPopoverIsOpen(): boolean {
 }
 
 /**
+ * Reports whether the popover is showing as the in-match Game Options dialog.
+ *
+ * Purpose: The in-match dialog reuses this popover with `data-mode="match"` and has its own close paths, so the new-game ones must leave it alone.
+ * When to use: At the start of every new-game open and close path in this module.
+ * Expected outcome: True while `#new-game-options-popover` carries `data-mode="match"`.
+ * Exceptions: None.
+ */
+function popoverInMatchMode(): boolean {
+  return document.getElementById('new-game-options-popover')?.dataset.mode === 'match';
+}
+
+/**
  * Hides Game Options and drops its document listeners.
  *
  * Purpose: Escape, an outside press, the close control, a collapsing panel, and a commander popover share one exit.
  * When to use: Those actions. A call while closed does nothing.
- * Expected outcome: The popover is hidden. The selects stay in the document.
+ * Expected outcome: The popover is hidden. The selects stay in the document. While the popover is the in-match dialog (`data-mode="match"`) this returns at once, because that dialog must restore the controls on its own close.
  * Exceptions: None.
  */
 export function closeNewGameOptionsPopover(): void {
+  if (popoverInMatchMode()) return;
   detachListeners?.();
   detachListeners = null;
   if (popover) popover.hidden = true;
@@ -56,9 +69,11 @@ export function closeNewGameOptionsPopover(): void {
  * Purpose: The button is the only control that shows Victory, Rules, and Other.
  * When to use: The button's click.
  * Expected outcome: An open popover closes. A closed one closes the commander popover, then opens under the button.
+ *   Nothing happens while the popover is the in-match dialog.
  * Exceptions: None. A missing popover element does nothing.
  */
 export function toggleNewGameOptionsPopover(button: HTMLButtonElement): void {
+  if (popoverInMatchMode()) return;
   if (newGameOptionsPopoverIsOpen()) {
     closeNewGameOptionsPopover();
     return;
@@ -72,7 +87,9 @@ export function toggleNewGameOptionsPopover(button: HTMLButtonElement): void {
   placeNewGameOptionsPopover();
   detachListeners = attachAnchoredPopoverListeners({
     containsTarget: (target) => !!(popover?.contains(target) || anchor?.contains(target)),
-    close: closeNewGameOptionsPopover,
+    close: () => {
+      if (!popoverInMatchMode()) closeNewGameOptionsPopover();
+    },
     reposition: placeNewGameOptionsPopover,
   });
 }
@@ -82,7 +99,8 @@ export function toggleNewGameOptionsPopover(button: HTMLButtonElement): void {
  *
  * Purpose: One setup point, after the page markup exists.
  * When to use: Once from `registerNewGameButton`.
- * Expected outcome: The button toggles the popover. The close control and a press on the grip hide it.
+ * Expected outcome: The button toggles the popover. The close control and a press on the grip hide it. The close
+ *   control does nothing here while the popover is the in-match dialog, which listens to it separately.
  * Exceptions: None. A missing element is skipped.
  */
 export function wireNewGameOptionsPopover(): void {
@@ -91,6 +109,7 @@ export function wireNewGameOptionsPopover(): void {
     button.addEventListener('click', () => toggleNewGameOptionsPopover(button));
   }
   document.querySelector('#new-game-options-popover .commander-popover-close')?.addEventListener('click', () => {
+    if (popoverInMatchMode()) return;
     closeNewGameOptionsPopover();
   });
   document.getElementById('new-game-panel-grip')?.addEventListener('pointerdown', () => {

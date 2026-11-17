@@ -9,6 +9,7 @@ import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { closeNewGameOptionsPopover } from '../gameplay/newGameOptionsPopover';
+import { closeMatchOptionsDialogIfOpen } from '../gameplay/matchOptionsDialogState';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, newGameOverlayIsOpen, scrollNewGameDialogToTop, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
@@ -121,7 +122,8 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  * When to use: After every state refresh.
  * Expected outcome: Returns true only when `#game-over-overlay` gains or loses `hidden`. Returns false when it
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
- *   enabled. Otherwise the overlay shows standings or a start message. Fog of war, Auto-start AI, and the bonus dropdowns return
+ *   enabled. Otherwise the overlay shows standings or a start message. An open in-match Game Options dialog closes
+ *   and restores the shared controls, then Fog of war, Auto-start AI, and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
  *   drawn only when the overlay opens, and that open closes the game menu. The panel starts expanded, at the map's
  *   top-left corner, only on that open, and the choice list scrolls to the top. A match that ends while the screen is
@@ -162,6 +164,8 @@ export function updateGameOverUI(
   }
 
   overlay?.classList.remove('hidden');
+  // The in-match dialog shares these controls; it puts its saved values back before the reset below.
+  closeMatchOptionsDialogIfOpen();
   resetNewGameOptionControls();
   if (wasHidden) {
     closeNewGameOptionsPopover();

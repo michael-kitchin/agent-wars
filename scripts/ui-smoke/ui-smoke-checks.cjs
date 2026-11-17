@@ -219,7 +219,6 @@ const FRAME_CHECKS = Object.freeze([
     name: 'placeholders-disabled',
     scenes: [SCENES.strategic, SCENES.gameMenuOpen],
     needs: [
-      '#topbar-settings-btn',
       '#topbar-help-btn',
       '#console-tab-build',
       '#console-tab-forces',

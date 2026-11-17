@@ -238,9 +238,9 @@ test('the commander cards cannot change a commander and a cost refresh leaves th
 
 test('replay keeps the selection from before it and puts it back on leaving', () => {
   const mode = readRendererSource('replay', 'replayMode.ts');
-  const toggle = getFunctionSource(mode, 'toggleReplay');
-  const saved = toggle.indexOf('savedSelection = [...S.selectedUnitIds];');
-  assert.ok(saved >= 0 && saved < toggle.indexOf('clearSelectionLikeRightClick('), 'the selection is copied before it is cleared');
+  const enter = getFunctionSource(mode, 'enterReplay');
+  const saved = enter.indexOf('savedSelection = [...S.selectedUnitIds];');
+  assert.ok(saved >= 0 && saved < enter.indexOf('clearSelectionLikeRightClick('), 'the selection is copied before it is cleared');
   const leave = getFunctionSource(mode, 'runLeaveReplay');
   assert.ok(leave.indexOf('restoreSelection(selection)') > leave.indexOf('applyGameStateSnapshot(live'), 'the selection returns after the live snapshot');
   assertMatches(getFunctionSource(mode, 'restoreSelection'), /replaceSelection\(/, 'the restored ids are reconciled through replaceSelection');
@@ -263,7 +263,7 @@ test('a played step starts no frames when replay was left while it was presented
 
 test('entering over the world map drops a kept battle, and leaving waits for a loading step', () => {
   const mode = readRendererSource('replay', 'replayMode.ts');
-  assertMatches(getFunctionSource(mode, 'toggleReplay'), /savedBattle = timeline\.scope === 'tactical' \? copyBattleState\(\) : null;/, 'a strategic entry clears the kept battle');
+  assertMatches(getFunctionSource(mode, 'enterReplay'), /savedBattle = timeline\.scope === 'tactical' \? copyBattleState\(\) : null;/, 'a strategic entry clears the kept battle');
   const leave = getFunctionSource(mode, 'runLeaveReplay');
   assertMatches(leave, /await waitForStepToSettle\(\);/, 'leaving waits for the step to settle');
 });
@@ -279,7 +279,7 @@ test('a new match that drops replay stops its animation and gives the Orders tab
 
 test('leaving replay puts the Orders tab back without expanding a collapsed console', () => {
   const mode = readRendererSource('replay', 'replayMode.ts');
-  assertMatches(getFunctionSource(mode, 'toggleReplay'), /ordersTabWasSelected = selectedConsoleTabId\(\) === ORDERS_TAB_ID;/, 'entry reads the console state, not aria-selected');
+  assertMatches(getFunctionSource(mode, 'enterReplay'), /ordersTabWasSelected = selectedConsoleTabId\(\) === ORDERS_TAB_ID;/, 'entry reads the console state, not aria-selected');
   const leave = getFunctionSource(mode, 'runLeaveReplay');
   assertMatches(leave, /selectConsoleTabKeepingCollapse\(ORDERS_TAB_ID\)/, 'leaving selects Orders without expanding');
   assert.equal(leave.includes('showConsoleTab('), false, 'leaving does not force the console open');
@@ -294,8 +294,8 @@ test('a leave that is running blocks a new entry until it finishes', () => {
   assertMatches(leave, /runLeaveReplay\(\)\.finally\(/, 'the flag clears when the leave settles');
   const toggle = getFunctionSource(mode, 'toggleReplay');
   const waits = toggle.indexOf('await replayLeaving;');
-  assert.ok(waits >= 0 && waits < toggle.indexOf('entryDecision()'), 'p waits for the leave before deciding to enter');
-  assertMatches(toggle, /replayActive\(\) \|\| replayLeaving !== null \|\|/, 'entry is refused when a leave started while the timeline loaded');
+  assert.ok(waits >= 0 && waits < toggle.indexOf('await enterReplay()'), 'p waits for the leave before deciding to enter');
+  assertMatches(getFunctionSource(mode, 'enterReplay'), /replayActive\(\) \|\| replayLeaving !== null \|\|/, 'entry is refused when a leave started while the timeline loaded');
 });
 
 test('a step whose match was replaced, or whose presentation throws, still clears the busy flag so leaving can finish', () => {
@@ -308,7 +308,7 @@ test('a step whose match was replaced, or whose presentation throws, still clear
   assert.ok(epochCheck > cleared, 'a stale match epoch returns only after the flag is cleared');
   const present = getFunctionSource(mode, 'presentReplayStep');
   assertMatches(present, /\} finally \{[\s\S]*busy: false/, 'presenting clears the flag in a finally');
-  const settle = getFunctionSource(mode, 'waitForStepToSettle');
+  const settle = getFunctionSource(readRendererSource('replay', 'replayState.ts'), 'waitForStepToSettle');
   assertMatches(settle, /rendererMatchEpochCurrent\(state\.matchEpoch\)/, 'waiting stops when the match was replaced');
   assertMatches(getFunctionSource(mode, 'runLeaveReplay'), /if \(rendererMatchEpochCurrent\(state\.matchEpoch\)\) \{\s+try \{\s+await showReplayStep\(/, 'leaving skips the last step of a replaced match');
 });
@@ -319,7 +319,7 @@ test('a last step that throws cannot keep replay on', () => {
   const shown = leave.search(/try \{\s+await showReplayStep\(state\.timeline\.steps\.length - 1\);\s+\} catch \(error\) \{\s+console\.error\(/);
   assert.ok(shown >= 0, 'leaving catches and logs a failure to show the last step');
   assert.ok(shown < leave.indexOf('setReplay(null);') && shown < leave.indexOf('fetchMatchSnapshot()'), 'the leave goes on to turn replay off and apply the live match');
-  const toggle = getFunctionSource(mode, 'toggleReplay');
+  const toggle = getFunctionSource(mode, 'enterReplay');
   const entered = toggle.search(/try \{\s+await showReplayStep\(last\);\s+\} catch \(error\) \{\s+console\.error\(/);
   assert.ok(entered >= 0, 'entering catches and logs a failure to show the last step');
   assert.ok(toggle.indexOf('await leaveReplay();', entered) > entered, 'a failed entry leaves replay');
@@ -343,7 +343,7 @@ test('a step button that a draw disables hands its focus to the slider or anothe
 test('the replay slider keeps focus, and p and Escape still reach replay from it', () => {
   const slider = getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'wireSlider');
   assert.equal(slider.includes('.blur()'), false, 'the slider does not drop focus after a step');
-  assertMatches(slider, /if \(currentReplay\(\)\?\.busy\) \{/, 'a change while a step loads is ignored');
+  assertMatches(slider, /showReleasedReplayStep\(Number\(slider\.value\), \(\) => scheduler\.settle\(\)\)/, 'a release waits for the previews to settle and then shows the step');
   const render = getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'renderReplayPanel');
   assertMatches(render, /slider\.disabled = !canSeek\(position\);/, 'the slider is disabled through canSeek');
   assertMatches(render, /field\.disabled = !canSeek\(position\);/, 'the turn field is disabled through canSeek');
@@ -367,4 +367,53 @@ test('the entry wrapper drops a live snapshot during replay before any side effe
     assert.ok(guard < body.indexOf(effect), `${effect} runs after the replay check`);
   }
   assertMatches(readRendererSource('core', 'stateSnapshot.ts'), /if \(replayActive\(\) && options\.replay !== 'step'\) return;/, 'the core applier keeps its guard');
+});
+
+test('the slider previews steps while it is dragged and shows the released step with its dialogs', () => {
+  const panel = readRendererSource('replay', 'replayPanel.ts');
+  const slider = getFunctionSource(panel, 'wireSlider');
+  assertMatches(slider, /createSliderPreviewScheduler\(\{[\s\S]*show: previewReplayStep,/, 'the slider builds one preview scheduler');
+  assertMatches(slider, /scheduler\.request\(Number\(slider\.value\)\)/, 'input asks for a preview');
+  assert.equal(slider.includes('currentReplay()?.busy'), false, 'a release is no longer dropped while a step loads');
+  const render = getFunctionSource(panel, 'renderReplayPanel');
+  assertMatches(render, /if \(!sliderDragging\) slider\.value = String\(state\.index\);/, 'a drag keeps the thumb where the pointer put it');
+  assertMatches(render, /document\.activeElement !== field && !sliderDragging\)/, 'a drag keeps the field the drag wrote');
+  const forget = getFunctionSource(panel, 'forgetSliderWhenReplayEnds');
+  assertMatches(forget, /sliderPreview\?\.cancel\(\);[\s\S]*sliderDragging = false;/, 'ending replay cancels previews and the drag');
+  const present = getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'presentReplayStep');
+  assertMatches(present, /if \(options\.showDialogs\) await showReplayStepDialogs\(/, 'a preview opens no dialog');
+  const previewSource = readRendererSource('replay', 'replayStepPreview.ts');
+  const preview = getFunctionSource(previewSource, 'previewReplayStep');
+  assertMatches(preview, /showDialogs: false/, 'a preview presents without dialogs');
+  assertMatches(getFunctionSource(previewSource, 'sliderMayShowStep'), /!replayIsLeaving\(\)/, 'no preview runs once replay is leaving');
+  assert.ok(preview.indexOf('sliderMayShowStep()') < preview.indexOf('loadReplayStep('), 'a preview checks before it loads');
+  const released = getFunctionSource(previewSource, 'showReleasedReplayStep');
+  const settled = released.indexOf('await waitForStepToSettle();');
+  assert.ok(released.indexOf('await settle();') < settled && settled >= 0, 'the release settles the previews, then the step');
+  assert.ok(settled < released.indexOf('showReplayStep(index)'), 'the released step is shown after the step settles');
+  assertMatches(getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'showReplayStep'), /showDialogs: true/, 'stepping shows the dialogs');
+  assertMatches(getFunctionSource(readRendererSource('replay', 'replayPlayback.ts'), 'playReplayStep'), /showDialogs: true/, 'playback shows the dialogs');
+  assertMatches(readRepoFile('static', 'index.html'), /id="replay-slider"[^>]*data-control-tooltip="Drag to a turn\. The map follows the thumb, and the turn's dialogs open when you let go\."/, 'the slider tip says the map follows the thumb');
+});
+
+test('follow units sits before the label and frames each shown step once, with the automatic watch fit', () => {
+  const html = readRepoFile('static', 'index.html');
+  const expand = html.indexOf('id="replay-panel-expand"');
+  const follow = html.search(/<button type="button" id="replay-follow-units"[^>]*aria-pressed="false"/);
+  assert.ok(expand >= 0 && follow > expand && follow < html.indexOf('id="replay-panel-label"'), 'the toggle sits between the expand control and the label');
+  const mode = readRendererSource('replay', 'replayMode.ts');
+  assertMatches(getFunctionSource(mode, 'showReplayStep'), /frameReplayStepIfFollowing\(\)/, 'stepping frames the step');
+  assert.equal(getFunctionSource(mode, 'presentReplayStep').includes('frameReplayStepIfFollowing'), false, 'presenting does not frame, so no step is framed twice');
+  assertMatches(getFunctionSource(readRendererSource('replay', 'replayStepPreview.ts'), 'previewReplayStep'), /frameReplayStepIfFollowing\(\)/, 'a preview frames its step');
+  const play = getFunctionSource(readRendererSource('replay', 'replayPlayback.ts'), 'playReplayStep');
+  assert.equal(play.match(/frameReplayStepIfFollowing\(\)/g)?.length, 2, 'a played step frames on one of two paths');
+  assert.ok(play.lastIndexOf('frameReplayStepIfFollowing()') > play.indexOf('await finished;'), 'an animated step frames after its animation ends');
+  const frame = readRendererSource('map', 'unitFrameCamera.ts');
+  assertMatches(frame, /export function fitStrategicUnitsNow\(/, 'the ungated strategic fit is exported');
+  assertMatches(frame, /export function fitBattleUnitsNow\(/, 'the ungated battle fit is exported');
+  assertMatches(getFunctionSource(frame, 'frameStrategicUnits'), /fitStrategicUnitsNow\(indexes\)/, 'the watch uses the same strategic fit');
+  assertMatches(getFunctionSource(frame, 'frameBattleUnits'), /fitBattleUnitsNow\(indexes, battleLimit\)/, 'the watch uses the same battle fit');
+  const camera = readRendererSource('replay', 'replayCamera.ts');
+  assertMatches(getFunctionSource(camera, 'frameReplayStepIfFollowing'), /if \(!S\.replayFollowUnits \|\| !replayActive\(\)\) return;/, 'the fit runs only while the toggle and replay are on');
+  assertMatches(getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'renderReplayPanel'), /setAttribute\('aria-pressed', String\(S\.replayFollowUnits\)\)/, 'the toggle shows its state');
 });

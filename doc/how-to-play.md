@@ -100,6 +100,8 @@ Each opponent's name starts as that side's short home name, and you change it on
 
 Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Beat limit, 30 by default, is the most beats one of those battles can run. Unlimited removes it. None turns it off. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
 
+During a match, the Settings button on the top bar shows these options for the match you're playing. While you plan a turn on the world map, you can change the victory rule, a turn limit later than the current turn, AI-only battles, Beat limit, Sight cues, and the four bonuses, and the change takes effect from the next turn's resolution; Nickname, Fog of war, and Auto-start AI stay as they are.
+
 ## Saving and Loading
 
 Save game… and Load game… are in the game menu, under the button at the top left. Load game… is also on the New game bar.

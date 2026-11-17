@@ -32,6 +32,7 @@ import { bindNewGameSides, loadCommanderKeyMemory, newGameHasAnyModel, readNewGa
 import { confirmStartWithNoModels } from './startConfirmDialog';
 import { closeCommanderPopover } from '../openRouter/commanderPopover';
 import { closeNewGameOptionsPopover, wireNewGameOptionsPopover } from './newGameOptionsPopover';
+import { closeMatchOptionsDialogIfOpen } from './matchOptionsDialogState';
 import { readHumanNicknameForStart, wireHumanNicknameField } from './humanNicknameField';
 import { showNewGameBanner } from './newGameBanner';
 import { hideGameOverStandings } from './gameOverStandings';
@@ -420,7 +421,8 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  *   camera is saved, and the renderer match epoch moves forward; nothing about the match stops. Moving the epoch
  *   retires a Ready, battle-exit, or battle-start handler that is still awaiting its reply, so its result cannot land
  *   on the match after close or on the new match after Start. A reply already in flight when the screen opened is
- *   discarded rather than applied. Fog of war, Auto-start AI, and the bonus dropdowns return to their defaults, the home regions,
+ *   discarded rather than applied. An open in-match Game Options dialog closes and restores the shared controls.
+ *   Fog of war, Auto-start AI, and the bonus dropdowns return to their defaults, the home regions,
  *   starting month, and map preview are drawn again, the panel opens expanded at the map's corner, the choice list
  *   scrolls to the top, any previous Result section is cleared, and the overlay opens. Returns true only when this
  *   call removes `hidden` from `#game-over-overlay`.
@@ -442,6 +444,8 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
     newGameBtn.textContent = 'Start game';
     newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(true));
   }
+  // The in-match dialog shares these controls; it puts its saved values back before the reset below.
+  closeMatchOptionsDialogIfOpen();
   resetNewGameOptionControls();
   void (async () => {
     await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);

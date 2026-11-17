@@ -24,7 +24,7 @@ From left to right:
 - Enemy homes: hexes of every active enemy home that you hold, then "/" and the hexes in those homes. A knocked-out side's home is left out of both numbers. Hidden while View as is All sides, hidden for a seat in a match that ends on a turn limit, and hidden while a human seat is playing a turn-limit match.
 - Cities, only in a match that ends on a turn limit: "{n} · {place} of {seats}". n is the city hexes you hold. place comes from `rankSeatsByCityHexes` over the active seats, and two sides with the same count share a place. The tip lists every active seat by the name `sideDisplayName` returns, highest first, and marks yours with "(you)". A null nickname shows `Human` for the human seat and the short home name for an AI seat. While View as is All sides, the readout stays, with no number and no "(you)". While View as is a seat, n is that seat's city hexes and the tip marks that seat with "(you)".
 - The date block, on two lines. The first line is the match date, such as "March, Year 1" on the global map or "March 8th, Year 1" on a regional map. The second line is "Turn N · Planning", or "Turn N of L · Planning" when the match has a turn limit. With no match loaded, both lines are an em dash.
-- Settings and Help. Both are disabled in this version.
+- Settings and Help. Settings opens Game Options as a dialog centered over the window, showing the live match's settings. Some of them can be changed while you plan a turn on the world map; see [new-game-dialog.md](new-game-dialog.md#during-a-match). Settings is disabled while no match is loaded and while the new-game screen shows (`syncSaveLoadItems`). Help is disabled in this version.
 - Below a 1360 px window, the captions Production, Credits, Forces, Your home, Enemy homes, and Cities hide and the numbers stay. Below 1100 px, each side's name is shortened sooner.
 - Control tips for the readouts and the buttons are in [control-tooltips.md](control-tooltips.md). The Forces tip lists each unit type against its cap.
 
@@ -49,6 +49,7 @@ While the new-game overlay is open, in New game and Game over, the bar is the ne
 ### Mouse
 
 - When the player clicks the game menu button, the game menu opens or closes. See [game-menu.md](game-menu.md).
+- When the player clicks Settings, the in-match Game Options dialog opens over a backdrop, unless another dialog, the game menu, or the charts are open.
 - The sides, the readouts, and the date block do not respond to clicks. View as changes which fog is drawn. It does not change the match.
 
 ### Keyboard
@@ -108,6 +109,8 @@ None.
 - `src/renderer/chrome/topBar.ts`
 - `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)
 - `src/renderer/core/uiState.ts` (`updateGameStateSidebar`, `setMainUIControlsEnabled`)
+- `src/renderer/gameplay/saveLoadMenu.ts` (`syncSaveLoadItems`, which also sets the Settings button's `disabled`)
+- `src/renderer/gameplay/matchOptionsDialog.ts` (`openMatchOptionsDialog`)
 - `src/shared/topBarStats.ts`
 - `src/shared/topBarSideTotals.ts` (`readoutSideIds`, `countFieldedForSides`, `scaleCapsForSides`)
 - `src/shared/economySymbols.ts` (`PRODUCTION_CAPACITY_SYMBOL`, `CREDITS_SYMBOL`)

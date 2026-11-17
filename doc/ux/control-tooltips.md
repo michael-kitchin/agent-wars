@@ -64,7 +64,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
 - Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
-- Settings, Help, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Help, Build, Forces, Replay: "<name> is not available in this version.", for example "Help is not available in this version."
+- Settings, in the top bar: Show the game options for this match. Some can be changed while you plan a turn.
+- Auto-start AI, in the in-match Game Options dialog: Use the Commanders Start/Stop button to turn planning on or off during a match (`AUTO_START_MATCH_TOOLTIP` in `src/renderer/gameplay/matchOptionsControls.ts`). Closing the dialog puts the new-game sentence back.
 - How to play, in the game menu: Open the How to play guide on GitHub in your web browser.
 - Playback…, in the game menu: Step through the turns already played. Same as the P key.
 - Metrics…, in the game menu: Open the match charts. Same as the C key.
@@ -83,6 +85,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Replay panel Step back: Go back one turn.
 - Replay panel Step forward: Go forward one turn.
 - Replay panel Play: Play the turns forward with their animations.
+- Replay panel Follow units: Fit the map to the visible units on every step. Click again to stop.
 - Replay panel Pause, while playback runs: Stop after this turn.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
@@ -220,7 +223,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 
 - `static/index.html` (`#charts-dialog-close`)
 - `src/renderer/charts/chartsDialog.ts` (`buildLineChartBlock`, `buildBody`)
-- `static/index.html` (`#replay-panel-expand`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`)
+- `static/index.html` (`#replay-panel-expand`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`, `#replay-follow-units`)
 - `src/renderer/replay/replayPanel.ts` (`SHOW_SEEK_TIP`, `HIDE_SEEK_TIP`, `PLAY_TIP`, `PAUSE_TIP`)
 - `static/index.html` (`#control-tooltip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)
 - `src/renderer/chat/chatPanel.ts` (`syncExpandControl`)
@@ -241,3 +244,5 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/shared/sideUnitCounts.ts` (`countSideUnitsByType`, `formatSideUnitCountsText`)
 - `src/shared/saveLoadAvailability.ts`
 - `src/renderer/gameplay/saveLoadMenu.ts`
+- `static/index.html` (`#topbar-settings-btn` and its tip host)
+- `src/renderer/gameplay/matchOptionsControls.ts` (`AUTO_START_MATCH_TOOLTIP`, `lockOptionControls`)

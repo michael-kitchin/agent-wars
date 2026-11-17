@@ -189,6 +189,15 @@ strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: n
    * Exceptions: None.
    */
   automaticFramedBeatNumber: null as number | null,
+  /**
+   * Whether replay's follow-units toggle is on.
+   *
+   * Purpose: While it is on, replay fits the camera to the visible units on every step it shows.
+   * When to use: Read by `frameReplayStepIfFollowing` and the replay panel. Written only by `setReplayFollowUnits`.
+   * Expected outcome: False when the app opens. It lasts for the app session, is not saved, and is not reset by a new match or by leaving replay.
+   * Exceptions: None.
+   */
+  replayFollowUnits: false,
 
     /**
    * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).

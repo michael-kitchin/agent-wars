@@ -26,6 +26,16 @@ const SAVE_BUTTON_ID = 'game-menu-save-btn';
 const LOAD_BUTTON_IDS = ['game-menu-load-btn', 'topbar-load-btn'] as const;
 
 /**
+ * Id of the top bar's settings button.
+ *
+ * Purpose: It opens the in-match Game Options dialog, which needs a loaded match and no new-game screen.
+ * When to use: `syncSaveLoadItems`, which already reads those facts.
+ * Expected outcome: Matches the button in `static/index.html`.
+ * Exceptions: None.
+ */
+const SETTINGS_BUTTON_ID = 'topbar-settings-btn';
+
+/**
  * Reads the facts the availability rules need.
  *
  * Purpose: The buttons see the same match, Ready flag, and new-game screen the rest of the renderer uses.
@@ -44,11 +54,11 @@ export function readSaveLoadUiState(): SaveLoadUiState {
 }
 
 /**
- * Applies the current availability to Save game and both Load game buttons.
+ * Applies the current availability to Save game, both Load game buttons, and the top bar's settings button.
  *
- * Purpose: The menu and the new-game bar must not offer a save or load the rules refuse.
+ * Purpose: The menu and the new-game bar must not offer a save or load the rules refuse, and the settings button needs a loaded match behind it.
  * When to use: When the game menu opens, when match controls are enabled or disabled, and once when the buttons are wired.
- * Expected outcome: Each button's `disabled` flag and its tip host match the rules. A missing button is skipped.
+ * Expected outcome: Each save and load button's `disabled` flag and its tip host match the rules. The settings button is disabled while no match is loaded or the new-game screen shows. A missing button is skipped.
  * Exceptions: None.
  */
 export function syncSaveLoadItems(): void {
@@ -56,6 +66,8 @@ export function syncSaveLoadItems(): void {
   applyItem(SAVE_BUTTON_ID, saveGameItemState(state));
   const load = loadGameItemState(state);
   for (const id of LOAD_BUTTON_IDS) applyItem(id, load);
+  const settings = document.getElementById(SETTINGS_BUTTON_ID);
+  if (settings instanceof HTMLButtonElement) settings.disabled = !state.matchLoaded || state.newGameScreenOpen;
 }
 
 /**

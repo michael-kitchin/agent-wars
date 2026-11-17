@@ -24,8 +24,10 @@ import { syncTacticalExitButtonElementVisibility } from '../tactical/tacticalExi
 import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrchestration';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
+import { copyBattleState, type ReplayBattleCopy } from './replayBattleCopy';
+import { frameReplayStepIfFollowing } from './replayCamera';
 import { showReplayStepDialogs } from './replayDialogs';
-import { abandonReplay, currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, waitForReplayIdle } from './replayState';
+import { abandonReplay, currentReplay, nextReplaySession, registerReplayLeaver, replayActive, setReplay, waitForStepToSettle } from './replayState';
 
 /**
  * Sentence shown when the match has no recorded turns.
@@ -126,16 +128,7 @@ let savedMarkers: {
  * Expected outcome: Copies of the battle view, the queued marches, and the six pending order lists, or null when replay is not over a battle.
  * Exceptions: None.
  */
-let savedBattle: {
-  readonly snapshot: typeof S.tacticalBattleSnapshot;
-  readonly marches: typeof S.tacticalPendingMarches;
-  readonly rangedAttacks: typeof S.pendingRangedAttacks;
-  readonly airStrikes: typeof S.pendingAirStrikes;
-  readonly airDrops: typeof S.pendingAirDrops;
-  readonly missileLaunches: typeof S.pendingMissileLaunches;
-  readonly ferryOrders: typeof S.pendingFerryOrders;
-  readonly embarkOrders: typeof S.pendingEmbarkOrders;
-} | null = null;
+let savedBattle: ReplayBattleCopy | null = null;
 
 /**
  * The unit selection that existed when replay opened.
@@ -296,27 +289,6 @@ function setAsideLastSeenMarkers(): void {
 }
 
 /**
- * Copies the battle's own state.
- *
- * Purpose: Replaying a battle's beats must leave the queued marches and the pending orders as they were.
- * When to use: On entering replay while a battle is open. Entering over the world map stores null instead, so a copy kept by a replay a new match dropped is never put back.
- * Expected outcome: Copies of the battle view, the queued marches, and the pending order lists. The live values stay where they are.
- * Exceptions: None.
- */
-function copyBattleState(): NonNullable<typeof savedBattle> {
-  return {
-    snapshot: S.tacticalBattleSnapshot,
-    marches: S.tacticalPendingMarches.map((row) => ({ ...row })),
-    rangedAttacks: [...S.pendingRangedAttacks],
-    airStrikes: [...S.pendingAirStrikes],
-    airDrops: [...S.pendingAirDrops],
-    missileLaunches: [...S.pendingMissileLaunches],
-    ferryOrders: [...S.pendingFerryOrders],
-    embarkOrders: [...S.pendingEmbarkOrders],
-  };
-}
-
-/**
  * Puts the battle's own state back.
  *
  * Purpose: Leaving replay shows the current beat with its queued marches and pending orders.
@@ -354,23 +326,6 @@ function restoreLastSeenMarkers(): void {
   for (const [key, value] of savedMarkers.stale) S.clientStaleEnemyIntelByUnitId.set(key, value);
   for (const [key, value] of savedMarkers.rendered) S.lastRenderedVisibleEnemyByUnitId.set(key, value);
   savedMarkers = null;
-}
-
-/**
- * Resolves once no step is loading or being presented.
- *
- * Purpose: A step clears the busy flag when its read returns and sets it again when its presentation starts in a later microtask. Leaving must wait past that gap, so it waits for idle and then for the next task before it checks again.
- * When to use: From `runLeaveReplay`, before it shows the last step.
- * Expected outcome: Resolves when replay is off, when the flag stays clear across a task boundary, or at once when the match replay belongs to was replaced, since no step of that match will be shown.
- * Exceptions: None.
- */
-async function waitForStepToSettle(): Promise<void> {
-  for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
-    await waitForReplayIdle();
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 0);
-    });
-  }
 }
 
 /**
@@ -432,9 +387,9 @@ export async function loadReplayStep(index: number): Promise<ReplayStepView | nu
 /**
  * What presenting a loaded step needs besides the step.
  *
- * Purpose: Stepping and playback present a step the same way except for when the map is redrawn.
+ * Purpose: Stepping, slider previews, and playback present a step the same way except for when the map is redrawn and whether the dialogs open.
  * When to use: The third argument of `presentReplayStep`.
- * Expected outcome: One flag.
+ * Expected outcome: Two flags.
  * Exceptions: None.
  */
 export interface PresentReplayStepOptions {
@@ -447,14 +402,23 @@ export interface PresentReplayStepOptions {
    * Exceptions: None.
    */
   readonly forPlayback: boolean;
+  /**
+   * Whether the step's turn update and battle result dialogs are shown.
+   *
+   * Contract: True shows them as the live turn did. False only applies the snapshot, for a slider preview while the thumb moves.
+   * When to use: Stepping, the released slider, and playback pass true. `previewReplayStep` passes false.
+   * Expected outcome: No dialog opens when false.
+   * Exceptions: None.
+   */
+  readonly showDialogs: boolean;
 }
 
 /**
- * Puts a loaded step on screen with both of its dialogs.
+ * Puts a loaded step on screen, with both of its dialogs unless it is a preview.
  *
  * Purpose: Stepping, the slider, the turn field, and playback all show a step through here.
  * When to use: With the view `loadReplayStep` returned for `index`.
- * Expected outcome: The snapshot is applied, the dialogs are shown, and the step becomes the current one. The busy flag is set until then, and is cleared even when applying or showing throws, so a leave waiting on the step can finish.
+ * Expected outcome: The snapshot is applied, the dialogs are shown when `options.showDialogs` is true, and the step becomes the current one. The busy flag is set until then, and is cleared even when applying or showing throws, so a leave waiting on the step can finish.
  * Exceptions: Rethrows a failure from applying the snapshot or showing the dialogs, after the busy flag is cleared and with the old step kept as current. Nothing is shown when replay was left while the view was loading.
  */
 export async function presentReplayStep(index: number, view: ReplayStepView, options: PresentReplayStepOptions): Promise<void> {
@@ -473,7 +437,7 @@ export async function presentReplayStep(index: number, view: ReplayStepView, opt
       redraw: !options.forPlayback,
       replay: 'step',
     });
-    await showReplayStepDialogs(view, state.timeline.view, requireDeps().readyDeps());
+    if (options.showDialogs) await showReplayStepDialogs(view, state.timeline.view, requireDeps().readyDeps());
     shown = true;
   } finally {
     const applied = currentReplay();
@@ -486,13 +450,15 @@ export async function presentReplayStep(index: number, view: ReplayStepView, opt
  *
  * Purpose: Stepping, the slider, and the turn field all move through here.
  * When to use: With an index into the timeline. Does nothing while a step is loading or Play is running.
- * Expected outcome: The top bar and the map show that turn, both dialogs for it are shown, and the step becomes the current one once they are. A failed read shows a sentence and keeps the old step.
+ * Expected outcome: The top bar and the map show that turn, both dialogs for it are shown, and the step becomes the current one once they are. With follow-units on, the camera then fits the step's units, except while replay is being left. A failed read shows a sentence and keeps the old step.
  * Exceptions: None. A reply that arrives after replay ended or the match changed is dropped.
  */
 export async function showReplayStep(index: number): Promise<void> {
   if (currentReplay()?.playing) return;
   const view = await loadReplayStep(index);
-  if (view) await presentReplayStep(index, view, { forPlayback: false });
+  if (!view) return;
+  await presentReplayStep(index, view, { forPlayback: false, showDialogs: true });
+  if (replayLeaving === null) frameReplayStepIfFollowing();
 }
 
 /**
@@ -524,6 +490,18 @@ let ordersTabWasSelected = false;
  * Exceptions: None.
  */
 let replayLeaving: Promise<void> | null = null;
+
+/**
+ * Tells whether a leave is running.
+ *
+ * Purpose: A slider preview or a released slider must not show a step once leaving has begun, or it would compete with the leave for the screen.
+ * When to use: `replayStepPreview.ts`, before it shows a step.
+ * Expected outcome: True from the start of `leaveReplay` until that leave settles.
+ * Exceptions: None.
+ */
+export function replayIsLeaving(): boolean {
+  return replayLeaving !== null;
+}
 
 /**
  * Leaves replay and brings the present back, once at a time.

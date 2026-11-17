@@ -4,7 +4,7 @@
 /**
  * Unit tests for the UI smoke checks, the battle-status pattern the scenes wait on, and the observed battle's hex edit.
  *
- * Purpose: Covers how a check result is decided, which battle header lines a beat wait accepts, which hex the observed battle is set up on, what a missing battle reports, and which march attempts skip a unit, without starting Electron.
+ * Purpose: Covers how a check result is decided, which top-bar controls the placeholder check expects disabled, which battle header lines a beat wait accepts, which hex the observed battle is set up on, what a missing battle reports, and which march attempts skip a unit, without starting Electron.
  * When to use: Discovered by `scripts/run-main-node-tests.cjs` as an extra CJS test.
  * Expected outcome: Exits 0 when the pass, missing-element, and thrown-check contracts hold.
  * Exceptions: Assertion failures abort the process via node:test.
@@ -12,7 +12,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
+const { SCENES, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
 const { aiContestedHexStatements, battleStatusPattern, missingBattleMessage } = require('./ui-smoke-beat-limit.cjs');
 const { attemptUnitMarch } = require('./ui-smoke-march-attempt.cjs');
 
@@ -58,6 +58,18 @@ test('runChecks reports a failing rule and a thrown error as FAIL', () => {
   assert.deepEqual(runChecks('scene', probeWithPanel(40), TEST_CHECKS), [{ check: 'wide', status: 'FAIL', detail: '#panel is 40 wide' }]);
   const throwing = [{ ...TEST_CHECKS[0], run: () => { throw new Error('boom'); } }];
   assert.deepEqual(runChecks('scene', probeWithPanel(120), throwing), [{ check: 'wide', status: 'FAIL', detail: 'check threw: boom' }]);
+});
+
+test('the placeholder check leaves the settings button out, since it opens Game Options', () => {
+  const disabled = { disabled: true };
+  const probe = {
+    viewport: { w: 800, h: 600, dpr: 1 },
+    scroll: { w: 800, h: 600 },
+    activeElementId: '',
+    elements: { '#topbar-settings-btn': { disabled: false }, '#topbar-help-btn': disabled, '#console-tab-build': disabled, '#console-tab-forces': disabled },
+  };
+  const result = runChecks(SCENES.strategic, probe).find((row) => row.check === 'placeholders-disabled');
+  assert.deepEqual(result, { check: 'placeholders-disabled', status: 'PASS', detail: '' });
 });
 
 test('a beat wait accepts the beats-left count and rejects a longer beat number', () => {

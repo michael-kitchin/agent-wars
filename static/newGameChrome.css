@@ -566,9 +566,41 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   padding: 12px 0;
   border-bottom: 1px solid var(--chrome-divider);
 }
-.new-game-options-popover .new-game-section:last-child {
+/* Sections are the only `section` elements in the popover, so this still finds Other when the match note and footer follow it. */
+.new-game-options-popover .new-game-section:last-of-type {
   padding-bottom: 0;
   border-bottom: 0;
+}
+/* The in-match Game Options dialog: the same popover, centered over a backdrop that sits above the charts overlay and below tooltips. */
+.match-options-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 7080;
+  background: rgba(0, 0, 0, 0.55);
+}
+.new-game-options-popover[data-mode="match"] {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  z-index: 7090;
+}
+.match-options-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.match-options-footer[hidden],
+.match-options-footer > [hidden] {
+  display: none;
+}
+.match-options-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--chrome-muted);
 }
 /* One row of the five unit types: the map glyph on a gray disk, the cap for the game size, and the price.
    The row stays on one line inside the 432 px panel, including a three-digit price, rather than widening the panel. */

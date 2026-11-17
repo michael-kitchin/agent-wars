@@ -17,9 +17,13 @@ import {
   stepNumber,
   type ReplayPosition,
 } from '../../shared/replayNavigation';
+import { REPLAY_SLIDER_PREVIEW_INTERVAL_MS, createSliderPreviewScheduler, type SliderPreviewScheduler } from '../../shared/replaySliderPreview';
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
+import { rendererSharedState as S } from '../core/state';
+import { setReplayFollowUnits } from './replayCamera';
 import { showReplayStep } from './replayMode';
 import { requestReplayPlaybackStop, startReplayPlayback } from './replayPlayback';
+import { previewReplayStep, showReleasedReplayStep } from './replayStepPreview';
 import { currentReplay, onReplayChange, type ReplayState } from './replayState';
 
 /**
@@ -163,6 +167,26 @@ let expanded = false;
 let slide: Animation | null = null;
 
 /**
+ * Whether the slider's thumb is held by a pointer.
+ *
+ * Purpose: Each preview redraws the panel, and a redraw that wrote the shown step into the slider would snap the thumb back under the pointer.
+ * When to use: Set on `pointerdown` on the slider. Cleared on `change`, on a pointer release or cancel, and when replay ends.
+ * Expected outcome: False except during a pointer drag. Keyboard steps never set it.
+ * Exceptions: None.
+ */
+let sliderDragging = false;
+
+/**
+ * The slider's preview scheduler.
+ *
+ * Purpose: The replay-change listener cancels it when replay ends, so no preview starts after that.
+ * When to use: Built once by `wireSlider`.
+ * Expected outcome: Null until the panel is wired.
+ * Exceptions: None.
+ */
+let sliderPreview: SliderPreviewScheduler | null = null;
+
+/**
  * Looks up an element by id.
  *
  * Purpose: The panel's controls are found the same way everywhere.
@@ -292,7 +316,7 @@ function keepFocusInPanel(focused: Element | null, buttons: readonly (HTMLButton
  *
  * Purpose: Every change to replay redraws the panel through one function.
  * When to use: Subscribed with `onReplayChange`, and called after a request that changed nothing.
- * Expected outcome: The panel shows while replay is on and hides otherwise. The label, the slider, the turn field, and the three buttons match the state. A field with focus keeps what the player typed. A focused button this draw disables hands its focus on through `keepFocusInPanel`.
+ * Expected outcome: The panel shows while replay is on and hides otherwise. The label, the slider, the turn field, the three buttons, and the follow-units toggle match the state. A field with focus keeps what the player typed. While the thumb is dragged, the slider's value and the field's value are left to the drag. A focused button this draw disables hands its focus on through `keepFocusInPanel`.
  * Exceptions: None. Missing elements are skipped.
  */
 export function renderReplayPanel(): void {
@@ -306,6 +330,7 @@ export function renderReplayPanel(): void {
     return;
   }
   panel.removeAttribute('hidden');
+  byId('replay-follow-units')?.setAttribute('aria-pressed', String(S.replayFollowUnits));
   const label = byId('replay-panel-label');
   if (label) label.textContent = replayLabel(state.timeline.steps, state.index, state.timeline.scope);
   const unit = state.timeline.scope === 'tactical' ? BEAT_NOUN : TURN_NOUN;
@@ -313,12 +338,12 @@ export function renderReplayPanel(): void {
   if (slider) {
     slider.setAttribute('aria-label', unit);
     slider.max = String(Math.max(0, position.stepCount - 1));
-    slider.value = String(state.index);
+    if (!sliderDragging) slider.value = String(state.index);
     slider.disabled = !canSeek(position);
   }
   const field = byId<HTMLInputElement>('replay-turn-input');
   field?.setAttribute('aria-label', unit);
-  if (field && document.activeElement !== field) {
+  if (field && document.activeElement !== field && !sliderDragging) {
     field.value = shownNumberText(state);
     field.removeAttribute('aria-invalid');
   }
@@ -420,14 +445,43 @@ function wireTurnField(field: HTMLInputElement): void {
 }
 
 /**
+ * Ends a pointer drag of the slider that no `change` ended.
+ *
+ * Purpose: A drag released where it began, or cancelled, fires no `change`, so the thumb must return to the step on screen.
+ * When to use: On `pointercancel`, and just after a pointer release.
+ * Expected outcome: When the drag was still marked, it is cleared and the panel is redrawn. Nothing happens otherwise.
+ * Exceptions: None.
+ */
+function endSliderDrag(): void {
+  if (!sliderDragging) return;
+  sliderDragging = false;
+  renderReplayPanel();
+}
+
+/**
  * Binds the slider.
  *
- * Purpose: Dragging only moves the thumb and the field. The map changes when the thumb is released.
+ * Purpose: Dragging previews the step under the thumb without its dialogs, through a scheduler that limits how often a step loads. Letting go shows the released step in full.
  * When to use: From `wireReplayPanel`.
- * Expected outcome: Input writes the turn under the thumb into the field. Change shows that step and redraws the panel. A change while a step loads is ignored, and the redraw puts the thumb back on the step on screen. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
+ * Expected outcome: Input writes the turn under the thumb into the field and asks for a preview. Change ends the drag, settles the previews, waits for the step on screen to settle, shows the released step with its dialogs, and redraws the panel. Keyboard steps fire input and change together, so they preview and then show in full, and the dialogs open once. The slider stays enabled while a step loads, so it keeps focus, the arrow keys keep stepping it, and `p` and Escape still leave replay through the window key handler.
  * Exceptions: None.
  */
 function wireSlider(slider: HTMLInputElement): void {
+  const scheduler = createSliderPreviewScheduler({
+    intervalMs: REPLAY_SLIDER_PREVIEW_INTERVAL_MS,
+    show: previewReplayStep,
+    now: () => performance.now(),
+    setTimer: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimer: (handle) => window.clearTimeout(handle as number),
+  });
+  sliderPreview = scheduler;
+  slider.addEventListener('pointerdown', () => {
+    sliderDragging = true;
+  });
+  slider.addEventListener('pointercancel', endSliderDrag);
+  window.addEventListener('pointerup', () => {
+    if (sliderDragging) window.setTimeout(endSliderDrag, 0);
+  });
   slider.addEventListener('input', () => {
     const state = currentReplay();
     const step = state?.timeline.steps[Number(slider.value)];
@@ -436,16 +490,28 @@ function wireSlider(slider: HTMLInputElement): void {
     if (turn === undefined || !field) return;
     field.value = String(turn);
     field.removeAttribute('aria-invalid');
+    scheduler.request(Number(slider.value));
   });
   slider.addEventListener('change', () => {
-    if (currentReplay()?.busy) {
-      renderReplayPanel();
-      return;
-    }
-    void showReplayStep(Number(slider.value)).then(() => {
+    sliderDragging = false;
+    void showReleasedReplayStep(Number(slider.value), () => scheduler.settle()).then(() => {
       renderReplayPanel();
     });
   });
+}
+
+/**
+ * Forgets the slider's drag and previews when replay ends.
+ *
+ * Purpose: A preview must not start after replay is left, and the next replay's panel must follow its own step.
+ * When to use: Subscribed with `onReplayChange` by `wireReplayPanel`.
+ * Expected outcome: When replay is off, the scheduler is cancelled and the drag is cleared. Nothing happens while replay is on.
+ * Exceptions: None.
+ */
+function forgetSliderWhenReplayEnds(): void {
+  if (currentReplay() !== null) return;
+  sliderPreview?.cancel();
+  sliderDragging = false;
 }
 
 /**
@@ -453,7 +519,7 @@ function wireSlider(slider: HTMLInputElement): void {
  *
  * Purpose: The panel's single setup point.
  * When to use: Once during renderer startup, after the page markup exists.
- * Expected outcome: The controls act, and the panel redraws after every change to replay.
+ * Expected outcome: The controls act, including the follow-units toggle, and the panel redraws after every change to replay.
  * Exceptions: None. Does nothing when the markup is missing.
  */
 export function wireReplayPanel(): void {
@@ -466,6 +532,10 @@ export function wireReplayPanel(): void {
   settlePanel(panel);
   syncExpandControl(button);
   button.addEventListener('click', () => toggleExpanded(panel, bar, button));
+  byId('replay-follow-units')?.addEventListener('click', () => {
+    setReplayFollowUnits(!S.replayFollowUnits);
+    renderReplayPanel();
+  });
   byId('replay-step-back')?.addEventListener('click', () => {
     const state = currentReplay();
     if (state) void showReplayStep(state.index - 1);
@@ -480,5 +550,6 @@ export function wireReplayPanel(): void {
   });
   wireTurnField(field);
   wireSlider(slider);
+  onReplayChange(forgetSliderWhenReplayEnds);
   onReplayChange(renderReplayPanel);
 }

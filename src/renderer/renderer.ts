@@ -126,6 +126,7 @@ import { wireObserveMode } from './gameplay/observeChrome';
 import { wireGameMenu } from './chrome/gameMenu';
 import { openChartsDialog } from './chrome/gameMenuActions';
 import { wireChartsDialog } from './charts/chartsDialog';
+import { wireMatchOptionsDialog } from './gameplay/matchOptionsDialog';
 import { showLoadedSaveToastAfterReload, wireSaveLoadMenu } from './gameplay/saveLoadMenu';
 import {
   tacticalMaybeScheduleAnnihilationExit,
@@ -733,6 +734,7 @@ function init(): void {
     redrawSelectionPanel: renderSelectionPanel,
   });
   wireGameMenu({ openReplay: () => { void openReplay(); }, openCharts: openChartsDialog });
+  wireMatchOptionsDialog({ applySnapshot: applyGameStateSnapshot });
   wireChartsDialog();
   wireReplayPanel();
   wireSaveLoadMenu();

@@ -136,11 +136,9 @@ function frameStrategicUnits(): void {
   });
   if (!open) return;
   const indexes = state.units.map((unit) => unit.h3Index).filter((index) => index.length > 0);
-  const framed = frameForIndexes(indexes, null);
-  if (!framed) return;
-  if (!fitMainMapToFrame(framed)) return;
+  if (!fitStrategicUnitsNow(indexes)) return;
   S.automaticFramedTurnNumber = state.turnNumber;
-  console.debug('automatic unit frame', { turnNumber: state.turnNumber, ...framed });
+  console.debug('automatic unit frame', { turnNumber: state.turnNumber, cells: indexes.length });
 }
 
 /**
@@ -183,11 +181,51 @@ function frameBattleUnits(battleLimit: LatLngFrameBox): void {
   const indexes = snap.subUnits
     .filter((unit) => unit.h3Index.length > 0)
     .map((unit) => unit.h3Index);
-  const framed = frameForIndexes(indexes, battleLimit);
-  if (!framed) return;
-  if (!fitMainMapToFrame(framed)) return;
+  if (!fitBattleUnitsNow(indexes, battleLimit)) return;
   S.automaticFramedBeatNumber = snap.tacticalTurnNumber;
-  console.debug('automatic battle frame', { tacticalTurnNumber: snap.tacticalTurnNumber, ...framed });
+  console.debug('automatic battle frame', { tacticalTurnNumber: snap.tacticalTurnNumber, cells: indexes.length });
+}
+
+/**
+ * Fits the main map to these strategic cells, with no gate and no turn memory.
+ *
+ * Purpose: The automatic watch and the replay panel's follow-units toggle share one fit, so the box math lives in one place.
+ * When to use: From `frameStrategicUnits` after its gate, and from replay's follow-units camera.
+ * Expected outcome: True when the camera moved. False when there are no cells, the panel has no size, the box collapses, the map is not ready, or the fit failed. Pan limits, minimum zoom, and the minimap stay as they are.
+ * Exceptions: None. A failure is logged with `console.error` and reported as false.
+ */
+export function fitStrategicUnitsNow(indexes: readonly string[]): boolean {
+  return fitCellsNow(indexes, null);
+}
+
+/**
+ * Fits the main map to these battle cells inside the battle area, with no gate and no beat memory.
+ *
+ * Purpose: The automatic watch and the replay panel's follow-units toggle share one battle fit.
+ * When to use: From `frameBattleUnits` after its gate, and from replay's follow-units camera, with the battle-area box the camera is allowed to show.
+ * Expected outcome: True when the camera moved inside `battleLimit`. False otherwise, as `fitStrategicUnitsNow`.
+ * Exceptions: None. A failure is logged with `console.error` and reported as false.
+ */
+export function fitBattleUnitsNow(indexes: readonly string[], battleLimit: LatLngFrameBox): boolean {
+  return fitCellsNow(indexes, battleLimit);
+}
+
+/**
+ * Builds the padded box for these cells and fits the main map to it.
+ *
+ * Purpose: The two ungated fits differ only in their limit.
+ * When to use: `fitStrategicUnitsNow` and `fitBattleUnitsNow`.
+ * Expected outcome: True when `fitBounds` ran. False when no box could be built or the map is not ready.
+ * Exceptions: None. A failure is logged and reported as false.
+ */
+function fitCellsNow(indexes: readonly string[], battleLimit: LatLngFrameBox | null): boolean {
+  try {
+    const framed = frameForIndexes(indexes, battleLimit);
+    return framed !== null && fitMainMapToFrame(framed);
+  } catch (err) {
+    console.error('unit frame failed', err);
+    return false;
+  }
 }
 
 /**

@@ -8,6 +8,7 @@
  */
 
 import type { ReplayTimeline } from '../../shared/replayTypes';
+import { rendererMatchEpochCurrent } from '../core/matchEpoch';
 
 /**
  * Where replay is.
@@ -234,7 +235,7 @@ export function abandonReplay(): void {
  * Resolves once no replay step is loading.
  *
  * Purpose: Leaving replay while a step is loading must wait for that step to settle before it shows the last one.
- * When to use: From `runLeaveReplay`, through its wait for a loading step to settle, after playback was told to stop or while a step loads.
+ * When to use: Through `waitForStepToSettle`, which also waits past the gap between loading and showing.
  * Expected outcome: Resolves at once when replay is off or idle, and otherwise after the change that clears the busy flag or ends replay.
  * Exceptions: None.
  */
@@ -252,4 +253,21 @@ export function waitForReplayIdle(): Promise<void> {
     };
     replayListeners.push(listener);
   });
+}
+
+/**
+ * Resolves once no step is loading or being presented.
+ *
+ * Purpose: A step clears the busy flag when its read returns and sets it again when its presentation starts in a later microtask, so one idle event is not enough. This waits for idle and then for the next task before it checks again. `loadReplayStep` refuses while a step is busy, so a leave or a released slider must wait here before it shows a step.
+ * When to use: From `runLeaveReplay` before it shows the last step, and from the slider's release before it shows the released step.
+ * Expected outcome: Resolves when replay is off, when the flag stays clear across a task boundary, or at once when the match replay belongs to was replaced, since no step of that match will be shown.
+ * Exceptions: None.
+ */
+export async function waitForStepToSettle(): Promise<void> {
+  for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
+    await waitForReplayIdle();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
 }

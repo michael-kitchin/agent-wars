@@ -18,6 +18,7 @@ import { rendererSharedState as S } from '../core/state';
 import { replayActive } from '../replay/replayState';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { newGameOverlayIsOpen } from './newGameDialogCollapse';
+import { matchOptionsDialogIsOpen } from './matchOptionsDialogState';
 import { isDeferredResolutionPlaybackConsultPending } from '../openRouter/aiPlanningState';
 import { anyCommanderIsPlanning, commanderStartIsSettling, subscribeCommanderPool } from '../openRouter/commanderPoolClient';
 import { onResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
@@ -88,7 +89,8 @@ export function frameAutomaticWatchCamera(): void {
  *
  * Purpose: Playback, a consult, and an open dialog all have to finish first.
  * When to use: `maybeObserveAutoAdvance`.
- * Expected outcome: False unless the checkbox is on, the roster is a watch, and nothing is in the way.
+ * Expected outcome: False unless the checkbox is on, the roster is a watch, and nothing is in the way. The new-game
+ *   screen, the in-match Game Options dialog, the knockout dialog, and the annihilation dialog are in the way.
  * Exceptions: None.
  */
 function autoAdvanceReady(): boolean {
@@ -99,7 +101,7 @@ function autoAdvanceReady(): boolean {
   const aiOnlyStillPlaying = S.tacticalBattleSnapshot?.leadPartyId != null && S.tacticalBattleSnapshot.aiOnlyEndReason == null;
   if (S.resolutionMoveAnimation || (S.tacticalBattleSnapshot && !aiOnlyStillPlaying)) return false;
   if (isDeferredResolutionPlaybackConsultPending() || anyCommanderIsPlanning() || commanderStartIsSettling()) return false;
-  if (newGameOverlayIsOpen()) return false;
+  if (newGameOverlayIsOpen() || matchOptionsDialogIsOpen()) return false;
   const knockout = document.getElementById('knockout-dialog');
   if (knockout && !knockout.classList.contains('hidden')) return false;
   const annihilation = document.getElementById('tactical-annihilation-overlay');

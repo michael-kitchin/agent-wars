@@ -80,7 +80,7 @@
       <span id="tactical-exit-host" class="control-tooltip-host" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back."><button type="button" id="tactical-exit-btn" class="battle-exit-btn"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"></path></svg>Exit Battle</button></span>
     </div>
     <span class="control-tooltip-host new-game-only" data-control-tooltip="Open a saved game from a file."><button type="button" id="topbar-load-btn" class="topbar-text-btn"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
-    <span class="control-tooltip-host" data-control-tooltip="Settings is not available in this version."><button type="button" id="topbar-settings-btn" class="topbar-icon-btn" aria-label="Settings" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h6.5M12.5 4H14M2 8h1.5M7.5 8H14M2 12h8.5"></path><circle cx="10.5" cy="4" r="1.8"></circle><circle cx="5.5" cy="8" r="1.8"></circle><circle cx="12.3" cy="12" r="1.8"></circle></svg></button></span>
+    <span class="control-tooltip-host" data-control-tooltip="Show the game options for this match. Some can be changed while you plan a turn."><button type="button" id="topbar-settings-btn" class="topbar-icon-btn" aria-label="Settings" aria-haspopup="dialog"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h6.5M12.5 4H14M2 8h1.5M7.5 8H14M2 12h8.5"></path><circle cx="10.5" cy="4" r="1.8"></circle><circle cx="5.5" cy="8" r="1.8"></circle><circle cx="12.3" cy="12" r="1.8"></circle></svg></button></span>
     <span class="control-tooltip-host" data-control-tooltip="Help is not available in this version."><button type="button" id="topbar-help-btn" class="topbar-icon-btn" aria-label="Help" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"></circle><path d="M6.3 6.2a1.8 1.8 0 1 1 2.5 1.7c-.5.2-.8.6-.8 1.1v.5M8 11.4v.1"></path></svg></button></span>
   </header>
   <div id="game-menu" class="game-menu" role="group" aria-label="Game menu" hidden>
@@ -318,10 +318,11 @@
     <section id="replay-panel" class="replay-panel" aria-label="Replay" data-state="compact" hidden>
       <div id="replay-panel-seek" class="replay-panel-seek">
         <input type="text" id="replay-turn-input" class="replay-turn-input" inputmode="numeric" autocomplete="off" aria-label="Turn" data-control-tooltip="Type a turn number and press Enter to go to that turn." />
-        <input type="range" id="replay-slider" class="replay-slider" min="0" max="0" step="1" value="0" aria-label="Turn" data-control-tooltip="Drag to a turn. The map changes when you let go." />
+        <input type="range" id="replay-slider" class="replay-slider" min="0" max="0" step="1" value="0" aria-label="Turn" data-control-tooltip="Drag to a turn. The map follows the thumb, and the turn's dialogs open when you let go." />
       </div>
       <div id="replay-panel-bar" class="replay-panel-bar">
         <button type="button" id="replay-panel-expand" class="replay-panel-expand" aria-expanded="false" aria-controls="replay-panel-seek" aria-label="Show the turn slider" data-control-tooltip="Show the slider and the turn field."><svg class="chrome-icon replay-panel-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"></path></svg></button>
+        <button type="button" id="replay-follow-units" class="replay-panel-btn" aria-pressed="false" aria-label="Follow units" data-control-tooltip="Fit the map to the visible units on every step. Click again to stop."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.3"></circle><path d="M10 10l4 4"></path></svg></button>
         <p id="replay-panel-label" class="replay-panel-label"></p>
         <button type="button" id="replay-step-back" class="replay-panel-btn" aria-label="Step back one turn" data-control-tooltip="Go back one turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3v10M13 3L6 8l7 5z"></path></svg></button>
         <button type="button" id="replay-step-forward" class="replay-panel-btn" aria-label="Step forward one turn" data-control-tooltip="Go forward one turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3v10M3 3l7 5-7 5z"></path></svg></button>
@@ -416,6 +417,7 @@
     </div>
   </aside>
   </div><!-- #app-body -->
+  <div id="match-options-backdrop" class="match-options-backdrop" hidden></div>
   <div id="new-game-options-popover" class="new-game-options-popover" role="dialog" aria-label="Game Options" hidden>
     <div class="commander-popover-header">
       <h3>Game Options</h3>
@@ -480,6 +482,8 @@
         <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, and planning stays off." /> Auto-start AI</label>
       </div>
     </section>
+    <p id="match-options-note" class="match-options-note" hidden></p>
+    <div id="match-options-footer" class="match-options-footer" hidden><button type="button" id="match-options-cancel">Cancel</button><button type="button" id="match-options-apply">Apply</button></div>
   </div>
   <div id="model-description-tooltip" class="hex-tooltip model-description-tooltip hidden" aria-hidden="true"></div>
   <div id="control-tooltip" class="hex-tooltip control-tooltip hidden" aria-hidden="true"></div>

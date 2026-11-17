@@ -58,6 +58,20 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 - None.
 
+### During a Match
+
+The top bar's Settings button opens the same Game Options popover as a dialog centered over the window, over a dimmed backdrop (`data-mode="match"` on `#new-game-options-popover`, opened by `openMatchOptionsDialog`). It shows the live match's settings, read with `fetchMatchSnapshot`. It does not open while the new-game screen, the game menu, the charts, or another dialog is open.
+
+- **What can change:** Victory rule, Turn limit, AI-only battles, Beat limit, Sight cues, and the four bonuses: Origin, Tech, Terrain, and Weather.
+- **What stays locked:** Nickname, Fog of war, and Auto-start AI show the match's values, disabled. Nickname shows the human seat's name (`sideDisplayName`). Auto-start AI shows whether commander planning is on now, and its tip says to use the Commanders Start/Stop button.
+- **When they can change:** only while the live match is in world-map planning, with no battle open, no Ready being sent, no replay, and the match not over. Otherwise every control is disabled, the note reads "These are the settings in force. They can be changed while you plan a turn on the world map.", Apply is hidden, and Cancel reads Close.
+- **Turn limit:** only limits later than the current turn are offered (`TURN_LIMIT_OPTIONS` in `src/shared/victoryRules.ts`). When none is left, the city-hexes rule is disabled. Deathmatch shows Unlimited, disabled.
+- **Apply and Cancel:** Apply sends the editable set through `setMatchOptions` and closes the dialog after the screen re-reads the match. A refusal shows its reason in the note and keeps the dialog open. Cancel, the close control, Escape, and a press and release on the backdrop close it without writing. A new match or a loaded save since the dialog opened closes it without writing.
+- **When a change takes effect:** from the next turn's resolution. An AI consult that is already running keeps the old rules.
+- **During replay:** the dialog shows the live match's settings, read-only, not the replayed turn's.
+
+While the dialog is open, Tab stays inside it and no key reaches the map. Watching with auto-advance on does not press Ready until it closes. Every close puts the new-game controls back as they were, and the new-game screen closes the dialog before it resets them, so edits made during a match never reach the next match's setup.
+
 ## States
 
 - Hidden: a match is in progress and not over.
@@ -98,6 +112,11 @@ None.
 
 - `static/index.html` (`#game-over-overlay`, `#new-game-dialog-collapse`, `#game-over-dialog`, `#game-over-message`, `#new-game-tab-global`, `#new-game-tab-regional`, `#new-game-region-select`, `#new-game-region-randomize`, `#new-game-sides-caption`, `#new-game-observe-only`, `#new-game-side-rows`, `#new-game-add-side-btn`, `#new-game-options-btn`, `#new-game-options-popover`, `#new-game-human-nickname`, `#new-game-victory-select`, `#new-game-turn-limit-select`, `#new-game-ai-only-battles-select`, `#new-game-beat-limit-select`, `#new-game-section-other`, `#new-game-sight-cues-checkbox`, `#new-game-advanced-tech`, `#new-game-cost-infantry`, `#new-game-cost-armor`, `#new-game-cost-naval`, `#new-game-cost-air`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-auto-start-checkbox`, `#new-game-origin-bonus-select`, `#new-game-terrain-bonus-select`, `#new-game-weather-bonus-select`, `#new-game-tech-bonus-select`, `#new-game-start-month`, `#new-game-start-month-randomize`, `#new-game-panel-footer`, `#new-game-btn`)
 - `src/renderer/gameplay/newGameOptionsPopover.ts` (`wireNewGameOptionsPopover`, `toggleNewGameOptionsPopover`, `closeNewGameOptionsPopover`)
+- `src/renderer/gameplay/matchOptionsDialog.ts` (`wireMatchOptionsDialog`, `openMatchOptionsDialog`, `closeMatchOptionsDialog`)
+- `src/renderer/gameplay/matchOptionsControls.ts` (`captureOptionControls`, `restoreOptionControls`, `fillOptionControlsFromMatch`, `lockOptionControls`, `readMatchOptionsUpdate`)
+- `src/renderer/gameplay/matchOptionsDialogState.ts` (`matchOptionsDialogIsOpen`, `closeMatchOptionsDialogIfOpen`)
+- `static/index.html` (`#match-options-backdrop`, `#match-options-note`, `#match-options-footer`, `#match-options-cancel`, `#match-options-apply`)
+- `src/main/ipc/matchOptionsIpcHandler.ts` (`handleSetMatchOptions`)
 - `src/renderer/chrome/anchoredPopoverLifecycle.ts` (`attachAnchoredPopoverListeners`, `placePopoverBelowAnchor`)
 - `src/shared/newGameSides.ts`
 - `src/shared/sideNicknames.ts` (`sideDisplayName`, `normalizeSideNickname`, `storedAiNickname`, `SIDE_NICKNAME_MAX_LENGTH`)
