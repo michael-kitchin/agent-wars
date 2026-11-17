@@ -126,8 +126,7 @@ test('a failed first read shows the sentence and a failed refresh keeps the char
 
 test('a backdrop click closes the dialog only when the press started on the backdrop', () => {
   const wire = getFunctionSource(readRendererSource('charts', 'chartsDialog.ts'), 'wireChartsDialog');
-  assert.equal(wire.includes('pressStartedOnBackdrop = event.target === overlay;'), true);
-  assert.equal(wire.includes('if (event.target === overlay && fromBackdrop) closeDialog(overlay);'), true);
+  assert.equal(wire.includes('wireBackdropDismiss(overlay, () => closeDialog(overlay));'), true);
   assert.equal(readRendererSource('gameplay', 'readyHandler.ts').includes('await (closeChartsDialogIfOpen(),'), false, 'no comma expression before the intercept list');
 });
 

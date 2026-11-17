@@ -9,6 +9,7 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
+import { focusableControls, trapTabWithin, wireBackdropDismiss } from '../chrome/modalDialogKit';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { rendererSharedState as S } from '../core/state';
@@ -155,16 +156,6 @@ function applyIsPending(): boolean {
 }
 
 /**
- * Whether the last press on the backdrop started there.
- *
- * Purpose: A text selection dragged out of the dialog must not close it.
- * When to use: Set by the backdrop's `pointerdown`, read and cleared by its `click`.
- * Expected outcome: True between a press on the backdrop and the click that follows.
- * Exceptions: None.
- */
-let pressStartedOnBackdrop = false;
-
-/**
  * Finds one element of the dialog by id.
  *
  * Purpose: Every function reaches the dialog's parts the same way.
@@ -217,43 +208,6 @@ function setNote(text: string | null): void {
 }
 
 /**
- * The enabled, visible controls of the popover a key can reach.
- *
- * Purpose: The Tab trap and the first focus use the same list.
- * When to use: `trapTabKey` and `openMatchOptionsDialog`.
- * Expected outcome: Buttons, selects, and inputs in document order.
- * Exceptions: None.
- */
-function focusableControls(popover: HTMLElement): HTMLElement[] {
-  return Array.from(popover.querySelectorAll<HTMLElement>('button, select, input, [tabindex]')).filter(
-    (element) => !(element as HTMLButtonElement).disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
-  );
-}
-
-/**
- * Keeps Tab inside the dialog.
- *
- * Purpose: From the last control Tab returns to the first, and Shift+Tab from the first goes to the last. Focus outside the dialog comes back in.
- * When to use: The dialog's key handling.
- * Expected outcome: Focus never leaves the dialog while it is open.
- * Exceptions: None.
- */
-function trapTabKey(event: KeyboardEvent, popover: HTMLElement): void {
-  const focusable = focusableControls(popover);
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (!first || !last) return;
-  const active = document.activeElement;
-  if (event.shiftKey && (active === first || !popover.contains(active))) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && (active === last || !popover.contains(active))) {
-    event.preventDefault();
-    first.focus();
-  }
-}
-
-/**
  * Handles one key while the dialog is open.
  *
  * Purpose: Escape closes, Tab stays inside, and no key reaches the map's window handler.
@@ -267,7 +221,7 @@ function handleDialogKey(event: KeyboardEvent, popover: HTMLElement): void {
     event.preventDefault();
     closeMatchOptionsDialogByPlayer();
   } else if (event.key === 'Tab') {
-    trapTabKey(event, popover);
+    trapTabWithin(event, popover);
   }
 }
 
@@ -534,16 +488,5 @@ export function wireMatchOptionsDialog(deps: MatchOptionsDialogDeps): void {
   });
   const backdrop = part('match-options-backdrop');
   if (!backdrop) return;
-  backdrop.addEventListener('pointerdown', (event) => {
-    pressStartedOnBackdrop = event.target === backdrop;
-  });
-  backdrop.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const fromBackdrop = pressStartedOnBackdrop;
-    pressStartedOnBackdrop = false;
-    if (event.target === backdrop && fromBackdrop) closeMatchOptionsDialogByPlayer();
-  });
-  for (const type of ['pointerdown', 'mousedown', 'dblclick', 'wheel']) {
-    backdrop.addEventListener(type, (event) => event.stopPropagation());
-  }
+  wireBackdropDismiss(backdrop, closeMatchOptionsDialogByPlayer);
 }

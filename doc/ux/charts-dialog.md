@@ -116,6 +116,7 @@ None.
 - `static/index.html` (`#charts-overlay`, `#charts-dialog`, `#charts-dialog-close`, `#charts-dialog-body`)
 - `static/chartsChrome.css`
 - `src/renderer/charts/chartsDialog.ts` (`wireChartsDialog`, `toggleChartsDialog`, `refreshChartsDialogIfOpen`, `closeChartsDialogIfOpen`)
+- `src/renderer/chrome/modalDialogKit.ts` (`trapTabWithin`, `wireBackdropDismiss`: the Tab trap and the click-the-backdrop rule)
 - `src/renderer/chrome/gameMenuActions.ts` (`openChartsDialog`, the game menu's Charts… checkbox)
 - `src/renderer/charts/lineChart.ts`
 - `src/renderer/charts/relationshipStack.ts`

@@ -24,6 +24,7 @@ import { isHumanSeatId } from '../../shared/seatIds';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { rendererSharedState as S } from '../core/state';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
+import { trapTabWithin, wireBackdropDismiss } from '../chrome/modalDialogKit';
 import { buildLegend, seatLookups, type SeatLookups } from './chartSeatLookups';
 import type { ChartsView, LineChartEntry } from './chartsDialogTypes';
 import { createLineChart } from './lineChart';
@@ -89,16 +90,6 @@ let openEpoch = 0;
  * Exceptions: None.
  */
 let previousFocus: HTMLElement | null = null;
-
-/**
- * Whether the last press inside the overlay started on the backdrop itself.
- *
- * Purpose: A click closes the dialog only when both the press and the release were on the backdrop, so a text selection dragged out of the dialog does not close it.
- * When to use: Set by the overlay's `pointerdown` listener, read and cleared by its `click` listener.
- * Expected outcome: True between a press on the backdrop and the click that follows it.
- * Exceptions: None.
- */
-let pressStartedOnBackdrop = false;
 
 /**
  * Finds the overlay element.
@@ -453,18 +444,7 @@ function trapTabKey(event: KeyboardEvent): void {
   const dialog = document.getElementById('charts-dialog');
   const close = document.getElementById('charts-dialog-close');
   if (dialog === null || close === null) return;
-  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button, select, input, [tabindex]')).filter(
-    (element) => !(element as HTMLButtonElement).disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
-  );
-  const last = focusable[focusable.length - 1] ?? close;
-  const active = document.activeElement;
-  if (event.shiftKey && (active === close || !dialog.contains(active))) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-    event.preventDefault();
-    close.focus();
-  }
+  trapTabWithin(event, dialog, { firstStop: close });
 }
 
 /**
@@ -517,19 +497,8 @@ export function wireChartsDialog(): void {
   const overlay = overlayElement();
   if (overlay === null) return;
   document.getElementById('charts-dialog-close')?.addEventListener('click', () => closeDialog(overlay));
-  overlay.addEventListener('pointerdown', (event) => {
-    pressStartedOnBackdrop = event.target === overlay;
-  });
-  overlay.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const fromBackdrop = pressStartedOnBackdrop;
-    pressStartedOnBackdrop = false;
-    if (event.target === overlay && fromBackdrop) closeDialog(overlay);
-  });
+  wireBackdropDismiss(overlay, () => closeDialog(overlay));
   overlay.addEventListener('keydown', trapTabKey);
-  for (const type of ['pointerdown', 'mousedown', 'dblclick', 'wheel']) {
-    overlay.addEventListener(type, (event) => event.stopPropagation());
-  }
 }
 
 /**
