@@ -8,17 +8,9 @@
  */
 
 import assert from 'node:assert/strict';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { test } from 'node:test';
 import { cellToChildren, cellToLatLng, gridDistance } from 'h3-js';
-import {
-  closeGameDatabaseForTests,
-  dbRun,
-  openGameDatabaseAtPathForTests,
-  resetGameForNewMatch,
-} from '../gameDb';
+import { dbRun } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
@@ -54,6 +46,7 @@ import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
 import { assertHeadingsNest, assertNoTripleBlankLines, assertProseLinesWithinLimit, headingOutline } from '../testSupport/promptOutlineHelpers';
 import { WIN_CONDITION_REMINDER_FIRST_SENTENCE } from './scenarioGoals';
 import { initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 /**
  * Builds a minimal land-only tactical battle with adjacent opponent and human sub-units.
@@ -169,16 +162,10 @@ function buildLandBattleFixture(options?: {
  * Exceptions: None.
  */
 function withTempDb(fn: () => void): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tactical-parity-'));
-  const dbPath = path.join(dir, 't.sqlite');
   try {
-    openGameDatabaseAtPathForTests(dbPath);
-    resetGameForNewMatch();
-    fn();
+    withTempGameDb('aw-tactical-parity-', fn);
   } finally {
     resetTacticalCallbackSubscriptionStashForTests();
-    closeGameDatabaseForTests();
-    fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 

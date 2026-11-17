@@ -4,9 +4,6 @@
  */
 
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { test } from 'node:test';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { MovementOrder } from '../../shared/ipcTypes';
@@ -14,17 +11,16 @@ import { AI_SEAT_IDS } from '../../shared/seatIds';
 import {
   addAiLossEventsSinceConsultation,
   addCombatSinceConsultation,
-  closeGameDatabaseForTests,
   getAiLastConsultationTurn,
   getAiLossEventsSinceConsultation,
   getAiPendingOrders,
   getAndClearAiToolLimitExceededLastTurn,
   getCombatSinceConsultation,
-  openGameDatabaseAtPathForTests,
   setAiLastConsultationTurn,
   setAiPendingOrders,
   setAiToolLimitExceededLastTurn,
 } from '../gameDb';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 /**
  * Opens a temporary database for one store check.
@@ -35,14 +31,7 @@ import {
  * Exceptions: Propagates `runCase` errors after closing the database.
  */
 function withTempDb(runCase: () => void): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-ai-seats-'));
-  openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
-  try {
-    runCase();
-  } finally {
-    closeGameDatabaseForTests();
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  withTempGameDb('aw-ai-seats-', runCase, { reset: false });
 }
 
 test('one seat cannot read another seat\'s commander stores', () => {

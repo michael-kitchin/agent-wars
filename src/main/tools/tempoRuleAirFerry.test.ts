@@ -4,22 +4,14 @@
  */
 
 import * as assert from 'assert';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { cellToLatLng, gridDisk } from 'h3-js';
-import {
-  dbRun,
-  getGameState,
-  resetGameForNewMatch,
-  openGameDatabaseAtPathForTests,
-  closeGameDatabaseForTests,
-} from '../gameDb';
+import { dbRun, getGameState } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { safeGridHexDistance } from './assessUnitProximity';
 import { collectTempoRuleFerries } from './tempoRuleAirFerry';
 import { validateFerryOrder } from '../gameActions/airValidation';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 /**
  * A rear-based opponent squadron, a forward friendly airport, and an enemy only the forward base can reach.
@@ -86,14 +78,7 @@ function stageIdleSquadron(): {
  * Exceptions: Propagates whatever `body` throws.
  */
 function withSeededGame(label: string, body: () => void): void {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `aw-ferry-${label}-`));
-  try {
-    openGameDatabaseAtPathForTests(path.join(tempDir, 't.sqlite'));
-    resetGameForNewMatch();
-    body();
-  } finally {
-    closeGameDatabaseForTests();
-  }
+  withTempGameDb(`aw-ferry-${label}-`, body);
 }
 
 /**

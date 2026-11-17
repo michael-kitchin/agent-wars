@@ -5,16 +5,9 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import {
-  closeGameDatabaseForTests,
-  openGameDatabaseAtPathForTests,
-  resetGameForNewMatch,
-} from '../gameDb';
 import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 /**
  * Opens a temp SQLite DB so subscription writes hit a real schema.
@@ -25,16 +18,7 @@ import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscript
  * Exceptions: None.
  */
 function withTempDb(fn: () => void): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-apply-callbacks-'));
-  const dbPath = path.join(dir, 't.sqlite');
-  try {
-    openGameDatabaseAtPathForTests(dbPath);
-    resetGameForNewMatch();
-    fn();
-  } finally {
-    closeGameDatabaseForTests();
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  withTempGameDb('aw-apply-callbacks-', fn);
 }
 
 /**

@@ -4,18 +4,10 @@
  */
 
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { test } from 'node:test';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
-import {
-  clearTacticalTurnNotes,
-  closeGameDatabaseForTests,
-  getRecentTurnNotes,
-  openGameDatabaseAtPathForTests,
-  upsertTurnStrategyNote,
-} from '../gameDb';
+import { clearTacticalTurnNotes, getRecentTurnNotes, upsertTurnStrategyNote } from '../gameDb';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 /**
  * Opens a temporary database for one notes check.
@@ -26,14 +18,7 @@ import {
  * Exceptions: Propagates `runCase` errors after closing the database.
  */
 function withTempDb(runCase: () => void): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-notes-seats-'));
-  openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
-  try {
-    runCase();
-  } finally {
-    closeGameDatabaseForTests();
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  withTempGameDb('aw-notes-seats-', runCase, { reset: false });
 }
 
 test('two seats keep separate notes and a tactical clear leaves strategic notes', () => {

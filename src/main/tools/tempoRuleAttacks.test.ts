@@ -4,20 +4,12 @@
  */
 
 import * as assert from 'assert';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { cellToLatLng, gridDisk } from 'h3-js';
-import {
-  dbRun,
-  getGameState,
-  resetGameForNewMatch,
-  openGameDatabaseAtPathForTests,
-  closeGameDatabaseForTests,
-} from '../gameDb';
+import { dbRun, getGameState } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { safeGridHexDistance } from './assessUnitProximity';
 import { collectTempoRuleAttacks, mergeCommanderAttackOrders } from './tempoRuleAttacks';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 /**
  * A shooter of the requested type with an enemy planted one hex away.
@@ -56,14 +48,7 @@ function stageAdjacentEnemy(
  * Exceptions: Propagates whatever `body` throws.
  */
 function withSeededGame(label: string, body: () => void): void {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `aw-tempo-${label}-`));
-  try {
-    openGameDatabaseAtPathForTests(path.join(tempDir, 't.sqlite'));
-    resetGameForNewMatch();
-    body();
-  } finally {
-    closeGameDatabaseForTests();
-  }
+  withTempGameDb(`aw-tempo-${label}-`, body);
 }
 
 /**
