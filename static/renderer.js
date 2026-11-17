@@ -383,19 +383,19 @@
     const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
     const updated = sorted.map((entry) => ({ ...entry }));
     const spawnedUnitTypes = [];
-    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
+    let points2 = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
     let idx = 0;
     while (idx < updated.length) {
       const entry = updated[idx];
       const unitCost = buildQueueItemCostFor(entry.unitType);
-      if (!Number.isInteger(unitCost) || unitCost <= 0 || points < unitCost) break;
-      const maxBuildable = Math.floor(points / unitCost);
+      if (!Number.isInteger(unitCost) || unitCost <= 0 || points2 < unitCost) break;
+      const maxBuildable = Math.floor(points2 / unitCost);
       const built = Math.min(maxBuildable, entry.remainingCount);
       if (built <= 0) break;
       if (isBuildUnitType(entry.unitType)) {
         for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
       }
-      points -= built * unitCost;
+      points2 -= built * unitCost;
       entry.remainingCount -= built;
       if (entry.remainingCount <= 0) {
         updated.splice(idx, 1);
@@ -406,7 +406,7 @@
     for (let i = 0; i < updated.length; i++) {
       updated[i].queueIndex = i;
     }
-    return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
+    return { updatedEntries: updated, storedPoints: points2, spawnedUnitTypes };
   }
   function sumQueuedProductionCost(entries) {
     let sum = 0;
@@ -1024,7 +1024,7 @@
           bytes[i] = decoded.charCodeAt(i);
         }
         return bytes;
-      } catch (_) {
+      } catch (_2) {
         throw new Error("Converting base64 string to bytes failed.");
       }
     }
@@ -1064,7 +1064,7 @@
       /** @suppress {uselessCode} */
       (function(global, env, buffer2) {
         "almost asm";
-        var a = new global.Int8Array(buffer2), b = new global.Int32Array(buffer2), c = new global.Uint8Array(buffer2), d = new global.Float32Array(buffer2), e = new global.Float64Array(buffer2), f = env.o | 0, g = env.p | 0, p = global.Math.floor, q = global.Math.abs, r = global.Math.sqrt, s = global.Math.pow, t = global.Math.cos, u = global.Math.sin, v = global.Math.tan, w = global.Math.acos, x = global.Math.asin, y = global.Math.atan, z = global.Math.atan2, A = global.Math.ceil, B = global.Math.imul, C = global.Math.min, D = global.Math.max, E = global.Math.clz32, G = env.b, H = env.c, I = env.d, J = env.e, K = env.f, L = env.g, M = env.h, N = env.i, T = 28656;
+        var a = new global.Int8Array(buffer2), b = new global.Int32Array(buffer2), c = new global.Uint8Array(buffer2), d = new global.Float32Array(buffer2), e = new global.Float64Array(buffer2), f = env.o | 0, g = env.p | 0, p = global.Math.floor, q = global.Math.abs, r = global.Math.sqrt, s = global.Math.pow, t = global.Math.cos, u = global.Math.sin, v = global.Math.tan, w = global.Math.acos, x = global.Math.asin, y = global.Math.atan, z = global.Math.atan2, A = global.Math.ceil, B = global.Math.imul, C = global.Math.min, D = global.Math.max, E = global.Math.clz32, G = env.b, H = env.c, I = env.d, J = env.e, K = env.f, L = env.g, M2 = env.h, N = env.i, T = 28656;
         function W(newBuffer) {
           a = new Int8Array(newBuffer);
           c = new Uint8Array(newBuffer);
@@ -1089,7 +1089,7 @@
           a2 = a2 | 0;
           T = a2;
         }
-        function _(a2, b2) {
+        function _2(a2, b2) {
           a2 = a2 | 0;
           b2 = b2 | 0;
           T = a2;
@@ -1120,7 +1120,7 @@
           }
           return 0;
         }
-        function aa(a2, b2, c2, d2) {
+        function aa2(a2, b2, c2, d2) {
           a2 = a2 | 0;
           b2 = b2 | 0;
           c2 = c2 | 0;
@@ -1982,7 +1982,7 @@
           g2 = g2 | 0;
           h = h | 0;
           i = i | 0;
-          var j = 0, k = 0, l = 0, m = 0, n = 0, o = 0, p2 = 0, q2 = 0, r2 = 0, s2 = 0, t2 = 0, u2 = 0, v2 = 0, w2 = 0, x2 = 0, y2 = 0, z2 = 0, A2 = 0, B2 = 0, C2 = 0, D2 = 0, E2 = 0, F = 0, G2 = 0, I2 = 0, J2 = 0, K2 = 0, L2 = 0, M2 = 0;
+          var j = 0, k = 0, l = 0, m = 0, n = 0, o = 0, p2 = 0, q2 = 0, r2 = 0, s2 = 0, t2 = 0, u2 = 0, v2 = 0, w2 = 0, x2 = 0, y2 = 0, z2 = 0, A2 = 0, B2 = 0, C2 = 0, D2 = 0, E2 = 0, F = 0, G2 = 0, I2 = 0, J2 = 0, K2 = 0, L2 = 0, M3 = 0;
           I2 = T;
           T = T + 64 | 0;
           D2 = I2 + 48 | 0;
@@ -2032,11 +2032,11 @@
                   u2 = 0;
                   b: while (1) {
                     K2 = 1 / (+(l >>> 0) + 4294967296 * +(k | 0));
-                    M2 = +e[D2 >> 3];
+                    M3 = +e[D2 >> 3];
                     k = Kd(l | 0, k | 0, t2 | 0, u2 | 0) | 0;
                     L2 = +(k >>> 0) + 4294967296 * +(H() | 0);
                     J2 = +(t2 >>> 0) + 4294967296 * +(u2 | 0);
-                    e[x2 >> 3] = K2 * (M2 * L2) + K2 * (+e[E2 >> 3] * J2);
+                    e[x2 >> 3] = K2 * (M3 * L2) + K2 * (+e[E2 >> 3] * J2);
                     e[C2 >> 3] = K2 * (+e[A2 >> 3] * L2) + K2 * (+e[B2 >> 3] * J2);
                     k = Zb(x2, f2, y2) | 0;
                     if (k | 0) {
@@ -4376,7 +4376,7 @@
             b[g2 >> 2] = 0;
             g2 = g2 + 4 | 0;
           } while ((g2 | 0) < (h | 0));
-          aa(a2, c2, 1, l) | 0;
+          aa2(a2, c2, 1, l) | 0;
           c2 = l;
           if (((((!((b[c2 >> 2] | 0) == (d2 | 0) ? (b[c2 + 4 >> 2] | 0) == (e2 | 0) : 0) ? (c2 = l + 8 | 0, !((b[c2 >> 2] | 0) == (d2 | 0) ? (b[c2 + 4 >> 2] | 0) == (e2 | 0) : 0)) : 0) ? (c2 = l + 16 | 0, !((b[c2 >> 2] | 0) == (d2 | 0) ? (b[c2 + 4 >> 2] | 0) == (e2 | 0) : 0)) : 0) ? (c2 = l + 24 | 0, !((b[c2 >> 2] | 0) == (d2 | 0) ? (b[c2 + 4 >> 2] | 0) == (e2 | 0) : 0)) : 0) ? (c2 = l + 32 | 0, !((b[c2 >> 2] | 0) == (d2 | 0) ? (b[c2 + 4 >> 2] | 0) == (e2 | 0) : 0)) : 0) ? (c2 = l + 40 | 0, !((b[c2 >> 2] | 0) == (d2 | 0) ? (b[c2 + 4 >> 2] | 0) == (e2 | 0) : 0)) : 0) {
             g2 = l + 48 | 0;
@@ -4733,7 +4733,7 @@
           f2 = f2 | 0;
           g2 = g2 | 0;
           var h = 0, i = 0, j = 0;
-          h = +md(a2);
+          h = +md2(a2);
           if (h < 1e-16) {
             c2 = 15600 + (c2 << 4) | 0;
             b[g2 >> 2] = b[c2 >> 2];
@@ -11055,7 +11055,7 @@
           a2 = a2 | 0;
           return +(+((b[a2 >> 2] | 0) >>> 0) + 4294967296 * +(b[a2 + 4 >> 2] | 0));
         }
-        function md(a2) {
+        function md2(a2) {
           a2 = a2 | 0;
           var b2 = 0, c2 = 0;
           c2 = +e[a2 >> 3];
@@ -13907,7 +13907,7 @@
             return -1;
           }
           if ((c2 | 0) > (e2 | 0)) {
-            if (!(M(c2 | 0) | 0)) {
+            if (!(M2(c2 | 0) | 0)) {
               J(12);
               return -1;
             }
@@ -13967,7 +13967,7 @@
           _greatCircleDistanceKm: pc,
           _greatCircleDistanceM: qc,
           _greatCircleDistanceRads: oc,
-          _gridDisk: aa,
+          _gridDisk: aa2,
           _gridDiskDistances: ba,
           _gridDistance: Oc,
           _gridPathCells: Qc,
@@ -14013,7 +14013,7 @@
           _uncompactCells: Pb,
           _uncompactCellsSize: Qb,
           _vertexToLatLng: vd,
-          establishStackSpace: _,
+          establishStackSpace: _2,
           stackAlloc: X,
           stackRestore: Z,
           stackSave: Y
@@ -16059,13 +16059,13 @@
     return words.length > 0 && words.every((word) => word.length === 1);
   }
   function hasUnclosedParenthesis(value) {
-    let open = 0;
+    let open2 = 0;
     for (const char of value) {
-      if (char === "(") open += 1;
-      else if (char === ")") open -= 1;
-      if (open < 0) return true;
+      if (char === "(") open2 += 1;
+      else if (char === ")") open2 -= 1;
+      if (open2 < 0) return true;
     }
-    return open !== 0;
+    return open2 !== 0;
   }
   function compassLetters(lettersOnly) {
     let rest = lettersOnly.toLowerCase();
@@ -16591,10 +16591,10 @@
     const shift = referenceLng == null ? 0 : alignLongitudeToReference(centerLng, referenceLng) - centerLng;
     return ring.map(([lat, lng]) => [lat, alignLongitudeToReference(lng, centerLng) + shift]);
   }
-  function alignLatLngRun(points, anchorLng) {
+  function alignLatLngRun(points2, anchorLng) {
     const aligned = [];
     let previousLng = anchorLng;
-    for (const [lat, lng] of points) {
+    for (const [lat, lng] of points2) {
       const alignedLng = previousLng == null ? lng : alignLongitudeToReference(lng, previousLng);
       aligned.push([lat, alignedLng]);
       previousLng = alignedLng;
@@ -16692,8 +16692,8 @@
     const reference = drawReferenceLng();
     return reference == null ? lng : alignLongitudeToReference(lng, reference);
   }
-  function alignLatLngRunToDrawReference(points, anchorLng) {
-    return alignLatLngRun(points, anchorLng ?? drawReferenceLng());
+  function alignLatLngRunToDrawReference(points2, anchorLng) {
+    return alignLatLngRun(points2, anchorLng ?? drawReferenceLng());
   }
   function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
     const [, centerLng] = cellToLatLng(h3Index);
@@ -16805,27 +16805,27 @@
   ];
   function decodePart(part, quantumDeg, lngOffset) {
     if (part.length < 4 || part.length % 2 !== 0) return [];
-    const points = [];
+    const points2 = [];
     let lat = part[0] * quantumDeg;
     let lng = part[1] * quantumDeg + lngOffset;
-    points.push([lat, lng]);
+    points2.push([lat, lng]);
     for (let index = 2; index < part.length; index += 2) {
       lat += part[index] * quantumDeg;
       lng += part[index + 1] * quantumDeg;
-      points.push([lat, lng]);
+      points2.push([lat, lng]);
     }
-    return points;
+    return points2;
   }
   function coastlineLodForZoom(pack, zoom) {
     return pack.lods.find((lod) => lod.minZoom <= zoom && (lod.maxZoom === null || zoom < lod.maxZoom)) ?? null;
   }
-  function visibleCellRefs(view, cellDeg, maxCells) {
-    if (maxCells <= 0 || view.south > view.north) return [];
-    const south = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, view.south);
-    const north = Math.min(WEB_MERCATOR_MAX_ABS_LAT, view.north);
+  function visibleCellRefs(view2, cellDeg, maxCells) {
+    if (maxCells <= 0 || view2.south > view2.north) return [];
+    const south = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, view2.south);
+    const north = Math.min(WEB_MERCATOR_MAX_ABS_LAT, view2.north);
     if (south > north) return [];
-    const west = view.west;
-    let east = view.east;
+    const west = view2.west;
+    let east = view2.east;
     if (east < west) east += 360;
     if (cellDeg >= 360) return [{ key: "0:0", lngOffset: 0 }];
     const refs = [];
@@ -16875,18 +16875,18 @@
     requireIdentity(record, "admin_borders");
     const groupsValue = record.groups;
     if (!Array.isArray(groupsValue)) throw new Error("groups is not an array");
-    const byId = /* @__PURE__ */ new Map();
+    const byId2 = /* @__PURE__ */ new Map();
     for (const group of groupsValue) {
       if (!isNonArrayObject(group)) throw new Error("group is not an object");
       const id = group.id;
       if (!isBorderGroupId(id)) throw new Error(`id ${String(id)} is not a border group`);
-      byId.set(id, parseLodList(group.lods));
+      byId2.set(id, parseLodList(group.lods));
     }
     return {
       schemaVersion: SCHEMA_VERSION,
       kind: "admin_borders",
       quantumDeg: requireNumber(record, "quantum_deg"),
-      groups: ADMIN_BORDER_GROUP_IDS.map((id) => ({ id, lods: byId.get(id) ?? [] }))
+      groups: ADMIN_BORDER_GROUP_IDS.map((id) => ({ id, lods: byId2.get(id) ?? [] }))
     };
   }
   function appendCells(refs, seen, south, north, lo, hi, lngOffset, cellDeg, maxCells) {
@@ -17183,13 +17183,13 @@
         }
         return;
       }
-      const view = {
+      const view2 = {
         west: bounds.getWest(),
         south: bounds.getSouth(),
         east: bounds.getEast(),
         north: bounds.getNorth()
       };
-      const cells = source(view, options.map.getZoom?.() ?? 0);
+      const cells = source(view2, options.map.getZoom?.() ?? 0);
       const live = /* @__PURE__ */ new Set();
       const paint2 = pathOptions();
       for (const cell of cells) {
@@ -17306,14 +17306,14 @@
   var mainMap = null;
   var readTacticalView = () => false;
   var borderLayers = [];
-  function borderCells(id, view, zoom) {
+  function borderCells(id, view2, zoom) {
     const pack = borderPack;
     const group = pack?.groups.find((candidate) => candidate.id === id);
     if (!pack || !group) return [];
     const lod = coastlineLodForZoom(group, zoom);
     if (!lod) return [];
     const lodIndex = group.lods.indexOf(lod);
-    const refs = visibleCellRefs(view, lod.cellDeg, VECTOR_CELL_CAP);
+    const refs = visibleCellRefs(view2, lod.cellDeg, VECTOR_CELL_CAP);
     noteVectorCellCap(refs.length);
     return refs.map((ref) => ({
       cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
@@ -17335,7 +17335,7 @@
         paneZIndex: 270,
         shape: "line"
       });
-      layer.setSource((view, zoom) => borderCells(id, view, zoom));
+      layer.setSource((view2, zoom) => borderCells(id, view2, zoom));
       borderLayers.push({ id, layer });
     }
     applyAdminBorderTheme(getActiveMapTheme());
@@ -17466,8 +17466,8 @@
       if (water) water.style.background = theme.waterColor;
       applyTileTheme(map?.getPanes?.()?.tilePane, landTileFilterCss(theme));
     }
-    const grid = mainMap2?.getPane?.(GRID_PANE);
-    if (grid) grid.style.filter = "";
+    const grid2 = mainMap2?.getPane?.(GRID_PANE);
+    if (grid2) grid2.style.filter = "";
     for (const line of gridLines) line.setStyle?.({ color: theme.gridLineColor });
   }
   async function applyGameMap(mapId) {
@@ -17594,23 +17594,23 @@
   function flatLandColor() {
     return `rgb(${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY})`;
   }
-  function coastCells(view, zoom, firstBandOnly) {
+  function coastCells(view2, zoom, firstBandOnly) {
     const pack = coastPack;
     if (!pack) return [];
     const lod = firstBandOnly ? pack.lods[0] ?? null : coastlineLodForZoom(pack, zoom);
     if (!lod) return [];
     const lodIndex = pack.lods.indexOf(lod);
-    const refs = visibleCellRefs(view, lod.cellDeg, VECTOR_CELL_CAP);
+    const refs = visibleCellRefs(view2, lod.cellDeg, VECTOR_CELL_CAP);
     noteVectorCellCap(refs.length);
     return refs.map((ref) => ({
       cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
       build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
     }));
   }
-  function maskCells(view, side) {
+  function maskCells(view2, side) {
     const pack = maskPack;
     if (!pack) return [];
-    const refs = visibleCellRefs(view, pack.cellDeg, VECTOR_CELL_CAP);
+    const refs = visibleCellRefs(view2, pack.cellDeg, VECTOR_CELL_CAP);
     noteVectorCellCap(refs.length);
     return refs.map((ref) => ({
       cacheKey: `mask|${ref.key}|${ref.lngOffset}`,
@@ -17684,10 +17684,10 @@
       paneZIndex: 260,
       shape: "line"
     });
-    coastLayer.setSource((view, zoom) => coastCells(view, zoom, false));
-    underlayLayer.setSource((view) => maskCells(view, "land"));
-    maskLayer.setSource((view) => maskCells(view, "water"));
-    miniLayer2.setSource((view, zoom) => coastCells(view, zoom, true));
+    coastLayer.setSource((view2, zoom) => coastCells(view2, zoom, false));
+    underlayLayer.setSource((view2) => maskCells(view2, "land"));
+    maskLayer.setSource((view2) => maskCells(view2, "water"));
+    miniLayer2.setSource((view2, zoom) => coastCells(view2, zoom, true));
     underlayLayer.setEnabled(false);
     maskLayer.setEnabled(false);
     applyCoastlineTheme(getActiveMapTheme());
@@ -18046,6 +18046,9 @@
     const tag = target.tagName.toLowerCase();
     return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
   }
+  function isRangeInputTarget(target) {
+    return target instanceof HTMLInputElement && target.type === "range";
+  }
   function getNeighborForPanAxes(centerH3, ns, ew) {
     if (ns === 0 && ew === 0) return null;
     const [centerLat, centerLng] = cellToLatLng(centerH3);
@@ -18179,8 +18182,8 @@
     if (!rendererSharedState.gameState) return null;
     const map = getMainLeafletMap();
     if (!map) return null;
-    const rect = map.getContainer().getBoundingClientRect();
-    return hitTestMapHexAtContainerPoint(clientX - rect.left, clientY - rect.top, rendererSharedState.gameState);
+    const rect2 = map.getContainer().getBoundingClientRect();
+    return hitTestMapHexAtContainerPoint(clientX - rect2.left, clientY - rect2.top, rendererSharedState.gameState);
   }
 
   // src/renderer/rendering/renderGeometry.ts
@@ -20810,10 +20813,10 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
   function ordinalSuffix(value) {
-    const abs = Math.abs(Math.trunc(value));
-    const mod100 = abs % 100;
+    const abs2 = Math.abs(Math.trunc(value));
+    const mod100 = abs2 % 100;
     if (mod100 >= 11 && mod100 <= 13) return "th";
-    const mod10 = abs % 10;
+    const mod10 = abs2 % 10;
     if (mod10 === 1) return "st";
     if (mod10 === 2) return "nd";
     if (mod10 === 3) return "rd";
@@ -20876,18 +20879,18 @@
     return `${unitDisplayOwner(unit)}:${unit.unitType}`;
   }
   function uniqueUnitsPreferringPersistedOrder(units) {
-    const byId = /* @__PURE__ */ new Map();
+    const byId2 = /* @__PURE__ */ new Map();
     for (const unit of units) {
-      const existing = byId.get(unit.id);
+      const existing = byId2.get(unit.id);
       if (!existing) {
-        byId.set(unit.id, unit);
+        byId2.set(unit.id, unit);
         continue;
       }
       const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
       const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
-      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
+      if (existingOrder === void 0 && nextOrder !== void 0) byId2.set(unit.id, unit);
     }
-    return [...byId.values()];
+    return [...byId2.values()];
   }
   function formatOrdinalLabel(value, locale) {
     const normalized = Math.max(1, Math.trunc(value));
@@ -20919,7 +20922,7 @@
         result.set(unit.id, `${numberLabel} ${noun}`);
       }
       let fallbackOrdinal = withPersisted.reduce(
-        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
+        (max2, u) => Math.max(max2, resolvePersistedDisplayOrderForUnitLabel(u)),
         0
       );
       for (const unit of withoutPersisted) {
@@ -21543,8 +21546,8 @@
       if (tacticalCellIsUrbanOrRubble(battle, anchor3)) {
         budget = Math.max(0, 1);
       } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor3)) {
-        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
-        budget = Math.max(0, inf);
+        const inf2 = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
+        budget = Math.max(0, inf2);
       } else {
         budget = Math.max(0, base);
       }
@@ -22023,7 +22026,7 @@ ${bonuses}`;
     return seatIds.map((seatId) => `${seatId}\0${nameOf(seatId)}`).join("");
   }
   function chatPanelShouldShow(input) {
-    return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance;
+    return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance && !input.replayActive;
   }
 
   // src/renderer/core/matchEpoch.ts
@@ -22234,6 +22237,62 @@ ${bonuses}`;
     return api.getGameState(matchViewArgument());
   }
 
+  // src/renderer/replay/replayState.ts
+  var lastReplaySession = 0;
+  function nextReplaySession() {
+    lastReplaySession += 1;
+    return lastReplaySession;
+  }
+  var replayState = null;
+  var replayListeners = [];
+  var replayLeaver = null;
+  function replayActive() {
+    return replayState !== null;
+  }
+  function currentReplay() {
+    return replayState;
+  }
+  function setReplay(next) {
+    replayState = next;
+    for (const listener of [...replayListeners]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error("replay listener failed", error);
+      }
+    }
+  }
+  function onReplayChange(listener) {
+    replayListeners.push(listener);
+  }
+  function registerReplayLeaver(leave) {
+    replayLeaver = leave;
+  }
+  async function requestReplayLeave() {
+    if (replayState === null || replayLeaver === null) return;
+    await replayLeaver();
+  }
+  function abandonReplay() {
+    if (replayState === null) return;
+    setReplay(null);
+    delete document.body.dataset.replay;
+  }
+  function waitForReplayIdle() {
+    return new Promise((resolve) => {
+      const settled = () => replayState === null || !replayState.busy;
+      if (settled()) {
+        resolve();
+        return;
+      }
+      const listener = () => {
+        if (!settled()) return;
+        replayListeners.splice(replayListeners.indexOf(listener), 1);
+        resolve();
+      };
+      replayListeners.push(listener);
+    });
+  }
+
   // src/renderer/openRouter/openRouterToolCountLabels.ts
   function updateOpenRouterToolCountLabels() {
     for (const group of rendererSharedState.openRouterToolGroups) {
@@ -22359,9 +22418,9 @@ ${bonuses}`;
     let x = lastClientX;
     let y = lastClientY;
     if (!placeFromPointer) {
-      const rect = host.getBoundingClientRect();
-      x = rect.left;
-      y = rect.top;
+      const rect2 = host.getBoundingClientRect();
+      x = rect2.left;
+      y = rect2.top;
     }
     const build = richContentByHost.get(host);
     if (build) el.replaceChildren(build());
@@ -22675,14 +22734,14 @@ ${bonuses}`;
       if (recomputing || active === "world" || activeBounds == null) return;
       recomputing = true;
       try {
-        const view = map;
-        const zoom = view.getZoom?.() ?? 0;
-        const center = view.getCenter?.();
-        view.setMinZoom?.(0);
-        view.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
-        const fitted = view.getZoom?.() ?? zoom;
-        view.setMinZoom?.(fitted);
-        if (center && view.setView) view.setView(center, Math.max(fitted, zoom));
+        const view2 = map;
+        const zoom = view2.getZoom?.() ?? 0;
+        const center = view2.getCenter?.();
+        view2.setMinZoom?.(0);
+        view2.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
+        const fitted = view2.getZoom?.() ?? zoom;
+        view2.setMinZoom?.(fitted);
+        if (center && view2.setView) view2.setView(center, Math.max(fitted, zoom));
       } finally {
         recomputing = false;
       }
@@ -22769,11 +22828,10 @@ ${bonuses}`;
     return Math.min(cap, Math.max(fitted, row));
   }
   function chatPanelPlacement(input) {
-    const scaleHeight = input.scaleHeight > 0 ? input.scaleHeight : 0;
     return {
       width: input.bandWidth,
       right: MAP_CHROME_INSET,
-      bottom: MAP_CHROME_INSET + scaleHeight + (scaleHeight > 0 ? MAP_CHROME_GAP : 0),
+      bottom: MAP_CHROME_INSET,
       maxHistoryHeight: Math.floor(input.mapHeight / 2)
     };
   }
@@ -22835,13 +22893,10 @@ ${bonuses}`;
   function placeChatPanel(mapBox, bandWidth) {
     const panel = document.getElementById("chat-panel");
     if (!(panel instanceof HTMLElement)) return;
-    const scale = document.querySelector("#main-map .leaflet-control-scale");
-    const scaleHeight = scale instanceof HTMLElement ? scale.getBoundingClientRect().height : 0;
     const place = chatPanelPlacement({
       mapWidth: mapBox.width,
       mapHeight: mapBox.height,
-      bandWidth,
-      scaleHeight
+      bandWidth
     });
     panel.style.width = `${place.width}px`;
     panel.style.right = `${place.right}px`;
@@ -22863,9 +22918,9 @@ ${bonuses}`;
     const style = getComputedStyle(toast);
     const padding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
     const gap = Number.parseFloat(style.columnGap) || Number.parseFloat(style.gap) || 0;
-    const border = (Number.parseFloat(style.borderLeftWidth) || 0) + (Number.parseFloat(style.borderRightWidth) || 0);
+    const border2 = (Number.parseFloat(style.borderLeftWidth) || 0) + (Number.parseFloat(style.borderRightWidth) || 0);
     const dismissWidth = dismiss instanceof HTMLElement ? dismiss.getBoundingClientRect().width : 0;
-    return Math.ceil(buttonsWidth + dismissWidth + padding + gap + border);
+    return Math.ceil(buttonsWidth + dismissWidth + padding + gap + border2);
   }
 
   // src/renderer/gameplay/newGameDialogMove.ts
@@ -22962,10 +23017,10 @@ ${bonuses}`;
     };
   }
   function placePopoverBelowAnchor(popover3, anchor3) {
-    const rect = anchor3.getBoundingClientRect();
+    const rect2 = anchor3.getBoundingClientRect();
     const box = popover3.getBoundingClientRect();
     const placed = placeBelowAnchor(
-      { top: rect.top, bottom: rect.bottom, left: rect.left },
+      { top: rect2.top, bottom: rect2.bottom, left: rect2.left },
       { width: box.width, height: box.height },
       { width: window.innerWidth, height: window.innerHeight }
     );
@@ -23003,10 +23058,10 @@ ${bonuses}`;
     }));
     return { mapKind: args.mapKind, observeOnly: false, rows };
   }
-  function setObserveOnly(state, on, defaultCommander2, homes) {
-    if (state.rows.length === 0) return { ...state, observeOnly: on };
+  function setObserveOnly(state, on2, defaultCommander2, homes) {
+    if (state.rows.length === 0) return { ...state, observeOnly: on2 };
     const first = state.rows[0];
-    const nextFirst = on ? {
+    const nextFirst = on2 ? {
       ...first,
       kind: AI_SEAT_KIND,
       commander: {
@@ -23014,7 +23069,7 @@ ${bonuses}`;
         nickname: nicknameForHome(first.homeKey ?? "", homes)
       }
     } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
-    return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
+    return { ...state, observeOnly: on2, rows: [nextFirst, ...state.rows.slice(1)] };
   }
   function sidesHaveAnyModel(state) {
     if (!state) return false;
@@ -23041,7 +23096,7 @@ ${bonuses}`;
   function removeSideRow(state, index) {
     if (state.rows.length <= MIN_SEATS) return state;
     if (index < 0 || index >= state.rows.length) return state;
-    return { ...state, rows: state.rows.filter((_, rowIndex) => rowIndex !== index) };
+    return { ...state, rows: state.rows.filter((_2, rowIndex) => rowIndex !== index) };
   }
   function setRowHome(state, index, homeKey, homes) {
     if (index < 0 || index >= state.rows.length) return state;
@@ -23085,8 +23140,8 @@ ${bonuses}`;
     });
   }
   function sidesCaption(state, homes) {
-    const max = Math.min(MAX_SEATS, homes.length);
-    const noun = state.observeOnly ? `${state.rows.length} of ${max} sides, all AI` : `${state.rows.length} of ${max} sides in play`;
+    const max2 = Math.min(MAX_SEATS, homes.length);
+    const noun = state.observeOnly ? `${state.rows.length} of ${max2} sides, all AI` : `${state.rows.length} of ${max2} sides in play`;
     return noun;
   }
   function addRowBlockedReason(state, homes) {
@@ -23665,9 +23720,9 @@ ${bonuses}`;
       provider.show(commander.providerSort);
       doctrine.show(commander.doctrineChoice);
     };
-    const copy = copyButton(request.copyButton);
+    const copy2 = copyButton(request.copyButton);
     fields.append(keyModel, choices, doctrine.row);
-    if (copy) fields.append(copy);
+    if (copy2) fields.append(copy2);
     return fields;
   }
   function copyButton(button) {
@@ -24033,11 +24088,11 @@ ${bonuses}`;
     await refreshSeatCosts();
   }
   async function refreshSeatCosts() {
-    if (!window.gameApi?.getGameState || !rendererSharedState.gameState) return;
+    if (!window.gameApi?.getGameState || !rendererSharedState.gameState || replayActive()) return;
     const matchEpoch = currentRendererMatchEpoch();
     try {
       const next = await fetchMatchSnapshot();
-      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats) return;
+      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats || replayActive()) return;
       rendererSharedState.gameState.seats = next.seats;
     } catch (err) {
       console.error("commander pool cost refresh failed", err);
@@ -24235,7 +24290,7 @@ ${bonuses}`;
     summary.className = "commander-card-summary";
     summary.dataset.seatId = seat.seatId;
     summary.textContent = summaryText(seat);
-    summary.disabled = presentation.summaryDisabled;
+    summary.disabled = presentation.summaryDisabled || replayActive();
     summary.addEventListener("click", () => void openSeatCommander(seat, summary));
     card.append(dot, name, chip, cost, summary);
     if (presentation.detail) {
@@ -24267,7 +24322,7 @@ ${bonuses}`;
     return optionRow?.textContent?.trim() || modelId;
   }
   async function openSeatCommander(seat, anchor3) {
-    if (!seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
+    if (replayActive() || !seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
     const seatId = seat.seatId;
     let includeKey = false;
     let apiKey = "";
@@ -24280,7 +24335,7 @@ ${bonuses}`;
     } catch (err) {
       console.error("getSeatApiKey failed", seatId, err);
     }
-    if (!anchor3.isConnected) return;
+    if (!anchor3.isConnected || replayActive()) return;
     const commander = {
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
@@ -24313,9 +24368,10 @@ ${bonuses}`;
     anchor3.setAttribute("aria-expanded", "true");
   }
   async function saveCommander(seatId, commander) {
+    if (replayActive()) return;
     try {
       const updated = await window.gameApi?.setSeatCommander(seatId, commander);
-      if (!updated || !rendererSharedState.gameState?.seats) return;
+      if (!updated || !rendererSharedState.gameState?.seats || replayActive()) return;
       rendererSharedState.gameState = { ...rendererSharedState.gameState, seats: rendererSharedState.gameState.seats.map((seat) => seat.seatId === updated.seatId ? updated : seat) };
       renderCommanderCards();
       repaintChatThread();
@@ -24328,6 +24384,12 @@ ${bonuses}`;
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dollars);
   }
   subscribeCommanderPool(() => {
+    renderCommanderCards();
+  });
+  var cardsPaintedForReplay = false;
+  onReplayChange(() => {
+    if (replayActive() === cardsPaintedForReplay) return;
+    cardsPaintedForReplay = replayActive();
     renderCommanderCards();
   });
 
@@ -24607,7 +24669,8 @@ ${bonuses}`;
       matchLoaded: (rendererSharedState.gameState?.seats?.length ?? 0) > 0,
       playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
       mapToastShowing: toast != null && !toast.classList.contains("hidden"),
-      autoAdvance: rendererSharedState.autoAdvance
+      autoAdvance: rendererSharedState.autoAdvance,
+      replayActive: replayActive()
     });
     const field = document.getElementById("chat-panel-input");
     if (!show && field instanceof HTMLElement && document.activeElement === field) field.blur();
@@ -24624,7 +24687,7 @@ ${bonuses}`;
     const deferredConsult = isDeferredResolutionPlaybackConsultPending();
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
     const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null;
-    readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen;
+    readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen || replayActive();
     const deferredClock = rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;
     if (waitingOnAi) {
       clearReadyAiWaitClock();
@@ -24912,6 +24975,26 @@ ${bonuses}`;
     const explored = getExploredHexSet(rendererSharedState.gameState);
     return explored.has(h3Index);
   }
+
+  // src/shared/navalStrategicEdges.ts
+  function isNativeNavalTransitTerrain(nativeTerrain, terrainKind) {
+    return nativeTerrain === "water" || nativeTerrain === "coastal" || terrainKind === "coastal";
+  }
+
+  // src/shared/seaAccess.ts
+  function hasSeaAccess(h3Index, terrainOf) {
+    let disk;
+    try {
+      disk = gridDisk(h3Index, 1);
+    } catch {
+      return false;
+    }
+    return disk.some((cell) => {
+      const found = terrainOf(cell);
+      return found !== void 0 && isNativeNavalTransitTerrain(found.terrain, found.terrainKind);
+    });
+  }
+  var SEAPORT_NO_SEA_ACCESS_LABEL = "Seaports (no sea access)";
 
   // src/shared/hexNamingCaption.ts
   var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
@@ -25631,7 +25714,10 @@ ${bonuses}`;
     const counts = getStrategicFeatureCounts(h3);
     const labels = [];
     if (counts.airportCount > 0) labels.push("Airports");
-    if (counts.seaportCount > 0) labels.push("Seaports");
+    if (counts.seaportCount > 0) {
+      const seaAccess = hasSeaAccess(h3, (hexId) => rendererSharedState.gameState?.hexes.find((hex) => hex.h3Index === hexId));
+      labels.push(seaAccess ? "Seaports" : SEAPORT_NO_SEA_ACCESS_LABEL);
+    }
     return labels;
   }
   function transportSideMaskHasAnyTrue(mask) {
@@ -25897,8 +25983,8 @@ ${bonuses}`;
       }
       return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
     }
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    const rect2 = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect2.left, clientY - rect2.top));
     try {
       const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
       const battle = rendererSharedState.tacticalBattleSnapshot;
@@ -25949,8 +26035,8 @@ ${bonuses}`;
       if (!fallbackStrategicH3) return null;
       return { h3Index: fallbackStrategicH3, resolution: 1 };
     }
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    const rect2 = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect2.left, clientY - rect2.top));
     try {
       const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
       return { h3Index: detailH3, resolution: 4 };
@@ -26162,12 +26248,12 @@ ${bonuses}`;
   // src/renderer/chrome/placeAnchoredPopup.ts
   function placeAnchoredPopupElement(popup, anchorX, anchorY) {
     if (popup.classList.contains("hidden")) return;
-    const rect = popup.getBoundingClientRect();
+    const rect2 = popup.getBoundingClientRect();
     const placed = placeAnchoredPopup({
       anchorX,
       anchorY,
-      popupWidth: rect.width,
-      popupHeight: rect.height,
+      popupWidth: rect2.width,
+      popupHeight: rect2.height,
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
       offsetPx: TOOLTIP_OFFSET_PX
@@ -26280,7 +26366,10 @@ ${bonuses}`;
 
   // src/renderer/rendering/canvasPreviewPolicy.ts
   function shouldDrawCommittedOrderPaths() {
-    return !rendererSharedState.shiftKeyActive;
+    return !rendererSharedState.shiftKeyActive && !replayActive();
+  }
+  function shouldDrawPendingOrderOverlays() {
+    return !replayActive();
   }
   function shouldDrawHoveredPathPreview() {
     return !rendererSharedState.shiftKeyActive && rendererSharedState.selectedUnitIds.length > 0;
@@ -26456,9 +26545,9 @@ ${bonuses}`;
   // src/shared/fortificationTickGeometry.ts
   var FORTIFICATION_TICKS_PER_EDGE = 4;
   var FORTIFICATION_DUPLICATE_POINT_PX = 0.5;
-  function dropDuplicatePoints(points) {
+  function dropDuplicatePoints(points2) {
     const kept = [];
-    for (const point of points) {
+    for (const point of points2) {
       const previous = kept[kept.length - 1];
       if (previous && distance(previous, point) < FORTIFICATION_DUPLICATE_POINT_PX) continue;
       kept.push(point);
@@ -26468,11 +26557,11 @@ ${bonuses}`;
     if (first && last && kept.length > 1 && distance(first, last) < FORTIFICATION_DUPLICATE_POINT_PX) kept.pop();
     return kept;
   }
-  function signedScreenArea(points) {
+  function signedScreenArea(points2) {
     let sum = 0;
-    for (let index = 0; index < points.length; index += 1) {
-      const current = points[index];
-      const next = points[(index + 1) % points.length];
+    for (let index = 0; index < points2.length; index += 1) {
+      const current = points2[index];
+      const next = points2[(index + 1) % points2.length];
       sum += current.x * next.y - next.x * current.y;
     }
     return sum;
@@ -26487,8 +26576,8 @@ ${bonuses}`;
   function distance(from, to) {
     return Math.hypot(to.x - from.x, to.y - from.y);
   }
-  function fortificationEdges(points, cornerCount) {
-    const ring = dropDuplicatePoints(points);
+  function fortificationEdges(points2, cornerCount) {
+    const ring = dropDuplicatePoints(points2);
     if (ring.length < 3) return [];
     if (signedScreenArea(ring) < 0) ring.reverse();
     const ranked = ring.map((point, index) => ({
@@ -26522,8 +26611,8 @@ ${bonuses}`;
   function fortificationTicksPerEdge(args) {
     if (!(args.fortified > 0)) return 0;
     const intact = Math.max(args.intactCityCells, args.fortified);
-    const ticks = Math.ceil(FORTIFICATION_TICKS_PER_EDGE * args.fortified / intact);
-    return Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(1, ticks));
+    const ticks2 = Math.ceil(FORTIFICATION_TICKS_PER_EDGE * args.fortified / intact);
+    return Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(1, ticks2));
   }
   function fortificationTickSegments(args) {
     const tickCount = Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(0, Math.floor(args.ticksPerEdge)));
@@ -26550,28 +26639,28 @@ ${bonuses}`;
     }
     return segments;
   }
-  function meanPoint(points) {
+  function meanPoint(points2) {
     let x = 0;
     let y = 0;
-    for (const point of points) {
+    for (const point of points2) {
       x += point.x;
       y += point.y;
     }
-    return { x: x / points.length, y: y / points.length };
+    return { x: x / points2.length, y: y / points2.length };
   }
-  function polylineLength(points) {
+  function polylineLength(points2) {
     let length = 0;
-    for (let index = 1; index < points.length; index += 1) length += distance(points[index - 1], points[index]);
+    for (let index = 1; index < points2.length; index += 1) length += distance(points2[index - 1], points2[index]);
     return length;
   }
-  function pointAlong(points, distanceAlong) {
+  function pointAlong(points2, distanceAlong) {
     let remaining = distanceAlong;
-    for (let index = 1; index < points.length; index += 1) {
-      const from = points[index - 1];
-      const to = points[index];
+    for (let index = 1; index < points2.length; index += 1) {
+      const from = points2[index - 1];
+      const to = points2[index];
       const span = distance(from, to);
       if (span <= 0) continue;
-      if (remaining <= span || index === points.length - 1) {
+      if (remaining <= span || index === points2.length - 1) {
         const t = Math.min(1, remaining / span);
         return {
           point: { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t },
@@ -26595,10 +26684,10 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/polygonOutline.ts
-  function drawClosedPolygonPath(ctx, points) {
+  function drawClosedPolygonPath(ctx, points2) {
     ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
+    for (let i = 0; i < points2.length; i++) {
+      const p = points2[i];
       if (i === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
     }
@@ -26741,7 +26830,7 @@ ${bonuses}`;
       const row = infra.get(hex.h3Index);
       const fortified = row?.fortifiedCount ?? 0;
       if (fortified <= 0) continue;
-      const points = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
+      const points2 = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
       const cornerCount = fortificationCornerCount(hex.h3Index);
       const ownershipVisible = isHexOwnershipVisibleToPerspective({
         h3Index: hex.h3Index,
@@ -26751,7 +26840,7 @@ ${bonuses}`;
         intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
       });
       drawScaledFortificationTicks(ctx, {
-        points,
+        points: points2,
         cornerCount,
         ticksPerEdge: fortificationTicksPerEdge({
           fortified,
@@ -26764,10 +26853,10 @@ ${bonuses}`;
       });
     }
   }
-  function drawFortifiedCellTicks(ctx, points, cellH3Index, color = fortificationCellTickColor(cellH3Index)) {
+  function drawFortifiedCellTicks(ctx, points2, cellH3Index, color = fortificationCellTickColor(cellH3Index)) {
     const cornerCount = fortificationCornerCount(cellH3Index);
     drawScaledFortificationTicks(ctx, {
-      points,
+      points: points2,
       cornerCount,
       ticksPerEdge: FORTIFICATION_TICKS_PER_EDGE,
       color,
@@ -26809,13 +26898,13 @@ ${bonuses}`;
     applyLegendSwatchChrome(swatch);
     const ctx = swatch.getContext("2d");
     if (ctx) {
-      const points = [];
+      const points2 = [];
       for (let index = 0; index < 6; index += 1) {
         const angle = index * Math.PI / 3;
-        points.push({ x: 9 + Math.sin(angle) * 5.5, y: 6 - Math.cos(angle) * 5.5 });
+        points2.push({ x: 9 + Math.sin(angle) * 5.5, y: 6 - Math.cos(angle) * 5.5 });
       }
       drawFortificationTicks(ctx, {
-        points,
+        points: points2,
         cornerCount: 6,
         ticksPerEdge: FORTIFICATION_TICKS_PER_EDGE,
         color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? SEAT_PALETTES[0].map,
@@ -28988,7 +29077,7 @@ ${bonuses}`;
   function statusIconCentersX(centerX, iconPx, count) {
     const step = iconPx + STATUS_ICON_GAP_PX;
     const firstX = centerX - (count - 1) * step / 2;
-    return Array.from({ length: Math.max(0, count) }, (_, i) => firstX + i * step);
+    return Array.from({ length: Math.max(0, count) }, (_2, i) => firstX + i * step);
   }
   function inspectionStatusIconFontPx(input) {
     if (input.productionSurface === "button" || input.hasInfraSymbols || input.hasVisibleUnits) return 10;
@@ -29055,14 +29144,14 @@ ${bonuses}`;
   }
 
   // src/shared/projectedRingCentroid.ts
-  function projectedRingCentroid(points) {
+  function projectedRingCentroid(points2) {
     let sx = 0;
     let sy = 0;
-    for (const point of points) {
+    for (const point of points2) {
       sx += point.x;
       sy += point.y;
     }
-    const count = points.length;
+    const count = points2.length;
     return { x: sx / count, y: sy / count };
   }
 
@@ -29343,9 +29432,9 @@ ${bonuses}`;
     const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
     const both = showAirport && showSeaport;
     if (both) {
-      const off = span * 0.1 * lin;
-      drawAirplaneAt(ctx, cx - off, centerY - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
-      drawAnchorAt(ctx, cx + off, centerY + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
+      const off2 = span * 0.1 * lin;
+      drawAirplaneAt(ctx, cx - off2, centerY - off2, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
+      drawAnchorAt(ctx, cx + off2, centerY + off2, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
       return;
     }
     const soloLin = Math.sqrt(SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE);
@@ -30375,7 +30464,7 @@ ${bonuses}`;
     const host = document.getElementById("new-game-side-rows");
     if (host && sidesState) {
       host.replaceChildren();
-      sidesState.rows.forEach((_, index) => host.appendChild(renderRow(sidesState, homes, index)));
+      sidesState.rows.forEach((_2, index) => host.appendChild(renderRow(sidesState, homes, index)));
       if (openCommanderRow != null) {
         const button = host.querySelector(`[data-commander-row="${openCommanderRow}"]`);
         if (button instanceof HTMLElement) reanchorCommanderPopover(button);
@@ -30651,9 +30740,9 @@ ${bonuses}`;
   }
   function formatMatchCost(dollars) {
     const cents = Math.round((Number.isFinite(dollars) ? dollars : 0) * 100);
-    const sign = cents < 0 ? "-" : "";
-    const abs = Math.abs(cents);
-    return `${sign}$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+    const sign2 = cents < 0 ? "-" : "";
+    const abs2 = Math.abs(cents);
+    return `${sign2}$${Math.floor(abs2 / 100)}.${String(abs2 % 100).padStart(2, "0")}`;
   }
 
   // src/renderer/gameplay/gameOverStandings.ts
@@ -30875,6 +30964,9 @@ ${bonuses}`;
     }
     notifyResolutionPlaybackFinished();
   }
+  function hasQueuedResolutionPlaybackCompleteNotify() {
+    return playbackCompleteNotifyQueue.length > 0;
+  }
 
   // src/shared/unitFrameBox.ts
   var UNIT_FRAME_PAD_HEXES = 3;
@@ -30969,8 +31061,8 @@ ${bonuses}`;
   }
   function frameStrategicUnits() {
     const state = rendererSharedState.gameState;
-    if (!state) return;
-    const open = shouldApplyAutomaticUnitFrame({
+    if (!state || replayActive()) return;
+    const open2 = shouldApplyAutomaticUnitFrame({
       observing: observeModeControls(state.seats ?? []).observing,
       autoAdvance: rendererSharedState.autoAdvance,
       inBattle: rendererSharedState.tacticalBattleSnapshot != null,
@@ -30979,7 +31071,7 @@ ${bonuses}`;
       turnNumber: state.turnNumber,
       framedTurnNumber: rendererSharedState.automaticFramedTurnNumber
     });
-    if (!open) return;
+    if (!open2) return;
     const indexes = state.units.map((unit) => unit.h3Index).filter((index) => index.length > 0);
     const framed = frameForIndexes(indexes, null);
     if (!framed) return;
@@ -30997,8 +31089,8 @@ ${bonuses}`;
   function frameBattleUnits(battleLimit) {
     const snap = rendererSharedState.tacticalBattleSnapshot;
     const state = rendererSharedState.gameState;
-    if (!snap || !state || snap.aiOnlyEndReason != null) return;
-    const open = shouldApplyAutomaticBattleFrame({
+    if (!snap || !state || snap.aiOnlyEndReason != null || replayActive()) return;
+    const open2 = shouldApplyAutomaticBattleFrame({
       observing: observeModeControls(state.seats ?? []).observing,
       autoAdvance: rendererSharedState.autoAdvance,
       inBattle: true,
@@ -31006,7 +31098,7 @@ ${bonuses}`;
       tacticalTurnNumber: snap.tacticalTurnNumber,
       framedBeatNumber: rendererSharedState.automaticFramedBeatNumber
     });
-    if (!open) return;
+    if (!open2) return;
     const indexes = snap.subUnits.filter((unit) => unit.h3Index.length > 0).map((unit) => unit.h3Index);
     const framed = frameForIndexes(indexes, battleLimit);
     if (!framed) return;
@@ -31273,7 +31365,7 @@ ${bonuses}`;
     return battleEntryHoldsAutoAdvance;
   }
   function frameAutomaticWatchCamera() {
-    if (observeAutoAdvanceHeldForBattleEntry()) return;
+    if (replayActive() || observeAutoAdvanceHeldForBattleEntry()) return;
     if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalBattleSnapshot.aiOnlyEndReason == null) {
       frameOpenAutomaticBattle();
       return;
@@ -31296,7 +31388,7 @@ ${bonuses}`;
     return true;
   }
   async function maybeObserveAutoAdvance() {
-    if (!autoAdvanceReady() || !pressReady) return;
+    if (replayActive() || !autoAdvanceReady() || !pressReady) return;
     pressing = true;
     try {
       await pressReady();
@@ -31342,9 +31434,9 @@ ${bonuses}`;
     if (input instanceof HTMLInputElement && document.activeElement !== input) input.checked = rendererSharedState.autoAdvance;
     if (!(select instanceof HTMLSelectElement)) return;
     if (!observing) return;
-    const view = currentViewAs();
-    if (view !== rendererSharedState.viewAs) {
-      rendererSharedState.viewAs = view;
+    const view2 = currentViewAs();
+    if (view2 !== rendererSharedState.viewAs) {
+      rendererSharedState.viewAs = view2;
       void refreshObservedSnapshot();
     }
     const ordered = sortSeatsByOrder(seats);
@@ -32118,6 +32210,7 @@ ${bonuses}`;
     const menu = document.getElementById(GAME_MENU_ID);
     const button = document.getElementById(GAME_MENU_BUTTON_ID);
     if (!menu || !button) return;
+    void requestReplayLeave();
     syncGameMenuNewGameItem();
     syncSaveLoadItems();
     menu.hidden = false;
@@ -32275,7 +32368,7 @@ ${bonuses}`;
   }
   function refreshConsoleHeader() {
     const orders = document.getElementById("console-tab-orders");
-    const observing = observeModeControls(rendererSharedState.gameState?.seats ?? []).observing;
+    const observing = observeModeControls(rendererSharedState.gameState?.seats ?? []).observing || replayActive();
     if (orders instanceof HTMLButtonElement) orders.disabled = observing;
     const redirected = consoleTabWhenOrdersDisabled(consoleState, observing);
     if (redirected !== consoleState) {
@@ -32335,12 +32428,24 @@ ${bonuses}`;
     consoleState = expandedConsoleTabState(tabId);
     applyConsoleState();
   }
+  function selectedConsoleTabId() {
+    return consoleState.activeTabId;
+  }
+  function selectConsoleTabKeepingCollapse(tabId) {
+    if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
+      console.error("[agent-wars] selectConsoleTabKeepingCollapse unknown tab", tabId);
+      return;
+    }
+    console.debug("[agent-wars] selectConsoleTabKeepingCollapse", { tabId, collapsed: consoleState.collapsed });
+    consoleState = { activeTabId: tabId, collapsed: consoleState.collapsed };
+    applyConsoleState();
+  }
   function wireConsoleFrame() {
     onQueuedOrdersChanged(refreshConsoleHeader);
     onConsoleReportsChanged(refreshConsoleHeader);
     for (const tab of CONSOLE_TABS) {
       document.getElementById(tab.tabId)?.addEventListener("click", () => {
-        if (tab.tabId === "console-tab-orders" && observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return;
+        if (tab.tabId === "console-tab-orders" && (observeModeControls(rendererSharedState.gameState?.seats ?? []).observing || replayActive())) return;
         consoleState = nextConsoleTabState(consoleState, tab.tabId);
         applyConsoleState();
       });
@@ -32446,8 +32551,8 @@ ${bonuses}`;
 
   // src/shared/selectionPanelSummary.ts
   function summarizeSelectionPanel(selectedIds, units, isSelectable) {
-    const byId = new Map(units.map((unit) => [unit.id, unit]));
-    const selected = selectedIds.map((id) => byId.get(id)).filter((unit) => unit !== void 0);
+    const byId2 = new Map(units.map((unit) => [unit.id, unit]));
+    const selected = selectedIds.map((id) => byId2.get(id)).filter((unit) => unit !== void 0);
     if (selected.length === 0) return null;
     const panelHex = selected[0].h3Index;
     const selectedHere = selected.filter((unit) => unit.h3Index === panelHex).length;
@@ -32499,9 +32604,9 @@ ${bonuses}`;
   function selectedUnitTypes() {
     const battle = rendererSharedState.tacticalBattleSnapshot;
     const units = battle ? battle.subUnits : rendererSharedState.gameState?.units ?? [];
-    const byId = new Map(units.map((unit) => [unit.id, unit.unitType]));
+    const byId2 = new Map(units.map((unit) => [unit.id, unit.unitType]));
     return rendererSharedState.selectedUnitIds.flatMap((id) => {
-      const unitType = byId.get(id);
+      const unitType = byId2.get(id);
       return unitType === void 0 ? [] : [unitType];
     });
   }
@@ -33293,11 +33398,11 @@ ${bonuses}`;
       ["app-topbar", topBarEnabled],
       ["sidebar", enabled]
     ];
-    for (const [id, on] of chromeEnabled) {
+    for (const [id, on2] of chromeEnabled) {
       const chrome = document.getElementById(id);
       if (!chrome) continue;
-      chrome.style.pointerEvents = on ? "" : "none";
-      chrome.classList.toggle("main-ui-disabled", !on);
+      chrome.style.pointerEvents = on2 ? "" : "none";
+      chrome.classList.toggle("main-ui-disabled", !on2);
     }
     if (!topBarEnabled) closeGameMenu();
     syncGameMenuNewGameItem();
@@ -33645,7 +33750,7 @@ ${bonuses}`;
       if (layer) hideTacticalEntryLayer(layer, false);
       return;
     }
-    if (rendererSharedState.gameState.phase !== "planning" || rendererSharedState.tacticalBattleSnapshot || !observeModeControls(rendererSharedState.gameState.seats ?? []).magnifierEnabled) {
+    if (rendererSharedState.gameState.phase !== "planning" || rendererSharedState.tacticalBattleSnapshot || !observeModeControls(rendererSharedState.gameState.seats ?? []).magnifierEnabled || replayActive()) {
       hideTacticalEntryLayer(layer);
       return;
     }
@@ -33715,8 +33820,8 @@ ${bonuses}`;
   function cityNamesInOverlayLabel(label) {
     return label.split(" / ").map((part) => part.trim()).filter((part) => part.length > 0);
   }
-  function cityCenterIsInView(center, view) {
-    return center.x >= 0 && center.x <= view.width && center.y >= 0 && center.y <= view.height;
+  function cityCenterIsInView(center, view2) {
+    return center.x >= 0 && center.x <= view2.width && center.y >= 0 && center.y <= view2.height;
   }
   function withoutStatesNamedForCities(features, cityNameKeys) {
     if (cityNameKeys.size === 0) return features.slice();
@@ -34121,7 +34226,7 @@ ${bonuses}`;
   function labelsForFrame(map, ctx, theme, tacticalView) {
     const zoom = map.getZoom();
     const bounds = map.getBounds();
-    const view = {
+    const view2 = {
       west: bounds.getWest(),
       south: bounds.getSouth(),
       east: bounds.getEast(),
@@ -34129,7 +34234,7 @@ ${bonuses}`;
     };
     const kinds = visibleLabelKinds(zoom, tacticalView);
     const candidates = withoutStatesNamedForCities(
-      labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, kinds, zoom) && featureMeetsView(feature, view)),
+      labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, kinds, zoom) && featureMeetsView(feature, view2)),
       getVisibleCityNameKeys()
     );
     const size = map.getSize();
@@ -34147,7 +34252,7 @@ ${bonuses}`;
     const placed = placeMapLabels({ ...placement, features: candidates, kinds });
     const nudged = nudgeBroadLabels(placed, { viewSize: placement.viewSize, previousNudges });
     previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
-    const water = waterLabelsForFrame({ zoom, tacticalView, view, placement, landLabels: nudged });
+    const water = waterLabelsForFrame({ zoom, tacticalView, view: view2, placement, landLabels: nudged });
     for (const label of placed) previousAnchors.set(label.featureId, label.anchorIndex);
     for (const label of water.placed) previousAnchors.set(label.featureId, label.anchorIndex);
     const candidateIds = new Set([...candidates, ...water.candidates].map((feature) => feature.id));
@@ -34168,8 +34273,8 @@ ${bonuses}`;
     });
     return { candidates, placed, settled };
   }
-  function featureMeetsView(feature, view) {
-    return longitudeMeets(feature, view.west, view.east) && latitudeMeets(feature, view.south, view.north);
+  function featureMeetsView(feature, view2) {
+    return longitudeMeets(feature, view2.west, view2.east) && latitudeMeets(feature, view2.south, view2.north);
   }
   function longitudeMeets(feature, west, east) {
     const viewWest = west;
@@ -34201,8 +34306,8 @@ ${bonuses}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
   }
-  function fallbackFamily(font) {
-    return font === "sans" ? "system-ui, sans-serif" : "Georgia, serif";
+  function fallbackFamily(font2) {
+    return font2 === "sans" ? "system-ui, sans-serif" : "Georgia, serif";
   }
   function paintLabel(ctx, theme, label, style, opacity) {
     applyLabelFont(ctx, theme, style);
@@ -34373,8 +34478,8 @@ ${bonuses}`;
         map.removeLayer(vectorLayer);
         vectorLayerAttached = false;
       }
-      const view = expandedViewport(viewport);
-      const visibleRows = alignedRows.filter((_, idx) => intersectsViewport(cachedRowBounds[idx], view));
+      const view2 = expandedViewport(viewport);
+      const visibleRows = alignedRows.filter((_2, idx) => intersectsViewport(cachedRowBounds[idx], view2));
       vectorLayer = buildVectorLayerGroup(map, visibleRows, L);
       lastViewportKey = key;
     }
@@ -34455,7 +34560,7 @@ ${bonuses}`;
     const active2 = !!rendererSharedState.tacticalBattleSnapshot;
     const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null;
     const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
-    const disabled = !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
+    const disabled = !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit || replayActive();
     if (exitBtn) {
       if (annihilationDialogOpen || !active2) {
         exitBtn.classList.add("hidden");
@@ -36868,13 +36973,13 @@ ${bonuses}`;
   var ORDER_LINE_LATER_DASH = [6, 4];
   var ATTACK_LINE_DOT_DASH = [2, 6];
   var ORDER_LINE_SOLID = [];
-  function traceRun(ctx, points, continuous = false) {
+  function traceRun(ctx, points2, continuous = false) {
     const wrapJumpPx = ctx.canvas.width * 0.5;
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      const current = points[i];
-      if (!continuous && Math.abs(current.x - points[i - 1].x) > wrapJumpPx) ctx.moveTo(current.x, current.y);
+    ctx.moveTo(points2[0].x, points2[0].y);
+    for (let i = 1; i < points2.length; i++) {
+      const current = points2[i];
+      if (!continuous && Math.abs(current.x - points2[i - 1].x) > wrapJumpPx) ctx.moveTo(current.x, current.y);
       else ctx.lineTo(current.x, current.y);
     }
   }
@@ -36951,11 +37056,11 @@ ${bonuses}`;
       if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
       const aligned = alignLatLngRunToDrawReference(seg.hexes, previousLng);
       previousLng = aligned[aligned.length - 1][1];
-      const points = aligned.map(([lat, lng]) => {
+      const points2 = aligned.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
         return { x: p.x, y: p.y };
       });
-      runs.push({ points, dash: seg.turn <= 1 ? ORDER_LINE_SOLID : ORDER_LINE_LATER_DASH });
+      runs.push({ points: points2, dash: seg.turn <= 1 ? ORDER_LINE_SOLID : ORDER_LINE_LATER_DASH });
     }
     const lastPoints = runs[runs.length - 1]?.points;
     const arrow = lastPoints ? routeEndArrow(lastPoints[lastPoints.length - 2], lastPoints[lastPoints.length - 1]) : null;
@@ -37023,13 +37128,13 @@ ${bonuses}`;
       const continuous = isMissileUnitType(move.unitType) ? { continuous: true } : void 0;
       const path = move.pathH3Indexes;
       if (path && path.length >= 2 && map) {
-        const points = alignLatLngRunToDrawReference(path.map((h) => cellToLatLng(h))).map(([lat, lng]) => {
+        const points2 = alignLatLngRunToDrawReference(path.map((h) => cellToLatLng(h))).map(([lat, lng]) => {
           const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
           return { x: p.x, y: p.y };
         });
         const hPen = path[path.length - 2];
         const arrow = withArrow ? routeEndArrow(hexCenterPx(hPen), hexCenterPxRelativeTo(hPen, path[path.length - 1])) : null;
-        drawOrderLine(ctx, { runs: [{ points, dash: ORDER_LINE_SOLID, ...continuous }], arrow }, style);
+        drawOrderLine(ctx, { runs: [{ points: points2, dash: ORDER_LINE_SOLID, ...continuous }], arrow }, style);
         continue;
       }
       const from = hexCenterPx(move.fromH3Index);
@@ -37207,11 +37312,11 @@ ${bonuses}`;
     drawPendingSupportOrderLines(ctx, "missile", launches, units, hexList);
   }
   function drawFerryRouteLine(ctx, pathH3Indexes) {
-    const points = pathH3Indexes.map((hex) => {
+    const points2 = pathH3Indexes.map((hex) => {
       const [lat, lng] = cellToLatLng(hex);
       return [lat, lng];
     });
-    drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
+    drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points2 }]);
   }
   function drawHeldFerryLines(ctx, lines) {
     for (const line of lines) drawFerryRouteLine(ctx, line.pathH3Indexes);
@@ -37227,9 +37332,9 @@ ${bonuses}`;
     }
   }
   function buildResolutionPlaybackMoves(moves, units) {
-    const byId = new Map(units.map((unit) => [unit.id, unit]));
+    const byId2 = new Map(units.map((unit) => [unit.id, unit]));
     return moves.map((move) => {
-      const unit = byId.get(move.unitId);
+      const unit = byId2.get(move.unitId);
       if (!unit) return null;
       const base = {
         unitId: move.unitId,
@@ -37326,6 +37431,7 @@ ${bonuses}`;
     }
   }
   function drawPendingMarchesHoverAndSupportOrderStack(options) {
+    if (!shouldDrawPendingOrderOverlays()) return;
     options.drawTacticalPendingMarchesFirst?.();
     drawMarchHoverPreviewStageIfEnabled(options.ctx, {
       shouldDraw: options.shouldDrawMarchHoverPreview,
@@ -37347,7 +37453,7 @@ ${bonuses}`;
   }
   function chainSegmentsIntoLoops(segments) {
     if (segments.length === 0) return [];
-    const unused = new Set(segments.map((_, i) => i));
+    const unused = new Set(segments.map((_2, i) => i));
     const neighbors = /* @__PURE__ */ new Map();
     for (let i = 0; i < segments.length; i++) {
       const s = segments[i];
@@ -38063,13 +38169,13 @@ ${bonuses}`;
       redraw();
     });
   }
-  function mergeTacticalSubUnitsForMarchPlayback(current, pre) {
-    if (!pre?.length) return current;
-    const byId = new Map(current.map((u) => [u.id, u]));
-    for (const u of pre) {
-      if (!byId.has(u.id)) byId.set(u.id, u);
+  function mergeTacticalSubUnitsForMarchPlayback(current, pre2) {
+    if (!pre2?.length) return current;
+    const byId2 = new Map(current.map((u) => [u.id, u]));
+    for (const u of pre2) {
+      if (!byId2.has(u.id)) byId2.set(u.id, u);
     }
-    return [...byId.values()];
+    return [...byId2.values()];
   }
   function casualtyDrawInputFromAnimation(anim) {
     return {
@@ -38320,9 +38426,9 @@ ${bonuses}`;
     if (!container || !canvas) return;
     invalidateLeafletMapSizes();
     const dpr = window.devicePixelRatio ?? 1;
-    const rect = container.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
+    const rect2 = container.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect2.width));
+    const h = Math.max(1, Math.floor(rect2.height));
     rendererSharedState.canvasMetrics = { w, h, dpr };
     resizeMapLabelCanvas(rendererSharedState.canvasMetrics);
     canvas.width = w * dpr;
@@ -38554,212 +38660,5406 @@ ${bonuses}`;
     collapseConsole();
   }
 
-  // src/renderer/gameplay/newGame.ts
-  function registerRegionRandomizeButtons() {
-    document.getElementById("new-game-start-month-randomize")?.addEventListener("click", () => {
-      randomizeNewGameStartMonth();
-      repaintNewGameMapPreview();
-    });
-    document.getElementById("new-game-start-month")?.addEventListener("change", () => {
-      repaintNewGameMapPreview();
-    });
-    document.getElementById("new-game-weather-bonus-select")?.addEventListener("change", () => {
-      repaintNewGameMapPreview();
-    });
-    document.getElementById("new-game-tech-bonus-select")?.addEventListener("change", () => {
-      repaintNewGameMapPreview();
-    });
-  }
-  function stopMatchWaitingUnderNewGame() {
-    if (!isMatchWaitingUnderNewGame()) return;
-    forgetMatchUnderNewGame();
-    void stopOpponentPlanning("new_game");
-    clearResolutionPlaybackAnimationState();
-    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
-      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
-    }
-    rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-    rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-    rendererSharedState.readyRequestInFlight = false;
-  }
-  function registerNewGameButton(deps) {
-    document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
-      toggleNewGameDialogCollapsed();
-    });
-    wireNewGameDialogMove();
-    document.getElementById("new-game-dialog-close")?.addEventListener("click", () => {
-      closeNewGameOverlayToMatch(deps);
-    });
-    registerRegionRandomizeButtons();
-    registerNewGameMapControls();
-    bindNewGameSides();
-    registerGameSizeSelect();
-    wireNewGameOptionsPopover();
-    wireHumanNicknameField();
-    document.getElementById("new-game-btn")?.addEventListener("click", async () => {
-      const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
-      if (!window.gameApi?.newGame) return;
-      const seatsStart = readNewGameSeatsStart();
-      if (seatsStart.blocked) {
-        showMapToast(seatsStart.blocked);
-        return;
-      }
-      if (!newGameHasAnyModel()) {
-        closeCommanderPopover();
-        closeNewGameOptionsPopover();
-        const startAnyway = await confirmStartWithNoModels();
-        if (!startAnyway) return;
-      }
-      const matchEpoch = advanceRendererMatchEpoch();
-      stopMatchWaitingUnderNewGame();
-      const cameraHold = holdNewGameMapPreviewCamera();
-      try {
-        const humanNickname = readHumanNicknameForStart();
-        const state = await window.gameApi.newGame({
-          ...readNewGameOptionChoices(),
-          startMonth: readNewGameStartMonth(),
-          ...readNewGameMapChoice(),
-          seats: seatsStart.seats,
-          turnLimit: seatsStart.turnLimit,
-          victoryRule: seatsStart.victoryRule,
-          aiOnlyBattles: seatsStart.aiOnlyBattles,
-          aiOnlyBeatLimit: seatsStart.aiOnlyBeatLimit,
-          sightCues: seatsStart.sightCues,
-          gameSize: readSelectedGameSizeFromDocument(),
-          ...humanNickname === void 0 ? {} : { humanNickname }
-        });
-        if (!rendererMatchEpochCurrent(matchEpoch)) return;
-        installRendererGameMap(state);
-        await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
-        rendererSharedState.gameState = state;
-        void refreshChatThread();
-        rendererSharedState.strategicScenarioInitialLeafletView = null;
-        tacticalReleaseRendererSessionForNewStrategicMatch(state);
-        clearObserveAfterKnockout();
-        clearRememberedUnitOrigins();
-        deps.rebuildUnitDisplayNameLookup(state);
-        deps.reconcileSelectionToCurrentState();
-        rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
-        rendererSharedState.lastObservedEnemyByUnitId.clear();
-        rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-        deps.updateClientStaleEnemyIntel(null, state);
-        rendererSharedState.initialCameraApplied = false;
-        deps.updateGameOverUI(state);
-        syncMapExtentToSnapshot(state, { refit: true });
-        if (state.hexes.length > 0) {
-          deps.applyInitialCameraForState(state);
-        }
-        deps.clearStrategicTooltipSummaryCaches();
-        rendererSharedState.humanStandingOrders = [];
-        rendererSharedState.hoverRoutePreview = null;
-        deps.clearPendingTacticalOrders();
-        discardStrategicOrderUiStash();
-        rendererSharedState.selectedUnitIds = [];
-        rendererSharedState.selectedUnitIdsAtMouseDown = [];
-        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
-        rendererSharedState.selectedHexIndex = null;
-        deps.hideStackCallout();
-        rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-        rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-        clearOpenRouterLog();
-        await readCommanderPoolAndApply(false);
-        hideAiStrategyToast();
-        clearConsoleReports();
-        deps.updateOpenRouterCostLabel();
-        deps.updateGameStateSidebar(state);
-        await deps.refreshHumanStandingOrders();
-        deps.updatePendingOrdersSidebar();
-        deps.updateRangedSidebar();
-        deps.updateSidebar();
-        await applyStartMatchAiChoice(startMatchAi, {
-          startPlanning: () => deps.startBackgroundRequestIfAllowed(),
-          updateReadyButtonState: () => deps.updateReadyButtonState()
-        });
-        await syncOpenRouterRunToggle();
-        deps.resizeAndRedraw();
-      } catch (err) {
-        console.error("newGame failed:", err);
-        showMapToast("The new game did not start. This screen stays open.");
-        if (releaseNewGameMapPreviewCamera(cameraHold)) void refreshNewGameMapPreview();
-      }
-    });
-  }
-  function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return false;
-    if (rendererSharedState.readyRequestInFlight) return false;
-    const overlay = document.getElementById("game-over-overlay");
-    const newGameBtn = document.getElementById("new-game-btn");
-    const opened = overlay?.classList.contains("hidden") === true;
-    if (opened && rendererSharedState.gameState && rendererSharedState.gameState.hexes.length > 0 && !rendererSharedState.gameState.gameOver) {
-      holdMatchUnderNewGame();
-      advanceRendererMatchEpoch();
-    }
-    hideGameOverStandings();
-    showNewGameBanner("newGame", selectedNewGameTab());
-    if (newGameBtn) {
-      newGameBtn.textContent = "Start game";
-      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
-    }
-    resetNewGameOptionControls();
-    void (async () => {
-      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
-      refreshNewGameSides({ reset: true });
-      await refreshNewGameMapPreview();
-    })();
-    syncGameSizeCapPreview();
-    overlay?.classList.remove("hidden");
-    expandNewGameDialog();
-    if (opened) scrollNewGameDialogToTop();
-    placeNewGameDialogAtInset();
-    blurMapChromeIfFocused();
-    resetNewGameMapPreviewFrame();
-    repaintNewGameMapPreview();
-    setMainUIControlsEnabled2(false);
-    updateReadyButtonState2();
-    return opened;
-  }
-  async function refreshHumanStandingOrders2() {
-    if (!window.gameApi?.listHumanStandingOrders) {
-      rendererSharedState.humanStandingOrders = [];
-      return;
-    }
-    try {
-      rendererSharedState.humanStandingOrders = await window.gameApi.listHumanStandingOrders();
-    } catch {
-      rendererSharedState.humanStandingOrders = [];
-    }
-  }
-
-  // src/shared/tacticalStateAssertions.ts
-  function tacticalBoundaryPlanningExitAllowed(tacticalSnapshot, tacticalPhasePlanning) {
-    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_exit" };
+  // src/shared/replayNavigation.ts
+  var REPLAY_BUSY_REASON = "Replay is available once this turn finishes resolving.";
+  function replayMayEnter(input) {
+    if (!input.matchLoaded) return { ok: false, reason: null };
+    if (input.otherModalOpen) return { ok: false, reason: null };
+    if (input.newGameOpenMidMatch) return { ok: false, reason: null };
+    if (input.readyInFlight || input.playbackRunning) return { ok: false, reason: REPLAY_BUSY_REASON };
     return { ok: true };
   }
-
-  // src/shared/tacticalAnnihilation.ts
-  function getTacticalAnnihilationOutcome(subUnits) {
-    let human = 0;
-    let opponent = 0;
-    for (const u of subUnits) {
-      if (u.player === HUMAN_SEAT_ID) human += 1;
-      else opponent += 1;
-    }
-    if (human > 0 && opponent > 0) return null;
-    if (human > 0 && opponent === 0) return "human_win";
-    if (human === 0 && opponent > 0) return "human_loss";
-    return "mutual";
+  var REPLAY_PLAYBACK_DWELL_MS = 1e3;
+  function canStepBack(position) {
+    return position.index > 0 && !position.busy && !position.playing;
   }
-  function getTwoPartyAnnihilationOutcome(subUnits, partyA, partyB) {
-    let countA = 0;
-    let countB = 0;
-    for (const unit of subUnits) {
-      if (unit.player === partyA) countA += 1;
-      else if (unit.player === partyB) countB += 1;
+  function canStepForward(position) {
+    return position.index < position.stepCount - 1 && !position.busy && !position.playing;
+  }
+  function canPlay(position) {
+    if (position.playing) return true;
+    return position.index < position.stepCount - 1 && !position.busy;
+  }
+  function canSeek(position) {
+    return !position.playing;
+  }
+  function nextPlaybackIndex(position, stopRequested) {
+    if (stopRequested) return null;
+    return position.index < position.stepCount - 1 ? position.index + 1 : null;
+  }
+  function parseTurnEntry(text, steps, scope = "strategic") {
+    const trimmed = text.trim();
+    if (!/^\d+$/.test(trimmed)) return { error: true };
+    const entered = Number(trimmed);
+    if (!Number.isSafeInteger(entered) || entered < 1) return { error: true };
+    const index = steps.findIndex((step) => stepNumber(step, scope) === entered);
+    return index < 0 ? { error: true } : { index };
+  }
+  function replayLabel(steps, index, scope = "strategic") {
+    const current = steps[index] ? stepNumber(steps[index], scope) : 0;
+    const lastStep = steps[steps.length - 1];
+    const last = lastStep ? stepNumber(lastStep, scope) : 0;
+    return `Replay \xB7 ${scope === "tactical" ? "Beat" : "Turn"} ${current} of ${last}`;
+  }
+  function stepNumber(step, scope) {
+    return scope === "tactical" ? step.beatNumber : step.turnNumber;
+  }
+
+  // src/shared/sideMessages.ts
+  var RELATIONSHIP_SCALE_MAX = 4;
+
+  // src/shared/matchStatistics.ts
+  var STATISTIC_UNIT_TYPES = ["infantry", "armor", "naval", "air", "missile"];
+  var STATISTIC_MERCENARY_TYPES = ["infantry", "armor", "naval", "air"];
+  var HEXES_TAKEN_WINDOW_TURNS = 5;
+  function totalUnits(counts) {
+    return Object.values(counts).reduce((sum, count) => sum + count, 0);
+  }
+
+  // src/shared/matchChartSeries.ts
+  var RELATIONSHIP_OLD_AFTER_TURNS = 3;
+  function sideValue(side, chartId, unitType) {
+    switch (chartId) {
+      case "built-units":
+        return unitType === null ? totalUnits(pickTypes(side.builtUnits, STATISTIC_UNIT_TYPES)) : side.builtUnits[unitType] ?? 0;
+      case "mercenary-units":
+        return unitType === null ? totalUnits(pickTypes(side.mercenaryUnits, STATISTIC_MERCENARY_TYPES)) : side.mercenaryUnits[unitType] ?? 0;
+      case "hexes":
+        return side.hexes;
+      case "production":
+        return side.productionPerTurn;
+      case "stored-points":
+        return side.storedPoints;
+      case "treasury":
+        return side.treasury;
+      case "upkeep":
+        return side.upkeepPerTurn;
+      case "units-lost":
+        return side.unitsLost;
+      case "model-cost":
+        return side.costUsd;
     }
-    if (countA > 0 && countB > 0) return null;
-    if (countA > 0) return partyA;
-    if (countB > 0) return partyB;
-    return "mutual";
+  }
+  function pickTypes(counts, types) {
+    return Object.fromEntries(types.filter((type) => type in counts).map((type) => [type, counts[type]]));
+  }
+  function lineChartData(snapshot3, chartId, unitType) {
+    const seats = [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder).filter((seat) => chartId !== "model-cost" || seat.kind === "ai");
+    return {
+      turns: snapshot3.turns.map((turn) => turn.turnNumber),
+      series: seats.map((seat) => ({
+        seatId: seat.seatId,
+        values: snapshot3.turns.map((turn) => {
+          const side = turn.sides.find((entry) => entry.seatId === seat.seatId);
+          return side ? sideValue(side, chartId, unitType) : null;
+        })
+      }))
+    };
+  }
+  function chartTooltip(data, index, nameOf, decimals) {
+    const values = data.series.map((series) => ({ seatId: series.seatId, value: series.values[index] ?? null }));
+    const sum = values.reduce((acc, entry) => acc + (entry.value ?? 0), 0);
+    return {
+      heading: `Turn ${data.turns[index]}`,
+      lines: values.map((entry) => `${nameOf(entry.seatId)}: ${entry.value === null ? "no data" : entry.value.toFixed(decimals)}`),
+      total: `Total: ${sum.toFixed(decimals)}`
+    };
+  }
+  function clampedRange(min2, span, full) {
+    const left = Math.min(Math.max(min2, full.min), full.max - span);
+    return { min: left, max: left + span };
+  }
+  function zoomedTurnRange(args) {
+    const { range, full, anchor: anchor3, factor, minSpan } = args;
+    const fullSpan = full.max - full.min;
+    const span = range.max - range.min;
+    const nextSpan = Math.max(minSpan, span * factor);
+    if (nextSpan >= fullSpan) {
+      return { min: full.min, max: full.max };
+    }
+    const ratio = span > 0 ? (anchor3 - range.min) / span : 0.5;
+    return clampedRange(anchor3 - ratio * nextSpan, nextSpan, full);
+  }
+  function pannedTurnRange(args) {
+    const { range, full, deltaTurns } = args;
+    return clampedRange(range.min + deltaTurns, range.max - range.min, full);
+  }
+  function reporterSeatIds(snapshot3, subjectSeatId) {
+    return [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder).filter((seat) => seat.kind === "ai" && seat.seatId !== subjectSeatId).map((seat) => seat.seatId);
+  }
+  function reportFor(turn, reporterSeatId, subjectSeatId) {
+    return turn?.relationships.find((entry) => entry.seatId === reporterSeatId && entry.towardSeatId === subjectSeatId);
+  }
+  function hexesTakenInWindow(turns, lastTurn, reporter, subject) {
+    const known = turns.filter((turn) => turn.turnNumber > lastTurn - HEXES_TAKEN_WINDOW_TURNS && turn.hexesTaken !== null);
+    if (known.length === 0) {
+      return null;
+    }
+    return known.reduce(
+      (sum, turn) => sum + (turn.hexesTaken ?? []).filter((entry) => entry.bySeatId === reporter && entry.fromSeatId === subject).reduce((inner, entry) => inner + entry.hexes, 0),
+      0
+    );
+  }
+  function relationshipRows(snapshot3, subjectSeatId) {
+    const last = snapshot3.turns[snapshot3.turns.length - 1];
+    const lastTurn = last?.turnNumber ?? snapshot3.currentTurnNumber;
+    return reporterSeatIds(snapshot3, subjectSeatId).map((reporterSeatId) => {
+      const report = reportFor(last, reporterSeatId, subjectSeatId);
+      const fresh = report !== void 0 && lastTurn - 1 - report.reportedTurn <= RELATIONSHIP_OLD_AFTER_TURNS;
+      return {
+        reporterSeatId,
+        stance: report?.stance ?? null,
+        trust: report?.trust ?? null,
+        threat: report?.threat ?? null,
+        hexesTaken: hexesTakenInWindow(snapshot3.turns, lastTurn, reporterSeatId, subjectSeatId),
+        reportedTurn: report?.reportedTurn ?? null,
+        age: report === void 0 ? "none" : fresh ? "fresh" : "old"
+      };
+    });
+  }
+  function relationshipStrip(snapshot3, subjectSeatId) {
+    return {
+      turns: snapshot3.turns.map((turn) => turn.turnNumber),
+      rows: reporterSeatIds(snapshot3, subjectSeatId).map((reporterSeatId) => ({
+        reporterSeatId,
+        cells: snapshot3.turns.map((turn, index) => {
+          const report = reportFor(turn, reporterSeatId, subjectSeatId);
+          if (report === void 0) {
+            return { stance: null, reportedThisTurn: false };
+          }
+          const previous = index > 0 ? reportFor(snapshot3.turns[index - 1], reporterSeatId, subjectSeatId) : void 0;
+          const reportedThisTurn = index === 0 ? report.reportedTurn >= turn.turnNumber - 1 : previous === void 0 || report.reportedTurn > previous.reportedTurn;
+          return { stance: report.stance, reportedThisTurn };
+        })
+      }))
+    };
+  }
+  function spokePositions(count, radius) {
+    return Array.from({ length: Math.max(0, count) }, (_2, index) => {
+      const angle = -Math.PI / 2 + 2 * Math.PI * index / count;
+      return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
+    });
+  }
+
+  // src/shared/chartsDialogState.ts
+  function chartsDialogMayOpen(input) {
+    return input.matchLoaded && !input.otherModalOpen;
+  }
+  function chartBlockHeight(dialogHeight2) {
+    return Math.floor(dialogHeight2 / 4);
+  }
+  function chartPlotHeight(dialogHeight2, titleRowHeight) {
+    return Math.max(0, chartBlockHeight(dialogHeight2) - titleRowHeight);
+  }
+  function unitTypeOptions(types) {
+    return [
+      { label: "Total", unitType: null },
+      ...types.map((type) => ({ label: type.charAt(0).toUpperCase() + type.slice(1), unitType: type }))
+    ];
+  }
+  var LINE_CHART_DEFINITIONS = [
+    { id: "built-units", title: "Built units", options: unitTypeOptions(STATISTIC_UNIT_TYPES), decimals: 0 },
+    { id: "mercenary-units", title: "Mercenary units", options: unitTypeOptions(STATISTIC_MERCENARY_TYPES), decimals: 0 },
+    { id: "hexes", title: "Hexes held", options: [], decimals: 0 },
+    { id: "production", title: "Production per turn", options: [], decimals: 0 },
+    { id: "stored-points", title: "Stored production points", options: [], decimals: 0 },
+    { id: "treasury", title: "Credits", options: [], decimals: 0 },
+    { id: "upkeep", title: "Upkeep per turn", options: [], decimals: 0 },
+    { id: "units-lost", title: "Units lost per turn", options: [], decimals: 0 },
+    { id: "model-cost", title: "Model cost so far (USD)", options: [], decimals: 2 }
+  ];
+
+  // src/renderer/chrome/blockingDialogGuards.ts
+  function tacticalBattlesDialogIsOpen() {
+    return document.querySelector('[role="dialog"][aria-label="Tactical battles"]') !== null;
+  }
+  var CLASS_HIDDEN_DIALOG_IDS = [
+    "knockout-dialog",
+    "start-confirm-dialog",
+    "load-confirm-dialog",
+    "tactical-annihilation-overlay"
+  ];
+  function blockingDialogIsOpen() {
+    if (tacticalBattlesDialogIsOpen()) return true;
+    if (document.querySelector(".melee-intercept-frame") !== null) return true;
+    if (CLASS_HIDDEN_DIALOG_IDS.some((id) => document.getElementById(id)?.classList.contains("hidden") === false)) return true;
+    const optionsPopover = document.getElementById("new-game-options-popover");
+    if (optionsPopover !== null && !optionsPopover.hidden) return true;
+    return isGameMenuOpen() || commanderPopoverIsOpen();
+  }
+
+  // src/renderer/charts/chartSeatLookups.ts
+  function seatColor(seatOrder2) {
+    const fromCss = getComputedStyle(document.documentElement).getPropertyValue(`--seat-${seatOrder2}-bar`).trim();
+    return fromCss || (SEAT_PALETTES[seatOrder2 - 1]?.forceBar ?? "#9CA3AF");
+  }
+  function seatLookups(snapshot3) {
+    const seats = snapshot3.seats.map((seat) => ({ seatId: seat.seatId, seatOrder: seat.seatOrder }));
+    const byId2 = new Map(snapshot3.seats.map((seat) => [seat.seatId, seat]));
+    return {
+      nameOf: (seatId) => byId2.get(seatId)?.name ?? seatId,
+      flagOf: (seatId) => createMessagePartyFlag(seatId, seats),
+      colorOf: (seatId) => seatColor(byId2.get(seatId)?.seatOrder ?? 1),
+      seatNumberOf: (seatId) => byId2.get(seatId)?.seatOrder ?? 1
+    };
+  }
+  function buildLegend(snapshot3, lookups) {
+    const legend = document.createElement("ul");
+    legend.className = "charts-legend";
+    for (const seat of [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder)) {
+      const item = document.createElement("li");
+      const swatch = document.createElement("span");
+      swatch.className = "charts-legend-swatch";
+      swatch.style.background = lookups.colorOf(seat.seatId);
+      const flag = lookups.flagOf(seat.seatId);
+      const name = document.createElement("span");
+      name.textContent = seat.name;
+      item.append(swatch, ...flag === null ? [name] : [flag, name]);
+      legend.appendChild(item);
+    }
+    return legend;
+  }
+
+  // node_modules/uplot/dist/uPlot.esm.js
+  var FEAT_TIME = true;
+  var pre = "u-";
+  var UPLOT = "uplot";
+  var ORI_HZ = pre + "hz";
+  var ORI_VT = pre + "vt";
+  var TITLE = pre + "title";
+  var WRAP = pre + "wrap";
+  var UNDER = pre + "under";
+  var OVER = pre + "over";
+  var AXIS = pre + "axis";
+  var OFF = pre + "off";
+  var SELECT = pre + "select";
+  var CURSOR_X = pre + "cursor-x";
+  var CURSOR_Y = pre + "cursor-y";
+  var CURSOR_PT = pre + "cursor-pt";
+  var LEGEND = pre + "legend";
+  var LEGEND_LIVE = pre + "live";
+  var LEGEND_INLINE = pre + "inline";
+  var LEGEND_SERIES = pre + "series";
+  var LEGEND_MARKER = pre + "marker";
+  var LEGEND_LABEL = pre + "label";
+  var LEGEND_VALUE = pre + "value";
+  var WIDTH = "width";
+  var HEIGHT = "height";
+  var TOP = "top";
+  var BOTTOM = "bottom";
+  var LEFT = "left";
+  var RIGHT = "right";
+  var hexBlack = "#000";
+  var transparent = hexBlack + "0";
+  var mousemove = "mousemove";
+  var mousedown = "mousedown";
+  var mouseup = "mouseup";
+  var mouseenter = "mouseenter";
+  var mouseleave = "mouseleave";
+  var dblclick = "dblclick";
+  var resize = "resize";
+  var scroll = "scroll";
+  var change = "change";
+  var dppxchange = "dppxchange";
+  var LEGEND_DISP = "--";
+  var domEnv = typeof window != "undefined";
+  var doc = domEnv ? document : null;
+  var win = domEnv ? window : null;
+  var nav = domEnv ? navigator : null;
+  var pxRatio;
+  var query;
+  function setPxRatio() {
+    let _pxRatio = devicePixelRatio;
+    if (pxRatio != _pxRatio) {
+      pxRatio = _pxRatio;
+      query && off(change, query, setPxRatio);
+      query = matchMedia(`(min-resolution: ${pxRatio - 1e-3}dppx) and (max-resolution: ${pxRatio + 1e-3}dppx)`);
+      on(change, query, setPxRatio);
+      win.dispatchEvent(new CustomEvent(dppxchange));
+    }
+  }
+  function addClass(el, c) {
+    if (c != null) {
+      let cl = el.classList;
+      !cl.contains(c) && cl.add(c);
+    }
+  }
+  function remClass(el, c) {
+    let cl = el.classList;
+    cl.contains(c) && cl.remove(c);
+  }
+  function setStylePx(el, name, value) {
+    el.style[name] = value + "px";
+  }
+  function placeTag(tag, cls, targ, refEl) {
+    let el = doc.createElement(tag);
+    if (cls != null)
+      addClass(el, cls);
+    if (targ != null)
+      targ.insertBefore(el, refEl);
+    return el;
+  }
+  function placeDiv(cls, targ) {
+    return placeTag("div", cls, targ);
+  }
+  var xformCache = /* @__PURE__ */ new WeakMap();
+  function elTrans(el, xPos, yPos, xMax, yMax) {
+    let xform = "translate(" + xPos + "px," + yPos + "px)";
+    let xformOld = xformCache.get(el);
+    if (xform != xformOld) {
+      el.style.transform = xform;
+      xformCache.set(el, xform);
+      if (xPos < 0 || yPos < 0 || xPos > xMax || yPos > yMax)
+        addClass(el, OFF);
+      else
+        remClass(el, OFF);
+    }
+  }
+  var colorCache = /* @__PURE__ */ new WeakMap();
+  function elColor(el, background, borderColor2) {
+    let newColor = background + borderColor2;
+    let oldColor = colorCache.get(el);
+    if (newColor != oldColor) {
+      colorCache.set(el, newColor);
+      el.style.background = background;
+      el.style.borderColor = borderColor2;
+    }
+  }
+  var sizeCache = /* @__PURE__ */ new WeakMap();
+  function elSize(el, newWid, newHgt, centered) {
+    let newSize = newWid + "" + newHgt;
+    let oldSize = sizeCache.get(el);
+    if (newSize != oldSize) {
+      sizeCache.set(el, newSize);
+      el.style.height = newHgt + "px";
+      el.style.width = newWid + "px";
+      el.style.marginLeft = centered ? -newWid / 2 + "px" : 0;
+      el.style.marginTop = centered ? -newHgt / 2 + "px" : 0;
+    }
+  }
+  var evOpts = { passive: true };
+  var evOpts2 = { ...evOpts, capture: true };
+  function on(ev, el, cb, capt) {
+    el.addEventListener(ev, cb, capt ? evOpts2 : evOpts);
+  }
+  function off(ev, el, cb, capt) {
+    el.removeEventListener(ev, cb, evOpts);
+  }
+  domEnv && setPxRatio();
+  function closestIdx(num, arr, lo, hi) {
+    let mid;
+    lo = lo || 0;
+    hi = hi || arr.length - 1;
+    let bitwise = hi <= 2147483647;
+    while (hi - lo > 1) {
+      mid = bitwise ? lo + hi >> 1 : floor((lo + hi) / 2);
+      if (arr[mid] < num)
+        lo = mid;
+      else
+        hi = mid;
+    }
+    if (num - arr[lo] <= arr[hi] - num)
+      return lo;
+    return hi;
+  }
+  function makeIndexOfs(predicate) {
+    let indexOfs = (data, _i0, _i1) => {
+      let i0 = -1;
+      let i1 = -1;
+      for (let i = _i0; i <= _i1; i++) {
+        if (predicate(data[i])) {
+          i0 = i;
+          break;
+        }
+      }
+      for (let i = _i1; i >= _i0; i--) {
+        if (predicate(data[i])) {
+          i1 = i;
+          break;
+        }
+      }
+      return [i0, i1];
+    };
+    return indexOfs;
+  }
+  var notNullish = (v) => v != null;
+  var isPositive = (v) => v != null && v > 0;
+  var nonNullIdxs = makeIndexOfs(notNullish);
+  var positiveIdxs = makeIndexOfs(isPositive);
+  function getMinMax(data, _i0, _i1, sorted = 0, log = false) {
+    let getEdgeIdxs = log ? positiveIdxs : nonNullIdxs;
+    let predicate = log ? isPositive : notNullish;
+    [_i0, _i1] = getEdgeIdxs(data, _i0, _i1);
+    let _min = data[_i0];
+    let _max = data[_i0];
+    if (_i0 > -1) {
+      if (sorted == 1) {
+        _min = data[_i0];
+        _max = data[_i1];
+      } else if (sorted == -1) {
+        _min = data[_i1];
+        _max = data[_i0];
+      } else {
+        for (let i = _i0; i <= _i1; i++) {
+          let v = data[i];
+          if (predicate(v)) {
+            if (v < _min)
+              _min = v;
+            else if (v > _max)
+              _max = v;
+          }
+        }
+      }
+    }
+    return [_min ?? inf, _max ?? -inf];
+  }
+  function rangeLog(min2, max2, base, fullMags) {
+    let minSign = sign(min2);
+    let maxSign = sign(max2);
+    if (min2 == max2) {
+      if (minSign == -1) {
+        min2 *= base;
+        max2 /= base;
+      } else {
+        min2 /= base;
+        max2 *= base;
+      }
+    }
+    let logFn = base == 10 ? log10 : log2;
+    let growMinAbs = minSign == 1 ? floor : ceil;
+    let growMaxAbs = maxSign == 1 ? ceil : floor;
+    let minExp = growMinAbs(logFn(abs(min2)));
+    let maxExp = growMaxAbs(logFn(abs(max2)));
+    let minIncr = pow(base, minExp);
+    let maxIncr = pow(base, maxExp);
+    if (base == 10) {
+      if (minExp < 0)
+        minIncr = roundDec(minIncr, -minExp);
+      if (maxExp < 0)
+        maxIncr = roundDec(maxIncr, -maxExp);
+    }
+    if (fullMags || base == 2) {
+      min2 = minIncr * minSign;
+      max2 = maxIncr * maxSign;
+    } else {
+      min2 = incrRoundDn(min2, minIncr);
+      max2 = incrRoundUp(max2, maxIncr);
+    }
+    return [min2, max2];
+  }
+  function rangeAsinh(min2, max2, base, fullMags) {
+    let minMax = rangeLog(min2, max2, base, fullMags);
+    if (min2 == 0)
+      minMax[0] = 0;
+    if (max2 == 0)
+      minMax[1] = 0;
+    return minMax;
+  }
+  var rangePad = 0.1;
+  var autoRangePart = {
+    mode: 3,
+    pad: rangePad
+  };
+  var _eqRangePart = {
+    pad: 0,
+    soft: null,
+    mode: 0
+  };
+  var _eqRange = {
+    min: _eqRangePart,
+    max: _eqRangePart
+  };
+  function rangeNum(_min, _max, mult, extra) {
+    if (isObj(mult))
+      return _rangeNum(_min, _max, mult);
+    _eqRangePart.pad = mult;
+    _eqRangePart.soft = extra ? 0 : null;
+    _eqRangePart.mode = extra ? 3 : 0;
+    return _rangeNum(_min, _max, _eqRange);
+  }
+  function ifNull(lh, rh) {
+    return lh == null ? rh : lh;
+  }
+  function hasData(data, idx0, idx1) {
+    idx0 = ifNull(idx0, 0);
+    idx1 = ifNull(idx1, data.length - 1);
+    while (idx0 <= idx1) {
+      if (data[idx0] != null)
+        return true;
+      idx0++;
+    }
+    return false;
+  }
+  function _rangeNum(_min, _max, cfg) {
+    let cmin = cfg.min;
+    let cmax = cfg.max;
+    let padMin = ifNull(cmin.pad, 0);
+    let padMax = ifNull(cmax.pad, 0);
+    let hardMin = ifNull(cmin.hard, -inf);
+    let hardMax = ifNull(cmax.hard, inf);
+    let softMin = ifNull(cmin.soft, inf);
+    let softMax = ifNull(cmax.soft, -inf);
+    let softMinMode = ifNull(cmin.mode, 0);
+    let softMaxMode = ifNull(cmax.mode, 0);
+    let delta = _max - _min;
+    let deltaMag = log10(delta);
+    let scalarMax = max(abs(_min), abs(_max));
+    let scalarMag = log10(scalarMax);
+    let scalarMagDelta = abs(scalarMag - deltaMag);
+    if (delta < 1e-24 || scalarMagDelta > 10) {
+      delta = 0;
+      if (_min == 0 || _max == 0) {
+        delta = 1e-24;
+        if (softMinMode == 2 && softMin != inf)
+          padMin = 0;
+        if (softMaxMode == 2 && softMax != -inf)
+          padMax = 0;
+      }
+    }
+    let nonZeroDelta = delta || scalarMax || 1e3;
+    let mag = log10(nonZeroDelta);
+    let base = pow(10, floor(mag));
+    let _padMin = nonZeroDelta * (delta == 0 ? _min == 0 ? 0.1 : 1 : padMin);
+    let _newMin = roundDec(incrRoundDn(_min - _padMin, base / 10), 24);
+    let _softMin = _min >= softMin && (softMinMode == 1 || softMinMode == 3 && _newMin <= softMin || softMinMode == 2 && _newMin >= softMin) ? softMin : inf;
+    let minLim = max(hardMin, _newMin < _softMin && _min >= _softMin ? _softMin : min(_softMin, _newMin));
+    let _padMax = nonZeroDelta * (delta == 0 ? _max == 0 ? 0.1 : 1 : padMax);
+    let _newMax = roundDec(incrRoundUp(_max + _padMax, base / 10), 24);
+    let _softMax = _max <= softMax && (softMaxMode == 1 || softMaxMode == 3 && _newMax >= softMax || softMaxMode == 2 && _newMax <= softMax) ? softMax : -inf;
+    let maxLim = min(hardMax, _newMax > _softMax && _max <= _softMax ? _softMax : max(_softMax, _newMax));
+    if (minLim == maxLim && minLim == 0)
+      maxLim = 100;
+    return [minLim, maxLim];
+  }
+  var numFormatter = new Intl.NumberFormat(domEnv ? nav.language : "en-US");
+  var fmtNum = (val) => numFormatter.format(val);
+  var M = Math;
+  var PI = M.PI;
+  var abs = M.abs;
+  var floor = M.floor;
+  var round = M.round;
+  var ceil = M.ceil;
+  var min = M.min;
+  var max = M.max;
+  var pow = M.pow;
+  var sign = M.sign;
+  var log10 = M.log10;
+  var log2 = M.log2;
+  var sinh = (v, linthresh = 1) => M.sinh(v) * linthresh;
+  var asinh = (v, linthresh = 1) => M.asinh(v / linthresh);
+  var inf = Infinity;
+  function numIntDigits(x) {
+    return (log10((x ^ x >> 31) - (x >> 31)) | 0) + 1;
+  }
+  function clamp(num, _min, _max) {
+    return min(max(num, _min), _max);
+  }
+  function isFn(v) {
+    return typeof v == "function";
+  }
+  function fnOrSelf(v) {
+    return isFn(v) ? v : () => v;
+  }
+  var noop = () => {
+  };
+  var retArg0 = (_0) => _0;
+  var retArg1 = (_0, _1) => _1;
+  var retNull = (_2) => null;
+  var retTrue = (_2) => true;
+  var retEq = (a, b) => a == b;
+  var regex6 = /\.\d*?(?=9{6,}|0{6,})/gm;
+  var fixFloat = (val) => {
+    if (isInt(val) || fixedDec.has(val))
+      return val;
+    const str = `${val}`;
+    const match = str.match(regex6);
+    if (match == null)
+      return val;
+    let len = match[0].length - 1;
+    if (str.indexOf("e-") != -1) {
+      let [num, exp] = str.split("e");
+      return +`${fixFloat(num)}e${exp}`;
+    }
+    return roundDec(val, len);
+  };
+  function incrRound(num, incr) {
+    return fixFloat(roundDec(fixFloat(num / incr)) * incr);
+  }
+  function incrRoundUp(num, incr) {
+    return fixFloat(ceil(fixFloat(num / incr)) * incr);
+  }
+  function incrRoundDn(num, incr) {
+    return fixFloat(floor(fixFloat(num / incr)) * incr);
+  }
+  function roundDec(val, dec = 0) {
+    if (isInt(val))
+      return val;
+    let p = 10 ** dec;
+    let n = val * p * (1 + Number.EPSILON);
+    return round(n) / p;
+  }
+  var fixedDec = /* @__PURE__ */ new Map();
+  function guessDec(num) {
+    return (("" + num).split(".")[1] || "").length;
+  }
+  function genIncrs(base, minExp, maxExp, mults) {
+    let incrs = [];
+    let multDec = mults.map(guessDec);
+    for (let exp = minExp; exp < maxExp; exp++) {
+      let expa = abs(exp);
+      let mag = roundDec(pow(base, exp), expa);
+      for (let i = 0; i < mults.length; i++) {
+        let _incr = base == 10 ? +`${mults[i]}e${exp}` : mults[i] * mag;
+        let dec = (exp >= 0 ? 0 : expa) + (exp >= multDec[i] ? 0 : multDec[i]);
+        let incr = base == 10 ? _incr : roundDec(_incr, dec);
+        incrs.push(incr);
+        fixedDec.set(incr, dec);
+      }
+    }
+    return incrs;
+  }
+  var EMPTY_OBJ = {};
+  var EMPTY_ARR = [];
+  var nullNullTuple = [null, null];
+  var isArr = Array.isArray;
+  var isInt = Number.isInteger;
+  var isUndef = (v) => v === void 0;
+  function isStr(v) {
+    return typeof v == "string";
+  }
+  function isObj(v) {
+    let is = false;
+    if (v != null) {
+      let c = v.constructor;
+      is = c == null || c == Object;
+    }
+    return is;
+  }
+  function fastIsObj(v) {
+    return v != null && typeof v == "object";
+  }
+  var TypedArray = Object.getPrototypeOf(Uint8Array);
+  var __proto__ = "__proto__";
+  function copy(o, _isObj = isObj) {
+    let out;
+    if (isArr(o)) {
+      let val = o.find((v) => v != null);
+      if (isArr(val) || _isObj(val)) {
+        out = Array(o.length);
+        for (let i = 0; i < o.length; i++)
+          out[i] = copy(o[i], _isObj);
+      } else
+        out = o.slice();
+    } else if (o instanceof TypedArray)
+      out = o.slice();
+    else if (_isObj(o)) {
+      out = {};
+      for (let k in o) {
+        if (k != __proto__)
+          out[k] = copy(o[k], _isObj);
+      }
+    } else
+      out = o;
+    return out;
+  }
+  function assign(targ) {
+    let args = arguments;
+    for (let i = 1; i < args.length; i++) {
+      let src = args[i];
+      for (let key in src) {
+        if (key != __proto__) {
+          if (isObj(targ[key]))
+            assign(targ[key], copy(src[key]));
+          else
+            targ[key] = copy(src[key]);
+        }
+      }
+    }
+    return targ;
+  }
+  var NULL_REMOVE = 0;
+  var NULL_RETAIN = 1;
+  var NULL_EXPAND = 2;
+  function nullExpand(yVals, nullIdxs, alignedLen) {
+    for (let i = 0, xi, lastNullIdx = -1; i < nullIdxs.length; i++) {
+      let nullIdx = nullIdxs[i];
+      if (nullIdx > lastNullIdx) {
+        xi = nullIdx - 1;
+        while (xi >= 0 && yVals[xi] == null)
+          yVals[xi--] = null;
+        xi = nullIdx + 1;
+        while (xi < alignedLen && yVals[xi] == null)
+          yVals[lastNullIdx = xi++] = null;
+      }
+    }
+  }
+  function join(tables, nullModes) {
+    if (allHeadersSame(tables)) {
+      let table = tables[0].slice();
+      for (let i = 1; i < tables.length; i++)
+        table.push(...tables[i].slice(1));
+      if (!isAsc(table[0]))
+        table = sortCols(table);
+      return table;
+    }
+    let xVals = /* @__PURE__ */ new Set();
+    for (let ti = 0; ti < tables.length; ti++) {
+      let t = tables[ti];
+      let xs = t[0];
+      let len = xs.length;
+      for (let i = 0; i < len; i++)
+        xVals.add(xs[i]);
+    }
+    let data = [Array.from(xVals).sort((a, b) => a - b)];
+    let alignedLen = data[0].length;
+    let xIdxs = /* @__PURE__ */ new Map();
+    for (let i = 0; i < alignedLen; i++)
+      xIdxs.set(data[0][i], i);
+    for (let ti = 0; ti < tables.length; ti++) {
+      let t = tables[ti];
+      let xs = t[0];
+      for (let si = 1; si < t.length; si++) {
+        let ys = t[si];
+        let yVals = Array(alignedLen).fill(void 0);
+        let nullMode = nullModes ? nullModes[ti][si] : NULL_RETAIN;
+        let nullIdxs = [];
+        for (let i = 0; i < ys.length; i++) {
+          let yVal = ys[i];
+          let alignedIdx = xIdxs.get(xs[i]);
+          if (yVal === null) {
+            if (nullMode != NULL_REMOVE) {
+              yVals[alignedIdx] = yVal;
+              if (nullMode == NULL_EXPAND)
+                nullIdxs.push(alignedIdx);
+            }
+          } else
+            yVals[alignedIdx] = yVal;
+        }
+        nullExpand(yVals, nullIdxs, alignedLen);
+        data.push(yVals);
+      }
+    }
+    return data;
+  }
+  var microTask = typeof queueMicrotask == "undefined" ? (fn) => Promise.resolve().then(fn) : queueMicrotask;
+  function sortCols(table) {
+    let head2 = table[0];
+    let rlen = head2.length;
+    let idxs = Array(rlen);
+    for (let i = 0; i < idxs.length; i++)
+      idxs[i] = i;
+    idxs.sort((i0, i1) => head2[i0] - head2[i1]);
+    let table2 = [];
+    for (let i = 0; i < table.length; i++) {
+      let row = table[i];
+      let row2 = Array(rlen);
+      for (let j = 0; j < rlen; j++)
+        row2[j] = row[idxs[j]];
+      table2.push(row2);
+    }
+    return table2;
+  }
+  function allHeadersSame(tables) {
+    let vals0 = tables[0][0];
+    let len0 = vals0.length;
+    for (let i = 1; i < tables.length; i++) {
+      let vals1 = tables[i][0];
+      if (vals1.length != len0)
+        return false;
+      if (vals1 != vals0) {
+        for (let j = 0; j < len0; j++) {
+          if (vals1[j] != vals0[j])
+            return false;
+        }
+      }
+    }
+    return true;
+  }
+  function isAsc(vals, samples = 100) {
+    const len = vals.length;
+    if (len <= 1)
+      return true;
+    let firstIdx = 0;
+    let lastIdx = len - 1;
+    while (firstIdx <= lastIdx && vals[firstIdx] == null)
+      firstIdx++;
+    while (lastIdx >= firstIdx && vals[lastIdx] == null)
+      lastIdx--;
+    if (lastIdx <= firstIdx)
+      return true;
+    const stride = max(1, floor((lastIdx - firstIdx + 1) / samples));
+    for (let prevVal = vals[firstIdx], i = firstIdx + stride; i <= lastIdx; i += stride) {
+      const v = vals[i];
+      if (v != null) {
+        if (v <= prevVal)
+          return false;
+        prevVal = v;
+      }
+    }
+    return true;
+  }
+  var months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ];
+  var days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday"
+  ];
+  function slice3(str) {
+    return str.slice(0, 3);
+  }
+  var days3 = days.map(slice3);
+  var months3 = months.map(slice3);
+  var engNames = {
+    MMMM: months,
+    MMM: months3,
+    WWWW: days,
+    WWW: days3
+  };
+  function zeroPad2(int) {
+    return (int < 10 ? "0" : "") + int;
+  }
+  function zeroPad3(int) {
+    return (int < 10 ? "00" : int < 100 ? "0" : "") + int;
+  }
+  var subs = {
+    // 2019
+    YYYY: (d) => d.getFullYear(),
+    // 19
+    YY: (d) => (d.getFullYear() + "").slice(2),
+    // July
+    MMMM: (d, names) => names.MMMM[d.getMonth()],
+    // Jul
+    MMM: (d, names) => names.MMM[d.getMonth()],
+    // 07
+    MM: (d) => zeroPad2(d.getMonth() + 1),
+    // 7
+    M: (d) => d.getMonth() + 1,
+    // 09
+    DD: (d) => zeroPad2(d.getDate()),
+    // 9
+    D: (d) => d.getDate(),
+    // Monday
+    WWWW: (d, names) => names.WWWW[d.getDay()],
+    // Mon
+    WWW: (d, names) => names.WWW[d.getDay()],
+    // 03
+    HH: (d) => zeroPad2(d.getHours()),
+    // 3
+    H: (d) => d.getHours(),
+    // 9 (12hr, unpadded)
+    h: (d) => {
+      let h = d.getHours();
+      return h == 0 ? 12 : h > 12 ? h - 12 : h;
+    },
+    // AM
+    AA: (d) => d.getHours() >= 12 ? "PM" : "AM",
+    // am
+    aa: (d) => d.getHours() >= 12 ? "pm" : "am",
+    // a
+    a: (d) => d.getHours() >= 12 ? "p" : "a",
+    // 09
+    mm: (d) => zeroPad2(d.getMinutes()),
+    // 9
+    m: (d) => d.getMinutes(),
+    // 09
+    ss: (d) => zeroPad2(d.getSeconds()),
+    // 9
+    s: (d) => d.getSeconds(),
+    // 374
+    fff: (d) => zeroPad3(d.getMilliseconds())
+  };
+  function fmtDate(tpl, names) {
+    names = names || engNames;
+    let parts = [];
+    let R = /\{([a-z]+)\}|[^{]+/gi, m;
+    while (m = R.exec(tpl))
+      parts.push(m[0][0] == "{" ? subs[m[1]] : m[0]);
+    return (d) => {
+      let out = "";
+      for (let i = 0; i < parts.length; i++)
+        out += typeof parts[i] == "string" ? parts[i] : parts[i](d, names);
+      return out;
+    };
+  }
+  var localTz = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  function tzDate(date, tz) {
+    let date2;
+    if (tz == "UTC" || tz == "Etc/UTC")
+      date2 = new Date(+date + date.getTimezoneOffset() * 6e4);
+    else if (tz == localTz)
+      date2 = date;
+    else {
+      date2 = new Date(date.toLocaleString("en-US", { timeZone: tz }));
+      date2.setMilliseconds(date.getMilliseconds());
+    }
+    return date2;
+  }
+  var onlyWhole = (v) => v % 1 == 0;
+  var allMults = [1, 2, 2.5, 5];
+  var decIncrs = genIncrs(10, -32, 0, allMults);
+  var oneIncrs = genIncrs(10, 0, 32, allMults);
+  var wholeIncrs = oneIncrs.filter(onlyWhole);
+  var numIncrs = decIncrs.concat(oneIncrs);
+  var NL = "\n";
+  var yyyy = "{YYYY}";
+  var NLyyyy = NL + yyyy;
+  var md = "{M}/{D}";
+  var NLmd = NL + md;
+  var NLmdyy = NLmd + "/{YY}";
+  var aa = "{aa}";
+  var hmm = "{h}:{mm}";
+  var hmmaa = hmm + aa;
+  var NLhmmaa = NL + hmmaa;
+  var ss = ":{ss}";
+  var _ = null;
+  function genTimeStuffs(ms) {
+    let s = ms * 1e3, m = s * 60, h = m * 60, d = h * 24, mo = d * 30, y = d * 365;
+    let subSecIncrs = ms == 1 ? genIncrs(10, 0, 3, allMults).filter(onlyWhole) : genIncrs(10, -3, 0, allMults);
+    let timeIncrs = subSecIncrs.concat([
+      // minute divisors (# of secs)
+      s,
+      s * 5,
+      s * 10,
+      s * 15,
+      s * 30,
+      // hour divisors (# of mins)
+      m,
+      m * 5,
+      m * 10,
+      m * 15,
+      m * 30,
+      // day divisors (# of hrs)
+      h,
+      h * 2,
+      h * 3,
+      h * 4,
+      h * 6,
+      h * 8,
+      h * 12,
+      // month divisors TODO: need more?
+      d,
+      d * 2,
+      d * 3,
+      d * 4,
+      d * 5,
+      d * 6,
+      d * 7,
+      d * 8,
+      d * 9,
+      d * 10,
+      d * 15,
+      // year divisors (# months, approx)
+      mo,
+      mo * 2,
+      mo * 3,
+      mo * 4,
+      mo * 6,
+      // century divisors
+      y,
+      y * 2,
+      y * 5,
+      y * 10,
+      y * 25,
+      y * 50,
+      y * 100
+    ]);
+    const _timeAxisStamps = [
+      //   tick incr    default          year                    month   day                   hour    min       sec   mode
+      [y, yyyy, _, _, _, _, _, _, 1],
+      [d * 28, "{MMM}", NLyyyy, _, _, _, _, _, 1],
+      [d, md, NLyyyy, _, _, _, _, _, 1],
+      [h, "{h}" + aa, NLmdyy, _, NLmd, _, _, _, 1],
+      [m, hmmaa, NLmdyy, _, NLmd, _, _, _, 1],
+      [s, ss, NLmdyy + " " + hmmaa, _, NLmd + " " + hmmaa, _, NLhmmaa, _, 1],
+      [ms, ss + ".{fff}", NLmdyy + " " + hmmaa, _, NLmd + " " + hmmaa, _, NLhmmaa, _, 1]
+    ];
+    function timeAxisSplits(tzDate2) {
+      return (self, axisIdx, scaleMin, scaleMax, foundIncr, foundSpace) => {
+        let splits = [];
+        let isYr = foundIncr >= y;
+        let isMo = foundIncr >= mo && foundIncr < y;
+        let minDate = tzDate2(scaleMin);
+        let minDateTs = roundDec(minDate * ms, 3);
+        let minMin = mkDate(minDate.getFullYear(), isYr ? 0 : minDate.getMonth(), isMo || isYr ? 1 : minDate.getDate());
+        let minMinTs = roundDec(minMin * ms, 3);
+        if (isMo || isYr) {
+          let moIncr = isMo ? foundIncr / mo : 0;
+          let yrIncr = isYr ? foundIncr / y : 0;
+          let split = minDateTs == minMinTs ? minDateTs : roundDec(mkDate(minMin.getFullYear() + yrIncr, minMin.getMonth() + moIncr, 1) * ms, 3);
+          let splitDate = new Date(round(split / ms));
+          let baseYear = splitDate.getFullYear();
+          let baseMonth = splitDate.getMonth();
+          for (let i = 0; split <= scaleMax; i++) {
+            let next = mkDate(baseYear + yrIncr * i, baseMonth + moIncr * i, 1);
+            let offs = next - tzDate2(roundDec(next * ms, 3));
+            split = roundDec((+next + offs) * ms, 3);
+            if (split <= scaleMax)
+              splits.push(split);
+          }
+        } else {
+          let incr0 = foundIncr >= d ? d : foundIncr;
+          let tzOffset = floor(scaleMin) - floor(minDateTs);
+          let split = minMinTs + tzOffset + incrRoundUp(minDateTs - minMinTs, incr0);
+          splits.push(split);
+          let date0 = tzDate2(split);
+          let prevHour = date0.getHours() + date0.getMinutes() / m + date0.getSeconds() / h;
+          let incrHours = foundIncr / h;
+          let minSpace = self.axes[axisIdx]._space;
+          let pctSpace = foundSpace / minSpace;
+          while (1) {
+            split = roundDec(split + foundIncr, ms == 1 ? 0 : 3);
+            if (split > scaleMax)
+              break;
+            if (incrHours > 1) {
+              let expectedHour = floor(roundDec(prevHour + incrHours, 6)) % 24;
+              let splitDate = tzDate2(split);
+              let actualHour = splitDate.getHours();
+              let dstShift = actualHour - expectedHour;
+              if (dstShift > 1)
+                dstShift = -1;
+              split -= dstShift * h;
+              prevHour = (prevHour + incrHours) % 24;
+              let prevSplit = splits[splits.length - 1];
+              let pctIncr = roundDec((split - prevSplit) / foundIncr, 3);
+              if (pctIncr * pctSpace >= 0.7)
+                splits.push(split);
+            } else
+              splits.push(split);
+          }
+        }
+        return splits;
+      };
+    }
+    return [
+      timeIncrs,
+      _timeAxisStamps,
+      timeAxisSplits
+    ];
+  }
+  var [timeIncrsMs, _timeAxisStampsMs, timeAxisSplitsMs] = genTimeStuffs(1);
+  var [timeIncrsS, _timeAxisStampsS, timeAxisSplitsS] = genTimeStuffs(1e-3);
+  genIncrs(2, -53, 53, [1]);
+  function timeAxisStamps(stampCfg, fmtDate2) {
+    return stampCfg.map((s) => s.map(
+      (v, i) => i == 0 || i == 8 || v == null ? v : fmtDate2(i == 1 || s[8] == 0 ? v : s[1] + v)
+    ));
+  }
+  function timeAxisVals(tzDate2, stamps) {
+    return (self, splits, axisIdx, foundSpace, foundIncr) => {
+      let s = stamps.find((s2) => foundIncr >= s2[0]) || stamps[stamps.length - 1];
+      let prevYear;
+      let prevMnth;
+      let prevDate;
+      let prevHour;
+      let prevMins;
+      let prevSecs;
+      return splits.map((split) => {
+        let date = tzDate2(split);
+        let newYear = date.getFullYear();
+        let newMnth = date.getMonth();
+        let newDate = date.getDate();
+        let newHour = date.getHours();
+        let newMins = date.getMinutes();
+        let newSecs = date.getSeconds();
+        let stamp = newYear != prevYear && s[2] || newMnth != prevMnth && s[3] || newDate != prevDate && s[4] || newHour != prevHour && s[5] || newMins != prevMins && s[6] || newSecs != prevSecs && s[7] || s[1];
+        prevYear = newYear;
+        prevMnth = newMnth;
+        prevDate = newDate;
+        prevHour = newHour;
+        prevMins = newMins;
+        prevSecs = newSecs;
+        return stamp(date);
+      });
+    };
+  }
+  function timeAxisVal(tzDate2, dateTpl) {
+    let stamp = fmtDate(dateTpl);
+    return (self, splits, axisIdx, foundSpace, foundIncr) => splits.map((split) => stamp(tzDate2(split)));
+  }
+  function mkDate(y, m, d) {
+    return new Date(y, m, d);
+  }
+  function timeSeriesStamp(stampCfg, fmtDate2) {
+    return fmtDate2(stampCfg);
+  }
+  var _timeSeriesStamp = "{YYYY}-{MM}-{DD} {h}:{mm}{aa}";
+  function timeSeriesVal(tzDate2, stamp) {
+    return (self, val, seriesIdx, dataIdx) => dataIdx == null ? LEGEND_DISP : stamp(tzDate2(val));
+  }
+  function legendStroke(self, seriesIdx) {
+    let s = self.series[seriesIdx];
+    return s.width ? s.stroke(self, seriesIdx) : s.points.width ? s.points.stroke(self, seriesIdx) : null;
+  }
+  function legendFill(self, seriesIdx) {
+    return self.series[seriesIdx].fill(self, seriesIdx);
+  }
+  var legendOpts = {
+    show: true,
+    live: true,
+    isolate: false,
+    mount: noop,
+    markers: {
+      show: true,
+      width: 2,
+      stroke: legendStroke,
+      fill: legendFill,
+      dash: "solid"
+    },
+    idx: null,
+    idxs: null,
+    values: []
+  };
+  function cursorPointShow(self, si) {
+    let o = self.cursor.points;
+    let pt = placeDiv();
+    let size = o.size(self, si);
+    setStylePx(pt, WIDTH, size);
+    setStylePx(pt, HEIGHT, size);
+    let mar = size / -2;
+    setStylePx(pt, "marginLeft", mar);
+    setStylePx(pt, "marginTop", mar);
+    let width = o.width(self, si, size);
+    width && setStylePx(pt, "borderWidth", width);
+    return pt;
+  }
+  function cursorPointFill(self, si) {
+    let sp = self.series[si].points;
+    return sp._fill || sp._stroke;
+  }
+  function cursorPointStroke(self, si) {
+    let sp = self.series[si].points;
+    return sp._stroke || sp._fill;
+  }
+  function cursorPointSize(self, si) {
+    let sp = self.series[si].points;
+    return sp.size;
+  }
+  var moveTuple = [0, 0];
+  function cursorMove(self, mouseLeft1, mouseTop1) {
+    moveTuple[0] = mouseLeft1;
+    moveTuple[1] = mouseTop1;
+    return moveTuple;
+  }
+  function filtBtn0(self, targ, handle, onlyTarg = true) {
+    return (e) => {
+      e.button == 0 && (!onlyTarg || e.target == targ) && handle(e);
+    };
+  }
+  function filtTarg(self, targ, handle, onlyTarg = true) {
+    return (e) => {
+      (!onlyTarg || e.target == targ) && handle(e);
+    };
+  }
+  var cursorOpts = {
+    show: true,
+    x: true,
+    y: true,
+    lock: false,
+    move: cursorMove,
+    points: {
+      one: false,
+      show: cursorPointShow,
+      size: cursorPointSize,
+      width: 0,
+      stroke: cursorPointStroke,
+      fill: cursorPointFill
+    },
+    bind: {
+      mousedown: filtBtn0,
+      mouseup: filtBtn0,
+      click: filtBtn0,
+      // legend clicks, not .u-over clicks
+      dblclick: filtBtn0,
+      mousemove: filtTarg,
+      mouseleave: filtTarg,
+      mouseenter: filtTarg
+    },
+    drag: {
+      setScale: true,
+      x: true,
+      y: false,
+      dist: 0,
+      uni: null,
+      click: (self, e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      },
+      _x: false,
+      _y: false
+    },
+    focus: {
+      dist: (self, seriesIdx, dataIdx, valPos, curPos) => valPos - curPos,
+      prox: -1,
+      bias: 0
+    },
+    hover: {
+      skip: [void 0],
+      prox: null,
+      bias: 0
+    },
+    left: -10,
+    top: -10,
+    idx: null,
+    dataIdx: null,
+    idxs: null,
+    event: null
+  };
+  var axisLines = {
+    show: true,
+    stroke: "rgba(0,0,0,0.07)",
+    width: 2
+    //	dash: [],
+  };
+  var grid = assign({}, axisLines, {
+    filter: retArg1
+  });
+  var ticks = assign({}, grid, {
+    size: 10
+  });
+  var border = assign({}, axisLines, {
+    show: false
+  });
+  var font = '12px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
+  var labelFont = "bold " + font;
+  var lineGap = 1.5;
+  var xAxisOpts = {
+    show: true,
+    scale: "x",
+    stroke: hexBlack,
+    space: 50,
+    gap: 5,
+    alignTo: 1,
+    size: 50,
+    labelGap: 0,
+    labelSize: 30,
+    labelFont,
+    side: 2,
+    //	class: "x-vals",
+    //	incrs: timeIncrs,
+    //	values: timeVals,
+    //	filter: retArg1,
+    grid,
+    ticks,
+    border,
+    font,
+    lineGap,
+    rotate: 0
+  };
+  var numSeriesLabel = "Value";
+  var timeSeriesLabel = "Time";
+  var xSeriesOpts = {
+    show: true,
+    scale: "x",
+    auto: false,
+    sorted: 1,
+    //	label: "Time",
+    //	value: v => stamp(new Date(v * 1e3)),
+    // internal caches
+    min: inf,
+    max: -inf,
+    idxs: []
+  };
+  function numAxisVals(self, splits, axisIdx, foundSpace, foundIncr) {
+    return splits.map((v) => v == null ? "" : fmtNum(v));
+  }
+  function numAxisSplits(self, axisIdx, scaleMin, scaleMax, foundIncr, foundSpace, forceMin) {
+    let splits = [];
+    let numDec = fixedDec.get(foundIncr) || 0;
+    scaleMin = forceMin ? scaleMin : roundDec(incrRoundUp(scaleMin, foundIncr), numDec);
+    for (let val = scaleMin; val <= scaleMax; val = roundDec(val + foundIncr, numDec))
+      splits.push(Object.is(val, -0) ? 0 : val);
+    return splits;
+  }
+  function logAxisSplits(self, axisIdx, scaleMin, scaleMax, foundIncr, foundSpace, forceMin) {
+    const splits = [];
+    const logBase = self.scales[self.axes[axisIdx].scale].log;
+    const logFn = logBase == 10 ? log10 : log2;
+    const exp = floor(logFn(scaleMin));
+    foundIncr = pow(logBase, exp);
+    if (logBase == 10)
+      foundIncr = numIncrs[closestIdx(foundIncr, numIncrs)];
+    let split = scaleMin;
+    let nextMagIncr = foundIncr * logBase;
+    if (logBase == 10)
+      nextMagIncr = numIncrs[closestIdx(nextMagIncr, numIncrs)];
+    do {
+      splits.push(split);
+      split = split + foundIncr;
+      if (logBase == 10 && !fixedDec.has(split))
+        split = roundDec(split, fixedDec.get(foundIncr));
+      if (split >= nextMagIncr) {
+        foundIncr = split;
+        nextMagIncr = foundIncr * logBase;
+        if (logBase == 10)
+          nextMagIncr = numIncrs[closestIdx(nextMagIncr, numIncrs)];
+      }
+    } while (split <= scaleMax);
+    return splits;
+  }
+  function asinhAxisSplits(self, axisIdx, scaleMin, scaleMax, foundIncr, foundSpace, forceMin) {
+    let sc = self.scales[self.axes[axisIdx].scale];
+    let linthresh = sc.asinh;
+    let posSplits = scaleMax > linthresh ? logAxisSplits(self, axisIdx, max(linthresh, scaleMin), scaleMax, foundIncr) : [linthresh];
+    let zero = scaleMax >= 0 && scaleMin <= 0 ? [0] : [];
+    let negSplits = scaleMin < -linthresh ? logAxisSplits(self, axisIdx, max(linthresh, -scaleMax), -scaleMin, foundIncr) : [linthresh];
+    return negSplits.reverse().map((v) => -v).concat(zero, posSplits);
+  }
+  var RE_ALL = /./;
+  var RE_12357 = /[12357]/;
+  var RE_125 = /[125]/;
+  var RE_1 = /1/;
+  var _filt = (splits, distr, re, keepMod) => splits.map((v, i) => distr == 4 && v == 0 || i % keepMod == 0 && re.test(v.toExponential()[v < 0 ? 1 : 0]) ? v : null);
+  function log10AxisValsFilt(self, splits, axisIdx, foundSpace, foundIncr) {
+    let axis = self.axes[axisIdx];
+    let scaleKey = axis.scale;
+    let sc = self.scales[scaleKey];
+    let valToPos = self.valToPos;
+    let minSpace = axis._space;
+    let _10 = valToPos(10, scaleKey);
+    let re = valToPos(9, scaleKey) - _10 >= minSpace ? RE_ALL : valToPos(7, scaleKey) - _10 >= minSpace ? RE_12357 : valToPos(5, scaleKey) - _10 >= minSpace ? RE_125 : RE_1;
+    if (re == RE_1) {
+      let magSpace = abs(valToPos(1, scaleKey) - _10);
+      if (magSpace < minSpace)
+        return _filt(splits.slice().reverse(), sc.distr, re, ceil(minSpace / magSpace)).reverse();
+    }
+    return _filt(splits, sc.distr, re, 1);
+  }
+  function log2AxisValsFilt(self, splits, axisIdx, foundSpace, foundIncr) {
+    let axis = self.axes[axisIdx];
+    let scaleKey = axis.scale;
+    let minSpace = axis._space;
+    let valToPos = self.valToPos;
+    let magSpace = abs(valToPos(1, scaleKey) - valToPos(2, scaleKey));
+    if (magSpace < minSpace)
+      return _filt(splits.slice().reverse(), 3, RE_ALL, ceil(minSpace / magSpace)).reverse();
+    return splits;
+  }
+  function numSeriesVal(self, val, seriesIdx, dataIdx) {
+    return dataIdx == null ? LEGEND_DISP : val == null ? "" : fmtNum(val);
+  }
+  var yAxisOpts = {
+    show: true,
+    scale: "y",
+    stroke: hexBlack,
+    space: 30,
+    gap: 5,
+    alignTo: 1,
+    size: 50,
+    labelGap: 0,
+    labelSize: 30,
+    labelFont,
+    side: 3,
+    //	class: "y-vals",
+    //	incrs: numIncrs,
+    //	values: (vals, space) => vals,
+    //	filter: retArg1,
+    grid,
+    ticks,
+    border,
+    font,
+    lineGap,
+    rotate: 0
+  };
+  function ptDia(width, mult) {
+    let dia = 3 + (width || 1) * 2;
+    return roundDec(dia * mult, 3);
+  }
+  function seriesPointsShow(self, si) {
+    let { scale, idxs } = self.series[0];
+    let xData = self._data[0];
+    let p0 = self.valToPos(xData[idxs[0]], scale, true);
+    let p1 = self.valToPos(xData[idxs[1]], scale, true);
+    let dim = abs(p1 - p0);
+    let s = self.series[si];
+    let maxPts = dim / (s.points.space * pxRatio);
+    return idxs[1] - idxs[0] <= maxPts;
+  }
+  var facet = {
+    scale: null,
+    auto: true,
+    sorted: 0,
+    // internal caches
+    min: inf,
+    max: -inf
+  };
+  var gaps = (self, seriesIdx, idx0, idx1, nullGaps) => nullGaps;
+  var xySeriesOpts = {
+    show: true,
+    auto: true,
+    sorted: 0,
+    gaps,
+    alpha: 1,
+    facets: [
+      assign({}, facet, { scale: "x" }),
+      assign({}, facet, { scale: "y" })
+    ]
+  };
+  var ySeriesOpts = {
+    scale: "y",
+    auto: true,
+    sorted: 0,
+    show: true,
+    spanGaps: false,
+    gaps,
+    alpha: 1,
+    points: {
+      show: seriesPointsShow,
+      filter: null
+      //  paths:
+      //	stroke: "#000",
+      //	fill: "#fff",
+      //	width: 1,
+      //	size: 10,
+    },
+    //	label: "Value",
+    //	value: v => v,
+    values: null,
+    // internal caches
+    min: inf,
+    max: -inf,
+    idxs: [],
+    path: null,
+    clip: null
+  };
+  function clampScale(self, val, scaleMin, scaleMax, scaleKey) {
+    return scaleMin / 10;
+  }
+  var xScaleOpts = {
+    time: FEAT_TIME,
+    auto: true,
+    distr: 1,
+    log: 10,
+    asinh: 1,
+    min: null,
+    max: null,
+    dir: 1,
+    ori: 0
+  };
+  var yScaleOpts = assign({}, xScaleOpts, {
+    time: false,
+    ori: 1
+  });
+  var syncs = {};
+  function _sync(key, opts) {
+    let s = syncs[key];
+    if (!s) {
+      s = {
+        key,
+        plots: [],
+        sub(plot) {
+          s.plots.push(plot);
+        },
+        unsub(plot) {
+          s.plots = s.plots.filter((c) => c != plot);
+        },
+        pub(type, self, x, y, w, h, i) {
+          for (let j = 0; j < s.plots.length; j++)
+            s.plots[j] != self && s.plots[j].pub(type, self, x, y, w, h, i);
+        }
+      };
+      if (key != null)
+        syncs[key] = s;
+    }
+    return s;
+  }
+  var BAND_CLIP_FILL = 1 << 0;
+  var BAND_CLIP_STROKE = 1 << 1;
+  function orient(u, seriesIdx, cb) {
+    const mode = u.mode;
+    const series = u.series[seriesIdx];
+    const data = mode == 2 ? u._data[seriesIdx] : u._data;
+    const scales = u.scales;
+    const bbox = u.bbox;
+    let dx = data[0], dy = mode == 2 ? data[1] : data[seriesIdx], sx = mode == 2 ? scales[series.facets[0].scale] : scales[u.series[0].scale], sy = mode == 2 ? scales[series.facets[1].scale] : scales[series.scale], l = bbox.left, t = bbox.top, w = bbox.width, h = bbox.height, H = u.valToPosH, V = u.valToPosV;
+    return sx.ori == 0 ? cb(
+      series,
+      dx,
+      dy,
+      sx,
+      sy,
+      H,
+      V,
+      l,
+      t,
+      w,
+      h,
+      moveToH,
+      lineToH,
+      rectH,
+      arcH,
+      bezierCurveToH
+    ) : cb(
+      series,
+      dx,
+      dy,
+      sx,
+      sy,
+      V,
+      H,
+      t,
+      l,
+      h,
+      w,
+      moveToV,
+      lineToV,
+      rectV,
+      arcV,
+      bezierCurveToV
+    );
+  }
+  function bandFillClipDirs(self, seriesIdx) {
+    let fillDir = 0;
+    let clipDirs = 0;
+    let bands = ifNull(self.bands, EMPTY_ARR);
+    for (let i = 0; i < bands.length; i++) {
+      let b = bands[i];
+      if (b.series[0] == seriesIdx)
+        fillDir = b.dir;
+      else if (b.series[1] == seriesIdx) {
+        if (b.dir == 1)
+          clipDirs |= 1;
+        else
+          clipDirs |= 2;
+      }
+    }
+    return [
+      fillDir,
+      clipDirs == 1 ? -1 : (
+        // neg only
+        clipDirs == 2 ? 1 : (
+          // pos only
+          clipDirs == 3 ? 2 : (
+            // both
+            0
+          )
+        )
+      )
+    ];
+  }
+  function seriesFillTo(self, seriesIdx, dataMin, dataMax, bandFillDir) {
+    let mode = self.mode;
+    let series = self.series[seriesIdx];
+    let scaleKey = mode == 2 ? series.facets[1].scale : series.scale;
+    let scale = self.scales[scaleKey];
+    return bandFillDir == -1 ? scale.min : bandFillDir == 1 ? scale.max : scale.distr == 3 ? scale.dir == 1 ? scale.min : scale.max : 0;
+  }
+  function clipBandLine(self, seriesIdx, idx0, idx1, strokePath, clipDir) {
+    return orient(self, seriesIdx, (series, dataX, dataY, scaleX, scaleY, valToPosX, valToPosY, xOff, yOff, xDim, yDim) => {
+      let pxRound = series.pxRound;
+      const dir = scaleX.dir * (scaleX.ori == 0 ? 1 : -1);
+      const lineTo = scaleX.ori == 0 ? lineToH : lineToV;
+      let frIdx, toIdx;
+      if (dir == 1) {
+        frIdx = idx0;
+        toIdx = idx1;
+      } else {
+        frIdx = idx1;
+        toIdx = idx0;
+      }
+      let x0 = pxRound(valToPosX(dataX[frIdx], scaleX, xDim, xOff));
+      let y0 = pxRound(valToPosY(dataY[frIdx], scaleY, yDim, yOff));
+      let x1 = pxRound(valToPosX(dataX[toIdx], scaleX, xDim, xOff));
+      let yLimit = pxRound(valToPosY(clipDir == 1 ? scaleY.max : scaleY.min, scaleY, yDim, yOff));
+      let clip = new Path2D(strokePath);
+      lineTo(clip, x1, yLimit);
+      lineTo(clip, x0, yLimit);
+      lineTo(clip, x0, y0);
+      return clip;
+    });
+  }
+  function clipGaps(gaps2, ori, plotLft, plotTop, plotWid, plotHgt) {
+    let clip = null;
+    if (gaps2.length > 0) {
+      clip = new Path2D();
+      const rect2 = ori == 0 ? rectH : rectV;
+      let prevGapEnd = plotLft;
+      for (let i = 0; i < gaps2.length; i++) {
+        let g = gaps2[i];
+        if (g[1] > g[0]) {
+          let w2 = g[0] - prevGapEnd;
+          w2 > 0 && rect2(clip, prevGapEnd, plotTop, w2, plotTop + plotHgt);
+          prevGapEnd = g[1];
+        }
+      }
+      let w = plotLft + plotWid - prevGapEnd;
+      let maxStrokeWidth = 10;
+      w > 0 && rect2(clip, prevGapEnd, plotTop - maxStrokeWidth / 2, w, plotTop + plotHgt + maxStrokeWidth);
+    }
+    return clip;
+  }
+  function addGap(gaps2, fromX, toX) {
+    let prevGap = gaps2[gaps2.length - 1];
+    if (prevGap && prevGap[0] == fromX)
+      prevGap[1] = toX;
+    else
+      gaps2.push([fromX, toX]);
+  }
+  function findGaps(xs, ys, idx0, idx1, dir, pixelForX, align) {
+    let gaps2 = [];
+    let len = xs.length;
+    for (let i = dir == 1 ? idx0 : idx1; i >= idx0 && i <= idx1; i += dir) {
+      let yVal = ys[i];
+      if (yVal === null) {
+        let fr = i, to = i;
+        if (dir == 1) {
+          while (++i <= idx1 && ys[i] === null)
+            to = i;
+        } else {
+          while (--i >= idx0 && ys[i] === null)
+            to = i;
+        }
+        let frPx = pixelForX(xs[fr]);
+        let toPx = to == fr ? frPx : pixelForX(xs[to]);
+        let fri2 = fr - dir;
+        let frPx2 = align <= 0 && fri2 >= 0 && fri2 < len ? pixelForX(xs[fri2]) : frPx;
+        frPx = frPx2;
+        let toi2 = to + dir;
+        let toPx2 = align >= 0 && toi2 >= 0 && toi2 < len ? pixelForX(xs[toi2]) : toPx;
+        toPx = toPx2;
+        if (toPx >= frPx)
+          gaps2.push([frPx, toPx]);
+      }
+    }
+    return gaps2;
+  }
+  function pxRoundGen(pxAlign) {
+    return pxAlign == 0 ? retArg0 : pxAlign == 1 ? round : (v) => incrRound(v, pxAlign);
+  }
+  function rect(ori) {
+    let moveTo = ori == 0 ? moveToH : moveToV;
+    let arcTo = ori == 0 ? (p, x1, y1, x2, y2, r) => {
+      p.arcTo(x1, y1, x2, y2, r);
+    } : (p, y1, x1, y2, x2, r) => {
+      p.arcTo(x1, y1, x2, y2, r);
+    };
+    let rect2 = ori == 0 ? (p, x, y, w, h) => {
+      p.rect(x, y, w, h);
+    } : (p, y, x, h, w) => {
+      p.rect(x, y, w, h);
+    };
+    return (p, x, y, w, h, endRad = 0, baseRad = 0) => {
+      if (endRad == 0 && baseRad == 0)
+        rect2(p, x, y, w, h);
+      else {
+        endRad = min(endRad, w / 2, h / 2);
+        baseRad = min(baseRad, w / 2, h / 2);
+        moveTo(p, x + endRad, y);
+        arcTo(p, x + w, y, x + w, y + h, endRad);
+        arcTo(p, x + w, y + h, x, y + h, baseRad);
+        arcTo(p, x, y + h, x, y, baseRad);
+        arcTo(p, x, y, x + w, y, endRad);
+        p.closePath();
+      }
+    };
+  }
+  var moveToH = (p, x, y) => {
+    p.moveTo(x, y);
+  };
+  var moveToV = (p, y, x) => {
+    p.moveTo(x, y);
+  };
+  var lineToH = (p, x, y) => {
+    p.lineTo(x, y);
+  };
+  var lineToV = (p, y, x) => {
+    p.lineTo(x, y);
+  };
+  var rectH = rect(0);
+  var rectV = rect(1);
+  var arcH = (p, x, y, r, startAngle, endAngle) => {
+    p.arc(x, y, r, startAngle, endAngle);
+  };
+  var arcV = (p, y, x, r, startAngle, endAngle) => {
+    p.arc(x, y, r, startAngle, endAngle);
+  };
+  var bezierCurveToH = (p, bp1x, bp1y, bp2x, bp2y, p2x, p2y) => {
+    p.bezierCurveTo(bp1x, bp1y, bp2x, bp2y, p2x, p2y);
+  };
+  var bezierCurveToV = (p, bp1y, bp1x, bp2y, bp2x, p2y, p2x) => {
+    p.bezierCurveTo(bp1x, bp1y, bp2x, bp2y, p2x, p2y);
+  };
+  function points(opts) {
+    return (u, seriesIdx, idx0, idx1, filtIdxs) => {
+      return orient(u, seriesIdx, (series, dataX, dataY, scaleX, scaleY, valToPosX, valToPosY, xOff, yOff, xDim, yDim) => {
+        let { pxRound, points: points2 } = series;
+        let moveTo, arc;
+        if (scaleX.ori == 0) {
+          moveTo = moveToH;
+          arc = arcH;
+        } else {
+          moveTo = moveToV;
+          arc = arcV;
+        }
+        const width = roundDec(points2.width * pxRatio, 3);
+        let rad = (points2.size - points2.width) / 2 * pxRatio;
+        let dia = roundDec(rad * 2, 3);
+        let fill = new Path2D();
+        let clip = new Path2D();
+        let { left: lft, top, width: wid, height: hgt } = u.bbox;
+        rectH(
+          clip,
+          lft - dia,
+          top - dia,
+          wid + dia * 2,
+          hgt + dia * 2
+        );
+        const drawPoint = (pi) => {
+          if (dataY[pi] != null) {
+            let x = pxRound(valToPosX(dataX[pi], scaleX, xDim, xOff));
+            let y = pxRound(valToPosY(dataY[pi], scaleY, yDim, yOff));
+            moveTo(fill, x + rad, y);
+            arc(fill, x, y, rad, 0, PI * 2);
+          }
+        };
+        if (filtIdxs)
+          filtIdxs.forEach(drawPoint);
+        else {
+          for (let pi = idx0; pi <= idx1; pi++)
+            drawPoint(pi);
+        }
+        return {
+          stroke: width > 0 ? fill : null,
+          fill,
+          clip,
+          flags: BAND_CLIP_FILL | BAND_CLIP_STROKE
+        };
+      });
+    };
+  }
+  function _drawAcc(lineTo) {
+    return (stroke, accX, minY, maxY, inY, outY) => {
+      if (minY != maxY) {
+        if (inY != minY && outY != minY)
+          lineTo(stroke, accX, minY);
+        if (inY != maxY && outY != maxY)
+          lineTo(stroke, accX, maxY);
+        lineTo(stroke, accX, outY);
+      }
+    };
+  }
+  var drawAccH = _drawAcc(lineToH);
+  var drawAccV = _drawAcc(lineToV);
+  function linear(opts) {
+    const alignGaps = ifNull(opts?.alignGaps, 0);
+    return (u, seriesIdx, idx0, idx1) => {
+      return orient(u, seriesIdx, (series, dataX, dataY, scaleX, scaleY, valToPosX, valToPosY, xOff, yOff, xDim, yDim) => {
+        [idx0, idx1] = nonNullIdxs(dataY, idx0, idx1);
+        let pxRound = series.pxRound;
+        let pixelForX = (val) => pxRound(valToPosX(val, scaleX, xDim, xOff));
+        let pixelForY = (val) => pxRound(valToPosY(val, scaleY, yDim, yOff));
+        let lineTo, drawAcc;
+        if (scaleX.ori == 0) {
+          lineTo = lineToH;
+          drawAcc = drawAccH;
+        } else {
+          lineTo = lineToV;
+          drawAcc = drawAccV;
+        }
+        const dir = scaleX.dir * (scaleX.ori == 0 ? 1 : -1);
+        const _paths = { stroke: new Path2D(), fill: null, clip: null, band: null, gaps: null, flags: BAND_CLIP_FILL };
+        const stroke = _paths.stroke;
+        let hasGap = false;
+        const decimate = idx1 - idx0 >= xDim * 4;
+        if (decimate) {
+          let xForPixel = (pos) => u.posToVal(pos, scaleX.key, true);
+          let minY = null, maxY = null, inY, outY, drawnAtX;
+          let accX = pixelForX(dataX[dir == 1 ? idx0 : idx1]);
+          let idx0px = pixelForX(dataX[idx0]);
+          let idx1px = pixelForX(dataX[idx1]);
+          let nextAccXVal = xForPixel(dir == 1 ? idx0px + 1 : idx1px - 1);
+          for (let i = dir == 1 ? idx0 : idx1; i >= idx0 && i <= idx1; i += dir) {
+            let xVal = dataX[i];
+            let reuseAccX = dir == 1 ? xVal < nextAccXVal : xVal > nextAccXVal;
+            let x = reuseAccX ? accX : pixelForX(xVal);
+            let yVal = dataY[i];
+            if (x == accX) {
+              if (yVal != null) {
+                outY = yVal;
+                if (minY == null) {
+                  lineTo(stroke, x, pixelForY(outY));
+                  inY = minY = maxY = outY;
+                } else {
+                  if (outY < minY)
+                    minY = outY;
+                  else if (outY > maxY)
+                    maxY = outY;
+                }
+              } else {
+                if (yVal === null)
+                  hasGap = true;
+              }
+            } else {
+              if (minY != null)
+                drawAcc(stroke, accX, pixelForY(minY), pixelForY(maxY), pixelForY(inY), pixelForY(outY));
+              if (yVal != null) {
+                outY = yVal;
+                lineTo(stroke, x, pixelForY(outY));
+                minY = maxY = inY = outY;
+              } else {
+                minY = maxY = null;
+                if (yVal === null)
+                  hasGap = true;
+              }
+              accX = x;
+              nextAccXVal = xForPixel(accX + dir);
+            }
+          }
+          if (minY != null && minY != maxY && drawnAtX != accX)
+            drawAcc(stroke, accX, pixelForY(minY), pixelForY(maxY), pixelForY(inY), pixelForY(outY));
+        } else {
+          for (let i = dir == 1 ? idx0 : idx1; i >= idx0 && i <= idx1; i += dir) {
+            let yVal = dataY[i];
+            if (yVal === null)
+              hasGap = true;
+            else if (yVal != null)
+              lineTo(stroke, pixelForX(dataX[i]), pixelForY(yVal));
+          }
+        }
+        let [bandFillDir, bandClipDir] = bandFillClipDirs(u, seriesIdx);
+        if (series.fill != null || bandFillDir != 0) {
+          let fill = _paths.fill = new Path2D(stroke);
+          let fillToVal = series.fillTo(u, seriesIdx, series.min, series.max, bandFillDir);
+          let fillToY = pixelForY(fillToVal);
+          let frX = pixelForX(dataX[idx0]);
+          let toX = pixelForX(dataX[idx1]);
+          if (dir == -1)
+            [toX, frX] = [frX, toX];
+          lineTo(fill, toX, fillToY);
+          lineTo(fill, frX, fillToY);
+        }
+        if (!series.spanGaps) {
+          let gaps2 = [];
+          hasGap && gaps2.push(...findGaps(dataX, dataY, idx0, idx1, dir, pixelForX, alignGaps));
+          _paths.gaps = gaps2 = series.gaps(u, seriesIdx, idx0, idx1, gaps2);
+          _paths.clip = clipGaps(gaps2, scaleX.ori, xOff, yOff, xDim, yDim);
+        }
+        if (bandClipDir != 0) {
+          _paths.band = bandClipDir == 2 ? [
+            clipBandLine(u, seriesIdx, idx0, idx1, stroke, -1),
+            clipBandLine(u, seriesIdx, idx0, idx1, stroke, 1)
+          ] : clipBandLine(u, seriesIdx, idx0, idx1, stroke, bandClipDir);
+        }
+        return _paths;
+      });
+    };
+  }
+  function stepped(opts) {
+    const align = ifNull(opts.align, 1);
+    const ascDesc = ifNull(opts.ascDesc, false);
+    const alignGaps = ifNull(opts.alignGaps, 0);
+    const extend = ifNull(opts.extend, false);
+    return (u, seriesIdx, idx0, idx1) => {
+      return orient(u, seriesIdx, (series, dataX, dataY, scaleX, scaleY, valToPosX, valToPosY, xOff, yOff, xDim, yDim) => {
+        [idx0, idx1] = nonNullIdxs(dataY, idx0, idx1);
+        let pxRound = series.pxRound;
+        let { left, width } = u.bbox;
+        let pixelForX = (val) => pxRound(valToPosX(val, scaleX, xDim, xOff));
+        let pixelForY = (val) => pxRound(valToPosY(val, scaleY, yDim, yOff));
+        let lineTo = scaleX.ori == 0 ? lineToH : lineToV;
+        const _paths = { stroke: new Path2D(), fill: null, clip: null, band: null, gaps: null, flags: BAND_CLIP_FILL };
+        const stroke = _paths.stroke;
+        const dir = scaleX.dir * (scaleX.ori == 0 ? 1 : -1);
+        let prevYPos = pixelForY(dataY[dir == 1 ? idx0 : idx1]);
+        let firstXPos = pixelForX(dataX[dir == 1 ? idx0 : idx1]);
+        let prevXPos = firstXPos;
+        let firstXPosExt = firstXPos;
+        if (extend && align == -1) {
+          firstXPosExt = left;
+          lineTo(stroke, firstXPosExt, prevYPos);
+        }
+        lineTo(stroke, firstXPos, prevYPos);
+        for (let i = dir == 1 ? idx0 : idx1; i >= idx0 && i <= idx1; i += dir) {
+          let yVal1 = dataY[i];
+          if (yVal1 == null)
+            continue;
+          let x1 = pixelForX(dataX[i]);
+          let y1 = pixelForY(yVal1);
+          if (align == 1)
+            lineTo(stroke, x1, prevYPos);
+          else
+            lineTo(stroke, prevXPos, y1);
+          lineTo(stroke, x1, y1);
+          prevYPos = y1;
+          prevXPos = x1;
+        }
+        let prevXPosExt = prevXPos;
+        if (extend && align == 1) {
+          prevXPosExt = left + width;
+          lineTo(stroke, prevXPosExt, prevYPos);
+        }
+        let [bandFillDir, bandClipDir] = bandFillClipDirs(u, seriesIdx);
+        if (series.fill != null || bandFillDir != 0) {
+          let fill = _paths.fill = new Path2D(stroke);
+          let fillTo = series.fillTo(u, seriesIdx, series.min, series.max, bandFillDir);
+          let fillToY = pixelForY(fillTo);
+          lineTo(fill, prevXPosExt, fillToY);
+          lineTo(fill, firstXPosExt, fillToY);
+        }
+        if (!series.spanGaps) {
+          let gaps2 = [];
+          gaps2.push(...findGaps(dataX, dataY, idx0, idx1, dir, pixelForX, alignGaps));
+          let halfStroke = series.width * pxRatio / 2;
+          let startsOffset = ascDesc || align == 1 ? halfStroke : -halfStroke;
+          let endsOffset = ascDesc || align == -1 ? -halfStroke : halfStroke;
+          gaps2.forEach((g) => {
+            g[0] += startsOffset;
+            g[1] += endsOffset;
+          });
+          _paths.gaps = gaps2 = series.gaps(u, seriesIdx, idx0, idx1, gaps2);
+          _paths.clip = clipGaps(gaps2, scaleX.ori, xOff, yOff, xDim, yDim);
+        }
+        if (bandClipDir != 0) {
+          _paths.band = bandClipDir == 2 ? [
+            clipBandLine(u, seriesIdx, idx0, idx1, stroke, -1),
+            clipBandLine(u, seriesIdx, idx0, idx1, stroke, 1)
+          ] : clipBandLine(u, seriesIdx, idx0, idx1, stroke, bandClipDir);
+        }
+        return _paths;
+      });
+    };
+  }
+  function findColWidth(dataX, dataY, valToPosX, scaleX, xDim, xOff, colWid = inf) {
+    if (dataX.length > 1) {
+      let prevIdx = null;
+      for (let i = 0, minDelta = Infinity; i < dataX.length; i++) {
+        if (dataY[i] !== void 0) {
+          if (prevIdx != null) {
+            let delta = abs(dataX[i] - dataX[prevIdx]);
+            if (delta < minDelta) {
+              minDelta = delta;
+              colWid = abs(valToPosX(dataX[i], scaleX, xDim, xOff) - valToPosX(dataX[prevIdx], scaleX, xDim, xOff));
+            }
+          }
+          prevIdx = i;
+        }
+      }
+    }
+    return colWid;
+  }
+  function bars(opts) {
+    opts = opts || EMPTY_OBJ;
+    const size = ifNull(opts.size, [0.6, inf, 1]);
+    const align = opts.align || 0;
+    const _extraGap = opts.gap || 0;
+    let ro = opts.radius;
+    ro = // [valueRadius, baselineRadius]
+    ro == null ? [0, 0] : typeof ro == "number" ? [ro, 0] : ro;
+    const radiusFn = fnOrSelf(ro);
+    const gapFactor = 1 - size[0];
+    const _maxWidth = ifNull(size[1], inf);
+    const _minWidth = ifNull(size[2], 1);
+    const disp = ifNull(opts.disp, EMPTY_OBJ);
+    const _each = ifNull(opts.each, (_2) => {
+    });
+    const { fill: dispFills, stroke: dispStrokes } = disp;
+    return (u, seriesIdx, idx0, idx1) => {
+      return orient(u, seriesIdx, (series, dataX, dataY, scaleX, scaleY, valToPosX, valToPosY, xOff, yOff, xDim, yDim) => {
+        let pxRound = series.pxRound;
+        let _align = align;
+        let extraGap = _extraGap * pxRatio;
+        let maxWidth = _maxWidth * pxRatio;
+        let minWidth = _minWidth * pxRatio;
+        let valRadius, baseRadius;
+        if (scaleX.ori == 0)
+          [valRadius, baseRadius] = radiusFn(u, seriesIdx);
+        else
+          [baseRadius, valRadius] = radiusFn(u, seriesIdx);
+        const _dirX = scaleX.dir * (scaleX.ori == 0 ? 1 : -1);
+        let rect2 = scaleX.ori == 0 ? rectH : rectV;
+        let each = scaleX.ori == 0 ? _each : (u2, seriesIdx2, i, top, lft, hgt, wid) => {
+          _each(u2, seriesIdx2, i, lft, top, wid, hgt);
+        };
+        let band = ifNull(u.bands, EMPTY_ARR).find((b) => b.series[0] == seriesIdx);
+        let fillDir = band != null ? band.dir : 0;
+        let fillTo = series.fillTo(u, seriesIdx, series.min, series.max, fillDir);
+        let fillToY = pxRound(valToPosY(fillTo, scaleY, yDim, yOff));
+        let xShift, barWid, fullGap, colWid = xDim;
+        let strokeWidth = pxRound(series.width * pxRatio);
+        let multiPath = false;
+        let fillColors = null;
+        let fillPaths = null;
+        let strokeColors = null;
+        let strokePaths = null;
+        if (dispFills != null && (strokeWidth == 0 || dispStrokes != null)) {
+          multiPath = true;
+          fillColors = dispFills.values(u, seriesIdx, idx0, idx1);
+          fillPaths = /* @__PURE__ */ new Map();
+          new Set(fillColors).forEach((color) => {
+            if (color != null)
+              fillPaths.set(color, new Path2D());
+          });
+          if (strokeWidth > 0) {
+            strokeColors = dispStrokes.values(u, seriesIdx, idx0, idx1);
+            strokePaths = /* @__PURE__ */ new Map();
+            new Set(strokeColors).forEach((color) => {
+              if (color != null)
+                strokePaths.set(color, new Path2D());
+            });
+          }
+        }
+        let { x0, size: size2 } = disp;
+        if (x0 != null && size2 != null) {
+          _align = 1;
+          dataX = x0.values(u, seriesIdx, idx0, idx1);
+          if (x0.unit == 2)
+            dataX = dataX.map((pct) => u.posToVal(xOff + pct * xDim, scaleX.key, true));
+          let sizes = size2.values(u, seriesIdx, idx0, idx1);
+          if (size2.unit == 2)
+            barWid = sizes[0] * xDim;
+          else
+            barWid = valToPosX(sizes[0], scaleX, xDim, xOff) - valToPosX(0, scaleX, xDim, xOff);
+          colWid = findColWidth(dataX, dataY, valToPosX, scaleX, xDim, xOff, colWid);
+          let gapWid = colWid - barWid;
+          fullGap = gapWid + extraGap;
+        } else {
+          colWid = findColWidth(dataX, dataY, valToPosX, scaleX, xDim, xOff, colWid);
+          let gapWid = colWid * gapFactor;
+          fullGap = gapWid + extraGap;
+          barWid = colWid - fullGap;
+        }
+        if (fullGap < 1)
+          fullGap = 0;
+        if (strokeWidth >= barWid / 2)
+          strokeWidth = 0;
+        if (fullGap < 5)
+          pxRound = retArg0;
+        let insetStroke = fullGap > 0;
+        let rawBarWid = colWid - fullGap - (insetStroke ? strokeWidth : 0);
+        barWid = pxRound(clamp(rawBarWid, minWidth, maxWidth));
+        xShift = (_align == 0 ? barWid / 2 : _align == _dirX ? 0 : barWid) - _align * _dirX * ((_align == 0 ? extraGap / 2 : 0) + (insetStroke ? strokeWidth / 2 : 0));
+        const _paths = { stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 };
+        const stroke = multiPath ? null : new Path2D();
+        let dataY0 = null;
+        if (band != null)
+          dataY0 = u.data[band.series[1]];
+        else {
+          let { y0, y1 } = disp;
+          if (y0 != null && y1 != null) {
+            dataY = y1.values(u, seriesIdx, idx0, idx1);
+            dataY0 = y0.values(u, seriesIdx, idx0, idx1);
+          }
+        }
+        let radVal = valRadius * barWid;
+        let radBase = baseRadius * barWid;
+        for (let i = _dirX == 1 ? idx0 : idx1; i >= idx0 && i <= idx1; i += _dirX) {
+          let yVal = dataY[i];
+          if (yVal == null)
+            continue;
+          if (dataY0 != null) {
+            let yVal0 = dataY0[i] ?? 0;
+            if (yVal - yVal0 == 0)
+              continue;
+            fillToY = valToPosY(yVal0, scaleY, yDim, yOff);
+          }
+          let xVal = scaleX.distr != 2 || disp != null ? dataX[i] : i;
+          let xPos = valToPosX(xVal, scaleX, xDim, xOff);
+          let yPos = valToPosY(ifNull(yVal, fillTo), scaleY, yDim, yOff);
+          let lft = pxRound(xPos - xShift);
+          let btm = pxRound(max(yPos, fillToY));
+          let top = pxRound(min(yPos, fillToY));
+          let barHgt = btm - top;
+          if (yVal != null) {
+            let rv = yVal < 0 ? radBase : radVal;
+            let rb = yVal < 0 ? radVal : radBase;
+            if (multiPath) {
+              if (strokeWidth > 0 && strokeColors[i] != null)
+                rect2(strokePaths.get(strokeColors[i]), lft, top + floor(strokeWidth / 2), barWid, max(0, barHgt - strokeWidth), rv, rb);
+              if (fillColors[i] != null)
+                rect2(fillPaths.get(fillColors[i]), lft, top + floor(strokeWidth / 2), barWid, max(0, barHgt - strokeWidth), rv, rb);
+            } else
+              rect2(stroke, lft, top + floor(strokeWidth / 2), barWid, max(0, barHgt - strokeWidth), rv, rb);
+            each(
+              u,
+              seriesIdx,
+              i,
+              lft - strokeWidth / 2,
+              top,
+              barWid + strokeWidth,
+              barHgt
+            );
+          }
+        }
+        if (strokeWidth > 0)
+          _paths.stroke = multiPath ? strokePaths : stroke;
+        else if (!multiPath) {
+          _paths._fill = series.width == 0 ? series._fill : series._stroke ?? series._fill;
+          _paths.width = 0;
+        }
+        _paths.fill = multiPath ? fillPaths : stroke;
+        return _paths;
+      });
+    };
+  }
+  function splineInterp(interp, opts) {
+    const alignGaps = ifNull(opts?.alignGaps, 0);
+    return (u, seriesIdx, idx0, idx1) => {
+      return orient(u, seriesIdx, (series, dataX, dataY, scaleX, scaleY, valToPosX, valToPosY, xOff, yOff, xDim, yDim) => {
+        [idx0, idx1] = nonNullIdxs(dataY, idx0, idx1);
+        let pxRound = series.pxRound;
+        let pixelForX = (val) => pxRound(valToPosX(val, scaleX, xDim, xOff));
+        let pixelForY = (val) => pxRound(valToPosY(val, scaleY, yDim, yOff));
+        let moveTo, bezierCurveTo, lineTo;
+        if (scaleX.ori == 0) {
+          moveTo = moveToH;
+          lineTo = lineToH;
+          bezierCurveTo = bezierCurveToH;
+        } else {
+          moveTo = moveToV;
+          lineTo = lineToV;
+          bezierCurveTo = bezierCurveToV;
+        }
+        const dir = scaleX.dir * (scaleX.ori == 0 ? 1 : -1);
+        let firstXPos = pixelForX(dataX[dir == 1 ? idx0 : idx1]);
+        let prevXPos = firstXPos;
+        let xCoords = [];
+        let yCoords = [];
+        for (let i = dir == 1 ? idx0 : idx1; i >= idx0 && i <= idx1; i += dir) {
+          let yVal = dataY[i];
+          if (yVal != null) {
+            let xVal = dataX[i];
+            let xPos = pixelForX(xVal);
+            xCoords.push(prevXPos = xPos);
+            yCoords.push(pixelForY(dataY[i]));
+          }
+        }
+        const _paths = { stroke: interp(xCoords, yCoords, moveTo, lineTo, bezierCurveTo, pxRound), fill: null, clip: null, band: null, gaps: null, flags: BAND_CLIP_FILL };
+        const stroke = _paths.stroke;
+        let [bandFillDir, bandClipDir] = bandFillClipDirs(u, seriesIdx);
+        if (series.fill != null || bandFillDir != 0) {
+          let fill = _paths.fill = new Path2D(stroke);
+          let fillTo = series.fillTo(u, seriesIdx, series.min, series.max, bandFillDir);
+          let fillToY = pixelForY(fillTo);
+          lineTo(fill, prevXPos, fillToY);
+          lineTo(fill, firstXPos, fillToY);
+        }
+        if (!series.spanGaps) {
+          let gaps2 = [];
+          gaps2.push(...findGaps(dataX, dataY, idx0, idx1, dir, pixelForX, alignGaps));
+          _paths.gaps = gaps2 = series.gaps(u, seriesIdx, idx0, idx1, gaps2);
+          _paths.clip = clipGaps(gaps2, scaleX.ori, xOff, yOff, xDim, yDim);
+        }
+        if (bandClipDir != 0) {
+          _paths.band = bandClipDir == 2 ? [
+            clipBandLine(u, seriesIdx, idx0, idx1, stroke, -1),
+            clipBandLine(u, seriesIdx, idx0, idx1, stroke, 1)
+          ] : clipBandLine(u, seriesIdx, idx0, idx1, stroke, bandClipDir);
+        }
+        return _paths;
+      });
+    };
+  }
+  function monotoneCubic(opts) {
+    return splineInterp(_monotoneCubic, opts);
+  }
+  function _monotoneCubic(xs, ys, moveTo, lineTo, bezierCurveTo, pxRound) {
+    const n = xs.length;
+    if (n < 2)
+      return null;
+    const path = new Path2D();
+    moveTo(path, xs[0], ys[0]);
+    if (n == 2)
+      lineTo(path, xs[1], ys[1]);
+    else {
+      let ms = Array(n), ds = Array(n - 1), dys = Array(n - 1), dxs = Array(n - 1);
+      for (let i = 0; i < n - 1; i++) {
+        dys[i] = ys[i + 1] - ys[i];
+        dxs[i] = xs[i + 1] - xs[i];
+        ds[i] = dys[i] / dxs[i];
+      }
+      ms[0] = ds[0];
+      for (let i = 1; i < n - 1; i++) {
+        if (ds[i] === 0 || ds[i - 1] === 0 || ds[i - 1] > 0 !== ds[i] > 0)
+          ms[i] = 0;
+        else {
+          ms[i] = 3 * (dxs[i - 1] + dxs[i]) / ((2 * dxs[i] + dxs[i - 1]) / ds[i - 1] + (dxs[i] + 2 * dxs[i - 1]) / ds[i]);
+          if (!isFinite(ms[i]))
+            ms[i] = 0;
+        }
+      }
+      ms[n - 1] = ds[n - 2];
+      for (let i = 0; i < n - 1; i++) {
+        bezierCurveTo(
+          path,
+          xs[i] + dxs[i] / 3,
+          ys[i] + ms[i] * dxs[i] / 3,
+          xs[i + 1] - dxs[i] / 3,
+          ys[i + 1] - ms[i + 1] * dxs[i] / 3,
+          xs[i + 1],
+          ys[i + 1]
+        );
+      }
+    }
+    return path;
+  }
+  var cursorPlots = /* @__PURE__ */ new Set();
+  function invalidateRects() {
+    for (let u of cursorPlots)
+      u.syncRect(true);
+  }
+  if (domEnv) {
+    on(resize, win, invalidateRects);
+    on(scroll, win, invalidateRects, true);
+    on(dppxchange, win, () => {
+      uPlot.pxRatio = pxRatio;
+    });
+  }
+  var linearPath = linear();
+  var pointsPath = points();
+  function setDefaults(d, xo, yo, initY) {
+    let d2 = initY ? [d[0], d[1]].concat(d.slice(2)) : [d[0]].concat(d.slice(1));
+    return d2.map((o, i) => setDefault(o, i, xo, yo));
+  }
+  function setDefaults2(d, xyo) {
+    return d.map((o, i) => i == 0 ? {} : assign({}, xyo, o));
+  }
+  function setDefault(o, i, xo, yo) {
+    return assign({}, i == 0 ? xo : yo, o);
+  }
+  function snapNumX(self, dataMin, dataMax) {
+    return dataMin == null ? nullNullTuple : [dataMin, dataMax];
+  }
+  var snapTimeX = snapNumX;
+  function snapNumY(self, dataMin, dataMax) {
+    return dataMin == null ? nullNullTuple : rangeNum(dataMin, dataMax, rangePad, true);
+  }
+  function snapLogY(self, dataMin, dataMax, scale) {
+    return dataMin == null ? nullNullTuple : rangeLog(dataMin, dataMax, self.scales[scale].log, false);
+  }
+  var snapLogX = snapLogY;
+  function snapAsinhY(self, dataMin, dataMax, scale) {
+    return dataMin == null ? nullNullTuple : rangeAsinh(dataMin, dataMax, self.scales[scale].log, false);
+  }
+  var snapAsinhX = snapAsinhY;
+  function findIncr(minVal, maxVal, incrs, dim, minSpace) {
+    let intDigits = max(numIntDigits(minVal), numIntDigits(maxVal));
+    let delta = maxVal - minVal;
+    let incrIdx = closestIdx(minSpace / dim * delta, incrs);
+    do {
+      let foundIncr = incrs[incrIdx];
+      let foundSpace = dim * foundIncr / delta;
+      if (foundSpace >= minSpace && intDigits + (foundIncr < 5 ? fixedDec.get(foundIncr) : 0) <= 17)
+        return [foundIncr, foundSpace];
+    } while (++incrIdx < incrs.length);
+    return [0, 0];
+  }
+  function pxRatioFont(font2) {
+    let fontSize, fontSizeCss;
+    font2 = font2.replace(/(\d+)px/, (m, p1) => (fontSize = round((fontSizeCss = +p1) * pxRatio)) + "px");
+    return [font2, fontSize, fontSizeCss];
+  }
+  function syncFontSize(axis) {
+    if (axis.show) {
+      [axis.font, axis.labelFont].forEach((f) => {
+        let size = roundDec(f[2] * pxRatio, 1);
+        f[0] = f[0].replace(/[0-9.]+px/, size + "px");
+        f[1] = size;
+      });
+    }
+  }
+  function uPlot(opts, data, then) {
+    const self = {
+      mode: ifNull(opts.mode, 1)
+    };
+    const mode = self.mode;
+    function getHPos(val, scale, dim, off2) {
+      let pct = scale.valToPct(val);
+      return off2 + dim * (scale.dir == -1 ? 1 - pct : pct);
+    }
+    function getVPos(val, scale, dim, off2) {
+      let pct = scale.valToPct(val);
+      return off2 + dim * (scale.dir == -1 ? pct : 1 - pct);
+    }
+    function getPos(val, scale, dim, off2) {
+      return scale.ori == 0 ? getHPos(val, scale, dim, off2) : getVPos(val, scale, dim, off2);
+    }
+    self.valToPosH = getHPos;
+    self.valToPosV = getVPos;
+    let ready = false;
+    self.status = 0;
+    const root = self.root = placeDiv(UPLOT);
+    if (opts.id != null)
+      root.id = opts.id;
+    addClass(root, opts.class);
+    if (opts.title) {
+      let title = placeDiv(TITLE, root);
+      title.textContent = opts.title;
+    }
+    const can = placeTag("canvas");
+    const ctx = self.ctx = can.getContext("2d");
+    const wrap = placeDiv(WRAP, root);
+    on("click", wrap, (e) => {
+      if (e.target === over) {
+        let didDrag = mouseLeft1 != mouseLeft0 || mouseTop1 != mouseTop0;
+        didDrag && drag.click(self, e);
+      }
+    }, true);
+    const under = self.under = placeDiv(UNDER, wrap);
+    wrap.appendChild(can);
+    const over = self.over = placeDiv(OVER, wrap);
+    opts = copy(opts);
+    const pxAlign = +ifNull(opts.pxAlign, 1);
+    const pxRound = pxRoundGen(pxAlign);
+    (opts.plugins || []).forEach((p) => {
+      if (p.opts)
+        opts = p.opts(self, opts) || opts;
+    });
+    const ms = opts.ms || 1e-3;
+    const series = self.series = mode == 1 ? setDefaults(opts.series || [], xSeriesOpts, ySeriesOpts, false) : setDefaults2(opts.series || [null], xySeriesOpts);
+    const axes = self.axes = setDefaults(opts.axes || [], xAxisOpts, yAxisOpts, true);
+    const scales = self.scales = {};
+    const bands = self.bands = opts.bands || [];
+    bands.forEach((b) => {
+      b.fill = fnOrSelf(b.fill || null);
+      b.dir = ifNull(b.dir, -1);
+    });
+    const xScaleKey = mode == 2 ? series[1].facets[0].scale : series[0].scale;
+    const drawOrderMap = {
+      axes: drawAxesGrid,
+      series: drawSeries
+    };
+    const drawOrder = (opts.drawOrder || ["axes", "series"]).map((key2) => drawOrderMap[key2]);
+    function initValToPct(sc) {
+      const getVal = sc.distr == 3 ? (val) => log10(val > 0 ? val : sc.clamp(self, val, sc.min, sc.max, sc.key)) : sc.distr == 4 ? (val) => asinh(val, sc.asinh) : sc.distr == 100 ? (val) => sc.fwd(val) : (val) => val;
+      return (val) => {
+        let _val = getVal(val);
+        let { _min, _max } = sc;
+        let delta = _max - _min;
+        return (_val - _min) / delta;
+      };
+    }
+    function initScale(scaleKey) {
+      let sc = scales[scaleKey];
+      if (sc == null) {
+        let scaleOpts = (opts.scales || EMPTY_OBJ)[scaleKey] || EMPTY_OBJ;
+        if (scaleOpts.from != null) {
+          initScale(scaleOpts.from);
+          let sc2 = assign({}, scales[scaleOpts.from], scaleOpts, { key: scaleKey });
+          sc2.valToPct = initValToPct(sc2);
+          scales[scaleKey] = sc2;
+        } else {
+          sc = scales[scaleKey] = assign({}, scaleKey == xScaleKey ? xScaleOpts : yScaleOpts, scaleOpts);
+          sc.key = scaleKey;
+          let isTime = sc.time;
+          let rn = sc.range;
+          let rangeIsArr = isArr(rn);
+          if (scaleKey != xScaleKey || mode == 2 && !isTime) {
+            if (rangeIsArr && (rn[0] == null || rn[1] == null)) {
+              rn = {
+                min: rn[0] == null ? autoRangePart : {
+                  mode: 1,
+                  hard: rn[0],
+                  soft: rn[0]
+                },
+                max: rn[1] == null ? autoRangePart : {
+                  mode: 1,
+                  hard: rn[1],
+                  soft: rn[1]
+                }
+              };
+              rangeIsArr = false;
+            }
+            if (!rangeIsArr && isObj(rn)) {
+              let cfg = rn;
+              rn = (self2, dataMin, dataMax) => dataMin == null ? nullNullTuple : rangeNum(dataMin, dataMax, cfg);
+            }
+          }
+          sc.range = fnOrSelf(rn || (isTime ? snapTimeX : scaleKey == xScaleKey ? sc.distr == 3 ? snapLogX : sc.distr == 4 ? snapAsinhX : snapNumX : sc.distr == 3 ? snapLogY : sc.distr == 4 ? snapAsinhY : snapNumY));
+          sc.auto = fnOrSelf(rangeIsArr ? false : sc.auto);
+          sc.clamp = fnOrSelf(sc.clamp || clampScale);
+          sc._min = sc._max = null;
+          sc.valToPct = initValToPct(sc);
+        }
+      }
+    }
+    initScale("x");
+    initScale("y");
+    if (mode == 1) {
+      series.forEach((s) => {
+        initScale(s.scale);
+      });
+    }
+    axes.forEach((a) => {
+      initScale(a.scale);
+    });
+    for (let k in opts.scales)
+      initScale(k);
+    const scaleX = scales[xScaleKey];
+    const xScaleDistr = scaleX.distr;
+    let valToPosX, valToPosY;
+    if (scaleX.ori == 0) {
+      addClass(root, ORI_HZ);
+      valToPosX = getHPos;
+      valToPosY = getVPos;
+    } else {
+      addClass(root, ORI_VT);
+      valToPosX = getVPos;
+      valToPosY = getHPos;
+    }
+    const pendScales = {};
+    for (let k in scales) {
+      let sc = scales[k];
+      if (sc.min != null || sc.max != null) {
+        pendScales[k] = { min: sc.min, max: sc.max };
+        sc.min = sc.max = null;
+      }
+    }
+    const _tzDate = opts.tzDate || ((ts) => new Date(round(ts / ms)));
+    const _fmtDate = opts.fmtDate || fmtDate;
+    const _timeAxisSplits = ms == 1 ? timeAxisSplitsMs(_tzDate) : timeAxisSplitsS(_tzDate);
+    const _timeAxisVals = timeAxisVals(_tzDate, timeAxisStamps(ms == 1 ? _timeAxisStampsMs : _timeAxisStampsS, _fmtDate));
+    const _timeSeriesVal = timeSeriesVal(_tzDate, timeSeriesStamp(_timeSeriesStamp, _fmtDate));
+    const activeIdxs = [];
+    const legend = self.legend = assign({}, legendOpts, opts.legend);
+    const cursor = self.cursor = assign({}, cursorOpts, { drag: { y: mode == 2 } }, opts.cursor);
+    const showLegend = legend.show;
+    const showCursor = cursor.show;
+    const markers = legend.markers;
+    {
+      legend.idxs = activeIdxs;
+      markers.width = fnOrSelf(markers.width);
+      markers.dash = fnOrSelf(markers.dash);
+      markers.stroke = fnOrSelf(markers.stroke);
+      markers.fill = fnOrSelf(markers.fill);
+    }
+    let legendTable;
+    let legendHead;
+    let legendBody;
+    let legendRows = [];
+    let legendCells = [];
+    let legendCols;
+    let multiValLegend = false;
+    let NULL_LEGEND_VALUES = {};
+    if (legend.live) {
+      const getMultiVals = series[1] ? series[1].values : null;
+      multiValLegend = getMultiVals != null;
+      legendCols = multiValLegend ? getMultiVals(self, 1, 0) : { _: 0 };
+      for (let k in legendCols)
+        NULL_LEGEND_VALUES[k] = LEGEND_DISP;
+    }
+    if (showLegend) {
+      legendTable = placeTag("table", LEGEND, root);
+      legendBody = placeTag("tbody", null, legendTable);
+      legend.mount(self, legendTable);
+      if (multiValLegend) {
+        legendHead = placeTag("thead", null, legendTable, legendBody);
+        let head2 = placeTag("tr", null, legendHead);
+        placeTag("th", null, head2);
+        for (var key in legendCols)
+          placeTag("th", LEGEND_LABEL, head2).textContent = key;
+      } else {
+        addClass(legendTable, LEGEND_INLINE);
+        legend.live && addClass(legendTable, LEGEND_LIVE);
+      }
+    }
+    const son = { show: true };
+    const soff = { show: false };
+    function initLegendRow(s, i) {
+      if (i == 0 && (multiValLegend || !legend.live || mode == 2))
+        return nullNullTuple;
+      let cells = [];
+      let row = placeTag("tr", LEGEND_SERIES, legendBody, legendBody.childNodes[i]);
+      addClass(row, s.class);
+      if (!s.show)
+        addClass(row, OFF);
+      let label = placeTag("th", null, row);
+      if (markers.show) {
+        let indic = placeDiv(LEGEND_MARKER, label);
+        if (i > 0) {
+          let width = markers.width(self, i);
+          if (width)
+            indic.style.border = width + "px " + markers.dash(self, i) + " " + markers.stroke(self, i);
+          indic.style.background = markers.fill(self, i);
+        }
+      }
+      let text = placeDiv(LEGEND_LABEL, label);
+      if (s.label instanceof HTMLElement)
+        text.appendChild(s.label);
+      else
+        text.textContent = s.label;
+      if (i > 0) {
+        if (!markers.show)
+          text.style.color = s.width > 0 ? markers.stroke(self, i) : markers.fill(self, i);
+        onMouse("click", label, (e) => {
+          if (cursor._lock)
+            return;
+          setCursorEvent(e);
+          let seriesIdx = series.indexOf(s);
+          if ((e.ctrlKey || e.metaKey) != legend.isolate) {
+            let isolate = series.some((s2, i2) => i2 > 0 && i2 != seriesIdx && s2.show);
+            series.forEach((s2, i2) => {
+              i2 > 0 && setSeries(i2, isolate ? i2 == seriesIdx ? son : soff : son, true, syncOpts.setSeries);
+            });
+          } else
+            setSeries(seriesIdx, { show: !s.show }, true, syncOpts.setSeries);
+        }, false);
+        if (cursorFocus) {
+          onMouse(mouseenter, label, (e) => {
+            if (cursor._lock)
+              return;
+            setCursorEvent(e);
+            setSeries(series.indexOf(s), FOCUS_TRUE, true, syncOpts.setSeries);
+          }, false);
+        }
+      }
+      for (var key2 in legendCols) {
+        let v = placeTag("td", LEGEND_VALUE, row);
+        v.textContent = "--";
+        cells.push(v);
+      }
+      return [row, cells];
+    }
+    const mouseListeners = /* @__PURE__ */ new Map();
+    function onMouse(ev, targ, fn, onlyTarg = true) {
+      const targListeners = mouseListeners.get(targ) || {};
+      const listener = cursor.bind[ev](self, targ, fn, onlyTarg);
+      if (listener) {
+        on(ev, targ, targListeners[ev] = listener);
+        mouseListeners.set(targ, targListeners);
+      }
+    }
+    function offMouse(ev, targ, fn) {
+      const targListeners = mouseListeners.get(targ) || {};
+      for (let k in targListeners) {
+        if (ev == null || k == ev) {
+          off(k, targ, targListeners[k]);
+          delete targListeners[k];
+        }
+      }
+      if (ev == null)
+        mouseListeners.delete(targ);
+    }
+    let fullWidCss = 0;
+    let fullHgtCss = 0;
+    let plotWidCss = 0;
+    let plotHgtCss = 0;
+    let plotLftCss = 0;
+    let plotTopCss = 0;
+    let _plotLftCss = plotLftCss;
+    let _plotTopCss = plotTopCss;
+    let _plotWidCss = plotWidCss;
+    let _plotHgtCss = plotHgtCss;
+    let plotLft = 0;
+    let plotTop = 0;
+    let plotWid = 0;
+    let plotHgt = 0;
+    self.bbox = {};
+    let shouldSetScales = false;
+    let shouldSetSize = false;
+    let shouldConvergeSize = false;
+    let shouldSetCursor = false;
+    let shouldSetSelect = false;
+    let shouldSetLegend = false;
+    function _setSize(width, height, force) {
+      if (force || (width != self.width || height != self.height))
+        calcSize(width, height);
+      resetYSeries(false);
+      shouldConvergeSize = true;
+      shouldSetSize = true;
+      commit();
+    }
+    function calcSize(width, height) {
+      self.width = fullWidCss = plotWidCss = width;
+      self.height = fullHgtCss = plotHgtCss = height;
+      plotLftCss = plotTopCss = 0;
+      calcPlotRect();
+      calcAxesRects();
+      let bb = self.bbox;
+      plotLft = bb.left = incrRound(plotLftCss * pxRatio, 0.5);
+      plotTop = bb.top = incrRound(plotTopCss * pxRatio, 0.5);
+      plotWid = bb.width = incrRound(plotWidCss * pxRatio, 0.5);
+      plotHgt = bb.height = incrRound(plotHgtCss * pxRatio, 0.5);
+    }
+    const CYCLE_LIMIT = 3;
+    function convergeSize() {
+      let converged = false;
+      let cycleNum = 0;
+      while (!converged) {
+        cycleNum++;
+        let axesConverged = axesCalc(cycleNum);
+        let paddingConverged = paddingCalc(cycleNum);
+        converged = cycleNum == CYCLE_LIMIT || axesConverged && paddingConverged;
+        if (!converged) {
+          calcSize(self.width, self.height);
+          shouldSetSize = true;
+        }
+      }
+    }
+    function setSize({ width, height }) {
+      _setSize(width, height);
+    }
+    self.setSize = setSize;
+    function calcPlotRect() {
+      let hasTopAxis = false;
+      let hasBtmAxis = false;
+      let hasRgtAxis = false;
+      let hasLftAxis = false;
+      axes.forEach((axis, i) => {
+        if (axis.show && axis._show) {
+          let { side, _size } = axis;
+          let isVt = side % 2;
+          let labelSize = axis.label != null ? axis.labelSize : 0;
+          let fullSize = _size + labelSize;
+          if (fullSize > 0) {
+            if (isVt) {
+              plotWidCss -= fullSize;
+              if (side == 3) {
+                plotLftCss += fullSize;
+                hasLftAxis = true;
+              } else
+                hasRgtAxis = true;
+            } else {
+              plotHgtCss -= fullSize;
+              if (side == 0) {
+                plotTopCss += fullSize;
+                hasTopAxis = true;
+              } else
+                hasBtmAxis = true;
+            }
+          }
+        }
+      });
+      sidesWithAxes[0] = hasTopAxis;
+      sidesWithAxes[1] = hasRgtAxis;
+      sidesWithAxes[2] = hasBtmAxis;
+      sidesWithAxes[3] = hasLftAxis;
+      plotWidCss -= _padding[1] + _padding[3];
+      plotLftCss += _padding[3];
+      plotHgtCss -= _padding[2] + _padding[0];
+      plotTopCss += _padding[0];
+    }
+    function calcAxesRects() {
+      let off1 = plotLftCss + plotWidCss;
+      let off2 = plotTopCss + plotHgtCss;
+      let off3 = plotLftCss;
+      let off0 = plotTopCss;
+      function incrOffset(side, size) {
+        switch (side) {
+          case 1:
+            off1 += size;
+            return off1 - size;
+          case 2:
+            off2 += size;
+            return off2 - size;
+          case 3:
+            off3 -= size;
+            return off3 + size;
+          case 0:
+            off0 -= size;
+            return off0 + size;
+        }
+      }
+      axes.forEach((axis, i) => {
+        if (axis.show && axis._show) {
+          let side = axis.side;
+          axis._pos = incrOffset(side, axis._size);
+          if (axis.label != null)
+            axis._lpos = incrOffset(side, axis.labelSize);
+        }
+      });
+    }
+    if (cursor.dataIdx == null) {
+      let hov = cursor.hover;
+      let skip = hov.skip = new Set(hov.skip ?? []);
+      skip.add(void 0);
+      let prox = hov.prox = fnOrSelf(hov.prox);
+      let bias = hov.bias ??= 0;
+      cursor.dataIdx = (self2, seriesIdx, cursorIdx, valAtPosX) => {
+        if (seriesIdx == 0)
+          return cursorIdx;
+        let idx2 = cursorIdx;
+        let _prox = prox(self2, seriesIdx, cursorIdx, valAtPosX) ?? inf;
+        let withProx = _prox >= 0 && _prox < inf;
+        let xDim = scaleX.ori == 0 ? plotWidCss : plotHgtCss;
+        let cursorLft = cursor.left;
+        let xValues = data[0];
+        let yValues = data[seriesIdx];
+        if (skip.has(yValues[cursorIdx])) {
+          idx2 = null;
+          let nonNullLft = null, nonNullRgt = null, j;
+          if (bias == 0 || bias == -1) {
+            j = cursorIdx;
+            while (nonNullLft == null && j-- > 0) {
+              if (!skip.has(yValues[j]))
+                nonNullLft = j;
+            }
+          }
+          if (bias == 0 || bias == 1) {
+            j = cursorIdx;
+            while (nonNullRgt == null && j++ < yValues.length) {
+              if (!skip.has(yValues[j]))
+                nonNullRgt = j;
+            }
+          }
+          if (nonNullLft != null || nonNullRgt != null) {
+            if (withProx) {
+              let lftPos = nonNullLft == null ? -Infinity : valToPosX(xValues[nonNullLft], scaleX, xDim, 0);
+              let rgtPos = nonNullRgt == null ? Infinity : valToPosX(xValues[nonNullRgt], scaleX, xDim, 0);
+              let lftDelta = cursorLft - lftPos;
+              let rgtDelta = rgtPos - cursorLft;
+              if (lftDelta <= rgtDelta) {
+                if (lftDelta <= _prox)
+                  idx2 = nonNullLft;
+              } else {
+                if (rgtDelta <= _prox)
+                  idx2 = nonNullRgt;
+              }
+            } else {
+              idx2 = nonNullRgt == null ? nonNullLft : nonNullLft == null ? nonNullRgt : cursorIdx - nonNullLft <= nonNullRgt - cursorIdx ? nonNullLft : nonNullRgt;
+            }
+          }
+        } else if (withProx) {
+          let dist = abs(cursorLft - valToPosX(xValues[cursorIdx], scaleX, xDim, 0));
+          if (dist > _prox)
+            idx2 = null;
+        }
+        return idx2;
+      };
+    }
+    const setCursorEvent = (e) => {
+      cursor.event = e;
+    };
+    cursor.idxs = activeIdxs;
+    cursor._lock = false;
+    let points2 = cursor.points;
+    points2.show = fnOrSelf(points2.show);
+    points2.size = fnOrSelf(points2.size);
+    points2.stroke = fnOrSelf(points2.stroke);
+    points2.width = fnOrSelf(points2.width);
+    points2.fill = fnOrSelf(points2.fill);
+    const focus = self.focus = assign({}, opts.focus || { alpha: 0.3 }, cursor.focus);
+    const cursorFocus = focus.prox >= 0;
+    const cursorOnePt = cursorFocus && points2.one;
+    let cursorPts = [];
+    let cursorPtsLft = [];
+    let cursorPtsTop = [];
+    function initCursorPt(s, si) {
+      let pt = points2.show(self, si);
+      if (pt instanceof HTMLElement) {
+        addClass(pt, CURSOR_PT);
+        addClass(pt, s.class);
+        elTrans(pt, -10, -10, plotWidCss, plotHgtCss);
+        over.insertBefore(pt, cursorPts[si]);
+        return pt;
+      }
+    }
+    function initSeries(s, i) {
+      if (mode == 1 || i > 0) {
+        let isTime = mode == 1 && scales[s.scale].time;
+        let sv = s.value;
+        s.value = isTime ? isStr(sv) ? timeSeriesVal(_tzDate, timeSeriesStamp(sv, _fmtDate)) : sv || _timeSeriesVal : sv || numSeriesVal;
+        s.label = s.label || (isTime ? timeSeriesLabel : numSeriesLabel);
+      }
+      if (cursorOnePt || i > 0) {
+        s.width = s.width == null ? 1 : s.width;
+        s.paths = s.paths || linearPath || retNull;
+        s.fillTo = fnOrSelf(s.fillTo || seriesFillTo);
+        s.pxAlign = +ifNull(s.pxAlign, pxAlign);
+        s.pxRound = pxRoundGen(s.pxAlign);
+        s.stroke = fnOrSelf(s.stroke || null);
+        s.fill = fnOrSelf(s.fill || null);
+        s._stroke = s._fill = s._paths = s._focus = null;
+        let _ptDia = ptDia(max(1, s.width), 1);
+        let points3 = s.points = assign({}, {
+          size: _ptDia,
+          width: max(1, _ptDia * 0.2),
+          stroke: s.stroke,
+          space: _ptDia * 2,
+          paths: pointsPath,
+          _stroke: null,
+          _fill: null
+        }, s.points);
+        points3.show = fnOrSelf(points3.show);
+        points3.filter = fnOrSelf(points3.filter);
+        points3.fill = fnOrSelf(points3.fill);
+        points3.stroke = fnOrSelf(points3.stroke);
+        points3.paths = fnOrSelf(points3.paths);
+        points3.pxAlign = s.pxAlign;
+      }
+      if (showLegend) {
+        let rowCells = initLegendRow(s, i);
+        legendRows.splice(i, 0, rowCells[0]);
+        legendCells.splice(i, 0, rowCells[1]);
+        legend.values.push(null);
+      }
+      if (showCursor) {
+        activeIdxs.splice(i, 0, null);
+        let pt = null;
+        if (cursorOnePt) {
+          if (i == 0)
+            pt = initCursorPt(s, i);
+        } else if (i > 0)
+          pt = initCursorPt(s, i);
+        cursorPts.splice(i, 0, pt);
+        cursorPtsLft.splice(i, 0, 0);
+        cursorPtsTop.splice(i, 0, 0);
+      }
+      fire("addSeries", i);
+    }
+    function addSeries(opts2, si) {
+      si = si == null ? series.length : si;
+      opts2 = mode == 1 ? setDefault(opts2, si, xSeriesOpts, ySeriesOpts) : setDefault(opts2, si, {}, xySeriesOpts);
+      series.splice(si, 0, opts2);
+      initSeries(series[si], si);
+    }
+    self.addSeries = addSeries;
+    function delSeries(i) {
+      series.splice(i, 1);
+      if (showLegend) {
+        legend.values.splice(i, 1);
+        legendCells.splice(i, 1);
+        let tr = legendRows.splice(i, 1)[0];
+        offMouse(null, tr.firstChild);
+        tr.remove();
+      }
+      if (showCursor) {
+        activeIdxs.splice(i, 1);
+        cursorPts.splice(i, 1)[0].remove();
+        cursorPtsLft.splice(i, 1);
+        cursorPtsTop.splice(i, 1);
+      }
+      fire("delSeries", i);
+    }
+    self.delSeries = delSeries;
+    const sidesWithAxes = [false, false, false, false];
+    function initAxis(axis, i) {
+      axis._show = axis.show;
+      if (axis.show) {
+        let isVt = axis.side % 2;
+        let sc = scales[axis.scale];
+        if (sc == null) {
+          axis.scale = isVt ? series[1].scale : xScaleKey;
+          sc = scales[axis.scale];
+        }
+        let isTime = sc.time;
+        axis.size = fnOrSelf(axis.size);
+        axis.space = fnOrSelf(axis.space);
+        axis.rotate = fnOrSelf(axis.rotate);
+        if (isArr(axis.incrs)) {
+          axis.incrs.forEach((incr) => {
+            !fixedDec.has(incr) && fixedDec.set(incr, guessDec(incr));
+          });
+        }
+        axis.incrs = fnOrSelf(axis.incrs || (sc.distr == 2 ? wholeIncrs : isTime ? ms == 1 ? timeIncrsMs : timeIncrsS : numIncrs));
+        axis.splits = fnOrSelf(axis.splits || (isTime && sc.distr == 1 ? _timeAxisSplits : sc.distr == 3 ? logAxisSplits : sc.distr == 4 ? asinhAxisSplits : numAxisSplits));
+        axis.stroke = fnOrSelf(axis.stroke);
+        axis.grid.stroke = fnOrSelf(axis.grid.stroke);
+        axis.ticks.stroke = fnOrSelf(axis.ticks.stroke);
+        axis.border.stroke = fnOrSelf(axis.border.stroke);
+        let av = axis.values;
+        axis.values = // static array of tick values
+        isArr(av) && !isArr(av[0]) ? fnOrSelf(av) : (
+          // temporal
+          isTime ? (
+            // config array of fmtDate string tpls
+            isArr(av) ? timeAxisVals(_tzDate, timeAxisStamps(av, _fmtDate)) : (
+              // fmtDate string tpl
+              isStr(av) ? timeAxisVal(_tzDate, av) : av || _timeAxisVals
+            )
+          ) : av || numAxisVals
+        );
+        axis.filter = fnOrSelf(axis.filter || (sc.distr >= 3 && sc.log == 10 ? log10AxisValsFilt : sc.distr == 3 && sc.log == 2 ? log2AxisValsFilt : retArg1));
+        axis.font = pxRatioFont(axis.font);
+        axis.labelFont = pxRatioFont(axis.labelFont);
+        axis._size = axis.size(self, null, i, 0);
+        axis._space = axis._rotate = axis._incrs = axis._found = // foundIncrSpace
+        axis._splits = axis._values = null;
+        if (axis._size > 0) {
+          sidesWithAxes[i] = true;
+          axis._el = placeDiv(AXIS, wrap);
+        }
+      }
+    }
+    function autoPadSide(self2, side, sidesWithAxes2, cycleNum) {
+      let [hasTopAxis, hasRgtAxis, hasBtmAxis, hasLftAxis] = sidesWithAxes2;
+      let ori = side % 2;
+      let size = 0;
+      if (ori == 0 && (hasLftAxis || hasRgtAxis))
+        size = side == 0 && !hasTopAxis || side == 2 && !hasBtmAxis ? round(xAxisOpts.size / 3) : 0;
+      if (ori == 1 && (hasTopAxis || hasBtmAxis))
+        size = side == 1 && !hasRgtAxis || side == 3 && !hasLftAxis ? round(yAxisOpts.size / 2) : 0;
+      return size;
+    }
+    const padding = self.padding = (opts.padding || [autoPadSide, autoPadSide, autoPadSide, autoPadSide]).map((p) => fnOrSelf(ifNull(p, autoPadSide)));
+    const _padding = self._padding = padding.map((p, i) => p(self, i, sidesWithAxes, 0));
+    let dataLen;
+    let i0 = null;
+    let i1 = null;
+    const idxs = mode == 1 ? series[0].idxs : null;
+    let data0 = null;
+    let viaAutoScaleX = false;
+    function setData(_data, _resetScales) {
+      data = _data == null ? [] : _data;
+      self.data = self._data = data;
+      if (mode == 2) {
+        dataLen = 0;
+        for (let i = 1; i < series.length; i++)
+          dataLen += data[i][0].length;
+      } else {
+        if (data.length == 0)
+          self.data = self._data = data = [[]];
+        data0 = data[0];
+        dataLen = data0.length;
+        let scaleData = data;
+        if (xScaleDistr == 2) {
+          scaleData = data.slice();
+          let _data0 = scaleData[0] = Array(dataLen);
+          for (let i = 0; i < dataLen; i++)
+            _data0[i] = i;
+        }
+        self._data = data = scaleData;
+      }
+      resetYSeries(true);
+      fire("setData");
+      if (xScaleDistr == 2) {
+        shouldConvergeSize = true;
+      }
+      if (_resetScales !== false) {
+        let xsc = scaleX;
+        if (xsc.auto(self, viaAutoScaleX))
+          autoScaleX();
+        else
+          _setScale(xScaleKey, xsc.min, xsc.max);
+        shouldSetCursor = shouldSetCursor || cursor.left >= 0;
+        shouldSetLegend = true;
+        commit();
+      }
+    }
+    self.setData = setData;
+    function autoScaleX() {
+      viaAutoScaleX = true;
+      let _min, _max;
+      if (mode == 1) {
+        if (dataLen > 0) {
+          i0 = idxs[0] = 0;
+          i1 = idxs[1] = dataLen - 1;
+          _min = data[0][i0];
+          _max = data[0][i1];
+          if (xScaleDistr == 2) {
+            _min = i0;
+            _max = i1;
+          } else if (_min == _max) {
+            if (xScaleDistr == 3)
+              [_min, _max] = rangeLog(_min, _min, scaleX.log, false);
+            else if (xScaleDistr == 4)
+              [_min, _max] = rangeAsinh(_min, _min, scaleX.log, false);
+            else if (scaleX.time)
+              _max = _min + round(86400 / ms);
+            else
+              [_min, _max] = rangeNum(_min, _max, rangePad, true);
+          }
+        } else {
+          i0 = idxs[0] = _min = null;
+          i1 = idxs[1] = _max = null;
+        }
+      }
+      _setScale(xScaleKey, _min, _max);
+    }
+    let ctxStroke, ctxFill, ctxWidth, ctxDash, ctxJoin, ctxCap, ctxFont, ctxAlign, ctxBaseline;
+    let ctxAlpha;
+    function setCtxStyle(stroke, width, dash, cap, fill, join2) {
+      stroke ??= transparent;
+      dash ??= EMPTY_ARR;
+      cap ??= "butt";
+      fill ??= transparent;
+      join2 ??= "round";
+      if (stroke != ctxStroke)
+        ctx.strokeStyle = ctxStroke = stroke;
+      if (fill != ctxFill)
+        ctx.fillStyle = ctxFill = fill;
+      if (width != ctxWidth)
+        ctx.lineWidth = ctxWidth = width;
+      if (join2 != ctxJoin)
+        ctx.lineJoin = ctxJoin = join2;
+      if (cap != ctxCap)
+        ctx.lineCap = ctxCap = cap;
+      if (dash != ctxDash)
+        ctx.setLineDash(ctxDash = dash);
+    }
+    function setFontStyle(font2, fill, align, baseline) {
+      if (fill != ctxFill)
+        ctx.fillStyle = ctxFill = fill;
+      if (font2 != ctxFont)
+        ctx.font = ctxFont = font2;
+      if (align != ctxAlign)
+        ctx.textAlign = ctxAlign = align;
+      if (baseline != ctxBaseline)
+        ctx.textBaseline = ctxBaseline = baseline;
+    }
+    function accScale(wsc, psc, facet2, data2, sorted = 0) {
+      if (data2.length > 0 && wsc.auto(self, viaAutoScaleX) && (psc == null || psc.min == null)) {
+        let _i0 = ifNull(i0, 0);
+        let _i1 = ifNull(i1, data2.length - 1);
+        let minMax = facet2.min == null ? getMinMax(data2, _i0, _i1, sorted, wsc.distr == 3) : [facet2.min, facet2.max];
+        wsc.min = min(wsc.min, facet2.min = minMax[0]);
+        wsc.max = max(wsc.max, facet2.max = minMax[1]);
+      }
+    }
+    const AUTOSCALE = { min: null, max: null };
+    function setScales() {
+      for (let k in scales) {
+        let sc = scales[k];
+        if (pendScales[k] == null && // scales that have never been set (on init)
+        (sc.min == null || // or auto scales when the x scale was explicitly set
+        pendScales[xScaleKey] != null && sc.auto(self, viaAutoScaleX))) {
+          pendScales[k] = AUTOSCALE;
+        }
+      }
+      for (let k in scales) {
+        let sc = scales[k];
+        if (pendScales[k] == null && sc.from != null && pendScales[sc.from] != null)
+          pendScales[k] = AUTOSCALE;
+      }
+      if (pendScales[xScaleKey] != null)
+        resetYSeries(true);
+      let wipScales = {};
+      for (let k in pendScales) {
+        let psc = pendScales[k];
+        if (psc != null) {
+          let wsc = wipScales[k] = copy(scales[k], fastIsObj);
+          if (psc.min != null)
+            assign(wsc, psc);
+          else if (k != xScaleKey || mode == 2) {
+            if (dataLen == 0 && wsc.from == null) {
+              let minMax = wsc.range(self, null, null, k);
+              wsc.min = minMax[0];
+              wsc.max = minMax[1];
+            } else {
+              wsc.min = inf;
+              wsc.max = -inf;
+            }
+          }
+        }
+      }
+      if (dataLen > 0) {
+        series.forEach((s, i) => {
+          if (mode == 1) {
+            let k = s.scale;
+            let psc = pendScales[k];
+            if (psc == null)
+              return;
+            let wsc = wipScales[k];
+            if (i == 0) {
+              let minMax = wsc.range(self, wsc.min, wsc.max, k);
+              wsc.min = minMax[0];
+              wsc.max = minMax[1];
+              i0 = closestIdx(wsc.min, data[0]);
+              i1 = closestIdx(wsc.max, data[0]);
+              if (i1 - i0 > 1) {
+                if (data[0][i0] < wsc.min)
+                  i0++;
+                if (data[0][i1] > wsc.max)
+                  i1--;
+              }
+              s.min = data0[i0];
+              s.max = data0[i1];
+            } else if (s.show && s.auto)
+              accScale(wsc, psc, s, data[i], s.sorted);
+            s.idxs[0] = i0;
+            s.idxs[1] = i1;
+          } else {
+            if (i > 0) {
+              if (s.show && s.auto) {
+                let [xFacet, yFacet] = s.facets;
+                let xScaleKey2 = xFacet.scale;
+                let yScaleKey = yFacet.scale;
+                let [xData, yData] = data[i];
+                let wscx = wipScales[xScaleKey2];
+                let wscy = wipScales[yScaleKey];
+                wscx != null && accScale(wscx, pendScales[xScaleKey2], xFacet, xData, xFacet.sorted);
+                wscy != null && accScale(wscy, pendScales[yScaleKey], yFacet, yData, yFacet.sorted);
+                s.min = yFacet.min;
+                s.max = yFacet.max;
+              }
+            }
+          }
+        });
+        for (let k in wipScales) {
+          let wsc = wipScales[k];
+          let psc = pendScales[k];
+          if (wsc.from == null && (psc == null || psc.min == null)) {
+            let minMax = wsc.range(
+              self,
+              wsc.min == inf ? null : wsc.min,
+              wsc.max == -inf ? null : wsc.max,
+              k
+            );
+            wsc.min = minMax[0];
+            wsc.max = minMax[1];
+          }
+        }
+      }
+      for (let k in wipScales) {
+        let wsc = wipScales[k];
+        if (wsc.from != null) {
+          let base = wipScales[wsc.from];
+          if (base.min == null)
+            wsc.min = wsc.max = null;
+          else {
+            let minMax = wsc.range(self, base.min, base.max, k);
+            wsc.min = minMax[0];
+            wsc.max = minMax[1];
+          }
+        }
+      }
+      let changed = {};
+      let anyChanged = false;
+      for (let k in wipScales) {
+        let wsc = wipScales[k];
+        let sc = scales[k];
+        if (sc.min != wsc.min || sc.max != wsc.max) {
+          sc.min = wsc.min;
+          sc.max = wsc.max;
+          let distr = sc.distr;
+          sc._min = distr == 3 ? log10(sc.min) : distr == 4 ? asinh(sc.min, sc.asinh) : distr == 100 ? sc.fwd(sc.min) : sc.min;
+          sc._max = distr == 3 ? log10(sc.max) : distr == 4 ? asinh(sc.max, sc.asinh) : distr == 100 ? sc.fwd(sc.max) : sc.max;
+          changed[k] = anyChanged = true;
+        }
+      }
+      if (anyChanged) {
+        series.forEach((s, i) => {
+          if (mode == 2) {
+            if (i > 0 && changed.y)
+              s._paths = null;
+          } else {
+            if (changed[s.scale])
+              s._paths = null;
+          }
+        });
+        for (let k in changed) {
+          shouldConvergeSize = true;
+          fire("setScale", k);
+        }
+        if (showCursor && cursor.left >= 0)
+          shouldSetCursor = shouldSetLegend = true;
+      }
+      for (let k in pendScales)
+        pendScales[k] = null;
+    }
+    function getOuterIdxs(ydata) {
+      let _i0 = clamp(i0 - 1, 0, dataLen - 1);
+      let _i1 = clamp(i1 + 1, 0, dataLen - 1);
+      while (ydata[_i0] == null && _i0 > 0)
+        _i0--;
+      while (ydata[_i1] == null && _i1 < dataLen - 1)
+        _i1++;
+      return [_i0, _i1];
+    }
+    function drawSeries() {
+      if (dataLen > 0) {
+        let shouldAlpha = series.some((s) => s._focus) && ctxAlpha != focus.alpha;
+        if (shouldAlpha)
+          ctx.globalAlpha = ctxAlpha = focus.alpha;
+        series.forEach((s, i) => {
+          if (i > 0 && s.show) {
+            cacheStrokeFill(i, false);
+            cacheStrokeFill(i, true);
+            if (s._paths == null) {
+              let _ctxAlpha = ctxAlpha;
+              if (ctxAlpha != s.alpha)
+                ctx.globalAlpha = ctxAlpha = s.alpha;
+              let _idxs = mode == 2 ? [0, data[i][0].length - 1] : getOuterIdxs(data[i]);
+              s._paths = s.paths(self, i, _idxs[0], _idxs[1]);
+              if (ctxAlpha != _ctxAlpha)
+                ctx.globalAlpha = ctxAlpha = _ctxAlpha;
+            }
+          }
+        });
+        series.forEach((s, i) => {
+          if (i > 0 && s.show) {
+            let _ctxAlpha = ctxAlpha;
+            if (ctxAlpha != s.alpha)
+              ctx.globalAlpha = ctxAlpha = s.alpha;
+            s._paths != null && drawPath(i, false);
+            {
+              let _gaps = s._paths != null ? s._paths.gaps : null;
+              let show = s.points.show(self, i, i0, i1, _gaps);
+              let idxs2 = s.points.filter(self, i, show, _gaps);
+              if (show || idxs2) {
+                s.points._paths = s.points.paths(self, i, i0, i1, idxs2);
+                drawPath(i, true);
+              }
+            }
+            if (ctxAlpha != _ctxAlpha)
+              ctx.globalAlpha = ctxAlpha = _ctxAlpha;
+            fire("drawSeries", i);
+          }
+        });
+        if (shouldAlpha)
+          ctx.globalAlpha = ctxAlpha = 1;
+      }
+    }
+    function cacheStrokeFill(si, _points) {
+      let s = _points ? series[si].points : series[si];
+      s._stroke = s.stroke(self, si);
+      s._fill = s.fill(self, si);
+    }
+    function drawPath(si, _points) {
+      let s = _points ? series[si].points : series[si];
+      let {
+        stroke,
+        fill,
+        clip: gapsClip,
+        flags,
+        _stroke: strokeStyle = s._stroke,
+        _fill: fillStyle = s._fill,
+        _width: width = s.width
+      } = s._paths;
+      width = roundDec(width * pxRatio, 3);
+      let boundsClip = null;
+      let offset = width % 2 / 2;
+      if (_points && fillStyle == null)
+        fillStyle = width > 0 ? "#fff" : strokeStyle;
+      let _pxAlign = s.pxAlign == 1 && offset > 0;
+      _pxAlign && ctx.translate(offset, offset);
+      if (!_points) {
+        let lft = plotLft - width / 2, top = plotTop - width / 2, wid = plotWid + width, hgt = plotHgt + width;
+        boundsClip = new Path2D();
+        boundsClip.rect(lft, top, wid, hgt);
+      }
+      if (_points)
+        strokeFill(strokeStyle, width, s.dash, s.cap, fillStyle, stroke, fill, flags, gapsClip);
+      else
+        fillStroke(si, strokeStyle, width, s.dash, s.cap, fillStyle, stroke, fill, flags, boundsClip, gapsClip);
+      _pxAlign && ctx.translate(-offset, -offset);
+    }
+    function fillStroke(si, strokeStyle, lineWidth2, lineDash, lineCap, fillStyle, strokePath, fillPath, flags, boundsClip, gapsClip) {
+      let didStrokeFill = false;
+      flags != 0 && bands.forEach((b, bi) => {
+        if (b.series[0] == si) {
+          let lowerEdge = series[b.series[1]];
+          let lowerData = data[b.series[1]];
+          let bandClip = (lowerEdge._paths || EMPTY_OBJ).band;
+          if (isArr(bandClip))
+            bandClip = b.dir == 1 ? bandClip[0] : bandClip[1];
+          let gapsClip2;
+          let _fillStyle = null;
+          if (lowerEdge.show && bandClip && hasData(lowerData, i0, i1)) {
+            _fillStyle = b.fill(self, bi) || fillStyle;
+            gapsClip2 = lowerEdge._paths.clip;
+          } else
+            bandClip = null;
+          strokeFill(strokeStyle, lineWidth2, lineDash, lineCap, _fillStyle, strokePath, fillPath, flags, boundsClip, gapsClip, gapsClip2, bandClip);
+          didStrokeFill = true;
+        }
+      });
+      if (!didStrokeFill)
+        strokeFill(strokeStyle, lineWidth2, lineDash, lineCap, fillStyle, strokePath, fillPath, flags, boundsClip, gapsClip);
+    }
+    const CLIP_FILL_STROKE = BAND_CLIP_FILL | BAND_CLIP_STROKE;
+    function strokeFill(strokeStyle, lineWidth2, lineDash, lineCap, fillStyle, strokePath, fillPath, flags, boundsClip, gapsClip, gapsClip2, bandClip) {
+      setCtxStyle(strokeStyle, lineWidth2, lineDash, lineCap, fillStyle);
+      if (boundsClip || gapsClip || bandClip) {
+        ctx.save();
+        boundsClip && ctx.clip(boundsClip);
+        gapsClip && ctx.clip(gapsClip);
+      }
+      if (bandClip) {
+        if ((flags & CLIP_FILL_STROKE) == CLIP_FILL_STROKE) {
+          ctx.clip(bandClip);
+          gapsClip2 && ctx.clip(gapsClip2);
+          doFill(fillStyle, fillPath);
+          doStroke(strokeStyle, strokePath, lineWidth2);
+        } else if (flags & BAND_CLIP_STROKE) {
+          doFill(fillStyle, fillPath);
+          ctx.clip(bandClip);
+          doStroke(strokeStyle, strokePath, lineWidth2);
+        } else if (flags & BAND_CLIP_FILL) {
+          ctx.save();
+          ctx.clip(bandClip);
+          gapsClip2 && ctx.clip(gapsClip2);
+          doFill(fillStyle, fillPath);
+          ctx.restore();
+          doStroke(strokeStyle, strokePath, lineWidth2);
+        }
+      } else {
+        doFill(fillStyle, fillPath);
+        doStroke(strokeStyle, strokePath, lineWidth2);
+      }
+      if (boundsClip || gapsClip || bandClip)
+        ctx.restore();
+    }
+    function doStroke(strokeStyle, strokePath, lineWidth2) {
+      if (lineWidth2 > 0) {
+        if (strokePath instanceof Map) {
+          strokePath.forEach((strokePath2, strokeStyle2) => {
+            ctx.strokeStyle = ctxStroke = strokeStyle2;
+            ctx.stroke(strokePath2);
+          });
+        } else
+          strokePath != null && strokeStyle && ctx.stroke(strokePath);
+      }
+    }
+    function doFill(fillStyle, fillPath) {
+      if (fillPath instanceof Map) {
+        fillPath.forEach((fillPath2, fillStyle2) => {
+          ctx.fillStyle = ctxFill = fillStyle2;
+          ctx.fill(fillPath2);
+        });
+      } else
+        fillPath != null && fillStyle && ctx.fill(fillPath);
+    }
+    function getIncrSpace(axisIdx, min2, max2, fullDim) {
+      let axis = axes[axisIdx];
+      let incrSpace;
+      if (fullDim <= 0)
+        incrSpace = [0, 0];
+      else {
+        let minSpace = axis._space = axis.space(self, axisIdx, min2, max2, fullDim);
+        let incrs = axis._incrs = axis.incrs(self, axisIdx, min2, max2, fullDim, minSpace);
+        incrSpace = findIncr(min2, max2, incrs, fullDim, minSpace);
+      }
+      return axis._found = incrSpace;
+    }
+    function drawOrthoLines(offs, filts, ori, side, pos0, len, width, stroke, dash, cap) {
+      let offset = width % 2 / 2;
+      pxAlign == 1 && ctx.translate(offset, offset);
+      setCtxStyle(stroke, width, dash, cap, stroke);
+      ctx.beginPath();
+      let x0, y0, x1, y1, pos1 = pos0 + (side == 0 || side == 3 ? -len : len);
+      if (ori == 0) {
+        y0 = pos0;
+        y1 = pos1;
+      } else {
+        x0 = pos0;
+        x1 = pos1;
+      }
+      for (let i = 0; i < offs.length; i++) {
+        if (filts[i] != null) {
+          if (ori == 0)
+            x0 = x1 = offs[i];
+          else
+            y0 = y1 = offs[i];
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+        }
+      }
+      ctx.stroke();
+      pxAlign == 1 && ctx.translate(-offset, -offset);
+    }
+    function axesCalc(cycleNum) {
+      let converged = true;
+      axes.forEach((axis, i) => {
+        if (!axis.show)
+          return;
+        let scale = scales[axis.scale];
+        if (scale.min == null) {
+          if (axis._show) {
+            converged = false;
+            axis._show = false;
+            resetYSeries(false);
+          }
+          return;
+        } else {
+          if (!axis._show) {
+            converged = false;
+            axis._show = true;
+            resetYSeries(false);
+          }
+        }
+        let side = axis.side;
+        let ori = side % 2;
+        let { min: min2, max: max2 } = scale;
+        let [_incr, _space] = getIncrSpace(i, min2, max2, ori == 0 ? plotWidCss : plotHgtCss);
+        if (_space == 0)
+          return;
+        let forceMin = scale.distr == 2;
+        let _splits = axis._splits = axis.splits(self, i, min2, max2, _incr, _space, forceMin);
+        let splits = scale.distr == 2 ? _splits.map((i2) => data0[i2]) : _splits;
+        let incr = scale.distr == 2 ? data0[_splits[1]] - data0[_splits[0]] : _incr;
+        let values = axis._values = axis.values(self, axis.filter(self, splits, i, _space, incr), i, _space, incr);
+        axis._rotate = side == 2 ? axis.rotate(self, values, i, _space) : 0;
+        let oldSize = axis._size;
+        axis._size = ceil(axis.size(self, values, i, cycleNum));
+        if (oldSize != null && axis._size != oldSize)
+          converged = false;
+      });
+      return converged;
+    }
+    function paddingCalc(cycleNum) {
+      let converged = true;
+      padding.forEach((p, i) => {
+        let _p = p(self, i, sidesWithAxes, cycleNum);
+        if (_p != _padding[i])
+          converged = false;
+        _padding[i] = _p;
+      });
+      return converged;
+    }
+    function drawAxesGrid() {
+      for (let i = 0; i < axes.length; i++) {
+        let axis = axes[i];
+        if (!axis.show || !axis._show)
+          continue;
+        let side = axis.side;
+        let ori = side % 2;
+        let x, y;
+        let fillStyle = axis.stroke(self, i);
+        let shiftDir = side == 0 || side == 3 ? -1 : 1;
+        let [_incr, _space] = axis._found;
+        if (axis.label != null) {
+          let shiftAmt2 = axis.labelGap * shiftDir;
+          let baseLpos = round((axis._lpos + shiftAmt2) * pxRatio);
+          setFontStyle(axis.labelFont[0], fillStyle, "center", side == 2 ? TOP : BOTTOM);
+          ctx.save();
+          if (ori == 1) {
+            x = y = 0;
+            ctx.translate(
+              baseLpos,
+              round(plotTop + plotHgt / 2)
+            );
+            ctx.rotate((side == 3 ? -PI : PI) / 2);
+          } else {
+            x = round(plotLft + plotWid / 2);
+            y = baseLpos;
+          }
+          let _label = isFn(axis.label) ? axis.label(self, i, _incr, _space) : axis.label;
+          ctx.fillText(_label, x, y);
+          ctx.restore();
+        }
+        if (_space == 0)
+          continue;
+        let scale = scales[axis.scale];
+        let plotDim = ori == 0 ? plotWid : plotHgt;
+        let plotOff = ori == 0 ? plotLft : plotTop;
+        let _splits = axis._splits;
+        let splits = scale.distr == 2 ? _splits.map((i2) => data0[i2]) : _splits;
+        let incr = scale.distr == 2 ? data0[_splits[1]] - data0[_splits[0]] : _incr;
+        let ticks2 = axis.ticks;
+        let border2 = axis.border;
+        let _tickSize = ticks2.show ? ticks2.size : 0;
+        let tickSize = round(_tickSize * pxRatio);
+        let axisGap = round((axis.alignTo == 2 ? axis._size - _tickSize - axis.gap : axis.gap) * pxRatio);
+        let angle = axis._rotate * -PI / 180;
+        let basePos = pxRound(axis._pos * pxRatio);
+        let shiftAmt = (tickSize + axisGap) * shiftDir;
+        let finalPos = basePos + shiftAmt;
+        y = ori == 0 ? finalPos : 0;
+        x = ori == 1 ? finalPos : 0;
+        let font2 = axis.font[0];
+        let textAlign = axis.align == 1 ? LEFT : axis.align == 2 ? RIGHT : angle > 0 ? LEFT : angle < 0 ? RIGHT : ori == 0 ? "center" : side == 3 ? RIGHT : LEFT;
+        let textBaseline = angle || ori == 1 ? "middle" : side == 2 ? TOP : BOTTOM;
+        setFontStyle(font2, fillStyle, textAlign, textBaseline);
+        let lineHeight = axis.font[1] * axis.lineGap;
+        let canOffs = _splits.map((val) => pxRound(getPos(val, scale, plotDim, plotOff)));
+        let _values = axis._values;
+        for (let i2 = 0; i2 < _values.length; i2++) {
+          let val = _values[i2];
+          if (val != null) {
+            if (ori == 0)
+              x = canOffs[i2];
+            else
+              y = canOffs[i2];
+            val = "" + val;
+            let _parts = val.indexOf("\n") == -1 ? [val] : val.split(/\n/gm);
+            for (let j = 0; j < _parts.length; j++) {
+              let text = _parts[j];
+              if (angle) {
+                ctx.save();
+                ctx.translate(x, y + j * lineHeight);
+                ctx.rotate(angle);
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+              } else
+                ctx.fillText(text, x, y + j * lineHeight);
+            }
+          }
+        }
+        if (ticks2.show) {
+          drawOrthoLines(
+            canOffs,
+            ticks2.filter(self, splits, i, _space, incr),
+            ori,
+            side,
+            basePos,
+            tickSize,
+            roundDec(ticks2.width * pxRatio, 3),
+            ticks2.stroke(self, i),
+            ticks2.dash,
+            ticks2.cap
+          );
+        }
+        let grid2 = axis.grid;
+        if (grid2.show) {
+          drawOrthoLines(
+            canOffs,
+            grid2.filter(self, splits, i, _space, incr),
+            ori,
+            ori == 0 ? 2 : 1,
+            ori == 0 ? plotTop : plotLft,
+            ori == 0 ? plotHgt : plotWid,
+            roundDec(grid2.width * pxRatio, 3),
+            grid2.stroke(self, i),
+            grid2.dash,
+            grid2.cap
+          );
+        }
+        if (border2.show) {
+          drawOrthoLines(
+            [basePos],
+            [1],
+            ori == 0 ? 1 : 0,
+            ori == 0 ? 1 : 2,
+            ori == 1 ? plotTop : plotLft,
+            ori == 1 ? plotHgt : plotWid,
+            roundDec(border2.width * pxRatio, 3),
+            border2.stroke(self, i),
+            border2.dash,
+            border2.cap
+          );
+        }
+      }
+      fire("drawAxes");
+    }
+    function resetYSeries(minMax) {
+      series.forEach((s, i) => {
+        if (i > 0) {
+          s._paths = null;
+          if (minMax) {
+            if (mode == 1) {
+              s.min = null;
+              s.max = null;
+            } else {
+              s.facets.forEach((f) => {
+                f.min = null;
+                f.max = null;
+              });
+            }
+          }
+        }
+      });
+    }
+    let queuedCommit = false;
+    let deferHooks = false;
+    let hooksQueue = [];
+    function flushHooks() {
+      deferHooks = false;
+      for (let i = 0; i < hooksQueue.length; i++)
+        fire(...hooksQueue[i]);
+      hooksQueue.length = 0;
+    }
+    function commit() {
+      if (!queuedCommit) {
+        microTask(_commit);
+        queuedCommit = true;
+      }
+    }
+    function batch(fn, _deferHooks = false) {
+      queuedCommit = true;
+      deferHooks = _deferHooks;
+      fn(self);
+      _commit();
+      if (_deferHooks && hooksQueue.length > 0)
+        queueMicrotask(flushHooks);
+    }
+    self.batch = batch;
+    function _commit() {
+      if (shouldSetScales) {
+        setScales();
+        shouldSetScales = false;
+      }
+      if (shouldConvergeSize) {
+        convergeSize();
+        shouldConvergeSize = false;
+      }
+      if (shouldSetSize) {
+        setStylePx(under, LEFT, plotLftCss);
+        setStylePx(under, TOP, plotTopCss);
+        setStylePx(under, WIDTH, plotWidCss);
+        setStylePx(under, HEIGHT, plotHgtCss);
+        setStylePx(over, LEFT, plotLftCss);
+        setStylePx(over, TOP, plotTopCss);
+        setStylePx(over, WIDTH, plotWidCss);
+        setStylePx(over, HEIGHT, plotHgtCss);
+        setStylePx(wrap, WIDTH, fullWidCss);
+        setStylePx(wrap, HEIGHT, fullHgtCss);
+        can.width = round(fullWidCss * pxRatio);
+        can.height = round(fullHgtCss * pxRatio);
+        axes.forEach(({ _el, _show, _size, _pos, side }) => {
+          if (_el != null) {
+            if (_show) {
+              let posOffset = side === 3 || side === 0 ? _size : 0;
+              let isVt = side % 2 == 1;
+              setStylePx(_el, isVt ? "left" : "top", _pos - posOffset);
+              setStylePx(_el, isVt ? "width" : "height", _size);
+              setStylePx(_el, isVt ? "top" : "left", isVt ? plotTopCss : plotLftCss);
+              setStylePx(_el, isVt ? "height" : "width", isVt ? plotHgtCss : plotWidCss);
+              remClass(_el, OFF);
+            } else
+              addClass(_el, OFF);
+          }
+        });
+        ctxStroke = ctxFill = ctxWidth = ctxJoin = ctxCap = ctxFont = ctxAlign = ctxBaseline = ctxDash = null;
+        ctxAlpha = 1;
+        syncRect(true);
+        if (plotLftCss != _plotLftCss || plotTopCss != _plotTopCss || plotWidCss != _plotWidCss || plotHgtCss != _plotHgtCss) {
+          resetYSeries(false);
+          let pctWid = plotWidCss / _plotWidCss;
+          let pctHgt = plotHgtCss / _plotHgtCss;
+          if (showCursor && !shouldSetCursor && cursor.left >= 0) {
+            cursor.left *= pctWid;
+            cursor.top *= pctHgt;
+            vCursor && elTrans(vCursor, round(cursor.left), 0, plotWidCss, plotHgtCss);
+            hCursor && elTrans(hCursor, 0, round(cursor.top), plotWidCss, plotHgtCss);
+            for (let i = 0; i < cursorPts.length; i++) {
+              let pt = cursorPts[i];
+              if (pt != null) {
+                cursorPtsLft[i] *= pctWid;
+                cursorPtsTop[i] *= pctHgt;
+                elTrans(pt, ceil(cursorPtsLft[i]), ceil(cursorPtsTop[i]), plotWidCss, plotHgtCss);
+              }
+            }
+          }
+          if (select.show && !shouldSetSelect && select.left >= 0 && select.width > 0) {
+            select.left *= pctWid;
+            select.width *= pctWid;
+            select.top *= pctHgt;
+            select.height *= pctHgt;
+            for (let prop in _hideProps)
+              setStylePx(selectDiv, prop, select[prop]);
+          }
+          _plotLftCss = plotLftCss;
+          _plotTopCss = plotTopCss;
+          _plotWidCss = plotWidCss;
+          _plotHgtCss = plotHgtCss;
+        }
+        fire("setSize");
+        shouldSetSize = false;
+      }
+      if (fullWidCss > 0 && fullHgtCss > 0) {
+        ctx.clearRect(0, 0, can.width, can.height);
+        fire("drawClear");
+        drawOrder.forEach((fn) => fn());
+        fire("draw");
+      }
+      if (select.show && shouldSetSelect) {
+        setSelect(select);
+        shouldSetSelect = false;
+      }
+      if (showCursor && shouldSetCursor) {
+        updateCursor(null, true, false);
+        shouldSetCursor = false;
+      }
+      if (legend.show && legend.live && shouldSetLegend) {
+        setLegend();
+        shouldSetLegend = false;
+      }
+      if (!ready) {
+        ready = true;
+        self.status = 1;
+        fire("ready");
+      }
+      viaAutoScaleX = false;
+      queuedCommit = false;
+    }
+    self.redraw = (rebuildPaths, recalcAxes) => {
+      shouldConvergeSize = recalcAxes || false;
+      if (rebuildPaths !== false)
+        _setScale(xScaleKey, scaleX.min, scaleX.max);
+      else
+        commit();
+    };
+    function setScale(key2, opts2) {
+      let sc = scales[key2];
+      if (sc.from == null) {
+        if (dataLen == 0) {
+          let minMax = sc.range(self, opts2.min, opts2.max, key2);
+          opts2.min = minMax[0];
+          opts2.max = minMax[1];
+        }
+        if (opts2.min > opts2.max) {
+          let _min = opts2.min;
+          opts2.min = opts2.max;
+          opts2.max = _min;
+        }
+        if (dataLen > 1 && opts2.min != null && opts2.max != null && opts2.max - opts2.min < 1e-16)
+          return;
+        if (key2 == xScaleKey) {
+          if (sc.distr == 2 && dataLen > 0) {
+            opts2.min = closestIdx(opts2.min, data[0]);
+            opts2.max = closestIdx(opts2.max, data[0]);
+            if (opts2.min == opts2.max)
+              opts2.max++;
+          }
+        }
+        pendScales[key2] = opts2;
+        shouldSetScales = true;
+        commit();
+      }
+    }
+    self.setScale = setScale;
+    let xCursor;
+    let yCursor;
+    let vCursor;
+    let hCursor;
+    let rawMouseLeft0;
+    let rawMouseTop0;
+    let mouseLeft0;
+    let mouseTop0;
+    let rawMouseLeft1;
+    let rawMouseTop1;
+    let mouseLeft1;
+    let mouseTop1;
+    let dragging = false;
+    const drag = cursor.drag;
+    let dragX = drag.x;
+    let dragY = drag.y;
+    if (showCursor) {
+      if (cursor.x)
+        xCursor = placeDiv(CURSOR_X, over);
+      if (cursor.y)
+        yCursor = placeDiv(CURSOR_Y, over);
+      if (scaleX.ori == 0) {
+        vCursor = xCursor;
+        hCursor = yCursor;
+      } else {
+        vCursor = yCursor;
+        hCursor = xCursor;
+      }
+      mouseLeft1 = cursor.left;
+      mouseTop1 = cursor.top;
+    }
+    const select = self.select = assign({
+      show: true,
+      over: true,
+      left: 0,
+      width: 0,
+      top: 0,
+      height: 0
+    }, opts.select);
+    const selectDiv = select.show ? placeDiv(SELECT, select.over ? over : under) : null;
+    function setSelect(opts2, _fire) {
+      if (select.show) {
+        for (let prop in opts2) {
+          select[prop] = opts2[prop];
+          if (prop in _hideProps)
+            setStylePx(selectDiv, prop, opts2[prop]);
+        }
+        _fire !== false && fire("setSelect");
+      }
+    }
+    self.setSelect = setSelect;
+    function toggleDOM(i) {
+      let s = series[i];
+      if (s.show)
+        showLegend && remClass(legendRows[i], OFF);
+      else {
+        showLegend && addClass(legendRows[i], OFF);
+        if (showCursor) {
+          let pt = cursorOnePt ? cursorPts[0] : cursorPts[i];
+          pt != null && elTrans(pt, -10, -10, plotWidCss, plotHgtCss);
+        }
+      }
+    }
+    function _setScale(key2, min2, max2) {
+      setScale(key2, { min: min2, max: max2 });
+    }
+    function setSeries(i, opts2, _fire, _pub) {
+      if (opts2.focus != null)
+        setFocus(i);
+      if (opts2.show != null) {
+        series.forEach((s, si) => {
+          if (si > 0 && (i == si || i == null)) {
+            s.show = opts2.show;
+            toggleDOM(si);
+            if (mode == 2) {
+              _setScale(s.facets[0].scale, null, null);
+              _setScale(s.facets[1].scale, null, null);
+            } else
+              _setScale(s.scale, null, null);
+            commit();
+          }
+        });
+      }
+      _fire !== false && fire("setSeries", i, opts2);
+      _pub && pubSync("setSeries", self, i, opts2);
+    }
+    self.setSeries = setSeries;
+    function setBand(bi, opts2) {
+      assign(bands[bi], opts2);
+    }
+    function addBand(opts2, bi) {
+      opts2.fill = fnOrSelf(opts2.fill || null);
+      opts2.dir = ifNull(opts2.dir, -1);
+      bi = bi == null ? bands.length : bi;
+      bands.splice(bi, 0, opts2);
+    }
+    function delBand(bi) {
+      if (bi == null)
+        bands.length = 0;
+      else
+        bands.splice(bi, 1);
+    }
+    self.addBand = addBand;
+    self.setBand = setBand;
+    self.delBand = delBand;
+    function setAlpha(i, value) {
+      series[i].alpha = value;
+      if (showCursor && cursorPts[i] != null)
+        cursorPts[i].style.opacity = value;
+      if (showLegend && legendRows[i])
+        legendRows[i].style.opacity = value;
+    }
+    let closestDist;
+    let closestSeries;
+    let focusedSeries;
+    const FOCUS_TRUE = { focus: true };
+    function setFocus(i) {
+      if (i != focusedSeries) {
+        let allFocused = i == null;
+        let _setAlpha = focus.alpha != 1;
+        series.forEach((s, i2) => {
+          if (mode == 1 || i2 > 0) {
+            let isFocused = allFocused || i2 == 0 || i2 == i;
+            s._focus = allFocused ? null : isFocused;
+            _setAlpha && setAlpha(i2, isFocused ? 1 : focus.alpha);
+          }
+        });
+        focusedSeries = i;
+        _setAlpha && commit();
+      }
+    }
+    if (showLegend && cursorFocus) {
+      onMouse(mouseleave, legendTable, (e) => {
+        if (cursor._lock)
+          return;
+        setCursorEvent(e);
+        if (focusedSeries != null)
+          setSeries(null, FOCUS_TRUE, true, syncOpts.setSeries);
+      });
+    }
+    function posToVal(pos, scale, can2) {
+      let sc = scales[scale];
+      if (can2)
+        pos = pos / pxRatio - (sc.ori == 1 ? plotTopCss : plotLftCss);
+      let dim = plotWidCss;
+      if (sc.ori == 1) {
+        dim = plotHgtCss;
+        pos = dim - pos;
+      }
+      if (sc.dir == -1)
+        pos = dim - pos;
+      let _min = sc._min, _max = sc._max, pct = pos / dim;
+      let sv = _min + (_max - _min) * pct;
+      let distr = sc.distr;
+      return distr == 3 ? pow(10, sv) : distr == 4 ? sinh(sv, sc.asinh) : distr == 100 ? sc.bwd(sv) : sv;
+    }
+    function closestIdxFromXpos(pos, can2) {
+      let v = posToVal(pos, xScaleKey, can2);
+      return closestIdx(v, data[0], i0, i1);
+    }
+    self.valToIdx = (val) => closestIdx(val, data[0]);
+    self.posToIdx = closestIdxFromXpos;
+    self.posToVal = posToVal;
+    self.valToPos = (val, scale, can2) => scales[scale].ori == 0 ? getHPos(
+      val,
+      scales[scale],
+      can2 ? plotWid : plotWidCss,
+      can2 ? plotLft : 0
+    ) : getVPos(
+      val,
+      scales[scale],
+      can2 ? plotHgt : plotHgtCss,
+      can2 ? plotTop : 0
+    );
+    self.setCursor = (opts2, _fire, _pub) => {
+      mouseLeft1 = opts2.left;
+      mouseTop1 = opts2.top;
+      updateCursor(null, _fire, _pub);
+    };
+    function setSelH(off2, dim) {
+      setStylePx(selectDiv, LEFT, select.left = off2);
+      setStylePx(selectDiv, WIDTH, select.width = dim);
+    }
+    function setSelV(off2, dim) {
+      setStylePx(selectDiv, TOP, select.top = off2);
+      setStylePx(selectDiv, HEIGHT, select.height = dim);
+    }
+    let setSelX = scaleX.ori == 0 ? setSelH : setSelV;
+    let setSelY = scaleX.ori == 1 ? setSelH : setSelV;
+    function syncLegend() {
+      if (showLegend && legend.live) {
+        for (let i = mode == 2 ? 1 : 0; i < series.length; i++) {
+          if (i == 0 && multiValLegend)
+            continue;
+          let vals = legend.values[i];
+          let j = 0;
+          for (let k in vals)
+            legendCells[i][j++].firstChild.nodeValue = vals[k];
+        }
+      }
+    }
+    function setLegend(opts2, _fire) {
+      if (opts2 != null) {
+        if (opts2.idxs) {
+          opts2.idxs.forEach((didx, sidx) => {
+            activeIdxs[sidx] = didx;
+          });
+        } else if (!isUndef(opts2.idx))
+          activeIdxs.fill(opts2.idx);
+        legend.idx = activeIdxs[0];
+      }
+      if (showLegend && legend.live) {
+        for (let sidx = 0; sidx < series.length; sidx++) {
+          if (sidx > 0 || mode == 1 && !multiValLegend)
+            setLegendValues(sidx, activeIdxs[sidx]);
+        }
+        syncLegend();
+      }
+      shouldSetLegend = false;
+      _fire !== false && fire("setLegend");
+    }
+    self.setLegend = setLegend;
+    function setLegendValues(sidx, idx) {
+      let s = series[sidx];
+      let src = sidx == 0 && xScaleDistr == 2 ? data0 : data[sidx];
+      let val;
+      if (multiValLegend)
+        val = s.values(self, sidx, idx) ?? NULL_LEGEND_VALUES;
+      else {
+        val = s.value(self, idx == null ? null : src[idx], sidx, idx);
+        val = val == null ? NULL_LEGEND_VALUES : { _: val };
+      }
+      legend.values[sidx] = val;
+    }
+    function updateCursor(src, _fire, _pub) {
+      rawMouseLeft1 = mouseLeft1;
+      rawMouseTop1 = mouseTop1;
+      [mouseLeft1, mouseTop1] = cursor.move(self, mouseLeft1, mouseTop1);
+      cursor.left = mouseLeft1;
+      cursor.top = mouseTop1;
+      if (showCursor) {
+        vCursor && elTrans(vCursor, round(mouseLeft1), 0, plotWidCss, plotHgtCss);
+        hCursor && elTrans(hCursor, 0, round(mouseTop1), plotWidCss, plotHgtCss);
+      }
+      let idx;
+      let noDataInRange = i0 > i1;
+      closestDist = inf;
+      closestSeries = null;
+      let xDim = scaleX.ori == 0 ? plotWidCss : plotHgtCss;
+      let yDim = scaleX.ori == 1 ? plotWidCss : plotHgtCss;
+      if (mouseLeft1 < 0 || dataLen == 0 || noDataInRange) {
+        idx = cursor.idx = null;
+        for (let i = 0; i < series.length; i++) {
+          let pt = cursorPts[i];
+          pt != null && elTrans(pt, -10, -10, plotWidCss, plotHgtCss);
+        }
+        if (cursorFocus)
+          setSeries(null, FOCUS_TRUE, true, src == null && syncOpts.setSeries);
+        if (legend.live) {
+          activeIdxs.fill(idx);
+          shouldSetLegend = true;
+        }
+      } else {
+        let mouseXPos, valAtPosX, xPos;
+        if (mode == 1) {
+          mouseXPos = scaleX.ori == 0 ? mouseLeft1 : mouseTop1;
+          valAtPosX = posToVal(mouseXPos, xScaleKey);
+          idx = cursor.idx = closestIdx(valAtPosX, data[0], i0, i1);
+          xPos = valToPosX(data[0][idx], scaleX, xDim, 0);
+        }
+        let _ptLft = -10;
+        let _ptTop = -10;
+        let _ptWid = 0;
+        let _ptHgt = 0;
+        let _centered = true;
+        let _ptFill = "";
+        let _ptStroke = "";
+        for (let i = mode == 2 ? 1 : 0; i < series.length; i++) {
+          let s = series[i];
+          let idx1 = activeIdxs[i];
+          let yVal1 = idx1 == null ? null : mode == 1 ? data[i][idx1] : data[i][1][idx1];
+          let idx2 = cursor.dataIdx(self, i, idx, valAtPosX);
+          let yVal2 = idx2 == null ? null : mode == 1 ? data[i][idx2] : data[i][1][idx2];
+          shouldSetLegend = shouldSetLegend || yVal2 != yVal1 || idx2 != idx1;
+          activeIdxs[i] = idx2;
+          if (i > 0 && s.show) {
+            let xPos2 = idx2 == null ? -10 : idx2 == idx ? xPos : valToPosX(mode == 1 ? data[0][idx2] : data[i][0][idx2], scaleX, xDim, 0);
+            let yPos = yVal2 == null ? -10 : valToPosY(yVal2, mode == 1 ? scales[s.scale] : scales[s.facets[1].scale], yDim, 0);
+            if (cursorFocus && yVal2 != null) {
+              let mouseYPos = scaleX.ori == 1 ? mouseLeft1 : mouseTop1;
+              let dist = abs(focus.dist(self, i, idx2, yPos, mouseYPos));
+              if (dist < closestDist) {
+                let bias = focus.bias;
+                if (bias != 0) {
+                  let mouseYVal = posToVal(mouseYPos, s.scale);
+                  let seriesYValSign = yVal2 >= 0 ? 1 : -1;
+                  let mouseYValSign = mouseYVal >= 0 ? 1 : -1;
+                  if (mouseYValSign == seriesYValSign && (mouseYValSign == 1 ? bias == 1 ? yVal2 >= mouseYVal : yVal2 <= mouseYVal : (
+                    // >= 0
+                    bias == 1 ? yVal2 <= mouseYVal : yVal2 >= mouseYVal
+                  ))) {
+                    closestDist = dist;
+                    closestSeries = i;
+                  }
+                } else {
+                  closestDist = dist;
+                  closestSeries = i;
+                }
+              }
+            }
+            if (shouldSetLegend || cursorOnePt) {
+              let hPos, vPos;
+              if (scaleX.ori == 0) {
+                hPos = xPos2;
+                vPos = yPos;
+              } else {
+                hPos = yPos;
+                vPos = xPos2;
+              }
+              let ptWid, ptHgt, ptLft, ptTop, ptStroke, ptFill, centered = true, getBBox = points2.bbox;
+              if (getBBox != null) {
+                centered = false;
+                let bbox = getBBox(self, i);
+                ptLft = bbox.left;
+                ptTop = bbox.top;
+                ptWid = bbox.width;
+                ptHgt = bbox.height;
+              } else {
+                ptLft = hPos;
+                ptTop = vPos;
+                ptWid = ptHgt = points2.size(self, i);
+              }
+              ptFill = points2.fill(self, i);
+              ptStroke = points2.stroke(self, i);
+              if (cursorOnePt) {
+                if (i == closestSeries && closestDist <= focus.prox) {
+                  _ptLft = ptLft;
+                  _ptTop = ptTop;
+                  _ptWid = ptWid;
+                  _ptHgt = ptHgt;
+                  _centered = centered;
+                  _ptFill = ptFill;
+                  _ptStroke = ptStroke;
+                }
+              } else {
+                let pt = cursorPts[i];
+                if (pt != null) {
+                  cursorPtsLft[i] = ptLft;
+                  cursorPtsTop[i] = ptTop;
+                  elSize(pt, ptWid, ptHgt, centered);
+                  elColor(pt, ptFill, ptStroke);
+                  elTrans(pt, ceil(ptLft), ceil(ptTop), plotWidCss, plotHgtCss);
+                }
+              }
+            }
+          }
+        }
+        if (cursorOnePt) {
+          let p = focus.prox;
+          let focusChanged = focusedSeries == null ? closestDist <= p : closestDist > p || closestSeries != focusedSeries;
+          if (shouldSetLegend || focusChanged) {
+            let pt = cursorPts[0];
+            if (pt != null) {
+              cursorPtsLft[0] = _ptLft;
+              cursorPtsTop[0] = _ptTop;
+              elSize(pt, _ptWid, _ptHgt, _centered);
+              elColor(pt, _ptFill, _ptStroke);
+              elTrans(pt, ceil(_ptLft), ceil(_ptTop), plotWidCss, plotHgtCss);
+            }
+          }
+        }
+      }
+      if (select.show && dragging) {
+        if (src != null) {
+          let [xKey, yKey] = syncOpts.scales;
+          let [matchXKeys, matchYKeys] = syncOpts.match;
+          let [xKeySrc, yKeySrc] = src.cursor.sync.scales;
+          let sdrag = src.cursor.drag;
+          dragX = sdrag._x;
+          dragY = sdrag._y;
+          if (dragX || dragY) {
+            let { left, top, width, height } = src.select;
+            let sori = src.scales[xKeySrc].ori;
+            let sPosToVal = src.posToVal;
+            let sOff, sDim, sc, a, b;
+            let matchingX = xKey != null && matchXKeys(xKey, xKeySrc);
+            let matchingY = yKey != null && matchYKeys(yKey, yKeySrc);
+            if (matchingX && dragX) {
+              if (sori == 0) {
+                sOff = left;
+                sDim = width;
+              } else {
+                sOff = top;
+                sDim = height;
+              }
+              sc = scales[xKey];
+              a = valToPosX(sPosToVal(sOff, xKeySrc), sc, xDim, 0);
+              b = valToPosX(sPosToVal(sOff + sDim, xKeySrc), sc, xDim, 0);
+              setSelX(min(a, b), abs(b - a));
+            } else
+              setSelX(0, xDim);
+            if (matchingY && dragY) {
+              if (sori == 1) {
+                sOff = left;
+                sDim = width;
+              } else {
+                sOff = top;
+                sDim = height;
+              }
+              sc = scales[yKey];
+              a = valToPosY(sPosToVal(sOff, yKeySrc), sc, yDim, 0);
+              b = valToPosY(sPosToVal(sOff + sDim, yKeySrc), sc, yDim, 0);
+              setSelY(min(a, b), abs(b - a));
+            } else
+              setSelY(0, yDim);
+          } else
+            hideSelect();
+        } else {
+          let rawDX = abs(rawMouseLeft1 - rawMouseLeft0);
+          let rawDY = abs(rawMouseTop1 - rawMouseTop0);
+          if (scaleX.ori == 1) {
+            let _rawDX = rawDX;
+            rawDX = rawDY;
+            rawDY = _rawDX;
+          }
+          dragX = drag.x && rawDX >= drag.dist;
+          dragY = drag.y && rawDY >= drag.dist;
+          let uni = drag.uni;
+          if (uni != null) {
+            if (dragX && dragY) {
+              dragX = rawDX >= uni;
+              dragY = rawDY >= uni;
+              if (!dragX && !dragY) {
+                if (rawDY > rawDX)
+                  dragY = true;
+                else
+                  dragX = true;
+              }
+            }
+          } else if (drag.x && drag.y && (dragX || dragY))
+            dragX = dragY = true;
+          let p0, p1;
+          if (dragX) {
+            if (scaleX.ori == 0) {
+              p0 = mouseLeft0;
+              p1 = mouseLeft1;
+            } else {
+              p0 = mouseTop0;
+              p1 = mouseTop1;
+            }
+            setSelX(min(p0, p1), abs(p1 - p0));
+            if (!dragY)
+              setSelY(0, yDim);
+          }
+          if (dragY) {
+            if (scaleX.ori == 1) {
+              p0 = mouseLeft0;
+              p1 = mouseLeft1;
+            } else {
+              p0 = mouseTop0;
+              p1 = mouseTop1;
+            }
+            setSelY(min(p0, p1), abs(p1 - p0));
+            if (!dragX)
+              setSelX(0, xDim);
+          }
+          if (!dragX && !dragY) {
+            setSelX(0, 0);
+            setSelY(0, 0);
+          }
+        }
+      }
+      drag._x = dragX;
+      drag._y = dragY;
+      if (src == null) {
+        if (_pub) {
+          if (syncKey != null) {
+            let [xSyncKey, ySyncKey] = syncOpts.scales;
+            syncOpts.values[0] = xSyncKey != null ? posToVal(scaleX.ori == 0 ? mouseLeft1 : mouseTop1, xSyncKey) : null;
+            syncOpts.values[1] = ySyncKey != null ? posToVal(scaleX.ori == 1 ? mouseLeft1 : mouseTop1, ySyncKey) : null;
+          }
+          pubSync(mousemove, self, mouseLeft1, mouseTop1, plotWidCss, plotHgtCss, idx);
+        }
+        if (cursorFocus) {
+          let shouldPub = _pub && syncOpts.setSeries;
+          let p = focus.prox;
+          if (focusedSeries == null) {
+            if (closestDist <= p)
+              setSeries(closestSeries, FOCUS_TRUE, true, shouldPub);
+          } else {
+            if (closestDist > p)
+              setSeries(null, FOCUS_TRUE, true, shouldPub);
+            else if (closestSeries != focusedSeries)
+              setSeries(closestSeries, FOCUS_TRUE, true, shouldPub);
+          }
+        }
+      }
+      if (shouldSetLegend) {
+        legend.idx = idx;
+        setLegend();
+      }
+      _fire !== false && fire("setCursor");
+    }
+    let rect2 = null;
+    Object.defineProperty(self, "rect", {
+      get() {
+        if (rect2 == null)
+          syncRect(false);
+        return rect2;
+      }
+    });
+    function syncRect(defer = false) {
+      if (defer)
+        rect2 = null;
+      else {
+        rect2 = over.getBoundingClientRect();
+        fire("syncRect", rect2);
+      }
+    }
+    function mouseMove(e, src, _l, _t, _w, _h, _i) {
+      if (cursor._lock)
+        return;
+      if (dragging && e != null && e.movementX == 0 && e.movementY == 0)
+        return;
+      cacheMouse(e, src, _l, _t, _w, _h, _i, false, e != null);
+      if (e != null)
+        updateCursor(null, true, true);
+      else
+        updateCursor(src, true, false);
+    }
+    function cacheMouse(e, src, _l, _t, _w, _h, _i, initial, snap) {
+      if (rect2 == null)
+        syncRect(false);
+      setCursorEvent(e);
+      if (e != null) {
+        _l = e.clientX - rect2.left;
+        _t = e.clientY - rect2.top;
+      } else {
+        if (_l < 0 || _t < 0) {
+          mouseLeft1 = -10;
+          mouseTop1 = -10;
+          return;
+        }
+        let [xKey, yKey] = syncOpts.scales;
+        let syncOptsSrc = src.cursor.sync;
+        let [xValSrc, yValSrc] = syncOptsSrc.values;
+        let [xKeySrc, yKeySrc] = syncOptsSrc.scales;
+        let [matchXKeys, matchYKeys] = syncOpts.match;
+        let rotSrc = src.axes[0].side % 2 == 1;
+        let xDim = scaleX.ori == 0 ? plotWidCss : plotHgtCss, yDim = scaleX.ori == 1 ? plotWidCss : plotHgtCss, _xDim = rotSrc ? _h : _w, _yDim = rotSrc ? _w : _h, _xPos = rotSrc ? _t : _l, _yPos = rotSrc ? _l : _t;
+        if (xKeySrc != null)
+          _l = matchXKeys(xKey, xKeySrc) ? getPos(xValSrc, scales[xKey], xDim, 0) : -10;
+        else
+          _l = xDim * (_xPos / _xDim);
+        if (yKeySrc != null)
+          _t = matchYKeys(yKey, yKeySrc) ? getPos(yValSrc, scales[yKey], yDim, 0) : -10;
+        else
+          _t = yDim * (_yPos / _yDim);
+        if (scaleX.ori == 1) {
+          let __l = _l;
+          _l = _t;
+          _t = __l;
+        }
+      }
+      if (snap && (src == null || src.cursor.event.type == mousemove)) {
+        if (_l <= 1 || _l >= plotWidCss - 1)
+          _l = incrRound(_l, plotWidCss);
+        if (_t <= 1 || _t >= plotHgtCss - 1)
+          _t = incrRound(_t, plotHgtCss);
+      }
+      if (initial) {
+        rawMouseLeft0 = _l;
+        rawMouseTop0 = _t;
+        [mouseLeft0, mouseTop0] = cursor.move(self, _l, _t);
+      } else {
+        mouseLeft1 = _l;
+        mouseTop1 = _t;
+      }
+    }
+    const _hideProps = {
+      width: 0,
+      height: 0,
+      left: 0,
+      top: 0
+    };
+    function hideSelect() {
+      setSelect(_hideProps, false);
+    }
+    let downSelectLeft;
+    let downSelectTop;
+    let downSelectWidth;
+    let downSelectHeight;
+    function mouseDown(e, src, _l, _t, _w, _h, _i) {
+      dragging = true;
+      dragX = dragY = drag._x = drag._y = false;
+      cacheMouse(e, src, _l, _t, _w, _h, _i, true, false);
+      if (e != null) {
+        onMouse(mouseup, doc, mouseUp, false);
+        pubSync(mousedown, self, mouseLeft0, mouseTop0, plotWidCss, plotHgtCss, null);
+      }
+      let { left, top, width, height } = select;
+      downSelectLeft = left;
+      downSelectTop = top;
+      downSelectWidth = width;
+      downSelectHeight = height;
+    }
+    function mouseUp(e, src, _l, _t, _w, _h, _i) {
+      dragging = drag._x = drag._y = false;
+      cacheMouse(e, src, _l, _t, _w, _h, _i, false, true);
+      let { left, top, width, height } = select;
+      let hasSelect = width > 0 || height > 0;
+      let chgSelect = downSelectLeft != left || downSelectTop != top || downSelectWidth != width || downSelectHeight != height;
+      hasSelect && chgSelect && setSelect(select);
+      if (drag.setScale && hasSelect && chgSelect) {
+        let xOff = left, xDim = width, yOff = top, yDim = height;
+        if (scaleX.ori == 1) {
+          xOff = top, xDim = height, yOff = left, yDim = width;
+        }
+        if (dragX) {
+          _setScale(
+            xScaleKey,
+            posToVal(xOff, xScaleKey),
+            posToVal(xOff + xDim, xScaleKey)
+          );
+        }
+        if (dragY) {
+          for (let k in scales) {
+            let sc = scales[k];
+            if (k != xScaleKey && sc.from == null && sc.min != inf) {
+              _setScale(
+                k,
+                posToVal(yOff + yDim, k),
+                posToVal(yOff, k)
+              );
+            }
+          }
+        }
+        hideSelect();
+      } else if (cursor.lock) {
+        cursor._lock = !cursor._lock;
+        updateCursor(src, true, e != null);
+      }
+      if (e != null) {
+        offMouse(mouseup, doc);
+        pubSync(mouseup, self, mouseLeft1, mouseTop1, plotWidCss, plotHgtCss, null);
+      }
+    }
+    function mouseLeave(e, src, _l, _t, _w, _h, _i) {
+      if (cursor._lock)
+        return;
+      setCursorEvent(e);
+      let _dragging = dragging;
+      if (dragging) {
+        let snapH = true;
+        let snapV = true;
+        let snapProx = 10;
+        let dragH, dragV;
+        if (scaleX.ori == 0) {
+          dragH = dragX;
+          dragV = dragY;
+        } else {
+          dragH = dragY;
+          dragV = dragX;
+        }
+        if (dragH && dragV) {
+          snapH = mouseLeft1 <= snapProx || mouseLeft1 >= plotWidCss - snapProx;
+          snapV = mouseTop1 <= snapProx || mouseTop1 >= plotHgtCss - snapProx;
+        }
+        if (dragH && snapH)
+          mouseLeft1 = mouseLeft1 < mouseLeft0 ? 0 : plotWidCss;
+        if (dragV && snapV)
+          mouseTop1 = mouseTop1 < mouseTop0 ? 0 : plotHgtCss;
+        updateCursor(null, true, true);
+        dragging = false;
+      }
+      mouseLeft1 = -10;
+      mouseTop1 = -10;
+      activeIdxs.fill(null);
+      updateCursor(null, true, true);
+      if (_dragging)
+        dragging = _dragging;
+    }
+    function dblClick(e, src, _l, _t, _w, _h, _i) {
+      if (cursor._lock)
+        return;
+      setCursorEvent(e);
+      autoScaleX();
+      hideSelect();
+      if (e != null)
+        pubSync(dblclick, self, mouseLeft1, mouseTop1, plotWidCss, plotHgtCss, null);
+    }
+    function syncPxRatio() {
+      axes.forEach(syncFontSize);
+      _setSize(self.width, self.height, true);
+    }
+    on(dppxchange, win, syncPxRatio);
+    const events = {};
+    events.mousedown = mouseDown;
+    events.mousemove = mouseMove;
+    events.mouseup = mouseUp;
+    events.dblclick = dblClick;
+    events["setSeries"] = (e, src, idx, opts2) => {
+      let seriesIdxMatcher2 = syncOpts.match[2];
+      idx = seriesIdxMatcher2(self, src, idx);
+      idx != -1 && setSeries(idx, opts2, true, false);
+    };
+    if (showCursor) {
+      onMouse(mousedown, over, mouseDown);
+      onMouse(mousemove, over, mouseMove);
+      onMouse(mouseenter, over, (e) => {
+        setCursorEvent(e);
+        syncRect(false);
+      });
+      onMouse(mouseleave, over, mouseLeave);
+      onMouse(dblclick, over, dblClick);
+      cursorPlots.add(self);
+      self.syncRect = syncRect;
+    }
+    const hooks = self.hooks = opts.hooks || {};
+    function fire(evName, a1, a2) {
+      if (deferHooks)
+        hooksQueue.push([evName, a1, a2]);
+      else {
+        if (evName in hooks) {
+          hooks[evName].forEach((fn) => {
+            fn.call(null, self, a1, a2);
+          });
+        }
+      }
+    }
+    (opts.plugins || []).forEach((p) => {
+      for (let evName in p.hooks)
+        hooks[evName] = (hooks[evName] || []).concat(p.hooks[evName]);
+    });
+    const seriesIdxMatcher = (self2, src, srcSeriesIdx) => srcSeriesIdx;
+    const syncOpts = assign({
+      key: null,
+      setSeries: false,
+      filters: {
+        pub: retTrue,
+        sub: retTrue
+      },
+      scales: [xScaleKey, series[1] ? series[1].scale : null],
+      match: [retEq, retEq, seriesIdxMatcher],
+      values: [null, null]
+    }, cursor.sync);
+    if (syncOpts.match.length == 2)
+      syncOpts.match.push(seriesIdxMatcher);
+    cursor.sync = syncOpts;
+    const syncKey = syncOpts.key;
+    const sync = _sync(syncKey);
+    function pubSync(type, src, x, y, w, h, i) {
+      if (syncOpts.filters.pub(type, src, x, y, w, h, i))
+        sync.pub(type, src, x, y, w, h, i);
+    }
+    sync.sub(self);
+    function pub(type, src, x, y, w, h, i) {
+      if (syncOpts.filters.sub(type, src, x, y, w, h, i))
+        events[type](null, src, x, y, w, h, i);
+    }
+    self.pub = pub;
+    function destroy() {
+      sync.unsub(self);
+      cursorPlots.delete(self);
+      mouseListeners.clear();
+      off(dppxchange, win, syncPxRatio);
+      root.remove();
+      legendTable?.remove();
+      fire("destroy");
+    }
+    self.destroy = destroy;
+    function _init() {
+      fire("init", opts, data);
+      setData(data || opts.data, false);
+      if (pendScales[xScaleKey])
+        setScale(xScaleKey, pendScales[xScaleKey]);
+      else
+        autoScaleX();
+      shouldSetSelect = select.show && (select.width > 0 || select.height > 0);
+      shouldSetCursor = shouldSetLegend = true;
+      _setSize(opts.width, opts.height);
+    }
+    series.forEach(initSeries);
+    axes.forEach(initAxis);
+    if (then) {
+      if (then instanceof HTMLElement) {
+        then.appendChild(root);
+        _init();
+      } else
+        then(self, _init);
+    } else
+      _init();
+    return self;
+  }
+  uPlot.assign = assign;
+  uPlot.fmtNum = fmtNum;
+  uPlot.rangeNum = rangeNum;
+  uPlot.rangeLog = rangeLog;
+  uPlot.rangeAsinh = rangeAsinh;
+  uPlot.orient = orient;
+  uPlot.pxRatio = pxRatio;
+  {
+    uPlot.join = join;
+  }
+  {
+    uPlot.fmtDate = fmtDate;
+    uPlot.tzDate = tzDate;
+  }
+  uPlot.sync = _sync;
+  {
+    uPlot.addGap = addGap;
+    uPlot.clipGaps = clipGaps;
+    let paths = uPlot.paths = {
+      points
+    };
+    paths.linear = linear;
+    paths.stepped = stepped;
+    paths.bars = bars;
+    paths.spline = monotoneCubic;
+  }
+
+  // src/renderer/charts/chartZoom.ts
+  var MIN_ZOOM_SPAN_TURNS = 2;
+  var WHEEL_ZOOM_IN_FACTOR = 0.8;
+  function wholeTurnRange(range, full) {
+    const fullSpan = full.max - full.min;
+    const span = Math.min(fullSpan, Math.max(MIN_ZOOM_SPAN_TURNS, Math.round(range.max - range.min)));
+    const min2 = Math.min(Math.max(Math.round(range.min), full.min), full.max - span);
+    return { min: min2, max: min2 + span };
+  }
+
+  // src/renderer/charts/lineChart.ts
+  var TURN_TICK_INCREMENTS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1e3];
+  function toUplotData(data) {
+    return [[...data.turns], ...data.series.map((series) => [...series.values])];
+  }
+  function fullTurnRange(data) {
+    if (data.turns.length < 2) return null;
+    return { min: data.turns[0], max: data.turns[data.turns.length - 1] };
+  }
+  function chromeColor(name, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  }
+  function createTooltipElement(host) {
+    const tooltip = document.createElement("div");
+    tooltip.className = "charts-tooltip";
+    tooltip.hidden = true;
+    host.appendChild(tooltip);
+    return tooltip;
+  }
+  function fillTooltip(tooltip, args, data, index) {
+    const text = chartTooltip(data, index, args.nameOf, args.decimals);
+    const heading = document.createElement("div");
+    heading.className = "charts-tooltip-heading";
+    heading.textContent = text.heading;
+    const rows = data.series.map((series, row) => {
+      const line = document.createElement("div");
+      line.className = "charts-tooltip-line";
+      const swatch = document.createElement("span");
+      swatch.className = "charts-tooltip-swatch";
+      swatch.style.background = args.colorOf(series.seatId);
+      const label = document.createElement("span");
+      label.textContent = text.lines[row];
+      line.append(swatch, label);
+      return line;
+    });
+    const total = document.createElement("div");
+    total.className = "charts-tooltip-total";
+    total.textContent = text.total;
+    tooltip.replaceChildren(heading, ...rows, total);
+  }
+  function placeTooltip(tooltip, host, cursorX, cursorY) {
+    const gap = 12;
+    const left = cursorX + gap + tooltip.offsetWidth > host.clientWidth ? cursorX - gap - tooltip.offsetWidth : cursorX + gap;
+    const top = cursorY + gap + tooltip.offsetHeight > host.clientHeight ? cursorY - gap - tooltip.offsetHeight : cursorY + gap;
+    tooltip.style.left = `${Math.max(0, left)}px`;
+    tooltip.style.top = `${Math.max(0, top)}px`;
+  }
+  function createLineChart(args) {
+    let data = args.data;
+    let view2 = null;
+    const tooltip = createTooltipElement(args.host);
+    const axisStroke = chromeColor("--chrome-muted", "#b7c4d4");
+    const gridStroke2 = chromeColor("--chrome-divider", "#243246");
+    const axis = { stroke: axisStroke, grid: { stroke: gridStroke2, width: 1 }, ticks: { stroke: gridStroke2, width: 1 } };
+    const plot = new uPlot(
+      {
+        width: args.width,
+        height: args.height,
+        legend: { show: false },
+        scales: { x: { time: false } },
+        cursor: { drag: { x: false, y: false, setScale: false } },
+        axes: [
+          {
+            ...axis,
+            incrs: TURN_TICK_INCREMENTS,
+            values: (_u, ticks2) => ticks2.map((tick) => Number.isInteger(tick) ? String(tick) : "")
+          },
+          { ...axis }
+        ],
+        series: [
+          {},
+          ...data.series.map((series) => ({
+            label: args.nameOf(series.seatId),
+            stroke: args.colorOf(series.seatId),
+            width: 2,
+            spanGaps: false
+          }))
+        ],
+        hooks: {
+          setCursor: [
+            (u) => {
+              const index = u.cursor.idx;
+              const left = u.cursor.left ?? -1;
+              if (typeof index !== "number" || left < 0 || data.turns[index] === void 0) {
+                tooltip.hidden = true;
+                return;
+              }
+              fillTooltip(tooltip, args, data, index);
+              tooltip.hidden = false;
+              placeTooltip(tooltip, args.host, u.over.offsetLeft + left, u.over.offsetTop + (u.cursor.top ?? 0));
+            }
+          ]
+        }
+      },
+      toUplotData(data),
+      args.host
+    );
+    const showRange = (range) => {
+      const full = fullTurnRange(data);
+      view2 = full !== null && range.min <= full.min && range.max >= full.max ? null : range;
+      plot.setScale("x", range);
+    };
+    const currentRange = () => view2 ?? fullTurnRange(data);
+    const onWheel = (event) => {
+      event.preventDefault();
+      const full = fullTurnRange(data);
+      const range = currentRange();
+      if (full === null || range === null) return;
+      const anchor3 = plot.posToVal(event.clientX - plot.over.getBoundingClientRect().left, "x");
+      const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
+      showRange(zoomedTurnRange({ range, full, anchor: anchor3, factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
+    };
+    let dragStart3 = null;
+    const onPointerDown = (event) => {
+      const range = currentRange();
+      if (range === null || event.button !== 0) return;
+      dragStart3 = { x: event.clientX, range };
+      plot.over.setPointerCapture(event.pointerId);
+    };
+    const onPointerMove = (event) => {
+      const full = fullTurnRange(data);
+      if (dragStart3 === null || full === null) return;
+      const turnsPerPixel = (dragStart3.range.max - dragStart3.range.min) / Math.max(1, plot.over.clientWidth);
+      const deltaTurns = -(event.clientX - dragStart3.x) * turnsPerPixel;
+      showRange(pannedTurnRange({ range: dragStart3.range, full, deltaTurns }));
+    };
+    const onPointerEnd = () => {
+      dragStart3 = null;
+    };
+    const onDoubleClick = () => {
+      const full = fullTurnRange(data);
+      if (full !== null) showRange(full);
+    };
+    plot.over.addEventListener("wheel", onWheel, { passive: false });
+    plot.over.addEventListener("pointerdown", onPointerDown);
+    plot.over.addEventListener("pointermove", onPointerMove);
+    plot.over.addEventListener("pointerup", onPointerEnd);
+    plot.over.addEventListener("pointercancel", onPointerEnd);
+    plot.over.addEventListener("dblclick", onDoubleClick);
+    return {
+      update(next) {
+        data = next;
+        const full = fullTurnRange(next);
+        const keep = view2 !== null && full !== null ? view2 : null;
+        plot.setData(toUplotData(next), keep === null);
+        if (keep !== null && full !== null) {
+          showRange(zoomedTurnRange({ range: keep, full, anchor: keep.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }));
+        } else {
+          view2 = null;
+        }
+      },
+      resize(width, height) {
+        plot.setSize({ width, height });
+      },
+      destroy() {
+        plot.over.removeEventListener("wheel", onWheel);
+        plot.over.removeEventListener("pointerdown", onPointerDown);
+        plot.over.removeEventListener("pointermove", onPointerMove);
+        plot.over.removeEventListener("pointerup", onPointerEnd);
+        plot.over.removeEventListener("pointercancel", onPointerEnd);
+        plot.over.removeEventListener("dblclick", onDoubleClick);
+        plot.destroy();
+        tooltip.remove();
+      }
+    };
+  }
+
+  // src/renderer/charts/relationshipStack.ts
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
+  var GRAPH_BOX = { width: 240, height: 200 };
+  var SPOKE_RADIUS = 58;
+  var NODE_LABEL_MAX_CHARS = 12;
+  var NO_REPORT_COLOR = "var(--stance-neutral)";
+  function svgElement(tag, attributes) {
+    const element = document.createElementNS(SVG_NS2, tag);
+    for (const [name, value] of Object.entries(attributes)) {
+      element.setAttribute(name, String(value));
+    }
+    return element;
+  }
+  function shortLabel(name) {
+    return name.length <= NODE_LABEL_MAX_CHARS ? name : `${name.slice(0, NODE_LABEL_MAX_CHARS - 1)}\u2026`;
+  }
+  function stanceColor(row) {
+    const stance = row.age === "none" ? null : row.stance;
+    return stance === null ? NO_REPORT_COLOR : `var(--stance-${stance})`;
+  }
+  function nodeSentence(name, row) {
+    if (row.stance === null || row.age === "none") return `${name}: no report yet`;
+    return `${name}: ${row.stance}, trust ${row.trust ?? "\u2013"}, threat ${row.threat ?? "\u2013"}, reported turn ${row.reportedTurn ?? "\u2013"}`;
+  }
+  function buildSpokeGraph(args) {
+    const centerX = GRAPH_BOX.width / 2;
+    const centerY = 100;
+    const svg = svgElement("svg", {
+      viewBox: `0 0 ${GRAPH_BOX.width} ${GRAPH_BOX.height}`,
+      class: "charts-spoke-graph",
+      role: "img",
+      "aria-label": `How the commanders see ${args.nameOf(args.subjectSeatId)}`
+    });
+    const positions = spokePositions(args.rows.length, SPOKE_RADIUS);
+    args.rows.forEach((row, index) => {
+      const point = { x: centerX + positions[index].x, y: centerY + positions[index].y };
+      const dashed = row.age !== "fresh";
+      const line = svgElement("line", {
+        x1: point.x,
+        y1: point.y,
+        x2: centerX,
+        y2: centerY,
+        "stroke-width": row.trust === null ? 1 : 1 + 1.5 * row.trust,
+        "stroke-dasharray": dashed ? "4 3" : "0"
+      });
+      line.style.stroke = stanceColor(row);
+      svg.appendChild(line);
+    });
+    const hub = svgElement("circle", { cx: centerX, cy: centerY, r: 15, class: "charts-spoke-hub" });
+    hub.style.fill = `var(--seat-${args.seatNumberOf(args.subjectSeatId)}-bar)`;
+    svg.append(hub, spokeDigit(centerX, centerY, args.seatNumberOf(args.subjectSeatId)));
+    args.rows.forEach((row, index) => {
+      const point = { x: centerX + positions[index].x, y: centerY + positions[index].y };
+      svg.appendChild(buildSpokeNode(args, row, point));
+    });
+    return svg;
+  }
+  function spokeDigit(x, y, number) {
+    const digit = svgElement("text", { x, y: y + 4, "text-anchor": "middle", class: "charts-spoke-digit" });
+    digit.textContent = String(number);
+    return digit;
+  }
+  function buildSpokeNode(args, row, point) {
+    const name = args.nameOf(row.reporterSeatId);
+    const group = svgElement("g", { class: "charts-spoke-node" });
+    const title = svgElement("title", {});
+    title.textContent = nodeSentence(name, row);
+    const circle = svgElement("circle", {
+      cx: point.x,
+      cy: point.y,
+      r: 13,
+      class: row.age === "none" ? "charts-spoke-circle charts-spoke-circle-missing" : "charts-spoke-circle"
+    });
+    circle.style.fill = `var(--seat-${args.seatNumberOf(row.reporterSeatId)}-bar)`;
+    const label = svgElement("text", { x: point.x, y: point.y + 26, "text-anchor": "middle", class: "charts-spoke-label" });
+    label.textContent = shortLabel(name);
+    group.append(title, circle, spokeDigit(point.x, point.y, args.seatNumberOf(row.reporterSeatId)), label);
+    if (row.age === "none") {
+      const missing = svgElement("text", { x: point.x, y: point.y + 37, "text-anchor": "middle", class: "charts-spoke-missing" });
+      missing.textContent = "no report";
+      group.appendChild(missing);
+    }
+    return group;
+  }
+  function scoreCell(score) {
+    const cell = document.createElement("td");
+    const bar = document.createElement("span");
+    bar.className = score === null ? "charts-score-bar charts-score-bar-empty" : "charts-score-bar";
+    for (let step = 0; step <= RELATIONSHIP_SCALE_MAX; step += 1) {
+      const part = document.createElement("span");
+      part.className = score !== null && step <= score ? "charts-score-step charts-score-step-on" : "charts-score-step";
+      bar.appendChild(part);
+    }
+    const number = document.createElement("span");
+    number.className = "charts-score-number";
+    number.textContent = score === null ? "\u2013" : String(score);
+    cell.append(bar, number);
+    return cell;
+  }
+  function textCell(text) {
+    const cell = document.createElement("td");
+    cell.textContent = text;
+    return cell;
+  }
+  function stanceCell(row) {
+    const cell = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "charts-stance-pill";
+    pill.style.background = stanceColor(row);
+    pill.textContent = row.age === "none" || row.stance === null ? "no report" : row.stance;
+    cell.appendChild(pill);
+    return cell;
+  }
+  function buildRowCard(args) {
+    const table = document.createElement("table");
+    table.className = "charts-row-card";
+    const head2 = document.createElement("tr");
+    for (const heading of ["Side", "Stance", "Trust", "Threat", "Taken", "As of"]) {
+      const cell = document.createElement("th");
+      cell.textContent = heading;
+      head2.appendChild(cell);
+    }
+    table.appendChild(head2);
+    for (const row of args.rows) {
+      const line = document.createElement("tr");
+      const side = document.createElement("td");
+      side.className = "charts-row-side";
+      const flag = args.flagOf(row.reporterSeatId);
+      const name = document.createElement("span");
+      name.textContent = args.nameOf(row.reporterSeatId);
+      side.append(...flag === null ? [name] : [flag, name]);
+      const asOf = row.reportedTurn === null ? "\u2013" : `turn ${row.reportedTurn}${row.age === "old" ? " (old)" : ""}`;
+      const taken = row.hexesTaken === null ? "\u2013" : `${row.hexesTaken} hexes`;
+      const takenCell = textCell(taken);
+      takenCell.title = `Hexes taken from this side in the last ${HEXES_TAKEN_WINDOW_TURNS} turns`;
+      line.append(side, stanceCell(row), scoreCell(row.trust), scoreCell(row.threat), takenCell, textCell(asOf));
+      table.appendChild(line);
+    }
+    return table;
+  }
+  function buildRelationshipStack(args) {
+    const card = document.createElement("section");
+    card.className = "charts-stack";
+    const heading = document.createElement("h4");
+    heading.className = "charts-stack-heading";
+    if (args.subjectIsViewer) {
+      heading.textContent = "How they see you";
+    } else {
+      const flag = args.flagOf(args.subjectSeatId);
+      const name = document.createElement("span");
+      name.textContent = args.nameOf(args.subjectSeatId);
+      heading.append("How they see ", ...flag === null ? [name] : [flag, name]);
+    }
+    card.appendChild(heading);
+    if (args.rows.length === 0) {
+      const none = document.createElement("p");
+      none.className = "charts-empty";
+      none.textContent = "No AI commander reports on this side.";
+      card.appendChild(none);
+      return card;
+    }
+    card.append(buildSpokeGraph(args), buildRowCard(args));
+    return card;
+  }
+
+  // src/renderer/charts/relationshipTimeline.ts
+  var ROW_HEIGHT_MAX = 22;
+  var ROW_HEIGHT_MIN = 10;
+  var AXIS_HEIGHT = 18;
+  var LABEL_WIDTH = 120;
+  var LETTER_MIN_CELL_WIDTH = 14;
+  function cssColor(name, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  }
+  function tickStep(cellWidth) {
+    return Math.max(1, Math.ceil(40 / Math.max(1, cellWidth)));
+  }
+  function createRelationshipTimeline(args) {
+    let size = { width: args.width, height: args.height };
+    let strip = { turns: [], rows: [] };
+    let view2 = null;
+    let dragStart3 = null;
+    const labels = document.createElement("div");
+    labels.className = "charts-strip-labels";
+    const canvas = document.createElement("canvas");
+    canvas.className = "charts-strip-canvas";
+    const empty = document.createElement("p");
+    empty.className = "charts-empty";
+    empty.textContent = "No AI commander reports on this side.";
+    empty.hidden = true;
+    const tooltip = document.createElement("div");
+    tooltip.className = "charts-tooltip";
+    tooltip.hidden = true;
+    args.host.append(labels, canvas, empty, tooltip);
+    const fullRange = () => strip.turns.length === 0 ? null : { min: strip.turns[0], max: strip.turns[strip.turns.length - 1] };
+    const visibleRange = () => view2 ?? fullRange();
+    const rowHeight = () => Math.min(ROW_HEIGHT_MAX, Math.max(ROW_HEIGHT_MIN, Math.floor((size.height - AXIS_HEIGHT) / Math.max(1, strip.rows.length))));
+    const plotWidth = () => Math.max(1, size.width - LABEL_WIDTH);
+    const drawLabels = () => {
+      const height = rowHeight();
+      labels.style.width = `${LABEL_WIDTH}px`;
+      labels.replaceChildren(
+        ...strip.rows.map((row) => {
+          const line = document.createElement("div");
+          line.className = "charts-strip-label";
+          line.style.height = `${height}px`;
+          const flag = args.flagOf(row.reporterSeatId);
+          const name = document.createElement("span");
+          name.textContent = args.nameOf(row.reporterSeatId);
+          line.append(...flag === null ? [name] : [flag, name]);
+          return line;
+        })
+      );
+    };
+    const draw = () => {
+      const range = visibleRange();
+      const ratio = window.devicePixelRatio || 1;
+      const height = rowHeight() * strip.rows.length + AXIS_HEIGHT;
+      canvas.width = Math.floor(plotWidth() * ratio);
+      canvas.height = Math.floor(height * ratio);
+      canvas.style.width = `${plotWidth()}px`;
+      canvas.style.height = `${height}px`;
+      const context = canvas.getContext("2d");
+      if (context === null || range === null) return;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const turnCount = range.max - range.min + 1;
+      const cellWidth = plotWidth() / turnCount;
+      const rowPx = rowHeight();
+      const muted = cssColor("--chrome-muted", "#b7c4d4");
+      context.font = "11px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      strip.rows.forEach((row, rowIndex) => {
+        strip.turns.forEach((turn, index) => {
+          if (turn < range.min || turn > range.max) return;
+          const cell = row.cells[index];
+          const x = (turn - range.min) * cellWidth;
+          const y = rowIndex * rowPx;
+          if (cell.stance === null) {
+            context.strokeStyle = muted;
+            context.lineWidth = 1;
+            context.strokeRect(x + 0.5, y + 0.5, Math.max(0, cellWidth - 1), rowPx - 1);
+            return;
+          }
+          context.globalAlpha = cell.reportedThisTurn ? 1 : 0.45;
+          context.fillStyle = cssColor(`--stance-${cell.stance}`, "#9AA5A3");
+          context.fillRect(x, y, cellWidth, rowPx - 1);
+          context.globalAlpha = 1;
+          if (cellWidth >= LETTER_MIN_CELL_WIDTH) {
+            context.fillStyle = "#10161d";
+            context.fillText(cell.stance.charAt(0).toUpperCase(), x + cellWidth / 2, y + rowPx / 2);
+          }
+        });
+      });
+      const axisTop = rowPx * strip.rows.length;
+      context.fillStyle = muted;
+      const step = tickStep(cellWidth);
+      strip.turns.forEach((turn) => {
+        if (turn < range.min || turn > range.max || (turn - range.min) % step !== 0) return;
+        context.fillText(String(turn), (turn - range.min) * cellWidth + cellWidth / 2, axisTop + AXIS_HEIGHT / 2);
+      });
+    };
+    const render = () => {
+      const hasRows = strip.rows.length > 0;
+      empty.hidden = hasRows;
+      canvas.hidden = !hasRows;
+      labels.hidden = !hasRows;
+      if (!hasRows) return;
+      drawLabels();
+      draw();
+    };
+    const showRange = (range) => {
+      const full = fullRange();
+      const whole = full === null ? range : wholeTurnRange(range, full);
+      view2 = full !== null && whole.min <= full.min && whole.max >= full.max ? null : whole;
+      render();
+    };
+    const turnAt = (clientX) => {
+      const range = visibleRange();
+      if (range === null) return 0;
+      const cellWidth = plotWidth() / (range.max - range.min + 1);
+      return range.min + (clientX - canvas.getBoundingClientRect().left) / cellWidth - 0.5;
+    };
+    const onWheel = (event) => {
+      event.preventDefault();
+      const full = fullRange();
+      const range = visibleRange();
+      if (full === null || range === null) return;
+      const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
+      showRange(zoomedTurnRange({ range, full, anchor: turnAt(event.clientX), factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
+    };
+    const onPointerDown = (event) => {
+      const range = visibleRange();
+      if (range === null || event.button !== 0) return;
+      dragStart3 = { x: event.clientX, range };
+      canvas.setPointerCapture(event.pointerId);
+    };
+    const showTooltip = (event) => {
+      const index = strip.turns.indexOf(Math.round(turnAt(event.clientX)));
+      if (index < 0) {
+        tooltip.hidden = true;
+        return;
+      }
+      const heading = document.createElement("div");
+      heading.className = "charts-tooltip-heading";
+      heading.textContent = `Turn ${strip.turns[index]}`;
+      const lines = strip.rows.map((row) => {
+        const cell = row.cells[index];
+        const name = args.nameOf(row.reporterSeatId);
+        const line = document.createElement("div");
+        line.className = "charts-tooltip-line";
+        line.textContent = cell.stance === null ? `${name}: no report` : `${name}: ${cell.stance} (${cell.reportedThisTurn ? "reported this turn" : "from an earlier turn"})`;
+        return line;
+      });
+      tooltip.replaceChildren(heading, ...lines);
+      tooltip.hidden = false;
+      const bounds = args.host.getBoundingClientRect();
+      const x = event.clientX - bounds.left;
+      const y = event.clientY - bounds.top;
+      const left = x + 12 + tooltip.offsetWidth > args.host.clientWidth ? x - 12 - tooltip.offsetWidth : x + 12;
+      tooltip.style.left = `${Math.max(0, left)}px`;
+      tooltip.style.top = `${Math.max(0, y + 12)}px`;
+    };
+    const onPointerMove = (event) => {
+      const full = fullRange();
+      if (dragStart3 !== null && full !== null) {
+        const turnsPerPixel = (dragStart3.range.max - dragStart3.range.min + 1) / plotWidth();
+        showRange(pannedTurnRange({ range: dragStart3.range, full, deltaTurns: -(event.clientX - dragStart3.x) * turnsPerPixel }));
+        return;
+      }
+      showTooltip(event);
+    };
+    const onPointerEnd = () => {
+      dragStart3 = null;
+    };
+    const onPointerLeave = () => {
+      tooltip.hidden = true;
+    };
+    const onDoubleClick = () => {
+      view2 = null;
+      render();
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerEnd);
+    canvas.addEventListener("pointercancel", onPointerEnd);
+    canvas.addEventListener("pointerleave", onPointerLeave);
+    canvas.addEventListener("dblclick", onDoubleClick);
+    return {
+      update(next) {
+        strip = next;
+        const full = fullRange();
+        if (view2 !== null && full !== null) {
+          view2 = wholeTurnRange(zoomedTurnRange({ range: view2, full, anchor: view2.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }), full);
+          if (view2.min <= full.min && view2.max >= full.max) view2 = null;
+        } else {
+          view2 = null;
+        }
+        render();
+      },
+      resize(width, height) {
+        size = { width, height };
+        render();
+      },
+      destroy() {
+        canvas.removeEventListener("wheel", onWheel);
+        canvas.removeEventListener("pointerdown", onPointerDown);
+        canvas.removeEventListener("pointermove", onPointerMove);
+        canvas.removeEventListener("pointerup", onPointerEnd);
+        canvas.removeEventListener("pointercancel", onPointerEnd);
+        canvas.removeEventListener("pointerleave", onPointerLeave);
+        canvas.removeEventListener("dblclick", onDoubleClick);
+        args.host.replaceChildren();
+      }
+    };
+  }
+
+  // src/renderer/charts/chartsDialog.ts
+  var view = null;
+  var latestSnapshot = null;
+  var open = false;
+  var openCounter = 0;
+  var openEpoch = 0;
+  var previousFocus = null;
+  var pressStartedOnBackdrop = false;
+  function overlayElement() {
+    return document.getElementById("charts-overlay");
+  }
+  function bodyElement() {
+    return document.getElementById("charts-dialog-body");
+  }
+  function matchIsLoaded() {
+    return (rendererSharedState.gameState?.seats?.length ?? 0) > 0;
+  }
+  function innerBodyWidth(body) {
+    const style = getComputedStyle(body);
+    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    return Math.max(200, Math.floor(body.clientWidth - padding));
+  }
+  function dialogHeight() {
+    return document.getElementById("charts-dialog")?.clientHeight ?? 0;
+  }
+  function appendBlock(parent, title) {
+    const block = document.createElement("section");
+    block.className = "charts-block";
+    const titleRow = document.createElement("div");
+    titleRow.className = "charts-block-title";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    titleRow.appendChild(heading);
+    const plotHost = document.createElement("div");
+    plotHost.className = "charts-plot-host";
+    block.append(titleRow, plotHost);
+    parent.appendChild(block);
+    return { titleRow, plotHost };
+  }
+  function fillStacks(host, snapshot3, lookups) {
+    const seats = [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder);
+    host.style.gridTemplateColumns = `repeat(${Math.min(seats.length, MAX_SEATS)}, minmax(0, 1fr))`;
+    host.replaceChildren(
+      ...seats.map(
+        (seat) => buildRelationshipStack({
+          subjectSeatId: seat.seatId,
+          rows: relationshipRows(snapshot3, seat.seatId),
+          nameOf: lookups.nameOf,
+          flagOf: lookups.flagOf,
+          seatNumberOf: lookups.seatNumberOf,
+          subjectIsViewer: isHumanSeatId(seat.seatId)
+        })
+      )
+    );
+  }
+  function buildLineChartBlock(body, definition, snapshot3, lookups) {
+    const { titleRow, plotHost } = appendBlock(body, definition.title);
+    let select = null;
+    if (definition.options.length > 0) {
+      select = document.createElement("select");
+      select.className = "charts-select";
+      select.setAttribute("aria-label", `${definition.title} unit type`);
+      select.dataset.controlTooltip = `Show the total or one unit type for ${definition.title.toLowerCase()}.`;
+      definition.options.forEach((option2, index) => {
+        const element = document.createElement("option");
+        element.value = String(index);
+        element.textContent = option2.label;
+        select?.appendChild(element);
+      });
+      titleRow.appendChild(select);
+    }
+    const handle = createLineChart({
+      host: plotHost,
+      data: lineChartData(snapshot3, definition.id, null),
+      width: innerBodyWidth(body),
+      height: chartPlotHeight(dialogHeight(), titleRow.offsetHeight),
+      colorOf: lookups.colorOf,
+      nameOf: lookups.nameOf,
+      decimals: definition.decimals
+    });
+    return { definition, handle, select, titleRow };
+  }
+  function chosenUnitType(entry) {
+    if (entry.select === null) return null;
+    return entry.definition.options[Number(entry.select.value)]?.unitType ?? null;
+  }
+  function updateLineChart(entry, snapshot3) {
+    entry.handle.update(lineChartData(snapshot3, entry.definition.id, chosenUnitType(entry)));
+  }
+  function buildBody(body, snapshot3) {
+    const lookups = seatLookups(snapshot3);
+    body.replaceChildren();
+    const relationships = appendBlock(body, "Relationships");
+    relationships.plotHost.className = "charts-stack-grid";
+    fillStacks(relationships.plotHost, snapshot3, lookups);
+    const stripBlock = appendBlock(body, "Stance over time");
+    const subjectSelect = document.createElement("select");
+    subjectSelect.className = "charts-select";
+    subjectSelect.setAttribute("aria-label", "How they see");
+    subjectSelect.dataset.controlTooltip = "Choose the side whose standing with each commander the strip shows.";
+    for (const seat of [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder)) {
+      const option2 = document.createElement("option");
+      option2.value = seat.seatId;
+      option2.textContent = seat.name;
+      subjectSelect.appendChild(option2);
+    }
+    const subjectLabel = document.createElement("label");
+    subjectLabel.className = "charts-select-label";
+    subjectLabel.append("How they see ", subjectSelect);
+    stripBlock.titleRow.appendChild(subjectLabel);
+    const strip = createRelationshipTimeline({
+      host: stripBlock.plotHost,
+      width: innerBodyWidth(body),
+      height: chartPlotHeight(dialogHeight(), stripBlock.titleRow.offsetHeight),
+      nameOf: lookups.nameOf,
+      flagOf: lookups.flagOf
+    });
+    strip.update(relationshipStrip(snapshot3, subjectSelect.value));
+    body.appendChild(buildLegend(snapshot3, lookups));
+    const lines = LINE_CHART_DEFINITIONS.map((definition) => buildLineChartBlock(body, definition, snapshot3, lookups));
+    latestSnapshot = snapshot3;
+    subjectSelect.addEventListener("change", () => {
+      if (latestSnapshot !== null) strip.update(relationshipStrip(latestSnapshot, subjectSelect.value));
+    });
+    for (const entry of lines) {
+      entry.select?.addEventListener("change", () => {
+        if (latestSnapshot !== null) updateLineChart(entry, latestSnapshot);
+      });
+    }
+    view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, lines };
+  }
+  function destroyView() {
+    if (view === null) return;
+    view.strip.destroy();
+    for (const entry of view.lines) entry.handle.destroy();
+    view = null;
+    latestSnapshot = null;
+  }
+  function showBodyMessage(body, text) {
+    destroyView();
+    const paragraph = document.createElement("p");
+    paragraph.className = "charts-empty";
+    paragraph.textContent = text;
+    body.replaceChildren(paragraph);
+  }
+  function resizeCharts() {
+    const body = bodyElement();
+    if (!open || body === null || view === null) return;
+    const width = innerBodyWidth(body);
+    const height = dialogHeight();
+    view.strip.resize(width, chartPlotHeight(height, view.stripTitleRow.offsetHeight));
+    for (const entry of view.lines) {
+      entry.handle.resize(width, chartPlotHeight(height, entry.titleRow.offsetHeight));
+    }
+  }
+  function applySnapshot2(body, snapshot3) {
+    if (snapshot3.turns.length === 0) {
+      showBodyMessage(body, "No turns have been recorded yet.");
+      return;
+    }
+    if (view === null) {
+      buildBody(body, snapshot3);
+      return;
+    }
+    const scrollTop = body.scrollTop;
+    const lookups = seatLookups(snapshot3);
+    latestSnapshot = snapshot3;
+    fillStacks(view.stackHost, snapshot3, lookups);
+    view.strip.update(relationshipStrip(snapshot3, view.subjectSelect.value));
+    for (const entry of view.lines) updateLineChart(entry, snapshot3);
+    body.scrollTop = scrollTop;
+  }
+  async function readSnapshot() {
+    if (!window.gameApi) throw new Error("readMatchCharts is unavailable");
+    return window.gameApi.readMatchCharts();
+  }
+  async function renderCharts() {
+    const body = bodyElement();
+    if (body === null) return;
+    const counter = openCounter;
+    try {
+      const snapshot3 = await readSnapshot();
+      if (!open || counter !== openCounter) return;
+      applySnapshot2(body, snapshot3);
+    } catch (error) {
+      console.error("readMatchCharts failed", error);
+      if (!open || counter !== openCounter) return;
+      showBodyMessage(body, "The charts could not be loaded.");
+    }
+  }
+  function trapTabKey(event) {
+    if (event.key !== "Tab") return;
+    const dialog = document.getElementById("charts-dialog");
+    const close = document.getElementById("charts-dialog-close");
+    if (dialog === null || close === null) return;
+    const focusable = Array.from(dialog.querySelectorAll("button, select, input, [tabindex]")).filter(
+      (element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
+    );
+    const last = focusable[focusable.length - 1] ?? close;
+    const active2 = document.activeElement;
+    if (event.shiftKey && (active2 === close || !dialog.contains(active2))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active2 === last || !dialog.contains(active2))) {
+      event.preventDefault();
+      close.focus();
+    }
+  }
+  function openDialog(overlay) {
+    previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    open = true;
+    openCounter += 1;
+    openEpoch = currentRendererMatchEpoch();
+    overlay.hidden = false;
+    window.addEventListener("resize", resizeCharts);
+    document.getElementById("charts-dialog-close")?.focus();
+    void renderCharts();
+  }
+  function closeDialog(overlay) {
+    open = false;
+    openCounter += 1;
+    window.removeEventListener("resize", resizeCharts);
+    destroyView();
+    bodyElement()?.replaceChildren();
+    overlay.hidden = true;
+    previousFocus?.focus();
+    previousFocus = null;
+  }
+  function wireChartsDialog() {
+    const overlay = overlayElement();
+    if (overlay === null) return;
+    document.getElementById("charts-dialog-close")?.addEventListener("click", () => closeDialog(overlay));
+    overlay.addEventListener("pointerdown", (event) => {
+      pressStartedOnBackdrop = event.target === overlay;
+    });
+    overlay.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const fromBackdrop = pressStartedOnBackdrop;
+      pressStartedOnBackdrop = false;
+      if (event.target === overlay && fromBackdrop) closeDialog(overlay);
+    });
+    overlay.addEventListener("keydown", trapTabKey);
+    for (const type of ["pointerdown", "mousedown", "dblclick", "wheel"]) {
+      overlay.addEventListener(type, (event) => event.stopPropagation());
+    }
+  }
+  function chartsDialogIsOpen() {
+    return open;
+  }
+  function toggleChartsDialog() {
+    const overlay = overlayElement();
+    if (overlay === null) return;
+    if (open) {
+      closeDialog(overlay);
+      return;
+    }
+    if (chartsDialogMayOpen({ matchLoaded: matchIsLoaded(), otherModalOpen: blockingDialogIsOpen() })) {
+      openDialog(overlay);
+    }
+  }
+  function closeChartsDialogIfOpen() {
+    const overlay = overlayElement();
+    if (open && overlay !== null) closeDialog(overlay);
+  }
+  async function refreshChartsDialogIfOpen() {
+    const overlay = overlayElement();
+    const body = bodyElement();
+    if (!open || overlay === null || body === null) return;
+    if (!rendererMatchEpochCurrent(openEpoch)) {
+      closeDialog(overlay);
+      return;
+    }
+    const counter = openCounter;
+    try {
+      const snapshot3 = await readSnapshot();
+      if (!open || counter !== openCounter || !rendererMatchEpochCurrent(openEpoch)) return;
+      applySnapshot2(body, snapshot3);
+    } catch (error) {
+      console.error("readMatchCharts refresh failed", error);
+    }
   }
 
   // src/shared/consolidatedTurnUpdateToast.ts
@@ -38970,11 +44270,11 @@ ${bonuses}`;
     return map;
   }
   function allRemovedSnapshots(args) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const s of args.removedUnits ?? []) byId.set(s.id, s);
-    for (const s of args.missileStrikeRemovedUnits ?? []) byId.set(s.id, s);
-    for (const s of args.airStrikeRemovedUnits ?? []) byId.set(s.id, s);
-    return [...byId.values()];
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const s of args.removedUnits ?? []) byId2.set(s.id, s);
+    for (const s of args.missileStrikeRemovedUnits ?? []) byId2.set(s.id, s);
+    for (const s of args.airStrikeRemovedUnits ?? []) byId2.set(s.id, s);
+    return [...byId2.values()];
   }
   function resolveLostUnit(victimId, snapshots, args) {
     const snap = snapshots.get(victimId);
@@ -39506,6 +44806,974 @@ ${bonuses}`;
       send();
       notifyResolutionPlaybackFinished();
     }
+  }
+
+  // src/renderer/gameplay/resolutionPlaybackPlan.ts
+  function planResolutionPlayback(input) {
+    const { readyResult, state, humanMoves, visibleHexesBeforeTurn, deps } = input;
+    const aiMoves = readyResult.aiMoves ?? [];
+    const resolutionMoves = [...humanMoves, ...aiMoves];
+    const visibleHexes = deps.getVisibleHexSet(state);
+    const visibleMissileLaunches = (readyResult.missileLaunches ?? []).filter(
+      (record) => missileLaunchVisibleToViewer(
+        record,
+        reportViewerSeatId(),
+        /* @__PURE__ */ new Set([...visibleHexesBeforeTurn, ...visibleHexes])
+      )
+    );
+    const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
+    const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
+    const airStrikeOutboundMoves = [
+      ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
+      ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves)
+    ];
+    const airStrikeReturnMoves = [
+      ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
+      ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves)
+    ];
+    const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
+    const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
+    const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
+    const hasAirStrikeResolution = visibleMissileLaunches.length > 0 || (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
+    const hasDiceRolls = (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 || (readyResult.rangedDiceRolls?.length ?? 0) > 0 || (readyResult.meleeDiceRolls?.length ?? 0) > 0;
+    const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
+    const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
+    const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
+    const visibleMissileVictims = (readyResult.missileStrikeRemovedUnits ?? []).filter(
+      (unit) => visibleMissileVictimIds.has(unit.id)
+    );
+    const airStrikeRemovedForPlayback = [...readyResult.airStrikeRemovedUnits ?? [], ...visibleMissileVictims];
+    const airStrikeCasualtyHexesForPlayback = [
+      ...readyResult.airStrikeCasualtyHexes ?? [],
+      ...visibleMissileVictims.map((unit) => unit.h3Index).filter((hex) => !(readyResult.airStrikeCasualtyHexes ?? []).includes(hex))
+    ];
+    const airStrikeCombatHexesForPlayback = [
+      ...readyResult.airStrikeHexes ?? [],
+      ...visibleMissileLaunches.map((record) => record.targetH3Index).filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex))
+    ];
+    const needsCombatOrMovementAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+    const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
+    return {
+      resolutionMoves,
+      visibleHexes,
+      visibleMissileLaunches,
+      sightCuesForPlayback,
+      airStrikeOutboundMoves,
+      airStrikeReturnMoves,
+      visibility,
+      unknownCombatHexes,
+      unknownCasualtyHexes,
+      airStrikeRemovedForPlayback,
+      airStrikeCasualtyHexesForPlayback,
+      airStrikeCombatHexesForPlayback,
+      needsCombatOrMovementAnimation,
+      needsAnimation
+    };
+  }
+
+  // src/shared/pendingMovementSidebarLabels.ts
+  function formatPendingMovementSidebarTargetLabel(destinationH3Index, distanceHexSteps) {
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(destinationH3Index, null),
+      distanceHexes: distanceHexSteps,
+      note: null
+    });
+  }
+  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
+    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
+    let steps = null;
+    if (origin) {
+      try {
+        steps = gridDistance(origin, destinationH3Index);
+      } catch {
+        steps = null;
+      }
+    }
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(destinationH3Index, battle),
+      distanceHexes: steps,
+      note: null
+    });
+  }
+
+  // src/renderer/gameplay/sidebarSupport.ts
+  function estimateHexesLeftForOrder(order) {
+    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
+    let total = 0;
+    for (const segment of order.routeSegments) {
+      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
+      total += Math.max(0, segment.hexes.length - 1);
+    }
+    return total;
+  }
+  function isPendingMovementOrderForDisplay(order) {
+    return estimateHexesLeftForOrder(order) > 0;
+  }
+  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
+    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
+    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
+    if (useMultiSelect) {
+      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
+      deps.toggleUnitSelection(unitId);
+    } else {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
+      deps.replaceSelection([unitId]);
+    }
+    deps.syncUiAfterSelectionChange();
+  }
+  function formatPendingOrderSidebarLabel(order) {
+    return formatPendingMovementSidebarTargetLabel(order.destinationH3Index, estimateHexesLeftForOrder(order));
+  }
+  function formatKillToastLine(kill, formatDisplayUnitName) {
+    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
+    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
+  }
+  function buildTacticalSubUnitKillLabelOverlay(args) {
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const row of args.subUnitsBeforeCommit ?? []) {
+      byId2.set(row.id, row.displayName);
+    }
+    for (const row of args.subUnitsAfterCommit ?? []) {
+      byId2.set(row.id, row.displayName);
+    }
+    for (const u of args.removedUnits ?? []) {
+      if (u.displayName) byId2.set(u.id, u.displayName);
+    }
+    return [...byId2.entries()].map(([id, displayName]) => ({ id, displayName }));
+  }
+  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
+    const removedUnitsForDisplay = removedUnits ?? [];
+    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      displayOrder: u.displayOrder
+    }));
+    const rosterById = /* @__PURE__ */ new Map();
+    for (const unit of state.units ?? []) {
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder,
+        player: unit.player
+      });
+    }
+    for (const unit of rosterFromRemoved) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder,
+        player: unit.player
+      });
+    }
+    for (const unit of killLabelUnits ?? []) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, unit);
+    }
+    const rosterForDisplay = [...rosterById.values()];
+    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+    for (const u of removedUnitsForDisplay) {
+      if (u.displayName) displayNameById.set(u.id, u.displayName);
+    }
+    for (const row of tacticalSubUnitsForKillLabels ?? []) {
+      displayNameById.set(row.id, row.displayName);
+    }
+    const formatBaseUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const formatDisplayUnitName = (unitId) => {
+      const baseName = formatBaseUnitName(unitId);
+      const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+      if (!ownerId) return baseName;
+      return formatUnitNameForViewer({
+        baseName,
+        ownerId,
+        viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState?.seats ?? []),
+        seats: rendererSharedState.gameState?.seats ?? []
+      });
+    };
+    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
+    return { formatUnitName: formatDisplayUnitName, formatBaseUnitName, formatKillLine };
+  }
+  function syncUiAfterSelectionChange2(deps, options = {}) {
+    if (options.refreshHoverPreview !== false) {
+      void deps.refreshHoverRoutePreview();
+    }
+    deps.updateSidebar();
+    deps.updatePendingOrdersSidebar();
+    deps.updateRangedSidebar();
+    if (options.refreshStackCallout !== false) {
+      deps.refreshStackCalloutIfOpen();
+    }
+    deps.redraw();
+  }
+  function updatePendingOrdersSidebar2(deps) {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const rows = [];
+    const rowFor = (unitId, detail, onCancel) => sidebarOrderRowArgs(unitId, detail, onCancel, deps);
+    if (battle) {
+      for (const row of rendererSharedState.tacticalPendingMarches) {
+        const detail = formatTacticalDraftMarchPendingOrderTargetLabel(battle, row.subUnitId, row.destinationH3Index);
+        rows.push(rowFor(row.subUnitId, detail, () => {
+          rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+          deps.updatePendingOrdersSidebar?.();
+          deps.redraw?.();
+        }));
+      }
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
+        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, battle), () => {
+          deps.cancelFerryForUnit(ferry.unitId);
+          deps.refreshStackCalloutIfOpen?.();
+        }));
+      }
+    } else {
+      for (const order of rendererSharedState.humanStandingOrders.filter((o) => deps.isPendingMovementOrderForDisplay(o))) {
+        rows.push(rowFor(order.unitId, deps.formatPendingOrderSidebarLabel(order), () => {
+          void deps.cancelOrderForUnit(order.unitId);
+        }));
+      }
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
+        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry), () => deps.cancelFerryForUnit(ferry.unitId)));
+      }
+    }
+    renderSidebarOrderGroup("movement", rows);
+  }
+  function showSidebarError(message, showMapToast2, clearSidebarError2) {
+    showMapToast2(message, { isError: true });
+    clearSidebarError2();
+  }
+  function clearSidebarError() {
+    const el = document.getElementById("sidebar-error");
+    if (el) el.style.display = "none";
+  }
+
+  // src/renderer/gameplay/tacticalAnimationStart.ts
+  function tacticalPlaybackNeeded(playback) {
+    const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
+    const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
+    const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+    const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+    const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
+    const hasDicePlayback = (playback?.airStrikeDiceRolls?.length ?? 0) > 0 || (playback?.rangedDiceRolls?.length ?? 0) > 0 || (playback?.meleeDiceRolls?.length ?? 0) > 0;
+    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
+    return needsResolutionPlayback;
+  }
+  function buildTacticalResolutionAnimation(input) {
+    const { playback, subUnitsBefore, deps } = input;
+    const tacticalMarchPlaybackUnits = subUnitsBefore?.length ? subUnitsBefore.map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      h3Index: u.h3Index
+    })) : void 0;
+    const airStrikeOutboundMoves = [
+      ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
+      ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves)
+    ];
+    const airStrikeReturnMoves = [
+      ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
+      ...buildAirDropReturnPlaybackMoves(playback.airDropMoves)
+    ];
+    return {
+      moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
+      startTime: Date.now(),
+      tacticalDeferResolutionClock: true,
+      ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
+      ...airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {},
+      ...airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {},
+      ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
+      ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
+      ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
+      rangedCombatHexes: playback.rangedCombatHexes,
+      rangedCasualtyHexes: playback.rangedCasualtyHexes,
+      rangedRemovedUnits: playback.rangedRemovedUnits,
+      ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
+      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
+      ...pickPlaybackDiceRolls(playback)
+    };
+  }
+
+  // src/shared/aiStrategyToastContent.ts
+  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
+  function trimToastField(raw) {
+    const trimmed = raw?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function buildAiStrategyToastSections(fields) {
+    const sections = [];
+    const bullets = (fields.messages ?? []).filter((row) => row.text.trim().length > 0);
+    const strategy = trimToastField(fields.strategy);
+    if (bullets.length > 0) sections.push({ title: SIDE_MESSAGES_TITLE, body: "", bullets });
+    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
+    return sections;
+  }
+
+  // src/renderer/openRouter/commanderMessageTabsUi.ts
+  var tabState = null;
+  function bindCommanderMessageTabs() {
+    setAiStrategyToastHiddenListener(() => {
+      tabState = null;
+    });
+  }
+  function showCommanderMessageTabs(dispatches, statuses = [], options) {
+    if (replayActive() && options?.fromReplay !== true) return;
+    const opening = strategyToastHidden() || tabState === null;
+    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
+    if (opening) {
+      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
+      tabState = initialCommanderMessageTabs(seats);
+    } else if (tabState) {
+      tabState = resetCommanderConsultMarks(tabState);
+    }
+    if (!tabState) return;
+    for (const dispatch of dispatches) {
+      tabState = commanderDispatchHasProse(dispatch) ? applyCommanderMessage(tabState, {
+        seatId: dispatch.seatId,
+        strategy: dispatch.strategy,
+        messages: dispatch.messages
+      }) : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
+    }
+    tabState = applyOpenTabAbsences(tabState, statuses);
+    if (!tabState.tabs.some((tab) => tab.enabled)) return;
+    showFilledAiStrategyToast(renderCommanderMessageTabs, false);
+  }
+  function applyOpenTabAbsences(state, statuses) {
+    let next = state;
+    for (const tab of state.tabs) {
+      const seat = (rendererSharedState.gameState?.seats ?? []).find((row) => row.seatId === tab.seatId);
+      const status = statuses.find((row) => row.seatId === tab.seatId);
+      const reason = resolveCommanderTabAbsence({
+        outTurn: seat?.outTurn ?? null,
+        status: status?.status ?? null,
+        storedReason: status?.absenceReason ?? null,
+        tacticalOtherSeat: seatIsOutsideThisBattle(tab.seatId, statuses),
+        consultedWithoutProse: tab.consultedWithoutProse
+      });
+      if (!reason) continue;
+      const turnNumber = reason === "knocked_out" ? seat?.outTurn ?? null : reason === "timed_out" ? status?.timedOutTurn ?? null : null;
+      next = applyCommanderAbsence(next, tab.seatId, formatCommanderAbsenceMessage(reason, turnNumber));
+    }
+    return next;
+  }
+  function seatIsOutsideThisBattle(seatId, statuses) {
+    const opposingPartyId = rendererSharedState.tacticalBattleSnapshot?.opposingPartyId;
+    const opponent = opposingPartyId ? statuses.find((row) => row.seatId === opposingPartyId) : void 0;
+    return seatOutsideTacticalConsult(seatId, opposingPartyId, opponent?.theater ?? null);
+  }
+  function renderCommanderMessageTabs(target) {
+    const host = target ?? document.getElementById("ai-strategy-toast-text");
+    if (!(host instanceof HTMLElement) || !tabState) return;
+    const state = tabState;
+    host.replaceChildren();
+    const list = document.createElement("div");
+    list.className = "ai-strategy-tab-bar";
+    list.setAttribute("role", "tablist");
+    for (const tab of state.tabs) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "tab");
+      const flag = createSideNumberFlag(tab.seatId, rendererSharedState.gameState?.seats ?? []);
+      if (flag) button.appendChild(flag);
+      button.appendChild(document.createTextNode(tab.label));
+      button.title = tab.label;
+      button.disabled = !tab.enabled;
+      button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
+      button.addEventListener("click", () => {
+        if (!tab.enabled || !tabState) return;
+        tabState = { ...tabState, selectedSeatId: tab.seatId };
+        restartAiStrategyToastTimer();
+        renderCommanderMessageTabs();
+      });
+      list.append(button);
+    }
+    host.append(list);
+    const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
+    if (!selected?.enabled) return;
+    const sections = buildAiStrategyToastSections({ messages: selected.messages, strategy: selected.strategy });
+    const absence = selected.fromAbsence ? selected.message : null;
+    if (sections.length === 0 && !absence) return;
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "tabpanel");
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    for (const section of sections) {
+      appendMapToastSectionHeader(panel, section.title);
+      if (section.bullets && section.bullets.length > 0) {
+        for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
+          const item = document.createElement("div");
+          item.className = "commander-message-line";
+          const label = seatName2(seats, bullet.toSeatId);
+          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_ARROW} `));
+          const flag = createMessagePartyFlag(bullet.toSeatId, seats);
+          if (flag) item.appendChild(flag);
+          const words = document.createElement("span");
+          words.textContent = `${label}: ${bullet.text}`;
+          item.appendChild(words);
+          panel.appendChild(item);
+        }
+      } else {
+        const span = document.createElement("span");
+        span.className = "commander-message-body";
+        span.textContent = section.body;
+        panel.append(span);
+      }
+    }
+    if (absence) {
+      const span = document.createElement("span");
+      span.style.display = "block";
+      span.textContent = absence;
+      panel.append(span);
+    }
+    host.append(panel);
+  }
+  function seatOrder(seats, seatId) {
+    return seats.find((seat) => seat.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
+  }
+  function seatName2(seats, seatId) {
+    const seat = seats.find((row) => row.seatId === seatId);
+    return seat ? sideDisplayName(seat) : seatId;
+  }
+  function strategyToastHidden() {
+    const toast = document.getElementById("ai-strategy-toast");
+    return !(toast instanceof HTMLElement) || toast.classList.contains("hidden");
+  }
+
+  // src/renderer/replay/replayDialogs.ts
+  async function showReplayUpdateDialog(view2, replayView, deps) {
+    const result = view2.resolution;
+    const plan = planResolutionPlayback({
+      readyResult: result,
+      state: view2.snapshot,
+      humanMoves: result.humanMoves ?? [],
+      visibleHexesBeforeTurn: new Set(view2.visibleHexesBefore ?? []),
+      deps
+    });
+    if (!(plan.needsCombatOrMovementAnimation || Boolean(result.tacticalAutoStartH3Index))) return;
+    const killToastFormatter = deps.buildKillToastFormatterBundle(
+      view2.snapshot,
+      result.removedUnits,
+      void 0,
+      result.killLabelUnits
+    );
+    await announceResolutionTurnUpdate(
+      {
+        readySlice: result,
+        visibility: plan.visibility,
+        missileLaunches: plan.visibleMissileLaunches,
+        visibleHexes: plan.visibleHexes,
+        killToastFormatter,
+        reportTag: currentConsoleReportTag(),
+        holdForBattle: false,
+        destroyedParents: [],
+        viewerSeatId: replayView === "player" ? HUMAN_SEAT_ID : null,
+        seats: view2.snapshot.seats ?? [],
+        exploredHexes: new Set(view2.snapshot.exploredHexes ?? [])
+      },
+      {
+        showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }),
+        appendOpenRouterLog: () => {
+        },
+        formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement
+      }
+    );
+  }
+  async function showReplayBeatDialog(view2, replayView, deps) {
+    const result = view2.resolution;
+    const playback = result.tacticalResolutionPlayback;
+    if (!playback || !tacticalPlaybackNeeded(playback)) return;
+    const slice = buildTacticalCommitReadyResultForToast(playback);
+    const battle = result.tacticalBattle ?? view2.snapshot.tacticalBattleSession ?? null;
+    const battleCells = battle?.tacticalChildH3Indexes ?? [];
+    const visibleHexes = /* @__PURE__ */ new Set([...deps.getVisibleHexSet(view2.snapshot), ...battleCells]);
+    const visibility = deriveCombatVisibilityClassification(slice, visibleHexes, reportViewerSeatId());
+    const killToastFormatter = deps.buildKillToastFormatterBundle(
+      view2.snapshot,
+      slice.removedUnits,
+      buildTacticalSubUnitKillLabelOverlay({
+        subUnitsBeforeCommit: view2.subUnitsBefore ?? void 0,
+        subUnitsAfterCommit: view2.snapshot.tacticalBattleSession?.subUnits,
+        removedUnits: slice.removedUnits
+      })
+    );
+    await announceResolutionTurnUpdate(
+      {
+        readySlice: slice,
+        visibility,
+        killToastFormatter,
+        reportTag: currentConsoleReportTag(),
+        extraKills: { killsByMelee: playback.killsByMelee, killsByAirStrike: playback.killsByAirStrike },
+        hexCodeBattle: battle,
+        destroyedParents: [],
+        viewerSeatId: replayView === "player" ? HUMAN_SEAT_ID : null,
+        seats: view2.snapshot.seats ?? [],
+        exploredHexes: /* @__PURE__ */ new Set([...view2.snapshot.exploredHexes ?? [], ...battleCells])
+      },
+      {
+        showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }),
+        appendOpenRouterLog: () => {
+        },
+        formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement
+      }
+    );
+  }
+  async function showReplayStepDialogs(view2, replayView, deps) {
+    hideMapToast();
+    deps.hideAiStrategyToast();
+    if (!replayActive()) return;
+    if (view2.resolution !== null) {
+      if (view2.ref.scope === "tactical") await showReplayBeatDialog(view2, replayView, deps);
+      else await showReplayUpdateDialog(view2, replayView, deps);
+    }
+    if (view2.dispatches.length > 0) showCommanderMessageTabs(view2.dispatches, [], { fromReplay: true });
+  }
+
+  // src/renderer/replay/replayMode.ts
+  var REPLAY_NO_TURNS_REASON = "This match has no recorded turns to replay yet.";
+  var REPLAY_STEP_FAILED_REASON = "That turn could not be loaded.";
+  var boundDeps = null;
+  var savedMarkers = null;
+  var savedBattle = null;
+  var savedSelection = [];
+  function bindReplayDeps(deps) {
+    boundDeps = deps;
+    registerReplayLeaver(leaveReplay);
+  }
+  function requireDeps() {
+    if (boundDeps === null) throw new Error("replay dependencies are not bound");
+    return boundDeps;
+  }
+  function entryDecision() {
+    return replayMayEnter({
+      matchLoaded: (rendererSharedState.gameState?.seats?.length ?? 0) > 0,
+      readyInFlight: rendererSharedState.readyRequestInFlight,
+      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
+      otherModalOpen: blockingDialogIsOpen() || chartsDialogIsOpen(),
+      newGameOpenMidMatch: newGameOverlayIsOpen() && rendererSharedState.gameState?.gameOver !== true
+    });
+  }
+  async function toggleReplay() {
+    if (replayLeaving !== null) {
+      await replayLeaving;
+      return;
+    }
+    if (replayActive()) {
+      await leaveReplay();
+      return;
+    }
+    const decision = entryDecision();
+    if (!decision.ok) {
+      if (decision.reason !== null) showMapToast(decision.reason, { isError: false, skipReport: true });
+      return;
+    }
+    const epoch = currentRendererMatchEpoch();
+    let timeline;
+    try {
+      timeline = await window.gameApi.readReplayTimeline();
+    } catch (error) {
+      console.error("readReplayTimeline failed", error);
+      showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
+      return;
+    }
+    if (!rendererMatchEpochCurrent(epoch) || replayActive() || replayLeaving !== null || !entryDecision().ok) return;
+    if (timeline.scope === "tactical" !== (rendererSharedState.tacticalBattleSnapshot != null)) return;
+    if (timeline.steps.length === 0) {
+      showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
+      return;
+    }
+    const deps = requireDeps();
+    deps.hideBuildPopup();
+    deps.hideStackCallout();
+    savedSelection = [...rendererSharedState.selectedUnitIds];
+    clearSelectionLikeRightClick(deps.selectionDeps);
+    setAsideLastSeenMarkers();
+    savedBattle = timeline.scope === "tactical" ? copyBattleState() : null;
+    ordersTabWasSelected = selectedConsoleTabId() === ORDERS_TAB_ID2;
+    const last = timeline.steps.length - 1;
+    setReplay({ timeline, index: last, busy: false, matchEpoch: epoch, playing: false, stopRequested: false, session: nextReplaySession() });
+    document.body.dataset.replay = "on";
+    refreshConsoleHeader();
+    syncTacticalExitButtonElementVisibility();
+    await showReplayStep(last);
+  }
+  function setAsideLastSeenMarkers() {
+    savedMarkers = {
+      observed: new Map(rendererSharedState.lastObservedEnemyByUnitId),
+      stale: new Map(rendererSharedState.clientStaleEnemyIntelByUnitId),
+      rendered: new Map(rendererSharedState.lastRenderedVisibleEnemyByUnitId)
+    };
+    rendererSharedState.lastObservedEnemyByUnitId.clear();
+    rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+  }
+  function copyBattleState() {
+    return {
+      snapshot: rendererSharedState.tacticalBattleSnapshot,
+      marches: rendererSharedState.tacticalPendingMarches.map((row) => ({ ...row })),
+      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      airStrikes: [...rendererSharedState.pendingAirStrikes],
+      airDrops: [...rendererSharedState.pendingAirDrops],
+      missileLaunches: [...rendererSharedState.pendingMissileLaunches],
+      ferryOrders: [...rendererSharedState.pendingFerryOrders],
+      embarkOrders: [...rendererSharedState.pendingEmbarkOrders]
+    };
+  }
+  function restoreBattleState() {
+    if (savedBattle === null) return;
+    rendererSharedState.tacticalBattleSnapshot = savedBattle.snapshot;
+    rendererSharedState.tacticalPendingMarches = savedBattle.marches;
+    rendererSharedState.pendingRangedAttacks = savedBattle.rangedAttacks;
+    rendererSharedState.pendingAirStrikes = savedBattle.airStrikes;
+    rendererSharedState.pendingAirDrops = savedBattle.airDrops;
+    rendererSharedState.pendingMissileLaunches = savedBattle.missileLaunches;
+    rendererSharedState.pendingFerryOrders = savedBattle.ferryOrders;
+    rendererSharedState.pendingEmbarkOrders = savedBattle.embarkOrders;
+    savedBattle = null;
+  }
+  function restoreLastSeenMarkers() {
+    if (savedMarkers === null) return;
+    rendererSharedState.lastObservedEnemyByUnitId.clear();
+    rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+    for (const [key, value] of savedMarkers.observed) rendererSharedState.lastObservedEnemyByUnitId.set(key, value);
+    for (const [key, value] of savedMarkers.stale) rendererSharedState.clientStaleEnemyIntelByUnitId.set(key, value);
+    for (const [key, value] of savedMarkers.rendered) rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(key, value);
+    savedMarkers = null;
+  }
+  async function waitForStepToSettle() {
+    for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
+      await waitForReplayIdle();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    }
+  }
+  function restoreSelection(unitIds) {
+    if (unitIds.length === 0) return;
+    replaceSelection([...unitIds]);
+    const { updateSidebar: updateSidebar3, updateRangedSidebar: updateRangedSidebar4, redraw: redraw2 } = requireDeps().selectionDeps;
+    updateSidebar3();
+    updateRangedSidebar4();
+    redraw2();
+  }
+  function replayReadyDeps() {
+    return requireDeps().readyDeps();
+  }
+  async function loadReplayStep(index) {
+    const state = currentReplay();
+    const ref = state?.timeline.steps[index];
+    if (!state || state.busy || !ref) return null;
+    setReplay({ ...state, busy: true });
+    let view2 = null;
+    try {
+      view2 = await window.gameApi.readReplayStep({ recordId: ref.recordId });
+    } catch (error) {
+      console.error("readReplayStep failed", error);
+    }
+    const waiting = currentReplay();
+    if (!waiting || waiting.session !== state.session) return null;
+    setReplay({ ...waiting, busy: false });
+    if (!rendererMatchEpochCurrent(state.matchEpoch)) return null;
+    if (!view2) showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+    return view2;
+  }
+  async function presentReplayStep(index, view2, options) {
+    const state = currentReplay();
+    if (!state) return;
+    setReplay({ ...state, busy: true });
+    let shown = false;
+    try {
+      await requireDeps().readyDeps().applyGameStateSnapshot(view2.snapshot, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: false,
+        updateGameOverUi: false,
+        updateReadyButton: true,
+        refreshBuildPopup: false,
+        redraw: !options.forPlayback,
+        replay: "step"
+      });
+      await showReplayStepDialogs(view2, state.timeline.view, requireDeps().readyDeps());
+      shown = true;
+    } finally {
+      const applied = currentReplay();
+      if (applied && applied.session === state.session) setReplay({ ...applied, ...shown ? { index } : {}, busy: false });
+    }
+  }
+  async function showReplayStep(index) {
+    if (currentReplay()?.playing) return;
+    const view2 = await loadReplayStep(index);
+    if (view2) await presentReplayStep(index, view2, { forPlayback: false });
+  }
+  var ORDERS_TAB_ID2 = "console-tab-orders";
+  var ordersTabWasSelected = false;
+  var replayLeaving = null;
+  function leaveReplay() {
+    if (replayLeaving !== null) return replayLeaving;
+    const leaving = runLeaveReplay().finally(() => {
+      replayLeaving = null;
+    });
+    replayLeaving = leaving;
+    return leaving;
+  }
+  function abandonReplayForNewMatch() {
+    if (!replayActive()) return;
+    clearResolutionPlaybackAnimationState();
+    abandonReplay();
+    savedSelection = [];
+    ordersTabWasSelected = false;
+    refreshConsoleHeader();
+    syncTacticalExitButtonElementVisibility();
+  }
+  async function runLeaveReplay() {
+    let state = currentReplay();
+    if (state?.playing) {
+      setReplay({ ...state, playing: false, stopRequested: true });
+      clearResolutionPlaybackAnimationState();
+    }
+    if (state?.busy || state?.playing) {
+      await waitForStepToSettle();
+      state = currentReplay();
+    }
+    if (!state) return;
+    if (rendererMatchEpochCurrent(state.matchEpoch)) await showReplayStep(state.timeline.steps.length - 1);
+    if (!replayActive()) return;
+    setReplay(null);
+    delete document.body.dataset.replay;
+    restoreLastSeenMarkers();
+    restoreBattleState();
+    const selection = savedSelection;
+    savedSelection = [];
+    try {
+      const live = await fetchMatchSnapshot();
+      await requireDeps().readyDeps().applyGameStateSnapshot(live, {
+        refreshStandingOrders: true,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: true,
+        updateGameOverUi: false,
+        updateReadyButton: true,
+        refreshBuildPopup: false,
+        redraw: true,
+        replay: "leave"
+      });
+    } catch (error) {
+      console.error("leaving replay could not read the live match", error);
+    }
+    restoreSelection(selection);
+    refreshConsoleHeader();
+    syncTacticalExitButtonElementVisibility();
+    if (ordersTabWasSelected) selectConsoleTabKeepingCollapse(ORDERS_TAB_ID2);
+    ordersTabWasSelected = false;
+    syncChatPanelVisibility();
+    void maybeObserveAutoAdvance();
+  }
+
+  // src/renderer/gameplay/newGame.ts
+  function registerRegionRandomizeButtons() {
+    document.getElementById("new-game-start-month-randomize")?.addEventListener("click", () => {
+      randomizeNewGameStartMonth();
+      repaintNewGameMapPreview();
+    });
+    document.getElementById("new-game-start-month")?.addEventListener("change", () => {
+      repaintNewGameMapPreview();
+    });
+    document.getElementById("new-game-weather-bonus-select")?.addEventListener("change", () => {
+      repaintNewGameMapPreview();
+    });
+    document.getElementById("new-game-tech-bonus-select")?.addEventListener("change", () => {
+      repaintNewGameMapPreview();
+    });
+  }
+  function stopMatchWaitingUnderNewGame() {
+    if (!isMatchWaitingUnderNewGame()) return;
+    forgetMatchUnderNewGame();
+    void stopOpponentPlanning("new_game");
+    clearResolutionPlaybackAnimationState();
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
+      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
+    }
+    rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+    rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+    rendererSharedState.readyRequestInFlight = false;
+  }
+  function registerNewGameButton(deps) {
+    document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
+      toggleNewGameDialogCollapsed();
+    });
+    wireNewGameDialogMove();
+    document.getElementById("new-game-dialog-close")?.addEventListener("click", () => {
+      closeNewGameOverlayToMatch(deps);
+    });
+    registerRegionRandomizeButtons();
+    registerNewGameMapControls();
+    bindNewGameSides();
+    registerGameSizeSelect();
+    wireNewGameOptionsPopover();
+    wireHumanNicknameField();
+    document.getElementById("new-game-btn")?.addEventListener("click", async () => {
+      const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
+      if (!window.gameApi?.newGame) return;
+      const seatsStart = readNewGameSeatsStart();
+      if (seatsStart.blocked) {
+        showMapToast(seatsStart.blocked);
+        return;
+      }
+      if (!newGameHasAnyModel()) {
+        closeCommanderPopover();
+        closeNewGameOptionsPopover();
+        const startAnyway = await confirmStartWithNoModels();
+        if (!startAnyway) return;
+      }
+      const matchEpoch = advanceRendererMatchEpoch();
+      stopMatchWaitingUnderNewGame();
+      const cameraHold = holdNewGameMapPreviewCamera();
+      try {
+        const humanNickname = readHumanNicknameForStart();
+        const state = await window.gameApi.newGame({
+          ...readNewGameOptionChoices(),
+          startMonth: readNewGameStartMonth(),
+          ...readNewGameMapChoice(),
+          seats: seatsStart.seats,
+          turnLimit: seatsStart.turnLimit,
+          victoryRule: seatsStart.victoryRule,
+          aiOnlyBattles: seatsStart.aiOnlyBattles,
+          aiOnlyBeatLimit: seatsStart.aiOnlyBeatLimit,
+          sightCues: seatsStart.sightCues,
+          gameSize: readSelectedGameSizeFromDocument(),
+          ...humanNickname === void 0 ? {} : { humanNickname }
+        });
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
+        abandonReplayForNewMatch();
+        installRendererGameMap(state);
+        await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
+        rendererSharedState.gameState = state;
+        void refreshChatThread();
+        rendererSharedState.strategicScenarioInitialLeafletView = null;
+        tacticalReleaseRendererSessionForNewStrategicMatch(state);
+        clearObserveAfterKnockout();
+        clearRememberedUnitOrigins();
+        deps.rebuildUnitDisplayNameLookup(state);
+        deps.reconcileSelectionToCurrentState();
+        rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+        rendererSharedState.lastObservedEnemyByUnitId.clear();
+        rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+        deps.updateClientStaleEnemyIntel(null, state);
+        rendererSharedState.initialCameraApplied = false;
+        deps.updateGameOverUI(state);
+        syncMapExtentToSnapshot(state, { refit: true });
+        if (state.hexes.length > 0) {
+          deps.applyInitialCameraForState(state);
+        }
+        deps.clearStrategicTooltipSummaryCaches();
+        rendererSharedState.humanStandingOrders = [];
+        rendererSharedState.hoverRoutePreview = null;
+        deps.clearPendingTacticalOrders();
+        discardStrategicOrderUiStash();
+        rendererSharedState.selectedUnitIds = [];
+        rendererSharedState.selectedUnitIdsAtMouseDown = [];
+        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+        rendererSharedState.selectedHexIndex = null;
+        deps.hideStackCallout();
+        rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+        rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+        clearOpenRouterLog();
+        await readCommanderPoolAndApply(false);
+        hideAiStrategyToast();
+        clearConsoleReports();
+        deps.updateOpenRouterCostLabel();
+        deps.updateGameStateSidebar(state);
+        await deps.refreshHumanStandingOrders();
+        deps.updatePendingOrdersSidebar();
+        deps.updateRangedSidebar();
+        deps.updateSidebar();
+        await applyStartMatchAiChoice(startMatchAi, {
+          startPlanning: () => deps.startBackgroundRequestIfAllowed(),
+          updateReadyButtonState: () => deps.updateReadyButtonState()
+        });
+        await syncOpenRouterRunToggle();
+        deps.resizeAndRedraw();
+      } catch (err) {
+        console.error("newGame failed:", err);
+        showMapToast("The new game did not start. This screen stays open.");
+        if (releaseNewGameMapPreviewCamera(cameraHold)) void refreshNewGameMapPreview();
+      }
+    });
+  }
+  function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return false;
+    if (rendererSharedState.readyRequestInFlight) return false;
+    const overlay = document.getElementById("game-over-overlay");
+    const newGameBtn = document.getElementById("new-game-btn");
+    const opened = overlay?.classList.contains("hidden") === true;
+    if (opened && rendererSharedState.gameState && rendererSharedState.gameState.hexes.length > 0 && !rendererSharedState.gameState.gameOver) {
+      holdMatchUnderNewGame();
+      advanceRendererMatchEpoch();
+    }
+    hideGameOverStandings();
+    showNewGameBanner("newGame", selectedNewGameTab());
+    if (newGameBtn) {
+      newGameBtn.textContent = "Start game";
+      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
+    }
+    resetNewGameOptionControls();
+    void (async () => {
+      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
+      refreshNewGameSides({ reset: true });
+      await refreshNewGameMapPreview();
+    })();
+    syncGameSizeCapPreview();
+    overlay?.classList.remove("hidden");
+    expandNewGameDialog();
+    if (opened) scrollNewGameDialogToTop();
+    placeNewGameDialogAtInset();
+    blurMapChromeIfFocused();
+    resetNewGameMapPreviewFrame();
+    repaintNewGameMapPreview();
+    setMainUIControlsEnabled2(false);
+    updateReadyButtonState2();
+    return opened;
+  }
+  async function refreshHumanStandingOrders2() {
+    if (!window.gameApi?.listHumanStandingOrders) {
+      rendererSharedState.humanStandingOrders = [];
+      return;
+    }
+    try {
+      rendererSharedState.humanStandingOrders = await window.gameApi.listHumanStandingOrders();
+    } catch {
+      rendererSharedState.humanStandingOrders = [];
+    }
+  }
+
+  // src/shared/tacticalStateAssertions.ts
+  function tacticalBoundaryPlanningExitAllowed(tacticalSnapshot, tacticalPhasePlanning) {
+    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_exit" };
+    return { ok: true };
+  }
+
+  // src/shared/tacticalAnnihilation.ts
+  function getTacticalAnnihilationOutcome(subUnits) {
+    let human = 0;
+    let opponent = 0;
+    for (const u of subUnits) {
+      if (u.player === HUMAN_SEAT_ID) human += 1;
+      else opponent += 1;
+    }
+    if (human > 0 && opponent > 0) return null;
+    if (human > 0 && opponent === 0) return "human_win";
+    if (human === 0 && opponent > 0) return "human_loss";
+    return "mutual";
+  }
+  function getTwoPartyAnnihilationOutcome(subUnits, partyA, partyB) {
+    let countA = 0;
+    let countB = 0;
+    for (const unit of subUnits) {
+      if (unit.player === partyA) countA += 1;
+      else if (unit.player === partyB) countB += 1;
+    }
+    if (countA > 0 && countB > 0) return null;
+    if (countA > 0) return partyA;
+    if (countB > 0) return partyB;
+    return "mutual";
   }
 
   // src/renderer/tactical/tacticalExitFlow.ts
@@ -40141,10 +46409,10 @@ ${bonuses}`;
 
   // src/renderer/gameplay/hirePanel.ts
   async function fetchHirePanelData(h3Index) {
-    let view = null;
+    let view2 = null;
     let caption = null;
     try {
-      view = await window.gameApi?.getHexHireView({ h3Index }) ?? null;
+      view2 = await window.gameApi?.getHexHireView({ h3Index }) ?? null;
     } catch (err) {
       console.error("getHexHireView failed:", err);
     }
@@ -40155,30 +46423,30 @@ ${bonuses}`;
     } catch (err) {
       console.error("getHexNamingTooltipLine failed:", err);
     }
-    return { view, caption };
+    return { view: view2, caption };
   }
   function renderHirePanel(panel, h3Index, data, deps) {
     panel.innerHTML = "";
     panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
     appendCaption(panel, h3Index, data.caption);
     appendTechLine(panel, h3Index);
-    const view = data.view;
-    if (!view) {
+    const view2 = data.view;
+    if (!view2) {
       panel.appendChild(note(HIRE_VIEW_FAILED));
       if (!panel.hidden) placeOpenBuildPopup();
       return;
     }
-    appendFunds(panel, view);
-    if (view.raiseShortage) appendShortage(panel, view.raiseShortage);
-    const unavailable = view.hireAvailable ? null : visibleBlockedReason(view.unavailableReason);
+    appendFunds(panel, view2);
+    if (view2.raiseShortage) appendShortage(panel, view2.raiseShortage);
+    const unavailable = view2.hireAvailable ? null : visibleBlockedReason(view2.unavailableReason);
     if (unavailable) panel.appendChild(note(unavailable));
-    if (view.raise) appendRaise(panel, h3Index, view, deps);
-    else if (!view.raiseShortage) {
-      const raiseBlocked = visibleBlockedReason(view.raiseBlockedReason);
+    if (view2.raise) appendRaise(panel, h3Index, view2, deps);
+    else if (!view2.raiseShortage) {
+      const raiseBlocked = visibleBlockedReason(view2.raiseBlockedReason);
       if (raiseBlocked && raiseBlocked !== unavailable) panel.appendChild(note(raiseBlocked));
     }
-    if (view.rehireUnits.length > 0) appendRehires(panel, h3Index, view, deps);
-    if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
+    if (view2.rehireUnits.length > 0) appendRehires(panel, h3Index, view2, deps);
+    if (view2.pendingOrders.length > 0) appendOrders(panel, h3Index, view2, deps);
     if (!panel.hidden) placeOpenBuildPopup();
   }
   function appendCaption(panel, h3Index, caption) {
@@ -40200,8 +46468,8 @@ ${bonuses}`;
     techLine.innerHTML = techLineHtml;
     panel.append(techLine, spacer());
   }
-  function appendFunds(panel, view) {
-    const raise = view.raise;
+  function appendFunds(panel, view2) {
+    const raise = view2.raise;
     if (!raise) return;
     appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft));
   }
@@ -40242,8 +46510,8 @@ ${bonuses}`;
     if (!Number.isInteger(count) || count < HIRE_COUNT_MIN || count > HIRE_COUNT_MAX) return null;
     return count;
   }
-  function appendRaise(panel, h3Index, view, deps) {
-    const raise = view.raise;
+  function appendRaise(panel, h3Index, view2, deps) {
+    const raise = view2.raise;
     if (!raise) return;
     const shortage = document.createElement("div");
     const section = document.createElement("div");
@@ -40274,7 +46542,7 @@ ${bonuses}`;
       const count = selectedHireCount(countInput.value);
       const option2 = raise.options.find((row2) => row2.unitType === typeSelect.value);
       if (count == null || !option2) return;
-      const label = hireShortageLabel(view.funds.credits, option2.fee * count, option2.unitCost * count, raise.capacityLeft);
+      const label = hireShortageLabel(view2.funds.credits, option2.fee * count, option2.unitCost * count, raise.capacityLeft);
       if (label) {
         shortage.replaceChildren();
         appendShortage(shortage, label);
@@ -40291,11 +46559,11 @@ ${bonuses}`;
     section.appendChild(row);
     panel.append(shortage, section);
   }
-  function appendRehires(panel, h3Index, view, deps) {
+  function appendRehires(panel, h3Index, view2, deps) {
     const section = document.createElement("div");
     section.className = "build-queue-section";
     section.appendChild(head(REHIRE_SECTION_TITLE));
-    for (const unit of view.rehireUnits) {
+    for (const unit of view2.rehireUnits) {
       const row = document.createElement("div");
       row.className = "build-queue-row";
       const label = document.createElement("span");
@@ -40316,12 +46584,12 @@ ${bonuses}`;
     }
     panel.appendChild(section);
   }
-  function appendOrders(panel, h3Index, view, deps) {
+  function appendOrders(panel, h3Index, view2, deps) {
     if (!endsWithSpacer(panel)) panel.appendChild(spacer());
     const section = document.createElement("div");
     section.className = "build-queue-section hire-orders";
     section.appendChild(head(PENDING_HIRE_SECTION_TITLE));
-    for (const order of view.pendingOrders) {
+    for (const order of view2.pendingOrders) {
       const row = document.createElement("div");
       row.className = "build-queue-row";
       const label = document.createElement("span");
@@ -40474,6 +46742,9 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/buildQueuePopup.ts
+  function rowTypeOptions(available, current) {
+    return available.includes(current) ? [...available] : [current, ...available];
+  }
   function isBuildQueueSelectInPopupFocused() {
     const popup = document.getElementById("build-popup");
     const active2 = document.activeElement;
@@ -40683,7 +46954,7 @@ ${bonuses}`;
         const row = document.createElement("div");
         row.className = "build-queue-row";
         const typeSelect = document.createElement("select");
-        for (const unitType of options) {
+        for (const unitType of rowTypeOptions(options, entry.unitType)) {
           const opt = document.createElement("option");
           opt.value = unitType;
           opt.textContent = formatBuildQueueItemLabel(unitType);
@@ -40779,10 +47050,10 @@ ${bonuses}`;
         `.build-entry-btn[data-h3-index="${CSS.escape(h3Index)}"]`
       );
       if (!button) return { clientX: fallbackClientX, clientY: fallbackClientY };
-      const rect = button.getBoundingClientRect();
+      const rect2 = button.getBoundingClientRect();
       return {
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2
+        clientX: rect2.left + rect2.width / 2,
+        clientY: rect2.top + rect2.height / 2
       };
     }
     async function processBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
@@ -41082,181 +47353,6 @@ ${bonuses}`;
     };
   }
 
-  // src/shared/pendingMovementSidebarLabels.ts
-  function formatPendingMovementSidebarTargetLabel(destinationH3Index, distanceHexSteps) {
-    return formatOrderRowDetail({
-      targetCode: orderTargetHexCode(destinationH3Index, null),
-      distanceHexes: distanceHexSteps,
-      note: null
-    });
-  }
-  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
-    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
-    let steps = null;
-    if (origin) {
-      try {
-        steps = gridDistance(origin, destinationH3Index);
-      } catch {
-        steps = null;
-      }
-    }
-    return formatOrderRowDetail({
-      targetCode: orderTargetHexCode(destinationH3Index, battle),
-      distanceHexes: steps,
-      note: null
-    });
-  }
-
-  // src/renderer/gameplay/sidebarSupport.ts
-  function estimateHexesLeftForOrder(order) {
-    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
-    let total = 0;
-    for (const segment of order.routeSegments) {
-      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
-      total += Math.max(0, segment.hexes.length - 1);
-    }
-    return total;
-  }
-  function isPendingMovementOrderForDisplay(order) {
-    return estimateHexesLeftForOrder(order) > 0;
-  }
-  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
-    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
-    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
-    if (useMultiSelect) {
-      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
-      deps.toggleUnitSelection(unitId);
-    } else {
-      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
-      deps.replaceSelection([unitId]);
-    }
-    deps.syncUiAfterSelectionChange();
-  }
-  function formatPendingOrderSidebarLabel(order) {
-    return formatPendingMovementSidebarTargetLabel(order.destinationH3Index, estimateHexesLeftForOrder(order));
-  }
-  function formatKillToastLine(kill, formatDisplayUnitName) {
-    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
-    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
-  }
-  function buildTacticalSubUnitKillLabelOverlay(args) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const row of args.subUnitsBeforeCommit ?? []) {
-      byId.set(row.id, row.displayName);
-    }
-    for (const row of args.subUnitsAfterCommit ?? []) {
-      byId.set(row.id, row.displayName);
-    }
-    for (const u of args.removedUnits ?? []) {
-      if (u.displayName) byId.set(u.id, u.displayName);
-    }
-    return [...byId.entries()].map(([id, displayName]) => ({ id, displayName }));
-  }
-  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
-    const removedUnitsForDisplay = removedUnits ?? [];
-    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      displayOrder: u.displayOrder
-    }));
-    const rosterById = /* @__PURE__ */ new Map();
-    for (const unit of state.units ?? []) {
-      rosterById.set(unit.id, {
-        id: unit.id,
-        unitType: unit.unitType,
-        displayOrder: unit.displayOrder,
-        player: unit.player
-      });
-    }
-    for (const unit of rosterFromRemoved) {
-      if (rosterById.has(unit.id)) continue;
-      rosterById.set(unit.id, {
-        id: unit.id,
-        unitType: unit.unitType,
-        displayOrder: unit.displayOrder,
-        player: unit.player
-      });
-    }
-    for (const unit of killLabelUnits ?? []) {
-      if (rosterById.has(unit.id)) continue;
-      rosterById.set(unit.id, unit);
-    }
-    const rosterForDisplay = [...rosterById.values()];
-    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
-    for (const u of removedUnitsForDisplay) {
-      if (u.displayName) displayNameById.set(u.id, u.displayName);
-    }
-    for (const row of tacticalSubUnitsForKillLabels ?? []) {
-      displayNameById.set(row.id, row.displayName);
-    }
-    const formatBaseUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
-    const formatDisplayUnitName = (unitId) => {
-      const baseName = formatBaseUnitName(unitId);
-      const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
-      if (!ownerId) return baseName;
-      return formatUnitNameForViewer({
-        baseName,
-        ownerId,
-        viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState?.seats ?? []),
-        seats: rendererSharedState.gameState?.seats ?? []
-      });
-    };
-    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
-    return { formatUnitName: formatDisplayUnitName, formatBaseUnitName, formatKillLine };
-  }
-  function syncUiAfterSelectionChange2(deps, options = {}) {
-    if (options.refreshHoverPreview !== false) {
-      void deps.refreshHoverRoutePreview();
-    }
-    deps.updateSidebar();
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    if (options.refreshStackCallout !== false) {
-      deps.refreshStackCalloutIfOpen();
-    }
-    deps.redraw();
-  }
-  function updatePendingOrdersSidebar2(deps) {
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    const rows = [];
-    const rowFor = (unitId, detail, onCancel) => sidebarOrderRowArgs(unitId, detail, onCancel, deps);
-    if (battle) {
-      for (const row of rendererSharedState.tacticalPendingMarches) {
-        const detail = formatTacticalDraftMarchPendingOrderTargetLabel(battle, row.subUnitId, row.destinationH3Index);
-        rows.push(rowFor(row.subUnitId, detail, () => {
-          rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-          deps.updatePendingOrdersSidebar?.();
-          deps.redraw?.();
-        }));
-      }
-      for (const ferry of rendererSharedState.pendingFerryOrders) {
-        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, battle), () => {
-          deps.cancelFerryForUnit(ferry.unitId);
-          deps.refreshStackCalloutIfOpen?.();
-        }));
-      }
-    } else {
-      for (const order of rendererSharedState.humanStandingOrders.filter((o) => deps.isPendingMovementOrderForDisplay(o))) {
-        rows.push(rowFor(order.unitId, deps.formatPendingOrderSidebarLabel(order), () => {
-          void deps.cancelOrderForUnit(order.unitId);
-        }));
-      }
-      for (const ferry of rendererSharedState.pendingFerryOrders) {
-        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry), () => deps.cancelFerryForUnit(ferry.unitId)));
-      }
-    }
-    renderSidebarOrderGroup("movement", rows);
-  }
-  function showSidebarError(message, showMapToast2, clearSidebarError2) {
-    showMapToast2(message, { isError: true });
-    clearSidebarError2();
-  }
-  function clearSidebarError() {
-    const el = document.getElementById("sidebar-error");
-    if (el) el.style.display = "none";
-  }
-
   // src/renderer/gameplay/readyTacticalCommit.ts
   async function runTacticalReadyCommit(context) {
     const { deps, matchEpoch } = context;
@@ -41296,49 +47392,15 @@ ${bonuses}`;
     void refreshChatThread();
     const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
     const playback = commitResult.tacticalResolutionPlayback;
-    const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
-    const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-    const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
-    const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
-    const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
-    const hasDicePlayback = (playback?.airStrikeDiceRolls?.length ?? 0) > 0 || (playback?.rangedDiceRolls?.length ?? 0) > 0 || (playback?.meleeDiceRolls?.length ?? 0) > 0;
-    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
+    const needsResolutionPlayback = tacticalPlaybackNeeded(playback);
     if (playback && needsResolutionPlayback) {
       if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
       rendererSharedState.resolutionMoveAnimationFrameId = null;
-      const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length ? tacticalSubUnitsBeforeCommit.map((u) => ({
-        id: u.id,
-        player: u.player,
-        unitType: u.unitType,
-        h3Index: u.h3Index
-      })) : void 0;
-      const airStrikeOutboundMoves = [
-        ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
-        ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves)
-      ];
-      const airStrikeReturnMoves = [
-        ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
-        ...buildAirDropReturnPlaybackMoves(playback.airDropMoves)
-      ];
-      rendererSharedState.resolutionMoveAnimation = {
-        moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
-        startTime: Date.now(),
-        tacticalDeferResolutionClock: true,
-        ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
-        ...airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {},
-        ...airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {},
-        ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
-        ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
-        ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
-        rangedCombatHexes: playback.rangedCombatHexes,
-        rangedCasualtyHexes: playback.rangedCasualtyHexes,
-        rangedRemovedUnits: playback.rangedRemovedUnits,
-        ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
-        meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
-        meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
-        meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
-        ...pickPlaybackDiceRolls(playback)
-      };
+      rendererSharedState.resolutionMoveAnimation = buildTacticalResolutionAnimation({
+        playback,
+        subUnitsBefore: tacticalSubUnitsBeforeCommit,
+        deps
+      });
       syncChatPanelVisibility();
     }
     if (commitResult.tacticalBattle) {
@@ -41571,15 +47633,15 @@ ${bonuses}`;
       return "continue";
     }
   }
-  function openHumanKnockoutDialog(copy) {
+  function openHumanKnockoutDialog(copy2) {
     const dialog = document.getElementById("knockout-dialog");
     const title = document.getElementById("knockout-dialog-title");
     const lead = document.getElementById("knockout-dialog-lead");
     const place = document.getElementById("knockout-dialog-place");
     if (!dialog || !title || !lead || !place) return Promise.resolve("watch");
-    title.textContent = copy.title;
-    lead.textContent = copy.lead;
-    place.textContent = copy.placeLine;
+    title.textContent = copy2.title;
+    lead.textContent = copy2.lead;
+    place.textContent = copy2.placeLine;
     dialog.classList.remove("hidden");
     setMainUIControlsEnabled(false);
     return new Promise((resolve) => {
@@ -41598,6 +47660,60 @@ ${bonuses}`;
     document.getElementById("knockout-dialog-end")?.addEventListener("click", () => closeHumanKnockoutDialog("end"));
   }
 
+  // src/renderer/gameplay/resolutionAnimationStart.ts
+  function buildStrategicResolutionAnimation(input) {
+    const { plan, readyResult, visibleHexesBeforeTurn, marchArrowsUntilMovementEnds, ferryArrowsUntilMovementEnds } = input;
+    const {
+      resolutionMoves,
+      visibleHexes,
+      sightCuesForPlayback,
+      airStrikeOutboundMoves,
+      airStrikeReturnMoves,
+      unknownCombatHexes,
+      unknownCasualtyHexes,
+      airStrikeRemovedForPlayback,
+      airStrikeCasualtyHexesForPlayback,
+      airStrikeCombatHexesForPlayback
+    } = plan;
+    return {
+      moves: resolutionMoves,
+      ...sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {},
+      airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : void 0,
+      airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : void 0,
+      airStrikeCombatHexes: airStrikeCombatHexesForPlayback.length > 0 ? airStrikeCombatHexesForPlayback : void 0,
+      airStrikeCasualtyHexes: airStrikeCasualtyHexesForPlayback.length > 0 ? airStrikeCasualtyHexesForPlayback : void 0,
+      ...airStrikeRemovedForPlayback.length > 0 ? { airStrikeRemovedUnits: airStrikeRemovedForPlayback } : {},
+      startTime: Date.now(),
+      tacticalDeferResolutionClock: true,
+      combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : void 0,
+      casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : void 0,
+      rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : void 0,
+      rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : void 0,
+      rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : void 0,
+      ...readyResult.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: readyResult.rangedResolutionShotLines } : {},
+      meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : void 0,
+      controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : void 0,
+      meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : void 0,
+      meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : void 0,
+      unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
+      unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0,
+      ...marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {},
+      ...ferryArrowsUntilMovementEnds.length > 0 ? { ferryArrowsUntilMovementEnds } : {},
+      ...pickPlaybackDiceRolls(readyResult, {
+        visibleHexesBeforeTurn,
+        visibleHexesAfterTurn: visibleHexes,
+        unknownHexes: /* @__PURE__ */ new Set([...unknownCombatHexes, ...unknownCasualtyHexes])
+      })
+    };
+  }
+  function startResolutionAnimationFrames(tick) {
+    if (rendererSharedState.resolutionMoveAnimation) {
+      rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
+      rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
+    }
+    rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(tick);
+  }
+
   // src/renderer/gameplay/readyHandler.ts
   function buildReadyPayload(args) {
     const { enabledToolGroupsPayload, useEventDriven, aiPlanningRunEnabled } = args;
@@ -41613,6 +47729,7 @@ ${bonuses}`;
   async function handleReadyButtonClick(deps) {
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
+    if (replayActive()) return;
     if (rendererSharedState.readyRequestInFlight) return;
     if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
     if (isDeferredResolutionPlaybackConsultPending()) {
@@ -41689,11 +47806,19 @@ ${bonuses}`;
           refreshBuildPopup: false,
           redraw: false
         });
-        const outcome = readyResult.aiOnlyBattleH3Index && rendererSharedState.autoAdvance ? { decision: "fight", selectedH3Index: readyResult.aiOnlyBattleH3Index } : readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled() ? await deps.openMeleeInterceptModal({
-          candidates: readyResult.meleeInterceptCandidates ?? [],
-          buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
-          preselectH3Index: readyResult.aiOnlyBattleH3Index
-        }) : { decision: "ignore" };
+        let outcome;
+        if (readyResult.aiOnlyBattleH3Index && rendererSharedState.autoAdvance) {
+          outcome = { decision: "fight", selectedH3Index: readyResult.aiOnlyBattleH3Index };
+        } else if (readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()) {
+          closeChartsDialogIfOpen();
+          outcome = await deps.openMeleeInterceptModal({
+            candidates: readyResult.meleeInterceptCandidates ?? [],
+            buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
+            preselectH3Index: readyResult.aiOnlyBattleH3Index
+          });
+        } else {
+          outcome = { decision: "ignore" };
+        }
         const resolveResult = await window.gameApi.resolveMeleeIntercept({
           meleeDecisionToken: readyResult.meleeDecisionToken ?? "",
           decision: outcome.decision,
@@ -41717,6 +47842,7 @@ ${bonuses}`;
       await deps.refreshTacticalTerrainOverridesForRenderer();
       const nextState = await fetchMatchSnapshot();
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      if ((readyResult.knockouts ?? []).some((knockout) => isHumanSeatId(knockout.seatId))) closeChartsDialogIfOpen();
       announceKnockouts(readyResult.knockouts ?? [], rendererSharedState.gameState, nextState.seats, readyResult.removedUnitIdsBySeat);
       const state = nextState;
       await deps.applyGameStateSnapshot(state, {
@@ -41729,26 +47855,14 @@ ${bonuses}`;
         redraw: false
       });
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
-      const aiMoves = readyResult.aiMoves ?? [];
-      const resolutionMoves = [...humanMoves, ...aiMoves];
-      const visibleHexes = deps.getVisibleHexSet(state);
-      const visibleMissileLaunches = (readyResult.missileLaunches ?? []).filter(
-        (record) => missileLaunchVisibleToViewer(
-          record,
-          reportViewerSeatId(),
-          /* @__PURE__ */ new Set([...visibleHexesBeforeTurn, ...visibleHexes])
-        )
-      );
-      const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
-      const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
-      const airStrikeOutboundMoves = [
-        ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
-        ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves)
-      ];
-      const airStrikeReturnMoves = [
-        ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
-        ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves)
-      ];
+      void refreshChartsDialogIfOpen();
+      const plan = planResolutionPlayback({
+        readyResult,
+        state,
+        humanMoves,
+        visibleHexesBeforeTurn,
+        deps
+      });
       deps.updateOpenRouterCostLabel();
       if (readyResult.aiConsulted === false) {
         deps.appendOpenRouterLog("AI executing standing orders (no event fired).");
@@ -41757,28 +47871,7 @@ ${bonuses}`;
           report: { kind: "notice", tag: turnReportTag }
         });
       }
-      const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
-      const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
-      const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
-      const hasAirStrikeResolution = visibleMissileLaunches.length > 0 || (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
-      const hasDiceRolls = (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 || (readyResult.rangedDiceRolls?.length ?? 0) > 0 || (readyResult.meleeDiceRolls?.length ?? 0) > 0;
-      const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
-      const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
-      const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
-      const visibleMissileVictims = (readyResult.missileStrikeRemovedUnits ?? []).filter(
-        (unit) => visibleMissileVictimIds.has(unit.id)
-      );
-      const airStrikeRemovedForPlayback = [...readyResult.airStrikeRemovedUnits ?? [], ...visibleMissileVictims];
-      const airStrikeCasualtyHexesForPlayback = [
-        ...readyResult.airStrikeCasualtyHexes ?? [],
-        ...visibleMissileVictims.map((unit) => unit.h3Index).filter((hex) => !(readyResult.airStrikeCasualtyHexes ?? []).includes(hex))
-      ];
-      const airStrikeCombatHexesForPlayback = [
-        ...readyResult.airStrikeHexes ?? [],
-        ...visibleMissileLaunches.map((record) => record.targetH3Index).filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex))
-      ];
-      const needsCombatOrMovementAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
-      const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
+      const { visibleHexes, visibleMissileLaunches, visibility, needsCombatOrMovementAnimation, needsAnimation } = plan;
       const watching = observeModeControls(state.seats ?? []).observing;
       const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
         watching,
@@ -41828,45 +47921,18 @@ ${bonuses}`;
         if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
         const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(rendererSharedState.humanStandingOrders, state.units, humanMoves);
         const ferryArrowsUntilMovementEnds = ferriesHeldUntilMovementEnds(submittedFerryOrders, humanMoves);
-        rendererSharedState.resolutionMoveAnimation = {
-          moves: resolutionMoves,
-          ...sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {},
-          airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : void 0,
-          airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : void 0,
-          airStrikeCombatHexes: airStrikeCombatHexesForPlayback.length > 0 ? airStrikeCombatHexesForPlayback : void 0,
-          airStrikeCasualtyHexes: airStrikeCasualtyHexesForPlayback.length > 0 ? airStrikeCasualtyHexesForPlayback : void 0,
-          ...airStrikeRemovedForPlayback.length > 0 ? { airStrikeRemovedUnits: airStrikeRemovedForPlayback } : {},
-          startTime: Date.now(),
-          tacticalDeferResolutionClock: true,
-          combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : void 0,
-          casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : void 0,
-          rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : void 0,
-          rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : void 0,
-          rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : void 0,
-          ...readyResult.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: readyResult.rangedResolutionShotLines } : {},
-          meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : void 0,
-          controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : void 0,
-          meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : void 0,
-          meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : void 0,
-          unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
-          unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0,
-          ...marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {},
-          ...ferryArrowsUntilMovementEnds.length > 0 ? { ferryArrowsUntilMovementEnds } : {},
-          ...pickPlaybackDiceRolls(readyResult, {
-            visibleHexesBeforeTurn,
-            visibleHexesAfterTurn: visibleHexes,
-            unknownHexes: /* @__PURE__ */ new Set([...unknownCombatHexes, ...unknownCasualtyHexes])
-          })
-        };
+        rendererSharedState.resolutionMoveAnimation = buildStrategicResolutionAnimation({
+          plan,
+          readyResult,
+          visibleHexesBeforeTurn,
+          marchArrowsUntilMovementEnds,
+          ferryArrowsUntilMovementEnds
+        });
         syncChatPanelVisibility();
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
         if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
-        if (rendererSharedState.resolutionMoveAnimation) {
-          rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
-          rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
-        }
-        rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+        startResolutionAnimationFrames(deps.tickResolutionMoveAnimation);
       }
       rendererSharedState.hoverRoutePreview = null;
       rendererSharedState.hideCommittedOrderLinesAfterReady = false;
@@ -42004,6 +48070,7 @@ ${bonuses}`;
     );
   }
   async function applyGameStateSnapshot(deps, nextState, options = {}) {
+    if (replayActive() && options.replay !== "step") return;
     installRendererGameMap(nextState);
     syncMapExtentToSnapshot(nextState);
     const previousState = rendererSharedState.gameState;
@@ -42013,7 +48080,9 @@ ${bonuses}`;
       tacticalReleaseRendererSessionForNewStrategicMatch(nextState);
     }
     const restored = nextState.tacticalBattleSession;
-    if (restored && deps.applyRestoredTacticalBattleFromMain) {
+    if (restored && options.replay === "step") {
+      rendererSharedState.tacticalBattleSnapshot = restored;
+    } else if (restored && deps.applyRestoredTacticalBattleFromMain) {
       const cur = rendererSharedState.tacticalBattleSnapshot;
       const materiallyDifferent = !cur || cur.battleId !== restored.battleId || cur.tacticalTurnNumber !== restored.tacticalTurnNumber || !!cur && cur.battleId === restored.battleId && cur.tacticalTurnNumber === restored.tacticalTurnNumber && rendererSharedState.preTacticalLeafletMinZoom == null;
       if (materiallyDifferent) {
@@ -42022,7 +48091,7 @@ ${bonuses}`;
     }
     deps.rebuildUnitDisplayNameLookup(nextState);
     deps.reconcileSelectionToCurrentState();
-    deps.updateClientStaleEnemyIntel(previousState, nextState);
+    if (options.replay === void 0) deps.updateClientStaleEnemyIntel(previousState, nextState);
     if (!rendererSharedState.initialCameraApplied && nextState.hexes.length > 0) {
       if (nextState.tacticalBattleSession) {
         rendererSharedState.initialCameraApplied = true;
@@ -42190,6 +48259,7 @@ ${bonuses}`;
     return refreshGameStateAfterBuildQueueChange({ applyGameStateSnapshot: applyGameStateSnapshot2 });
   }
   async function applyGameStateSnapshot2(nextState, options = {}) {
+    if (replayActive() && options.replay !== "step") return;
     const previousMapId = rendererSharedState.gameState?.gameMap?.id;
     if (nextState.gameMap && previousMapId !== nextState.gameMap.id) {
       sessionStaticTacticalOverlaysLoaded = false;
@@ -42544,149 +48614,6 @@ ${bonuses}`;
   }
   function formatModelOptionLabel(model) {
     return `${model.name ?? model.id}${formatModelOptionSuffix(model)}`;
-  }
-
-  // src/shared/aiStrategyToastContent.ts
-  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
-  function trimToastField(raw) {
-    const trimmed = raw?.trim() ?? "";
-    return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function buildAiStrategyToastSections(fields) {
-    const sections = [];
-    const bullets = (fields.messages ?? []).filter((row) => row.text.trim().length > 0);
-    const strategy = trimToastField(fields.strategy);
-    if (bullets.length > 0) sections.push({ title: SIDE_MESSAGES_TITLE, body: "", bullets });
-    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
-    return sections;
-  }
-
-  // src/renderer/openRouter/commanderMessageTabsUi.ts
-  var tabState = null;
-  function bindCommanderMessageTabs() {
-    setAiStrategyToastHiddenListener(() => {
-      tabState = null;
-    });
-  }
-  function showCommanderMessageTabs(dispatches, statuses = []) {
-    const opening = strategyToastHidden() || tabState === null;
-    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
-    if (opening) {
-      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
-      tabState = initialCommanderMessageTabs(seats);
-    } else if (tabState) {
-      tabState = resetCommanderConsultMarks(tabState);
-    }
-    if (!tabState) return;
-    for (const dispatch of dispatches) {
-      tabState = commanderDispatchHasProse(dispatch) ? applyCommanderMessage(tabState, {
-        seatId: dispatch.seatId,
-        strategy: dispatch.strategy,
-        messages: dispatch.messages
-      }) : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
-    }
-    tabState = applyOpenTabAbsences(tabState, statuses);
-    if (!tabState.tabs.some((tab) => tab.enabled)) return;
-    showFilledAiStrategyToast(renderCommanderMessageTabs, false);
-  }
-  function applyOpenTabAbsences(state, statuses) {
-    let next = state;
-    for (const tab of state.tabs) {
-      const seat = (rendererSharedState.gameState?.seats ?? []).find((row) => row.seatId === tab.seatId);
-      const status = statuses.find((row) => row.seatId === tab.seatId);
-      const reason = resolveCommanderTabAbsence({
-        outTurn: seat?.outTurn ?? null,
-        status: status?.status ?? null,
-        storedReason: status?.absenceReason ?? null,
-        tacticalOtherSeat: seatIsOutsideThisBattle(tab.seatId, statuses),
-        consultedWithoutProse: tab.consultedWithoutProse
-      });
-      if (!reason) continue;
-      const turnNumber = reason === "knocked_out" ? seat?.outTurn ?? null : reason === "timed_out" ? status?.timedOutTurn ?? null : null;
-      next = applyCommanderAbsence(next, tab.seatId, formatCommanderAbsenceMessage(reason, turnNumber));
-    }
-    return next;
-  }
-  function seatIsOutsideThisBattle(seatId, statuses) {
-    const opposingPartyId = rendererSharedState.tacticalBattleSnapshot?.opposingPartyId;
-    const opponent = opposingPartyId ? statuses.find((row) => row.seatId === opposingPartyId) : void 0;
-    return seatOutsideTacticalConsult(seatId, opposingPartyId, opponent?.theater ?? null);
-  }
-  function renderCommanderMessageTabs(target) {
-    const host = target ?? document.getElementById("ai-strategy-toast-text");
-    if (!(host instanceof HTMLElement) || !tabState) return;
-    const state = tabState;
-    host.replaceChildren();
-    const list = document.createElement("div");
-    list.className = "ai-strategy-tab-bar";
-    list.setAttribute("role", "tablist");
-    for (const tab of state.tabs) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.setAttribute("role", "tab");
-      const flag = createSideNumberFlag(tab.seatId, rendererSharedState.gameState?.seats ?? []);
-      if (flag) button.appendChild(flag);
-      button.appendChild(document.createTextNode(tab.label));
-      button.title = tab.label;
-      button.disabled = !tab.enabled;
-      button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
-      button.addEventListener("click", () => {
-        if (!tab.enabled || !tabState) return;
-        tabState = { ...tabState, selectedSeatId: tab.seatId };
-        restartAiStrategyToastTimer();
-        renderCommanderMessageTabs();
-      });
-      list.append(button);
-    }
-    host.append(list);
-    const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
-    if (!selected?.enabled) return;
-    const sections = buildAiStrategyToastSections({ messages: selected.messages, strategy: selected.strategy });
-    const absence = selected.fromAbsence ? selected.message : null;
-    if (sections.length === 0 && !absence) return;
-    const panel = document.createElement("div");
-    panel.setAttribute("role", "tabpanel");
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    for (const section of sections) {
-      appendMapToastSectionHeader(panel, section.title);
-      if (section.bullets && section.bullets.length > 0) {
-        for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
-          const item = document.createElement("div");
-          item.className = "commander-message-line";
-          const label = seatName2(seats, bullet.toSeatId);
-          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_ARROW} `));
-          const flag = createMessagePartyFlag(bullet.toSeatId, seats);
-          if (flag) item.appendChild(flag);
-          const words = document.createElement("span");
-          words.textContent = `${label}: ${bullet.text}`;
-          item.appendChild(words);
-          panel.appendChild(item);
-        }
-      } else {
-        const span = document.createElement("span");
-        span.className = "commander-message-body";
-        span.textContent = section.body;
-        panel.append(span);
-      }
-    }
-    if (absence) {
-      const span = document.createElement("span");
-      span.style.display = "block";
-      span.textContent = absence;
-      panel.append(span);
-    }
-    host.append(panel);
-  }
-  function seatOrder(seats, seatId) {
-    return seats.find((seat) => seat.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
-  }
-  function seatName2(seats, seatId) {
-    const seat = seats.find((row) => row.seatId === seatId);
-    return seat ? sideDisplayName(seat) : seatId;
-  }
-  function strategyToastHidden() {
-    const toast = document.getElementById("ai-strategy-toast");
-    return !(toast instanceof HTMLElement) || toast.classList.contains("hidden");
   }
 
   // src/renderer/openRouter/modelDescriptionTooltip.ts
@@ -43261,8 +49188,8 @@ ${bonuses}`;
     if (unitCount <= 1) return within(x, y);
     return within(x, y) || within(x + STACK_OFFSET_X, y + STACK_OFFSET_Y);
   }
-  function pointInExpandedClientRect(clientX, clientY, rect, padPx) {
-    return clientX >= rect.left - padPx && clientX <= rect.right + padPx && clientY >= rect.top - padPx && clientY <= rect.bottom + padPx;
+  function pointInExpandedClientRect(clientX, clientY, rect2, padPx) {
+    return clientX >= rect2.left - padPx && clientX <= rect2.right + padPx && clientY >= rect2.top - padPx && clientY <= rect2.bottom + padPx;
   }
   function tryHandleBuildEntryAtClientXY(clientX, clientY, deps, eventShiftKey = false) {
     if (isHoverOrderPlanningActive()) return false;
@@ -43297,8 +49224,8 @@ ${bonuses}`;
       }
       return;
     }
-    const rect = container.getBoundingClientRect();
-    const inside = clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+    const rect2 = container.getBoundingClientRect();
+    const inside = clientX >= rect2.left && clientX <= rect2.right && clientY >= rect2.top && clientY <= rect2.bottom;
     if (!inside) {
       if (rendererSharedState.lastAppliedMapInteractionCursor !== "") {
         rendererSharedState.lastAppliedMapInteractionCursor = "";
@@ -43330,8 +49257,8 @@ ${bonuses}`;
       }
     }
     if (want === "" && rendererSharedState.gameState) {
-      const px = clientX - rect.left;
-      const py = clientY - rect.top;
+      const px = clientX - rect2.left;
+      const py = clientY - rect2.top;
       const hit = hitTestMapHexAtContainerPoint(px, py, rendererSharedState.gameState);
       if (hit) {
         const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds2(rendererSharedState.gameState, deps);
@@ -43350,12 +49277,12 @@ ${bonuses}`;
 
   // src/renderer/map/visibleMapFrame.ts
   function syncFrameToVisibleMap(frame) {
-    const rect = document.getElementById(MAP_CONTAINER_ID)?.getBoundingClientRect();
-    const hasArea = rect !== void 0 && rect.width > 0 && rect.height > 0;
-    frame.style.left = `${hasArea ? rect.left : 0}px`;
-    frame.style.top = `${hasArea ? rect.top : 0}px`;
-    frame.style.width = `${hasArea ? rect.width : window.innerWidth}px`;
-    frame.style.height = `${hasArea ? rect.height : window.innerHeight}px`;
+    const rect2 = document.getElementById(MAP_CONTAINER_ID)?.getBoundingClientRect();
+    const hasArea = rect2 !== void 0 && rect2.width > 0 && rect2.height > 0;
+    frame.style.left = `${hasArea ? rect2.left : 0}px`;
+    frame.style.top = `${hasArea ? rect2.top : 0}px`;
+    frame.style.width = `${hasArea ? rect2.width : window.innerWidth}px`;
+    frame.style.height = `${hasArea ? rect2.height : window.innerHeight}px`;
   }
   function attachFrameToVisibleMap(frame) {
     syncFrameToVisibleMap(frame);
@@ -43616,8 +49543,8 @@ ${bonuses}`;
     if (!map) return null;
     const L = getLeafletGlobal();
     if (!L) return null;
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    const rect2 = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect2.left, clientY - rect2.top));
     try {
       const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
       if (battle) return battle.tacticalChildH3Indexes.includes(detailH3) ? detailH3 : null;
@@ -44020,23 +49947,23 @@ ${bonuses}`;
             if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
             const aligned = alignLatLngRunToDrawReference(seg.hexes, previousLng);
             previousLng = aligned[aligned.length - 1][1];
-            const points = aligned.map(([lat, lng]) => {
+            const points2 = aligned.map(([lat, lng]) => {
               const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
               return { x: p.x, y: p.y };
             });
-            const edgeCount = Math.max(0, points.length - 1);
+            const edgeCount = Math.max(0, points2.length - 1);
             if (remainingSolidEdges >= edgeCount) {
-              runs.push({ points, dash: ORDER_LINE_SOLID });
+              runs.push({ points: points2, dash: ORDER_LINE_SOLID });
             } else if (remainingSolidEdges <= 0) {
-              runs.push({ points, dash: ORDER_LINE_LATER_DASH });
+              runs.push({ points: points2, dash: ORDER_LINE_LATER_DASH });
             } else {
-              const splitIndex = Math.min(points.length - 1, remainingSolidEdges);
-              runs.push({ points: points.slice(0, splitIndex + 1), dash: ORDER_LINE_SOLID });
-              runs.push({ points: points.slice(splitIndex), dash: ORDER_LINE_LATER_DASH });
+              const splitIndex = Math.min(points2.length - 1, remainingSolidEdges);
+              runs.push({ points: points2.slice(0, splitIndex + 1), dash: ORDER_LINE_SOLID });
+              runs.push({ points: points2.slice(splitIndex), dash: ORDER_LINE_LATER_DASH });
             }
             remainingSolidEdges -= edgeCount;
-            lastSegmentPenultimate = points[points.length - 2] ?? null;
-            lastSegmentLast = points[points.length - 1] ?? null;
+            lastSegmentPenultimate = points2[points2.length - 2] ?? null;
+            lastSegmentLast = points2[points2.length - 1] ?? null;
           }
           let arrow = lastSegmentPenultimate && lastSegmentLast ? routeEndArrow(lastSegmentPenultimate, lastSegmentLast) : null;
           if (!arrow && preview.arrowLatLng && preview.segments.length > 0) {
@@ -44246,6 +50173,7 @@ ${bonuses}`;
   async function handleMainMapDoubleClick(event, deps) {
     if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
     if (observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return;
+    if (replayActive()) return;
     clearDeferredHumanUnitSingleSelectTimer();
     rendererSharedState.gestureSelectionSnapshotAtMs = 0;
     const state = rendererSharedState.gameState;
@@ -44535,13 +50463,13 @@ ${bonuses}`;
       if (!rendererSharedState.gameState) return false;
       const map = getMainLeafletMap();
       if (!map) return false;
-      const rect = map.getContainer().getBoundingClientRect();
+      const rect2 = map.getContainer().getBoundingClientRect();
       const { unitsToDraw, movingIds } = deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState);
       const drawnAtHit = unitsToDraw.filter((unit) => unit.h3Index === h3Index && !movingIds?.has(unit.id));
       if (drawnAtHit.length === 0) return false;
       return deps.containerPixelHitsDrawnUnitIcon(
-        clientX - rect.left,
-        clientY - rect.top,
+        clientX - rect2.left,
+        clientY - rect2.top,
         h3Index,
         drawnAtHit.length
       );
@@ -44570,13 +50498,13 @@ ${bonuses}`;
     }
     async function commitGroupedMarchOrders(selectedIds, destinationH3) {
       if (!window.gameApi?.assignHumanMarchOrders) return false;
-      const assign = await window.gameApi.assignHumanMarchOrders({
+      const assign2 = await window.gameApi.assignHumanMarchOrders({
         unitIds: selectedIds,
         destinationH3Index: destinationH3
       });
-      if (!assign.success) {
+      if (!assign2.success) {
         deps.showMapToast(
-          deps.formatTargetingValidationReason(assign.reason, "Failed to assign movement order."),
+          deps.formatTargetingValidationReason(assign2.reason, "Failed to assign movement order."),
           { isError: true }
         );
         return true;
@@ -44753,7 +50681,7 @@ ${bonuses}`;
       }
     });
     mainMapEl.addEventListener("pointerdown", (e) => {
-      if (newGameOverlayIsOpen()) return;
+      if (newGameOverlayIsOpen() || replayActive()) return;
       if (e.button !== 0) return;
       const pressAtMs = Date.now();
       const press = resolveMapGesturePress({
@@ -44788,7 +50716,7 @@ ${bonuses}`;
       hideOrderBlockHexTooltip();
     });
     mainMapEl.addEventListener("click", async (e) => {
-      if (newGameOverlayIsOpen()) return;
+      if (newGameOverlayIsOpen() || replayActive()) return;
       if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
         if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
           deps.updateSidebar();
@@ -44930,7 +50858,7 @@ ${bonuses}`;
       deps.redraw();
     });
     mainMapEl.addEventListener("dblclick", (e) => {
-      if (newGameOverlayIsOpen()) return;
+      if (newGameOverlayIsOpen() || replayActive()) return;
       void handleMainMapDoubleClick(e, {
         clientXYToHit: hitTestMapHexAtClientPoint,
         pointerHitsDrawnUnitIcon,
@@ -44953,7 +50881,7 @@ ${bonuses}`;
     });
     mainMapEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (newGameOverlayIsOpen()) return;
+      if (newGameOverlayIsOpen() || replayActive()) return;
       clearSelectionLikeRightClick(deps);
     });
     document.getElementById("selection-panel-close")?.addEventListener("click", () => clearSelectionLikeRightClick(deps));
@@ -45083,9 +51011,6 @@ ${bonuses}`;
       deps.requestRedraw();
     }
   }
-  function tacticalBattlesDialogIsOpen() {
-    return document.querySelector('[role="dialog"][aria-label="Tactical battles"]') !== null;
-  }
   function wireInitCore(deps) {
     try {
       installControlTooltip();
@@ -45196,6 +51121,17 @@ ${bonuses}`;
     });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        if (chartsDialogIsOpen()) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          toggleChartsDialog();
+          return;
+        }
+        if (replayActive() && (!shouldIgnoreGlobalKeydown(e) || isRangeInputTarget(e.target))) {
+          e.preventDefault();
+          void leaveReplay();
+          return;
+        }
         if (tacticalBattlesDialogIsOpen()) return;
         const buildPopup = document.getElementById("build-popup");
         if (buildPopup && !buildPopup.classList.contains("hidden")) {
@@ -45211,7 +51147,19 @@ ${bonuses}`;
           return;
         }
       }
+      if (replayActive() && isRangeInputTarget(e.target) && !e.repeat && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        void toggleReplay();
+        return;
+      }
       if (shouldIgnoreGlobalKeydown(e)) return;
+      if (chartsDialogIsOpen()) {
+        if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "c") {
+          e.preventDefault();
+          toggleChartsDialog();
+        }
+        return;
+      }
       if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
         clearMapKeyboardPan();
         if (e.key === "Shift") {
@@ -45237,6 +51185,16 @@ ${bonuses}`;
       }
       if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
       const key = e.key.toLowerCase();
+      if (key === "c") {
+        e.preventDefault();
+        toggleChartsDialog();
+        return;
+      }
+      if (key === "p") {
+        e.preventDefault();
+        void toggleReplay();
+        return;
+      }
       if (key === "t") {
         rendererSharedState.hideTerrainFillWhileHeld = true;
         deps.requestRedraw();
@@ -45331,6 +51289,7 @@ ${bonuses}`;
       rendererSharedState.buildEntryButtonPointerInside = false;
     });
     buildEntryLayer?.addEventListener("click", (e) => {
+      if (replayActive()) return;
       const target = e.target;
       const btn = target?.closest(".build-entry-btn");
       if (!btn) return;
@@ -45356,7 +51315,7 @@ ${bonuses}`;
       rendererSharedState.tacticalEntryButtonPointerInside = false;
     });
     const canvasContainer = document.getElementById("canvas-container");
-    for (const chromeId of ["sidebar", "app-topbar", "game-menu", "selection-panel", "chat-panel"]) {
+    for (const chromeId of ["sidebar", "app-topbar", "game-menu", "selection-panel", "chat-panel", "replay-panel"]) {
       document.getElementById(chromeId)?.addEventListener("pointerenter", () => {
         dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
       });
@@ -45374,6 +51333,274 @@ ${bonuses}`;
       const map = getMainLeafletMap();
       map?.getContainer?.()?.style.removeProperty("cursor");
     });
+  }
+
+  // src/renderer/replay/replayPlayback.ts
+  function positionOf(state) {
+    return { stepCount: state.timeline.steps.length, index: state.index, busy: state.busy, playing: state.playing };
+  }
+  function playbackContinues(session, matchEpoch) {
+    const state = currentReplay();
+    return state !== null && state.session === session && state.playing && rendererMatchEpochCurrent(matchEpoch);
+  }
+  function holdReplayStep() {
+    return new Promise((resolve) => {
+      setTimeout(resolve, REPLAY_PLAYBACK_DWELL_MS);
+    });
+  }
+  function strategicAnimationFor(view2) {
+    if (view2.resolution === null) return null;
+    const readyResult = view2.resolution;
+    const humanMoves = readyResult.humanMoves ?? [];
+    const visibleHexesBeforeTurn = new Set(view2.visibleHexesBefore ?? []);
+    const plan = planResolutionPlayback({
+      readyResult,
+      state: view2.snapshot,
+      humanMoves,
+      visibleHexesBeforeTurn,
+      deps: replayReadyDeps()
+    });
+    if (!plan.needsAnimation) return null;
+    return buildStrategicResolutionAnimation({
+      plan,
+      readyResult,
+      visibleHexesBeforeTurn,
+      marchArrowsUntilMovementEnds: ordersHeldUntilMovementEnds([], view2.snapshot.units, humanMoves),
+      ferryArrowsUntilMovementEnds: ferriesHeldUntilMovementEnds([], humanMoves)
+    });
+  }
+  function tacticalAnimationFor(view2) {
+    const playback = view2.resolution?.tacticalResolutionPlayback;
+    if (!playback || !tacticalPlaybackNeeded(playback)) return null;
+    return buildTacticalResolutionAnimation({ playback, subUnitsBefore: view2.subUnitsBefore, deps: replayReadyDeps() });
+  }
+  async function playReplayStep(index, view2, continues) {
+    const animation = view2.ref.scope === "tactical" ? tacticalAnimationFor(view2) : strategicAnimationFor(view2);
+    if (animation) rendererSharedState.resolutionMoveAnimation = animation;
+    await presentReplayStep(index, view2, { forPlayback: animation !== null });
+    if (!animation) return;
+    if (!continues() || rendererSharedState.resolutionMoveAnimation !== animation) {
+      if (rendererSharedState.resolutionMoveAnimation === animation) clearResolutionPlaybackAnimationState();
+      return;
+    }
+    const finished = waitForNextResolutionPlaybackFinished();
+    startResolutionAnimationFrames(replayReadyDeps().tickResolutionMoveAnimation);
+    await finished;
+  }
+  async function startReplayPlayback() {
+    const start = currentReplay();
+    if (!start || start.playing || start.busy || hasQueuedResolutionPlaybackCompleteNotify()) return;
+    const { session, matchEpoch } = start;
+    if (nextPlaybackIndex({ ...positionOf(start), playing: true }, false) === null) return;
+    setReplay({ ...start, playing: true, stopRequested: false });
+    try {
+      while (playbackContinues(session, matchEpoch)) {
+        const state = currentReplay();
+        if (!state || nextPlaybackIndex(positionOf(state), state.stopRequested) === null) break;
+        await holdReplayStep();
+        const holding = currentReplay();
+        if (!playbackContinues(session, matchEpoch) || !holding) break;
+        const index = nextPlaybackIndex(positionOf(holding), holding.stopRequested);
+        if (index === null) break;
+        const view2 = await loadReplayStep(index);
+        if (!view2 || !playbackContinues(session, matchEpoch)) break;
+        await playReplayStep(index, view2, () => playbackContinues(session, matchEpoch));
+      }
+    } catch (error) {
+      console.error("replay playback failed", error);
+      clearResolutionPlaybackAnimationState();
+      showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+    } finally {
+      const end = currentReplay();
+      if (end && end.session === session) setReplay({ ...end, playing: false, stopRequested: false });
+    }
+  }
+  function requestReplayPlaybackStop() {
+    const state = currentReplay();
+    if (state?.playing) setReplay({ ...state, stopRequested: true });
+  }
+
+  // src/renderer/replay/replayPanel.ts
+  var SHOW_SEEK_LABEL = "Show the turn slider";
+  var HIDE_SEEK_LABEL = "Hide the turn slider";
+  var HIDE_SEEK_TIP = "Hide the slider and the turn field.";
+  var SHOW_SEEK_TIP = "Show the slider and the turn field.";
+  var PLAY_LABEL = "Play";
+  var PLAY_TIP = "Play the turns forward with their animations.";
+  var PAUSE_LABEL = "Pause";
+  var PAUSE_TIP = "Stop after this turn.";
+  var PLAY_GLYPH_PATH = "M4 3l9 5-9 5z";
+  var PAUSE_GLYPH_PATH = "M4 3h3v10H4zM9 3h3v10H9z";
+  var TURN_NOUN = "Turn";
+  var BEAT_NOUN = "Beat";
+  var expanded4 = false;
+  var slide4 = null;
+  function byId(id) {
+    return document.getElementById(id);
+  }
+  function syncExpandControl3(button) {
+    button.setAttribute("aria-expanded", String(expanded4));
+    button.setAttribute("aria-label", expanded4 ? HIDE_SEEK_LABEL : SHOW_SEEK_LABEL);
+    button.setAttribute("data-control-tooltip", expanded4 ? HIDE_SEEK_TIP : SHOW_SEEK_TIP);
+  }
+  function settlePanel(panel) {
+    slide4?.cancel();
+    slide4 = null;
+    panel.dataset.state = expanded4 ? "expanded" : "compact";
+  }
+  function slidePanel2(panel, from, to) {
+    slide4 = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide4 === finished) settlePanel(panel);
+    });
+    if (!slide4) settlePanel(panel);
+  }
+  function toggleExpanded(panel, bar, button) {
+    const from = panel.getBoundingClientRect().height;
+    slide4?.cancel();
+    slide4 = null;
+    expanded4 = !expanded4;
+    syncExpandControl3(button);
+    if (expanded4) {
+      panel.dataset.state = "expanding";
+      slidePanel2(panel, from, panel.getBoundingClientRect().height);
+      return;
+    }
+    panel.dataset.state = "collapsing";
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slidePanel2(panel, from, bar.offsetHeight + borders);
+  }
+  function currentPosition() {
+    const state = currentReplay();
+    return state ? { stepCount: state.timeline.steps.length, index: state.index, busy: state.busy, playing: state.playing } : null;
+  }
+  function syncPlayButton(play, position) {
+    const playing = position.playing;
+    play.setAttribute("aria-label", playing ? PAUSE_LABEL : PLAY_LABEL);
+    play.setAttribute("data-control-tooltip", playing ? PAUSE_TIP : PLAY_TIP);
+    play.querySelector("path")?.setAttribute("d", playing ? PAUSE_GLYPH_PATH : PLAY_GLYPH_PATH);
+    play.disabled = !canPlay(position);
+  }
+  function renderReplayPanel() {
+    const panel = byId("replay-panel");
+    if (!panel) return;
+    const state = currentReplay();
+    const position = currentPosition();
+    if (!state || !position) {
+      panel.setAttribute("hidden", "");
+      return;
+    }
+    panel.removeAttribute("hidden");
+    const label = byId("replay-panel-label");
+    if (label) label.textContent = replayLabel(state.timeline.steps, state.index, state.timeline.scope);
+    const unit = state.timeline.scope === "tactical" ? BEAT_NOUN : TURN_NOUN;
+    const slider = byId("replay-slider");
+    if (slider) {
+      slider.setAttribute("aria-label", unit);
+      slider.max = String(Math.max(0, position.stepCount - 1));
+      slider.value = String(state.index);
+      slider.disabled = !canSeek(position);
+    }
+    const field = byId("replay-turn-input");
+    field?.setAttribute("aria-label", unit);
+    if (field && document.activeElement !== field) {
+      field.value = shownNumberText(state);
+      field.removeAttribute("aria-invalid");
+    }
+    if (field) field.disabled = !canSeek(position);
+    const back = byId("replay-step-back");
+    const forward = byId("replay-step-forward");
+    const play = byId("replay-play");
+    if (back) back.disabled = !canStepBack(position);
+    if (forward) forward.disabled = !canStepForward(position);
+    if (play) syncPlayButton(play, position);
+  }
+  function shownNumberText(state) {
+    const step = state.timeline.steps[state.index];
+    return step ? String(stepNumber(step, state.timeline.scope)) : "";
+  }
+  function restoreTurnField(field) {
+    const state = currentReplay();
+    field.value = state ? shownNumberText(state) : "";
+    field.removeAttribute("aria-invalid");
+  }
+  function validateTurnField(field) {
+    const state = currentReplay();
+    if (!state) return null;
+    const parsed = parseTurnEntry(field.value, state.timeline.steps, state.timeline.scope);
+    if ("error" in parsed) {
+      field.setAttribute("aria-invalid", "true");
+      return null;
+    }
+    field.removeAttribute("aria-invalid");
+    return parsed.index;
+  }
+  function commitTurnField(field) {
+    const index = validateTurnField(field);
+    const state = currentReplay();
+    if (index === null || !state || state.busy || index === state.index) return;
+    void showReplayStep(index);
+  }
+  function wireTurnField(field) {
+    field.addEventListener("input", () => {
+      validateTurnField(field);
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitTurnField(field);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        restoreTurnField(field);
+      }
+    });
+    field.addEventListener("blur", () => commitTurnField(field));
+  }
+  function wireSlider(slider) {
+    slider.addEventListener("input", () => {
+      const state = currentReplay();
+      const step = state?.timeline.steps[Number(slider.value)];
+      const turn = state && step ? stepNumber(step, state.timeline.scope) : void 0;
+      const field = byId("replay-turn-input");
+      if (turn === void 0 || !field) return;
+      field.value = String(turn);
+      field.removeAttribute("aria-invalid");
+    });
+    slider.addEventListener("change", () => {
+      if (currentReplay()?.busy) {
+        renderReplayPanel();
+        return;
+      }
+      void showReplayStep(Number(slider.value)).then(() => {
+        renderReplayPanel();
+      });
+    });
+  }
+  function wireReplayPanel() {
+    const panel = byId("replay-panel");
+    const bar = byId("replay-panel-bar");
+    const button = byId("replay-panel-expand");
+    const field = byId("replay-turn-input");
+    const slider = byId("replay-slider");
+    if (!panel || !bar || !button || !field || !slider) return;
+    settlePanel(panel);
+    syncExpandControl3(button);
+    button.addEventListener("click", () => toggleExpanded(panel, bar, button));
+    byId("replay-step-back")?.addEventListener("click", () => {
+      const state = currentReplay();
+      if (state) void showReplayStep(state.index - 1);
+    });
+    byId("replay-step-forward")?.addEventListener("click", () => {
+      const state = currentReplay();
+      if (state) void showReplayStep(state.index + 1);
+    });
+    byId("replay-play")?.addEventListener("click", () => {
+      if (currentReplay()?.playing) requestReplayPlaybackStop();
+      else void startReplayPlayback();
+    });
+    wireTurnField(field);
+    wireSlider(slider);
+    onReplayChange(renderReplayPanel);
   }
 
   // src/renderer/renderer.ts
@@ -45699,6 +51926,8 @@ ${bonuses}`;
       redrawSelectionPanel: renderSelectionPanel
     });
     wireGameMenu();
+    wireChartsDialog();
+    wireReplayPanel();
     wireSaveLoadMenu();
     wireInitCore({
       requestRedraw: requestRedraw2,
@@ -45772,6 +52001,12 @@ ${bonuses}`;
       replacePendingFerryOrdersForSelected,
       clearCommittedOrderDraftState: clearCommittedOrderDraftState2,
       refreshHumanStandingOrders: refreshHumanStandingOrders2
+    });
+    bindReplayDeps({
+      readyDeps: createReadyHandlerDeps,
+      selectionDeps: { updateSidebar: updateSidebar2, updateRangedSidebar: updateRangedSidebar3, redraw },
+      hideBuildPopup: hideBuildPopup2,
+      hideStackCallout
     });
     const tacticalEntryLayer = document.getElementById("tactical-entry-layer");
     tacticalEntryLayer?.addEventListener("click", (e) => {

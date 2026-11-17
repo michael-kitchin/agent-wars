@@ -1,0 +1,40 @@
+{
+  "title": "AGENT WARS",
+  "subtitle": "Same scenario · four AI powers · no fog",
+  "footer": "Condensed replays, aligned by elapsed time (≈ by turn)",
+  "replays": [
+    {
+      "key": "v221",
+      "file": "2026-11-09_19-59-16.condensed.mp4",
+      "version": "v2.21.0",
+      "nickname": "“World War N”",
+      "turns_shown": 515,
+      "legend_width": 404
+    },
+    {
+      "key": "v222",
+      "file": "2026-11-11_18-39-20.condensed.mp4",
+      "version": "v2.22.0",
+      "nickname": "“Slap fight”",
+      "turns_shown": 512,
+      "legend_width": 404
+    },
+    {
+      "key": "v300",
+      "file": "2026-11-15_23-31-41.condensed.mp4",
+      "version": "v3.0.0",
+      "nickname": "“Better tools”",
+      "turns_shown": 446,
+      "note": "Two knockouts by turn 225",
+      "legend_width": 437,
+      "legend_masks": [
+        { "x": 410, "until_seconds": 43.1 },
+        { "x": 428, "until_seconds": 44.6 }
+      ]
+    }
+  ],
+  "layouts": {
+    "quad": ["v221", "v222", "v300"],
+    "duo": ["v221", "v300"]
+  }
+}

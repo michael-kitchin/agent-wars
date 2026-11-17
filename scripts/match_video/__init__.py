@@ -1,1 +1,1 @@
-"""Condense a match recording by dropping audio and long frozen stretches."""
+"""Condense match recordings and compose condensed replays side by side."""
