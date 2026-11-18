@@ -14891,13 +14891,6 @@
     return after.some((id) => !beforeSet.has(id));
   }
 
-  // src/shared/aiConsultationLimits.ts
-  var AI_MODEL_REQUEST_TIMEOUT_MS = 18e4;
-  var AI_MODEL_REQUEST_RETRY_COUNT = 1;
-  var AI_CONSULTATION_WALL_CLOCK_MS = 6e5;
-  var AI_TALK_ROUND_TIMEOUT_MS = 75e3;
-  var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS + AI_TALK_ROUND_TIMEOUT_MS;
-
   // src/renderer/core/constants.ts
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 18;
@@ -14969,7 +14962,6 @@
   var UNIT_DESELECT_GLYPH = "-";
   var TOAST_DURATION_MS = 24e3;
   var READY_REQUEST_TIMEOUT_MS = 12e4;
-  var TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS + 5e3;
   var UNIT_ICON_HIT_PAD_PX = 2;
   var BUILD_ENTRY_HIT_PAD_PX = 2;
   var TACTICAL_ENTRY_HIT_PAD_PX = 6;
@@ -16441,1885 +16433,7 @@
     return flag;
   }
 
-  // src/shared/observeModeControls.ts
-  function activeHumanSeatId(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
-  }
-  function isObservingRoster(seats) {
-    return seats.length > 0 && activeHumanSeatId(seats) === null;
-  }
-  function observeModeControls(seats) {
-    const observing = isObservingRoster(seats);
-    return {
-      observing,
-      ordersEnabled: !observing,
-      buildEnabled: false,
-      forcesEnabled: false,
-      unitSelectionEnabled: !observing,
-      magnifierEnabled: !observing,
-      hexOnlySelection: observing
-    };
-  }
-  function readoutViewerSeatId(seats, viewAs) {
-    if (seats.length === 0) return void 0;
-    if (!observeModeControls(seats).observing) {
-      return activeHumanSeatId(seats);
-    }
-    if (viewAs === "all") return null;
-    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
-    return chosen?.seatId ?? null;
-  }
-  function staleIntelViewer(playerPerspective) {
-    if (playerPerspective === "all") return null;
-    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
-    return HUMAN_SEAT_ID;
-  }
-  function deferTacticalEntryUntilStrategicPlayback(observing, battleHex, needsAnimation) {
-    return observing && typeof battleHex === "string" && battleHex.length > 0 && needsAnimation;
-  }
-
-  // src/shared/codeUnitOrder.ts
-  function compareCodeUnits(left, right) {
-    if (left < right) return -1;
-    if (left > right) return 1;
-    return 0;
-  }
-
-  // src/shared/unitIds.ts
-  var UNIT_TYPE_ID_CODES = {
-    infantry: "i",
-    armor: "t",
-    naval: "n",
-    air: "a",
-    missile: "m"
-  };
-  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itnam])(\d+)$/;
-  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
-  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
-    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
-  );
-  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
-  function isPositiveInteger(value) {
-    return Number.isInteger(value) && value > 0;
-  }
-  function hasForbiddenLeadingZero(digits) {
-    return digits.startsWith("0");
-  }
-  function parseStrategicUnitId(unitId) {
-    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const playerLetter = match[1];
-    const playerIndexDigits = match[2];
-    const typeCode = match[3];
-    const ordinalDigits = match[4];
-    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
-    const playerIndex = Number.parseInt(playerIndexDigits, 10);
-    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
-    if (!unitType) return null;
-    const ordinal = Number.parseInt(ordinalDigits, 10);
-    if (!isPositiveInteger(ordinal)) return null;
-    if (playerLetter === "h") {
-      if (playerIndex !== 1) return null;
-      return { player: HUMAN_SEAT_ID, unitType, ordinal };
-    }
-    if (playerIndex < 1 || playerIndex > 4) return null;
-    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal };
-  }
-  function parseTacticalSubUnitId(unitId) {
-    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const parentUnitId = match[1];
-    const slotDigits = match[2];
-    if (hasForbiddenLeadingZero(slotDigits)) return null;
-    const slot = Number.parseInt(slotDigits, 10);
-    if (!isPositiveInteger(slot)) return null;
-    return { parentUnitId, slot };
-  }
-  function unitTypeFromUnitId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.unitType;
-    if (unitId.includes("-infantry-")) return "infantry";
-    if (unitId.includes("-armor-")) return "armor";
-    if (unitId.includes("-naval-")) return "naval";
-    if (unitId.includes("-air-")) return "air";
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
-    return null;
-  }
-  function unitIdOwnerFromId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.player;
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) {
-      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
-      if (parentOwner) return parentOwner;
-    }
-    if (unitId.startsWith("opponent-")) return AI_SEAT_IDS[0];
-    if (unitId.startsWith("human-")) return HUMAN_SEAT_ID;
-    return null;
-  }
-
-  // src/renderer/rendering/ownerColors.ts
-  function paletteSeats() {
-    return rendererSharedState.gameState?.seats ?? [];
-  }
-  function paletteForCurrentOwner(ownerId) {
-    if (ownerId == null || ownerId === "") return null;
-    const seats = paletteSeats();
-    const palette = paletteForOwner(ownerId, seats);
-    if (palette) return palette;
-    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
-    return null;
-  }
-
-  // src/renderer/rendering/mercenaryBadgeDrawing.ts
-  var MERCENARY_BADGE_TEXT = CREDITS_SYMBOL;
-  var MERCENARY_BADGE_FONT = "bold 14px system-ui, sans-serif";
-  function drawMercenaryBadge(ctx, x, y) {
-    ctx.save();
-    ctx.font = MERCENARY_BADGE_FONT;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.strokeText(MERCENARY_BADGE_TEXT, x, y);
-    ctx.fillStyle = "#000";
-    ctx.fillText(MERCENARY_BADGE_TEXT, x, y);
-    ctx.restore();
-  }
-
-  // src/shared/webMercator.ts
-  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
-  function alignLongitudeToReference(lng, refLng) {
-    let shifted = lng;
-    while (shifted - refLng > 180) shifted -= 360;
-    while (refLng - shifted > 180) shifted += 360;
-    return shifted;
-  }
-  function alignRingToReference(ring, centerLng, referenceLng) {
-    const shift = referenceLng == null ? 0 : alignLongitudeToReference(centerLng, referenceLng) - centerLng;
-    return ring.map(([lat, lng]) => [lat, alignLongitudeToReference(lng, centerLng) + shift]);
-  }
-  function alignLatLngRun(points2, anchorLng) {
-    const aligned = [];
-    let previousLng = anchorLng;
-    for (const [lat, lng] of points2) {
-      const alignedLng = previousLng == null ? lng : alignLongitudeToReference(lng, previousLng);
-      aligned.push([lat, alignedLng]);
-      previousLng = alignedLng;
-    }
-    return aligned;
-  }
-
-  // src/shared/mapExtent.ts
-  var extentReferenceLng = null;
-  var battleReferenceLng = null;
-  var battleReferenceSuspended = false;
-  function setMapExtentReferenceLng(lng) {
-    extentReferenceLng = lng;
-  }
-  function setBattleDrawReferenceLng(lng) {
-    battleReferenceLng = lng;
-  }
-  function setBattleDrawReferenceSuspended(suspended) {
-    battleReferenceSuspended = suspended;
-  }
-  function drawReferenceLng() {
-    if (battleReferenceLng != null && !battleReferenceSuspended) return battleReferenceLng;
-    return extentReferenceLng;
-  }
-  function battleDrawReferenceLng(h3Indexes, regionalReferenceLng) {
-    const interval = longitudeIntervalFromCenters(h3Indexes.map((h3) => cellToLatLng(h3)[1]));
-    if (!interval) return null;
-    return regionalReferenceLng == null ? interval.referenceLng : alignLongitudeToReference(interval.referenceLng, regionalReferenceLng);
-  }
-  function loadedMapExtentKey(mapId, h3Indexes) {
-    if (h3Indexes.length === 0) return `${mapId}:empty`;
-    return `${mapId}:${h3Indexes.length}:${h3Indexes[0]}:${h3Indexes[h3Indexes.length - 1]}`;
-  }
-  function shouldApplyLoadedMapExtent(appliedKey3, nextKey, refit) {
-    return refit || appliedKey3 !== nextKey;
-  }
-  function longitudeIntervalFromCenters(longitudes) {
-    const sorted = longitudes.filter((lng) => Number.isFinite(lng)).sort((a, b) => a - b);
-    if (sorted.length === 0) return null;
-    let largestGap = sorted[0] + 360 - sorted[sorted.length - 1];
-    let west = sorted[0];
-    let east = sorted[sorted.length - 1];
-    for (let i = 0; i < sorted.length - 1; i += 1) {
-      const gap = sorted[i + 1] - sorted[i];
-      if (gap > largestGap) {
-        largestGap = gap;
-        west = sorted[i + 1];
-        east = sorted[i] + 360;
-      }
-    }
-    const crossesAntimeridian = east > 180 || west < -180;
-    return {
-      west,
-      east,
-      referenceLng: (west + east) / 2,
-      crossesAntimeridian
-    };
-  }
-  function mapExtentBoxForHexes(interval, h3Indexes) {
-    if (!interval) return null;
-    let south = 90;
-    let north = -90;
-    let west = interval.west;
-    let east = interval.east;
-    for (const h3 of h3Indexes) {
-      const [, centerLng] = cellToLatLng(h3);
-      for (const [lat, lng] of cellToBoundary(h3)) {
-        const alignedToCell = alignLongitudeToReference(lng, centerLng);
-        const aligned = alignLongitudeToReference(alignedToCell, interval.referenceLng);
-        const clampedLat = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, Math.min(WEB_MERCATOR_MAX_ABS_LAT, lat));
-        south = Math.min(south, clampedLat);
-        north = Math.max(north, clampedLat);
-        west = Math.min(west, aligned);
-        east = Math.max(east, aligned);
-      }
-    }
-    if (south > north) {
-      south = -WEB_MERCATOR_MAX_ABS_LAT;
-      north = WEB_MERCATOR_MAX_ABS_LAT;
-    }
-    return { south, west, north, east, referenceLng: interval.referenceLng };
-  }
-
-  // src/renderer/map/hexGrid.ts
-  function clampLatForWebMercatorDisplay(lat) {
-    if (lat > WEB_MERCATOR_MAX_ABS_LAT) return WEB_MERCATOR_MAX_ABS_LAT;
-    if (lat < -WEB_MERCATOR_MAX_ABS_LAT) return -WEB_MERCATOR_MAX_ABS_LAT;
-    return lat;
-  }
-  function alignLngToReference(lng, refLng) {
-    const reference = drawReferenceLng() ?? refLng;
-    return alignLongitudeToReference(lng, reference);
-  }
-  function alignLngToDrawReference(lng) {
-    const reference = drawReferenceLng();
-    return reference == null ? lng : alignLongitudeToReference(lng, reference);
-  }
-  function alignLatLngRunToDrawReference(points2, anchorLng) {
-    return alignLatLngRun(points2, anchorLng ?? drawReferenceLng());
-  }
-  function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
-    const [, centerLng] = cellToLatLng(h3Index);
-    return alignRingToReference(cellToBoundary(h3Index), centerLng, drawReferenceLng()).map(
-      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), lng]
-    );
-  }
-
-  // src/shared/mapLabelRules.ts
-  var COUNTRY_LABEL_MIN_ZOOM = 4;
-  var LABEL_MIN_ZOOM_SLACK = 1.5;
-  var COUNTRY_LABEL_ZOOM_DELAY = 1;
-  var STATE_LABEL_MIN_RADIUS_PX = 40;
-  var WATER_LABEL_ZOOM_DELAY = 1;
-  var WATER_LABEL_MIN_RADIUS_PX = 40;
-  var NARROW_WATER_ZOOM_DELAY = 2;
-  var WATER_LABEL_OPACITY = 1;
-  var MAX_LABELS_PER_FRAME = 150;
-  var LABEL_COLLISION_PADDING_PX = 4;
-  var LABEL_VIEW_INSET_PX = 24;
-  var WATER_LABEL_KINDS = ["ocean", "major_water", "minor_water"];
-  function isWaterLabelKind(kind) {
-    return WATER_LABEL_KINDS.includes(kind);
-  }
-  function visibleLabelKinds(zoom, tacticalView) {
-    if (tacticalView) return ["country", "state"];
-    if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["continent"];
-    return ["continent", "country"];
-  }
-  function visibleWaterLabelKinds(zoom, tacticalView) {
-    if (tacticalView) return ["major_water", "minor_water"];
-    if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["ocean"];
-    return ["ocean", "major_water"];
-  }
-  function annotationViewIsDetail(input) {
-    return input.overlayOpen ? input.previewAtDetailZoom : input.readMatchDetailView();
-  }
-  var COUNTRY_LABEL_OPACITY = 1;
-  var CONTINENT_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
-  var STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
-  var CONTINENT_BESIDE_COUNTRY_OPACITY = 4 / 5;
-  var COUNTRY_BESIDE_STATE_OPACITY = 3 / 5;
-  function labelKindOpacity(kind, zoom, tacticalView) {
-    if (isWaterLabelKind(kind)) return WATER_LABEL_OPACITY;
-    if (kind === "country") return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
-    if (kind === "state") return STATE_LABEL_OPACITY;
-    if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
-    return CONTINENT_LABEL_OPACITY;
-  }
-  var METERS_PER_PIXEL_Z0 = 156543.03392804097;
-  var MAP_LABEL_KIND_STYLES = {
-    continent: { sizePx: 18, weight: 600, fontStyle: "normal", letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
-    country: { sizePx: 13, weight: 600, fontStyle: "normal", letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
-    state: { sizePx: 11, weight: 400, fontStyle: "normal", letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
-    ocean: { sizePx: 12, weight: 400, fontStyle: "italic", letterSpacingEm: 0.3, haloWidthPx: 2, uppercase: true },
-    major_water: { sizePx: 9.75, weight: 400, fontStyle: "italic", letterSpacingEm: 0.06, haloWidthPx: 1.5, uppercase: false },
-    minor_water: { sizePx: 8.25, weight: 400, fontStyle: "italic", letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false }
-  };
-  var CONTINENT_BESIDE_COUNTRY_SIZE_PX = 27;
-  var COUNTRY_BESIDE_STATE_SIZE_PX = 19.5;
-  var continentBesideCountryStyle = {
-    ...MAP_LABEL_KIND_STYLES.continent,
-    sizePx: CONTINENT_BESIDE_COUNTRY_SIZE_PX
-  };
-  var countryBesideStateStyle = {
-    ...MAP_LABEL_KIND_STYLES.country,
-    sizePx: COUNTRY_BESIDE_STATE_SIZE_PX
-  };
-  function mapLabelStyleForView(kind, zoom, tacticalView) {
-    if (kind === "continent" && !tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return continentBesideCountryStyle;
-    if (kind === "country" && tacticalView) return countryBesideStateStyle;
-    return MAP_LABEL_KIND_STYLES[kind];
-  }
-  function labelDisplayText(feature) {
-    return MAP_LABEL_KIND_STYLES[feature.kind].uppercase ? feature.name.toLocaleUpperCase("en") : feature.name;
-  }
-  function mercatorMetersPerPixel(zoom) {
-    return METERS_PER_PIXEL_Z0 / 2 ** zoom;
-  }
-
-  // src/shared/adminBorderRules.ts
-  var NATIONAL_BORDER_OPACITY = 4 / 5;
-  var STATE_BORDER_OPACITY = 3 / 5;
-  function adminBorderGroupsForView(zoom, tacticalView) {
-    const kinds = visibleLabelKinds(zoom, tacticalView);
-    const groups = [];
-    if (kinds.includes("country")) groups.push("country", "country_disputed");
-    if (kinds.includes("state")) groups.push("state", "state_disputed");
-    return groups;
-  }
-  function borderLineOpacity(id) {
-    return id === "state" || id === "state_disputed" ? STATE_BORDER_OPACITY : NATIONAL_BORDER_OPACITY;
-  }
-
-  // src/shared/objectGuards.ts
-  function isNonArrayObject(value) {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-
-  // src/shared/vectorPackTypes.ts
-  var ADMIN_BORDER_GROUP_IDS = ["country", "country_disputed", "state", "state_disputed"];
-
-  // src/shared/vectorPackDecode.ts
-  var SCHEMA_VERSION = "1.0.0";
-  var LONGITUDE_WINDOWS = [
-    { lo: -540, hi: -180, offset: -360 },
-    { lo: -180, hi: 180, offset: 0 },
-    { lo: 180, hi: 540, offset: 360 }
-  ];
-  function decodePart(part2, quantumDeg, lngOffset) {
-    if (part2.length < 4 || part2.length % 2 !== 0) return [];
-    const points2 = [];
-    let lat = part2[0] * quantumDeg;
-    let lng = part2[1] * quantumDeg + lngOffset;
-    points2.push([lat, lng]);
-    for (let index = 2; index < part2.length; index += 2) {
-      lat += part2[index] * quantumDeg;
-      lng += part2[index + 1] * quantumDeg;
-      points2.push([lat, lng]);
-    }
-    return points2;
-  }
-  function coastlineLodForZoom(pack, zoom) {
-    return pack.lods.find((lod) => lod.minZoom <= zoom && (lod.maxZoom === null || zoom < lod.maxZoom)) ?? null;
-  }
-  function visibleCellRefs(view2, cellDeg, maxCells) {
-    if (maxCells <= 0 || view2.south > view2.north) return [];
-    const south = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, view2.south);
-    const north = Math.min(WEB_MERCATOR_MAX_ABS_LAT, view2.north);
-    if (south > north) return [];
-    const west = view2.west;
-    let east = view2.east;
-    if (east < west) east += 360;
-    if (cellDeg >= 360) return [{ key: "0:0", lngOffset: 0 }];
-    const refs = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const window2 of LONGITUDE_WINDOWS) {
-      const lo = Math.max(west, window2.lo);
-      const hi = Math.min(east, window2.hi);
-      if (!(hi > lo)) continue;
-      appendCells(refs, seen, south, north, lo - window2.offset, hi - window2.offset, window2.offset, cellDeg, maxCells);
-      if (refs.length >= maxCells) break;
-    }
-    return refs;
-  }
-  function parseCoastlinePack(value) {
-    const record = requireRecord(value, "coastlines");
-    requireIdentity(record, "coastlines");
-    return {
-      schemaVersion: SCHEMA_VERSION,
-      kind: "coastlines",
-      quantumDeg: requireNumber(record, "quantum_deg"),
-      lods: requireLods(record)
-    };
-  }
-  function parseCoastEdgeMaskPack(value) {
-    const record = requireRecord(value, "coast_edge_mask");
-    requireIdentity(record, "coast_edge_mask");
-    const cellsValue = record.cells;
-    if (!isNonArrayObject(cellsValue)) throw new Error("cells is not an object");
-    const cells = {};
-    for (const [key, cell] of Object.entries(cellsValue)) {
-      if (!isNonArrayObject(cell)) throw new Error(`cells ${key} is not an object`);
-      cells[key] = {
-        water: requirePolygons(cell.water, "water"),
-        land: requirePolygons(cell.land, "land")
-      };
-    }
-    return {
-      schemaVersion: SCHEMA_VERSION,
-      kind: "coast_edge_mask",
-      quantumDeg: requireNumber(record, "quantum_deg"),
-      cellDeg: requireNumber(record, "cell_deg"),
-      cells
-    };
-  }
-  function parseAdminBorderPack(value) {
-    const record = requireRecord(value, "admin_borders");
-    requireIdentity(record, "admin_borders");
-    const groupsValue = record.groups;
-    if (!Array.isArray(groupsValue)) throw new Error("groups is not an array");
-    const byId2 = /* @__PURE__ */ new Map();
-    for (const group of groupsValue) {
-      if (!isNonArrayObject(group)) throw new Error("group is not an object");
-      const id = group.id;
-      if (!isBorderGroupId(id)) throw new Error(`id ${String(id)} is not a border group`);
-      byId2.set(id, parseLodList(group.lods));
-    }
-    return {
-      schemaVersion: SCHEMA_VERSION,
-      kind: "admin_borders",
-      quantumDeg: requireNumber(record, "quantum_deg"),
-      groups: ADMIN_BORDER_GROUP_IDS.map((id) => ({ id, lods: byId2.get(id) ?? [] }))
-    };
-  }
-  function appendCells(refs, seen, south, north, lo, hi, lngOffset, cellDeg, maxCells) {
-    const start = Math.max(lo, -180);
-    const end = Math.min(hi, 180);
-    if (!(end > start)) return;
-    const row0 = rowOf(south, cellDeg);
-    const row1 = rowOf(north, cellDeg);
-    const col0 = Math.floor((start + 180) / cellDeg);
-    const col1 = Math.floor((end - 1e-9 + 180) / cellDeg);
-    for (let row = row0; row <= row1; row += 1) {
-      for (let col = col0; col <= col1; col += 1) {
-        const key = `${row}:${col}`;
-        const id = `${lngOffset}:${key}`;
-        if (seen.has(id)) continue;
-        seen.add(id);
-        refs.push({ key, lngOffset });
-        if (refs.length >= maxCells) return;
-      }
-    }
-  }
-  function rowOf(lat, cellDeg) {
-    const lastRow = Math.floor(180 / cellDeg) - 1;
-    const row = Math.floor((lat + 90) / cellDeg);
-    if (row < 0) return 0;
-    if (row > lastRow) return lastRow;
-    return row;
-  }
-  function requireRecord(value, label) {
-    if (!isNonArrayObject(value)) throw new Error(`${label} document is not an object`);
-    return value;
-  }
-  function requireIdentity(record, kind) {
-    if (record.schema_version !== SCHEMA_VERSION) {
-      throw new Error(`schema_version ${String(record.schema_version)} is not ${SCHEMA_VERSION}`);
-    }
-    if (record.kind !== kind) throw new Error(`kind ${String(record.kind)} is not ${kind}`);
-  }
-  function requireNumber(record, field) {
-    const value = record[field];
-    if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${field} is not a number`);
-    return value;
-  }
-  function isBorderGroupId(value) {
-    return typeof value === "string" && ADMIN_BORDER_GROUP_IDS.includes(value);
-  }
-  function requireLods(record) {
-    return parseLodList(record.lods);
-  }
-  function parseLodList(value) {
-    if (!Array.isArray(value)) throw new Error("lods is not an array");
-    return value.map((lod) => {
-      if (!isNonArrayObject(lod)) throw new Error("lod is not an object");
-      const minZoom = lod.min_zoom;
-      const maxZoom = lod.max_zoom;
-      const cellDeg = lod.cell_deg;
-      if (typeof minZoom !== "number") throw new Error("min_zoom is not a number");
-      if (maxZoom !== null && typeof maxZoom !== "number") throw new Error("max_zoom is not a number or null");
-      if (typeof cellDeg !== "number") throw new Error("cell_deg is not a number");
-      return { minZoom, maxZoom, cellDeg, cells: parseCells(lod.cells) };
-    });
-  }
-  function parseCells(value) {
-    if (!isNonArrayObject(value)) throw new Error("cells is not an object");
-    const cells = {};
-    for (const [key, parts] of Object.entries(value)) {
-      if (!Array.isArray(parts)) throw new Error(`cells ${key} is not an array`);
-      cells[key] = parts.map((part2) => {
-        if (!Array.isArray(part2) || part2.some((item) => typeof item !== "number")) throw new Error("part is not a number list");
-        return part2;
-      });
-    }
-    return cells;
-  }
-  function requirePolygons(value, field) {
-    if (!Array.isArray(value)) throw new Error(`${field} is not an array`);
-    return value.map((polygon) => {
-      if (!Array.isArray(polygon)) throw new Error(`${field} polygon is not an array`);
-      return polygon.map((ring) => {
-        if (!Array.isArray(ring) || ring.some((item) => typeof item !== "number")) {
-          throw new Error(`${field} ring is not a number list`);
-        }
-        return ring;
-      });
-    });
-  }
-
-  // src/shared/mapThemes.ts
-  var LIGHT_THEME_TRANSPORT_LINE_COLORS = {
-    roadCenter: "#ffffff",
-    roadOutline: "#000000",
-    railCenter: "#000000",
-    railHalo: "#ffffff"
-  };
-  var MAP_THEMES = [
-    {
-      id: "standard",
-      label: "Standard",
-      waterColor: "rgb(163, 199, 223)",
-      landShadowRgb: [92, 90, 85],
-      landHighlightRgb: [251, 250, 247],
-      coastlineColor: "#6d8ea6",
-      countryBorderColor: "#4e6273",
-      stateBorderColor: "#4e6273",
-      gridLineColor: "rgba(48, 56, 64, 0.15)",
-      hexPaletteId: "default",
-      labelFont: "sans",
-      labelColors: {
-        continent: "#3b3f46",
-        country: "#3b3f46",
-        state: "#3b3f46",
-        halo: "rgba(255, 255, 255, 0.85)"
-      },
-      waterLabelColors: { ink: "#2a5676", halo: "rgba(163, 199, 223, 0.8)" },
-      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
-    },
-    {
-      id: "topographic",
-      label: "Topographic",
-      waterColor: "rgb(166, 217, 239)",
-      landShadowRgb: [107, 85, 54],
-      landHighlightRgb: [251, 246, 228],
-      coastlineColor: "#3f8fc0",
-      countryBorderColor: "#6e5340",
-      stateBorderColor: "#6e5340",
-      gridLineColor: "rgba(48, 56, 64, 0.15)",
-      hexPaletteId: "default",
-      labelFont: "serif",
-      labelColors: {
-        continent: "#4a3a28",
-        country: "#4a3a28",
-        state: "#4a3a28",
-        halo: "rgba(251, 246, 228, 0.9)"
-      },
-      waterLabelColors: { ink: "#1f5a80", halo: "rgba(166, 217, 239, 0.8)" },
-      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
-    },
-    {
-      id: "nautical",
-      label: "Nautical",
-      waterColor: "rgb(227, 241, 248)",
-      landShadowRgb: [122, 100, 51],
-      landHighlightRgb: [251, 231, 166],
-      coastlineColor: "#2f3a40",
-      countryBorderColor: "#1e4d78",
-      stateBorderColor: "#1e4d78",
-      gridLineColor: "rgba(48, 56, 64, 0.15)",
-      hexPaletteId: "default",
-      labelFont: "serif",
-      labelColors: {
-        continent: "#2b2f33",
-        country: "#2b2f33",
-        state: "#2b2f33",
-        halo: "rgba(251, 236, 180, 0.9)"
-      },
-      waterLabelColors: { ink: "#3d6a8a", halo: "rgba(227, 241, 248, 0.8)" },
-      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
-    },
-    {
-      id: "night",
-      label: "Night",
-      waterColor: "rgb(15, 26, 38)",
-      landShadowRgb: [16, 19, 23],
-      landHighlightRgb: [74, 82, 92],
-      coastlineColor: "#7d97ad",
-      countryBorderColor: "#9eb4c8",
-      stateBorderColor: "#9eb4c8",
-      gridLineColor: "rgba(210, 216, 228, 0.12)",
-      hexPaletteId: "wargame",
-      labelFont: "sans",
-      labelColors: {
-        continent: "#d7dde5",
-        country: "#d7dde5",
-        state: "#d7dde5",
-        halo: "rgba(10, 14, 20, 0.85)"
-      },
-      waterLabelColors: { ink: "#8fb0c9", halo: "rgba(15, 26, 38, 0.8)" },
-      transportLineColors: {
-        roadCenter: "#8b95a3",
-        roadOutline: "#0a0e14",
-        railCenter: "#dfe6ee",
-        railHalo: "#0a0e14"
-      }
-    }
-  ];
-  var DEFAULT_MAP_THEME_ID = "standard";
-  var LAND_TILE_CONTRAST = 1.4;
-  var FLAT_LAND_GRAY = 210;
-  var STANDARD_THEME = MAP_THEMES[0];
-  function mapThemeById(id) {
-    return MAP_THEMES.find((theme) => theme.id === id) ?? STANDARD_THEME;
-  }
-  function labelPaintColors(theme, kind) {
-    if (isWaterLabelKind(kind)) return { fill: theme.waterLabelColors.ink, halo: theme.waterLabelColors.halo };
-    return { fill: theme.labelColors[kind], halo: theme.labelColors.halo };
-  }
-  function landTransferFunctions(theme) {
-    const channel = (index) => ({
-      slope: (theme.landHighlightRgb[index] - theme.landShadowRgb[index]) / 255,
-      intercept: theme.landShadowRgb[index] / 255
-    });
-    return { r: channel(0), g: channel(1), b: channel(2) };
-  }
-
-  // src/renderer/map/activeMapTheme.ts
-  var activeTheme = mapThemeById(DEFAULT_MAP_THEME_ID);
-  function getActiveMapTheme() {
-    return activeTheme;
-  }
-  function setActiveMapThemeId(id) {
-    const next = mapThemeById(id);
-    if (next.id === activeTheme.id) return false;
-    activeTheme = next;
-    return true;
-  }
-
-  // src/renderer/map/bucketedVectorLayer.ts
-  function ignoreRedrawWithoutContext(renderer) {
-    if (!renderer) return;
-    const names = ["_update", "_clear", "_draw", "_redraw"];
-    for (const name of names) {
-      const original = renderer[name];
-      if (typeof original !== "function") continue;
-      renderer[name] = function redrawWhenContextExists() {
-        if (!this._ctx) return;
-        original.call(this);
-      };
-    }
-  }
-  function createBucketedVectorLayer(options) {
-    const pane = options.map.getPane?.(options.paneName) ?? options.map.createPane?.(options.paneName);
-    if (pane) {
-      pane.style.zIndex = String(options.paneZIndex);
-      pane.style.pointerEvents = "none";
-    }
-    const renderer = options.leaflet.canvas?.({ pane: options.paneName, padding: 0.5 });
-    ignoreRedrawWithoutContext(renderer);
-    const paths = /* @__PURE__ */ new Map();
-    let source = null;
-    let style = {
-      color: "#000000",
-      weight: 1,
-      dashArray: null,
-      smoothFactor: 0,
-      seamWeightPx: null
-    };
-    let enabled = true;
-    let loggedSyncError = false;
-    let loggedMissingConstructor = false;
-    function pathOptions() {
-      if (options.shape === "polygon") {
-        return {
-          renderer,
-          interactive: false,
-          smoothFactor: 0,
-          fill: true,
-          fillColor: style.color,
-          fillOpacity: 1,
-          stroke: style.seamWeightPx != null,
-          color: style.color,
-          weight: style.seamWeightPx ?? 0
-        };
-      }
-      const line = {
-        renderer,
-        interactive: false,
-        smoothFactor: style.smoothFactor,
-        stroke: true,
-        color: style.color,
-        weight: style.weight,
-        opacity: style.opacity ?? 1,
-        lineCap: "round",
-        lineJoin: "round",
-        fill: false
-      };
-      if (style.dashArray != null) line.dashArray = style.dashArray;
-      return line;
-    }
-    function clearPaths() {
-      for (const path of paths.values()) path.remove?.();
-      paths.clear();
-      renderer?.remove?.();
-    }
-    function syncUncaught() {
-      if (!enabled || !source) {
-        clearPaths();
-        return;
-      }
-      const bounds = options.map.getBounds?.();
-      if (!bounds || !renderer) {
-        if (!renderer && !loggedMissingConstructor) {
-          loggedMissingConstructor = true;
-          console.error("[agent-wars] vector layer has no canvas renderer", options.paneName);
-        }
-        return;
-      }
-      const view2 = {
-        west: bounds.getWest(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        north: bounds.getNorth()
-      };
-      const cells = source(view2, options.map.getZoom?.() ?? 0);
-      const live = /* @__PURE__ */ new Set();
-      const paint2 = pathOptions();
-      for (const cell of cells) {
-        live.add(cell.cacheKey);
-        if (paths.has(cell.cacheKey)) continue;
-        const geometry = cell.build();
-        if (geometry.length === 0) continue;
-        const path = options.shape === "line" ? options.leaflet.polyline?.(geometry, paint2) : options.leaflet.polygon?.(geometry, paint2);
-        if (!path) continue;
-        path.addTo?.(options.map);
-        paths.set(cell.cacheKey, path);
-      }
-      for (const [key, path] of paths) {
-        if (live.has(key)) continue;
-        path.remove?.();
-        paths.delete(key);
-      }
-      if (paths.size === 0) renderer.remove?.();
-    }
-    function sync() {
-      try {
-        syncUncaught();
-      } catch (error) {
-        if (loggedSyncError) return;
-        loggedSyncError = true;
-        console.error("[agent-wars] vector layer sync failed", options.paneName, error);
-      }
-    }
-    return {
-      setSource(next) {
-        source = next;
-        clearPaths();
-        sync();
-      },
-      setStyle(next) {
-        style = next;
-        const paint2 = pathOptions();
-        for (const path of paths.values()) path.setStyle?.(paint2);
-      },
-      setEnabled(next) {
-        enabled = next;
-        sync();
-      },
-      setPaneFilter(filter) {
-        const target = options.map.getPane?.(options.paneName);
-        if (target) target.style.filter = filter;
-      },
-      sync
-    };
-  }
-
-  // src/renderer/map/vectorLayerGeometry.ts
-  var VECTOR_CELL_CAP = 800;
-  var cellCapLogged = false;
-  function noteVectorCellCap(count) {
-    if (count !== VECTOR_CELL_CAP || cellCapLogged) return;
-    cellCapLogged = true;
-    console.error("[agent-wars] vector cell cap reached", count);
-  }
-  async function loadBasemapVectorText(name) {
-    const ask = window.gameApi?.basemapVectorDocument;
-    if (!ask) {
-      console.error("[agent-wars] basemap vector document unavailable", name);
-      return null;
-    }
-    try {
-      return await ask(name);
-    } catch (error) {
-      console.error("[agent-wars] basemap vector document failed", name, error);
-      return null;
-    }
-  }
-  function vectorLines(parts, quantumDeg, lngOffset) {
-    const lines = [];
-    for (const part2 of parts) {
-      const decoded = decodePart(part2, quantumDeg, lngOffset);
-      if (decoded.length >= 2) lines.push(decoded);
-    }
-    return lines;
-  }
-  function vectorPolygons(polygons, quantumDeg, lngOffset) {
-    const shapes = [];
-    for (const polygon of polygons) {
-      const rings = [];
-      for (const ring of polygon) {
-        const decoded = decodePart(ring, quantumDeg, lngOffset);
-        if (decoded.length >= 3) rings.push(decoded);
-      }
-      if (rings.length > 0) shapes.push(rings);
-    }
-    return shapes;
-  }
-
-  // src/renderer/map/adminBorderLayers.ts
-  var BORDER_DRAW_ORDER = [
-    "state",
-    "state_disputed",
-    "country",
-    "country_disputed"
-  ];
-  function borderWeight(id) {
-    return id === "country" || id === "country_disputed" ? 1.25 : 1;
-  }
-  function borderDash(id) {
-    if (id === "country_disputed" || id === "state_disputed") return "1 3";
-    if (id === "state") return "4 3";
-    return null;
-  }
-  function borderColor(theme, id) {
-    return id === "state" || id === "state_disputed" ? theme.stateBorderColor : theme.countryBorderColor;
-  }
-  var borderPack = null;
-  var bound = false;
-  var mainMap = null;
-  var readTacticalView = () => false;
-  var borderLayers = [];
-  function borderCells(id, view2, zoom) {
-    const pack = borderPack;
-    const group = pack?.groups.find((candidate) => candidate.id === id);
-    if (!pack || !group) return [];
-    const lod = coastlineLodForZoom(group, zoom);
-    if (!lod) return [];
-    const lodIndex = group.lods.indexOf(lod);
-    const refs = visibleCellRefs(view2, lod.cellDeg, VECTOR_CELL_CAP);
-    noteVectorCellCap(refs.length);
-    return refs.map((ref) => ({
-      cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
-      build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
-    }));
-  }
-  function setAdminBorderTacticalReader(reader) {
-    readTacticalView = reader;
-  }
-  function bindAdminBorderLayers(leaflet, main) {
-    if (bound) return;
-    bound = true;
-    mainMap = main;
-    for (const id of BORDER_DRAW_ORDER) {
-      const layer = createBucketedVectorLayer({
-        map: main,
-        leaflet,
-        paneName: "basemapBorders",
-        paneZIndex: 270,
-        shape: "line"
-      });
-      layer.setSource((view2, zoom) => borderCells(id, view2, zoom));
-      borderLayers.push({ id, layer });
-    }
-    applyAdminBorderTheme(getActiveMapTheme());
-    main.on?.("moveend", syncAdminBorderLayers);
-    main.on?.("zoomend", syncAdminBorderLayers);
-    syncAdminBorderLayers();
-    void loadBorders();
-  }
-  async function loadBorders() {
-    const text = await loadBasemapVectorText("admin_borders");
-    if (text == null) return;
-    try {
-      borderPack = parseAdminBorderPack(JSON.parse(text));
-    } catch (error) {
-      console.error("[agent-wars] admin borders document rejected", error);
-      return;
-    }
-    syncAdminBorderLayers();
-  }
-  function syncAdminBorderLayers() {
-    if (!mainMap) return;
-    let groups;
-    try {
-      groups = adminBorderGroupsForView(mainMap.getZoom?.() ?? 0, readTacticalView());
-    } catch (error) {
-      console.error("[agent-wars] admin border visibility failed", error);
-      return;
-    }
-    const visible = new Set(groups);
-    for (const entry of borderLayers) entry.layer.setEnabled(visible.has(entry.id));
-  }
-  function applyAdminBorderTheme(theme) {
-    for (const entry of borderLayers) {
-      const style = {
-        color: borderColor(theme, entry.id),
-        weight: borderWeight(entry.id),
-        dashArray: borderDash(entry.id),
-        smoothFactor: 0.5,
-        seamWeightPx: null,
-        opacity: borderLineOpacity(entry.id)
-      };
-      entry.layer.setStyle(style);
-    }
-  }
-
-  // src/renderer/map/mapThemeFilters.ts
-  var SVG_ID = "map-theme-filters";
-  function ensureMapThemeSvgFilters() {
-    if (document.getElementById(SVG_ID)) return;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.id = SVG_ID;
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("width", "0");
-    svg.setAttribute("height", "0");
-    svg.style.position = "absolute";
-    for (const theme of MAP_THEMES) {
-      const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
-      filter.id = `map-theme-land-${theme.id}`;
-      filter.setAttribute("color-interpolation-filters", "sRGB");
-      const transfer = document.createElementNS("http://www.w3.org/2000/svg", "feComponentTransfer");
-      const functions = landTransferFunctions(theme);
-      for (const [name, channel] of [
-        ["feFuncR", functions.r],
-        ["feFuncG", functions.g],
-        ["feFuncB", functions.b]
-      ]) {
-        const fn = document.createElementNS("http://www.w3.org/2000/svg", name);
-        fn.setAttribute("type", "linear");
-        fn.setAttribute("slope", String(channel.slope));
-        fn.setAttribute("intercept", String(channel.intercept));
-        transfer.appendChild(fn);
-      }
-      filter.appendChild(transfer);
-      svg.appendChild(filter);
-    }
-    document.body.appendChild(svg);
-  }
-  function landTileFilterCss(theme) {
-    return `url(#map-theme-land-${theme.id})`;
-  }
-  function landUnderlayFilterCss(theme) {
-    return `contrast(${LAND_TILE_CONTRAST}) ${landTileFilterCss(theme)}`;
-  }
-
-  // src/renderer/map/basemapLayer.ts
-  var OFFLINE_HILLSHADE_ID = "offline_hillshade";
-  var WATER_PANE = "basemapWater";
-  var GRID_PANE = "basemapGrid";
-  var GRID_DASH = "2 3";
-  var SOURCE_MERIDIANS = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180];
-  var SOURCE_PARALLELS = [-70, -50, -30, -10, 0, 10, 30, 50, 70];
-  var leafletRef = null;
-  var mainMap2 = null;
-  var miniMap = null;
-  var mainLayer = null;
-  var miniLayer = null;
-  var gameMapId = "global";
-  var appliedKey = "";
-  var requestSerial = 0;
-  var basemapErrorShown = false;
-  var publishedNativeZoom = 7;
-  var gridLines = [];
-  var nativeZoomListeners = /* @__PURE__ */ new Set();
-  function onBasemapNativeZoomChanged(listener) {
-    nativeZoomListeners.add(listener);
-  }
-  function publishBasemapNativeZoom(nativeZoom2) {
-    publishedNativeZoom = nativeZoom2;
-    for (const listener of nativeZoomListeners) listener(nativeZoom2);
-  }
-  function bindOfflineBasemap(leaflet, main, mini) {
-    leafletRef = leaflet;
-    mainMap2 = main;
-    miniMap = mini;
-    ensureWaterPane(main);
-    ensureWaterPane(mini);
-    ensureSourceGrid(leaflet, main);
-    void applyGameMap(gameMapId);
-  }
-  function setBasemapGameMap(nextMapId) {
-    const mapId = nextMapId || "global";
-    gameMapId = mapId;
-    void applyGameMap(mapId);
-  }
-  function applyBasemapTheme(theme) {
-    for (const map of [mainMap2, miniMap]) {
-      const water = map?.getPane?.(WATER_PANE);
-      if (water) water.style.background = theme.waterColor;
-      applyTileTheme(map?.getPanes?.()?.tilePane, landTileFilterCss(theme));
-    }
-    const grid2 = mainMap2?.getPane?.(GRID_PANE);
-    if (grid2) grid2.style.filter = "";
-    for (const line of gridLines) line.setStyle?.({ color: theme.gridLineColor });
-  }
-  async function applyGameMap(mapId) {
-    const serial = ++requestSerial;
-    const nativeZoom2 = await nativeZoomFor(mapId);
-    if (serial !== requestSerial || !leafletRef || !mainMap2 || !miniMap) return;
-    publishBasemapNativeZoom(nativeZoom2);
-    const key = `${mapId}:${nativeZoom2}`;
-    if (key === appliedKey && mainLayer && miniLayer) return;
-    appliedKey = key;
-    const url = `agentwars-basemap://tiles/${mapId}/{z}/{x}/{y}.webp`;
-    mainLayer = replaceLayer(leafletRef, mainMap2, mainLayer, url, nativeZoom2);
-    miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom2);
-  }
-  function replaceLayer(leaflet, map, current, url, nativeZoom2) {
-    if (current) {
-      current.off("tileerror", onTileError);
-      try {
-        map.removeLayer?.(current);
-      } catch {
-      }
-    }
-    const layer = leaflet.tileLayer(url, {
-      maxZoom: 16,
-      maxNativeZoom: nativeZoom2,
-      minZoom: 0
-    });
-    layer.addTo?.(map);
-    layer.on("tileerror", onTileError);
-    return layer;
-  }
-  function ensureSourceGrid(leaflet, map) {
-    if (!leaflet.polyline || map.getPane?.(GRID_PANE)) return;
-    const pane = map.createPane?.(GRID_PANE);
-    if (!pane) return;
-    pane.style.zIndex = "250";
-    pane.style.pointerEvents = "none";
-    for (const longitude of SOURCE_MERIDIANS) {
-      const line = leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180));
-      line?.addTo?.(map);
-      if (line) gridLines.push(line);
-    }
-    for (const latitude of SOURCE_PARALLELS) {
-      const line = leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0));
-      line?.addTo?.(map);
-      if (line) gridLines.push(line);
-    }
-  }
-  function meridianPositions(longitude) {
-    return [
-      [-WEB_MERCATOR_MAX_ABS_LAT, longitude],
-      [WEB_MERCATOR_MAX_ABS_LAT, longitude]
-    ];
-  }
-  function parallelPositions(latitude) {
-    return [
-      [latitude, -180],
-      [latitude, 180]
-    ];
-  }
-  function gridStroke(solid) {
-    const stroke = {
-      pane: GRID_PANE,
-      color: mapThemeById(DEFAULT_MAP_THEME_ID).gridLineColor,
-      weight: 1,
-      opacity: 1,
-      interactive: false,
-      smoothFactor: 0
-    };
-    if (!solid) stroke.dashArray = GRID_DASH;
-    return stroke;
-  }
-  function ensureWaterPane(map) {
-    if (map.getPane?.(WATER_PANE)) return;
-    const pane = map.createPane?.(WATER_PANE);
-    if (!pane) return;
-    const container = map.getContainer?.();
-    if (container) container.insertBefore(pane, container.firstChild);
-    pane.style.position = "absolute";
-    pane.style.inset = "0";
-    pane.style.width = "100%";
-    pane.style.height = "100%";
-    pane.style.zIndex = "190";
-    pane.style.pointerEvents = "none";
-    pane.style.background = mapThemeById(DEFAULT_MAP_THEME_ID).waterColor;
-  }
-  function applyTileTheme(pane, filter) {
-    if (!pane) return;
-    const filtered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
-    for (const el of filtered) el.style.filter = "";
-    pane.style.filter = filter;
-  }
-  function onTileError() {
-    if (basemapErrorShown) return;
-    basemapErrorShown = true;
-    showMapToast("Some map tiles failed to load. The game remains playable; try again later.", { isError: false });
-  }
-  async function nativeZoomFor(mapId) {
-    const ask = window.gameApi?.basemapNativeZoom;
-    if (!ask) return 7;
-    try {
-      const result = await ask(mapId);
-      return result?.nativeZoom === 9 ? 9 : 7;
-    } catch (err) {
-      console.error("[agent-wars] basemap native zoom failed", err);
-      return 7;
-    }
-  }
-
-  // src/renderer/map/coastlineLayers.ts
-  var COASTLINE_WEIGHT_PX = 1.5;
-  var MINIMAP_COASTLINE_WEIGHT_PX = 1;
-  var MASK_SEAM_WEIGHT_PX = 1;
-  var coastPack = null;
-  var maskPack = null;
-  var nativeZoom = 7;
-  var maskLoadStarted = false;
-  var bound2 = false;
-  var mainMap3 = null;
-  var coastLayer = null;
-  var underlayLayer = null;
-  var maskLayer = null;
-  var miniLayer2 = null;
-  function flatLandColor() {
-    return `rgb(${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY})`;
-  }
-  function coastCells(view2, zoom, firstBandOnly) {
-    const pack = coastPack;
-    if (!pack) return [];
-    const lod = firstBandOnly ? pack.lods[0] ?? null : coastlineLodForZoom(pack, zoom);
-    if (!lod) return [];
-    const lodIndex = pack.lods.indexOf(lod);
-    const refs = visibleCellRefs(view2, lod.cellDeg, VECTOR_CELL_CAP);
-    noteVectorCellCap(refs.length);
-    return refs.map((ref) => ({
-      cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
-      build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
-    }));
-  }
-  function maskCells(view2, side) {
-    const pack = maskPack;
-    if (!pack) return [];
-    const refs = visibleCellRefs(view2, pack.cellDeg, VECTOR_CELL_CAP);
-    noteVectorCellCap(refs.length);
-    return refs.map((ref) => ({
-      cacheKey: `mask|${ref.key}|${ref.lngOffset}`,
-      build: () => vectorPolygons(pack.cells[ref.key]?.[side] ?? [], pack.quantumDeg, ref.lngOffset)
-    }));
-  }
-  function refreshCoastLayers() {
-    if (!mainMap3) return;
-    const pastNative = (mainMap3.getZoom?.() ?? 0) > nativeZoom;
-    if (pastNative) void ensureMaskLoaded();
-    underlayLayer?.setEnabled(pastNative);
-    maskLayer?.setEnabled(pastNative);
-    coastLayer?.sync();
-    miniLayer2?.sync();
-  }
-  async function ensureMaskLoaded() {
-    if (maskLoadStarted) return;
-    maskLoadStarted = true;
-    const text = await loadBasemapVectorText("coast_edge_mask");
-    if (text == null) return;
-    try {
-      maskPack = parseCoastEdgeMaskPack(JSON.parse(text));
-    } catch (error) {
-      console.error("[agent-wars] coast edge mask document rejected", error);
-      return;
-    }
-    underlayLayer?.sync();
-    maskLayer?.sync();
-  }
-  async function loadCoastlines() {
-    const text = await loadBasemapVectorText("coastlines");
-    if (text == null) return;
-    try {
-      coastPack = parseCoastlinePack(JSON.parse(text));
-    } catch (error) {
-      console.error("[agent-wars] coastlines document rejected", error);
-      return;
-    }
-    coastLayer?.sync();
-    miniLayer2?.sync();
-  }
-  function bindCoastlineLayers(leaflet, main, mini) {
-    if (bound2) return;
-    bound2 = true;
-    mainMap3 = main;
-    coastLayer = createBucketedVectorLayer({
-      map: main,
-      leaflet,
-      paneName: "basemapCoast",
-      paneZIndex: 260,
-      shape: "line"
-    });
-    underlayLayer = createBucketedVectorLayer({
-      map: main,
-      leaflet,
-      paneName: "basemapLandUnderlay",
-      paneZIndex: 150,
-      shape: "polygon"
-    });
-    maskLayer = createBucketedVectorLayer({
-      map: main,
-      leaflet,
-      paneName: "basemapWaterMask",
-      paneZIndex: 230,
-      shape: "polygon"
-    });
-    miniLayer2 = createBucketedVectorLayer({
-      map: mini,
-      leaflet,
-      paneName: "basemapCoast",
-      paneZIndex: 260,
-      shape: "line"
-    });
-    coastLayer.setSource((view2, zoom) => coastCells(view2, zoom, false));
-    underlayLayer.setSource((view2) => maskCells(view2, "land"));
-    maskLayer.setSource((view2) => maskCells(view2, "water"));
-    miniLayer2.setSource((view2, zoom) => coastCells(view2, zoom, true));
-    underlayLayer.setEnabled(false);
-    maskLayer.setEnabled(false);
-    applyCoastlineTheme(getActiveMapTheme());
-    main.on?.("moveend", refreshCoastLayers);
-    main.on?.("zoomend", refreshCoastLayers);
-    mini.on?.("moveend", () => miniLayer2?.sync());
-    mini.on?.("zoomend", () => miniLayer2?.sync());
-    refreshCoastLayers();
-    void loadCoastlines();
-  }
-  function setCoastEdgeMaskNativeZoom(zoom) {
-    nativeZoom = zoom;
-    refreshCoastLayers();
-  }
-  function applyCoastlineTheme(theme) {
-    const coastStyle = {
-      color: theme.coastlineColor,
-      weight: COASTLINE_WEIGHT_PX,
-      dashArray: null,
-      smoothFactor: 0,
-      seamWeightPx: null
-    };
-    const seam = (color) => ({
-      color,
-      weight: 0,
-      dashArray: null,
-      smoothFactor: 0,
-      seamWeightPx: MASK_SEAM_WEIGHT_PX
-    });
-    coastLayer?.setStyle(coastStyle);
-    miniLayer2?.setStyle({ ...coastStyle, weight: MINIMAP_COASTLINE_WEIGHT_PX });
-    underlayLayer?.setStyle(seam(flatLandColor()));
-    underlayLayer?.setPaneFilter(landUnderlayFilterCss(theme));
-    maskLayer?.setStyle(seam(theme.waterColor));
-  }
-
-  // src/shared/mapKeyboardZoom.ts
-  var MAP_KEYBOARD_ZOOM_STEP = 0.5;
-  function mapZoomKeyStep(args) {
-    if (args.ctrlKey || args.altKey || args.metaKey) return null;
-    if (args.key === "+" || args.key === "=" || args.code === "NumpadAdd") return 1;
-    if (args.key === "-" || args.code === "NumpadSubtract") return -1;
-    return null;
-  }
-
-  // src/renderer/map/worldLeafletMap.ts
-  var mainMap4 = null;
-  var miniMap2 = null;
-  var viewportRect = null;
-  var onMainViewChanged = null;
-  function notifyMainViewChanged() {
-    syncMinimapViewportRect();
-    onMainViewChanged?.();
-  }
-  function getL() {
-    const leafletRef2 = globalThis.L;
-    if (!leafletRef2) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
-    return leafletRef2;
-  }
-  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
-    onMainViewChanged = onViewChanged;
-    const leafletRef2 = getL();
-    const mainEl = document.getElementById(mainContainerId);
-    const miniEl = document.getElementById(minimapContainerId);
-    if (!mainEl || !miniEl) {
-      console.error("[agent-wars] initWorldLeafletMaps: missing map container elements", {
-        mainContainerId,
-        minimapContainerId,
-        hasMain: !!mainEl,
-        hasMinimap: !!miniEl
-      });
-      return;
-    }
-    const worldBounds2 = leafletRef2.latLngBounds(
-      leafletRef2.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      leafletRef2.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-    mainMap4 = leafletRef2.map(mainEl, {
-      minZoom: 1.5,
-      maxZoom: 12,
-      zoomSnap: 0.25,
-      zoomDelta: MAP_KEYBOARD_ZOOM_STEP,
-      wheelPxPerZoomLevel: 80,
-      /* Max bounds keep the world view inside ±180°; the drag wrap would pull a battle drawn past 180° to another copy. */
-      worldCopyJump: false,
-      maxBounds: worldBounds2,
-      maxBoundsViscosity: 1,
-      /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
-      keyboard: false,
-      /* The main map zooms from the wheel, from Shift-drag, and from the zoom keys. There is no on-screen control. */
-      zoomControl: false,
-      /* Elevation and Natural Earth credits stay in the notices file. The map does not print them. */
-      attributionControl: false,
-      /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
-      zoomAnimation: false,
-      fadeAnimation: false,
-      inertia: false
-    });
-    const initialId = initialBasemapProviderId ?? "offline_hillshade";
-    if (initialId !== "offline_hillshade") {
-      console.error("[agent-wars] the hillshade is the only basemap", initialId);
-    }
-    mainMap4.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
-    mainMap4.doubleClickZoom.disable();
-    try {
-      leafletRef2.control.scale({
-        position: "bottomright",
-        metric: true,
-        imperial: true,
-        maxWidth: 120
-      }).addTo(mainMap4);
-    } catch {
-    }
-    miniMap2 = leafletRef2.map(miniEl, {
-      minZoom: 0,
-      maxZoom: 2,
-      zoomControl: false,
-      attributionControl: false,
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      boxZoom: false,
-      keyboard: false
-    });
-    bindOfflineBasemap(leafletRef2, mainMap4, miniMap2);
-    const vectorLeaflet = leafletRef2;
-    const vectorMain = mainMap4;
-    bindCoastlineLayers(vectorLeaflet, vectorMain, miniMap2);
-    bindAdminBorderLayers(vectorLeaflet, vectorMain);
-    onBasemapNativeZoomChanged(setCoastEdgeMaskNativeZoom);
-    miniMap2.fitBounds(worldBounds2, { padding: [1, 1], animate: false });
-    miniMap2.setZoom(miniMap2.getZoom());
-    mainMap4.on("move", notifyMainViewChanged);
-    mainMap4.on("zoom", notifyMainViewChanged);
-    mainMap4.on("moveend", notifyMainViewChanged);
-    mainMap4.on("zoomend", notifyMainViewChanged);
-    syncMinimapViewportRect();
-  }
-  function syncMinimapViewportRect() {
-    if (!mainMap4 || !miniMap2) return;
-    const leafletRef2 = getL();
-    const mainBounds = mainMap4.getBounds();
-    const miniBounds = miniMap2.getBounds();
-    const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
-    const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
-    const zoomedIn = mainSpan < miniSpan * 0.92;
-    if (!zoomedIn) {
-      if (viewportRect) {
-        viewportRect.remove();
-        viewportRect = null;
-      }
-      return;
-    }
-    if (!viewportRect) {
-      viewportRect = leafletRef2.rectangle(mainBounds, {
-        color: getComputedStyle(document.documentElement).getPropertyValue("--chrome-border").trim() || "#5a7090",
-        weight: 2,
-        opacity: 1,
-        fill: false,
-        interactive: false
-      }).addTo(miniMap2);
-    } else {
-      viewportRect.setBounds(mainBounds);
-    }
-  }
-  function getMainLeafletMap() {
-    return mainMap4;
-  }
-  function zoomMainMapByKeyStep(step) {
-    if (!mainMap4) return;
-    mainMap4.setZoom(mainMap4.getZoom() + step * MAP_KEYBOARD_ZOOM_STEP);
-  }
-  function getMiniLeafletMap() {
-    return miniMap2;
-  }
-  function hexCenterToOverlayPoint(h3Index, latLngFn) {
-    if (!mainMap4) return { x: 0, y: 0 };
-    const leafletRef2 = getL();
-    const [lat, lng] = latLngFn(h3Index);
-    const p = mainMap4.latLngToContainerPoint(leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
-    return { x: p.x, y: p.y };
-  }
-  function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
-    if (!mainMap4) return { x: 0, y: 0 };
-    const leafletRef2 = getL();
-    const [lat, lng] = latLngFn(h3Index);
-    const lngAligned = alignLngToReference(lng, referenceLngDegrees);
-    const p = mainMap4.latLngToContainerPoint(
-      leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
-    );
-    return { x: p.x, y: p.y };
-  }
-  function invalidateLeafletMapSizes() {
-    mainMap4?.invalidateSize({ animate: false });
-    miniMap2?.invalidateSize({ animate: false });
-    notifyMainViewChanged();
-  }
-
-  // src/shared/mapKeyboardPanLogic.ts
-  var MAP_PAN_BASELINE_INTERVAL_MS = 200;
-  var MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
-  var STRATEGIC_KEYBOARD_PAN_SPEED = 0.5;
-  var TACTICAL_KEYBOARD_PAN_SPEED = STRATEGIC_KEYBOARD_PAN_SPEED;
-  function panKeyToDirection(key) {
-    switch (key.toLowerCase()) {
-      case "w":
-      case "arrowup":
-        return "north";
-      case "s":
-      case "arrowdown":
-        return "south";
-      case "a":
-      case "arrowleft":
-        return "west";
-      case "d":
-      case "arrowright":
-        return "east";
-      default:
-        return null;
-    }
-  }
-  function panCodeToDirection(code) {
-    switch (code) {
-      case "KeyW":
-      case "ArrowUp":
-        return "north";
-      case "KeyS":
-      case "ArrowDown":
-        return "south";
-      case "KeyA":
-      case "ArrowLeft":
-        return "west";
-      case "KeyD":
-      case "ArrowRight":
-        return "east";
-      default:
-        return null;
-    }
-  }
-  function panBindingToDirection(code, key) {
-    return panCodeToDirection(code) ?? panKeyToDirection(key);
-  }
-  function panPhysicalKeyId(code, key) {
-    return code || key;
-  }
-  var RANGE_INPUT_KEYS = /* @__PURE__ */ new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
-  function rangeInputOwnsKey(key) {
-    return RANGE_INPUT_KEYS.has(key);
-  }
-  function resolveNetPanAxes(held2) {
-    const north = held2.has("north");
-    const south = held2.has("south");
-    const east = held2.has("east");
-    const west = held2.has("west");
-    const ns = north === south ? 0 : north ? 1 : -1;
-    const ew = east === west ? 0 : east ? 1 : -1;
-    return { ns, ew };
-  }
-  function netPanAxesEqual(a, b) {
-    return a.ns === b.ns && a.ew === b.ew;
-  }
-  function scoreNeighborForPanAxes(deltaLat, deltaLng, ns, ew) {
-    return ns * deltaLat + ew * deltaLng;
-  }
-  function isNetPanAxesZero(axes) {
-    return axes.ns === 0 && axes.ew === 0;
-  }
-  function netAxesToScreenPanDelta(ns, ew, stepPixels) {
-    if (ns === 0 && ew === 0) return { dx: 0, dy: 0 };
-    if (!Number.isFinite(stepPixels) || stepPixels <= 0) return { dx: 0, dy: 0 };
-    const length = ns !== 0 && ew !== 0 ? stepPixels / Math.SQRT2 : stepPixels;
-    return { dx: ew === 0 ? 0 : ew * length, dy: ns === 0 ? 0 : -ns * length };
-  }
-  function keyboardPanModeSpeed(tactical) {
-    return tactical ? TACTICAL_KEYBOARD_PAN_SPEED : STRATEGIC_KEYBOARD_PAN_SPEED;
-  }
-  function directionsFromPhysicalKeys(heldPhysical) {
-    return new Set(heldPhysical.values());
-  }
-  function createMapKeyboardPanHandler(deps) {
-    const heldPhysical = /* @__PURE__ */ new Map();
-    let intervalHandle = null;
-    const stopInterval = () => {
-      if (intervalHandle !== null) {
-        deps.clearInterval(intervalHandle);
-        intervalHandle = null;
-      }
-    };
-    const startInterval = () => {
-      stopInterval();
-      intervalHandle = deps.setInterval(() => {
-        if (heldPhysical.size === 0) {
-          stopInterval();
-          return;
-        }
-        const axes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
-        if (isNetPanAxesZero(axes)) {
-          stopInterval();
-          return;
-        }
-        deps.pan(axes.ns, axes.ew);
-      }, MAP_PAN_HOLD_INTERVAL_MS);
-    };
-    const panImmediateAndSchedule = (axes) => {
-      deps.pan(axes.ns, axes.ew);
-      startInterval();
-    };
-    const syncAfterPhysicalChange = (previousAxes) => {
-      if (heldPhysical.size === 0) {
-        stopInterval();
-        return;
-      }
-      const nextAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
-      if (netPanAxesEqual(previousAxes, nextAxes)) {
-        if (!isNetPanAxesZero(nextAxes) && intervalHandle === null) {
-          startInterval();
-        }
-        return;
-      }
-      if (isNetPanAxesZero(nextAxes)) {
-        stopInterval();
-        return;
-      }
-      panImmediateAndSchedule(nextAxes);
-    };
-    return {
-      onPanKeyDown(physicalKeyId, direction) {
-        if (heldPhysical.has(physicalKeyId)) return;
-        const previousAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
-        heldPhysical.set(physicalKeyId, direction);
-        syncAfterPhysicalChange(previousAxes);
-      },
-      onPanKeyUp(physicalKeyId) {
-        if (!heldPhysical.has(physicalKeyId)) return;
-        const previousAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
-        heldPhysical.delete(physicalKeyId);
-        syncAfterPhysicalChange(previousAxes);
-      },
-      clear() {
-        heldPhysical.clear();
-        stopInterval();
-      }
-    };
-  }
-
-  // src/shared/landUnitType.ts
-  function isLandUnitType(unitType) {
-    return unitType === "infantry" || unitType === "armor";
-  }
-
-  // src/renderer/map/mapHelpers.ts
-  function shouldIgnoreGlobalKeydown(e) {
-    const target = e.target;
-    if (!target) return false;
-    const tag = target.tagName.toLowerCase();
-    return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
-  }
-  function isEditableKeyboardTarget(target) {
-    if (!(target instanceof HTMLElement)) return false;
-    const tag = target.tagName.toLowerCase();
-    return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
-  }
-  function isRangeInputTarget(target) {
-    return target instanceof HTMLInputElement && target.type === "range";
-  }
-  function getNeighborForPanAxes(centerH3, ns, ew) {
-    if (ns === 0 && ew === 0) return null;
-    const [centerLat, centerLng] = cellToLatLng(centerH3);
-    const neighbors = Array.from(gridDisk(centerH3, 1)).filter((h3) => h3 !== centerH3);
-    if (neighbors.length === 0) return null;
-    let bestH3 = null;
-    let bestScore = -Infinity;
-    for (const h3 of neighbors) {
-      const [lat, lng] = cellToLatLng(h3);
-      const alignedLng = alignLongitudeToReference(lng, centerLng);
-      const score = scoreNeighborForPanAxes(lat - centerLat, alignedLng - centerLng, ns, ew);
-      if (score > bestScore) {
-        bestScore = score;
-        bestH3 = h3;
-      }
-    }
-    return bestH3;
-  }
-  function panMapByNetAxes(ns, ew) {
-    if (isNetPanAxesZero({ ns, ew })) return;
-    const map = getMainLeafletMap();
-    const leafletRef2 = globalThis.L;
-    if (!map || !leafletRef2) return;
-    const center = map.getCenter();
-    const tactical = rendererSharedState.tacticalBattleSnapshot != null;
-    let centerH3;
-    try {
-      centerH3 = tactical ? tacticalCellAt(center.lat, center.lng) : strategicCellAt(center.lat, center.lng);
-    } catch {
-      return;
-    }
-    const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
-    if (!neighbor) return;
-    const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
-    const neighborLng = alignLongitudeToReference(neighborLngRaw, center.lng);
-    const centerPt = map.latLngToContainerPoint(leafletRef2.latLng(center.lat, center.lng));
-    const neighborPt = map.latLngToContainerPoint(
-      leafletRef2.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
-    );
-    const hexPixels = Math.hypot(neighborPt.x - centerPt.x, neighborPt.y - centerPt.y);
-    const stepPixels = hexPixels * keyboardPanModeSpeed(tactical);
-    const { dx, dy } = netAxesToScreenPanDelta(ns, ew, stepPixels);
-    if (dx === 0 && dy === 0) return;
-    map.panBy([dx, dy], { animate: false });
-  }
-  function applyInitialCameraForState(state) {
-    const map = getMainLeafletMap();
-    const leafletRef2 = globalThis.L;
-    if (!map || !leafletRef2) return;
-    const humanGround = state.units.filter(
-      (u) => u.player === HUMAN_SEAT_ID && isLandUnitType(u.unitType)
-    );
-    const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === HUMAN_SEAT_ID);
-    if (anchors.length === 0) return;
-    const [, anchorLng] = cellToLatLng(anchors[0].h3Index);
-    let latSum = 0;
-    let lngSum = 0;
-    for (const unit of anchors) {
-      const [lat, lng] = cellToLatLng(unit.h3Index);
-      latSum += lat;
-      lngSum += alignLngToReference(lng, anchorLng);
-    }
-    const centerLat = latSum / anchors.length;
-    const centerLng = lngSum / anchors.length;
-    const maxZoom = typeof map.getMaxZoom === "function" ? map.getMaxZoom() : 12;
-    const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
-    map.setView(leafletRef2.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
-    const ctr = typeof map.getCenter === "function" ? map.getCenter() : null;
-    if (ctr) {
-      rendererSharedState.strategicScenarioInitialLeafletView = { lat: ctr.lat, lng: ctr.lng, zoom: map.getZoom() };
-    }
-    rendererSharedState.initialCameraApplied = true;
-  }
-  function getLeafletGlobal() {
-    return globalThis.L;
-  }
-  function hexCenterPx(h3Index) {
-    return hexCenterToOverlayPoint(h3Index, cellToLatLng);
-  }
-  function hexCenterPxRelativeTo(fromH3Index, toH3Index) {
-    const [, refLng] = cellToLatLng(fromH3Index);
-    return hexCenterToOverlayPointWithReferenceLng(toH3Index, refLng, cellToLatLng);
-  }
-  function hitTestHexAtContainerPixel(x, y, mapHexSet) {
-    const map = getMainLeafletMap();
-    if (!map) return null;
-    const L = getLeafletGlobal();
-    const latlng = map.containerPointToLatLng(L.point(x, y));
-    let cell;
-    try {
-      cell = strategicCellAt(latlng.lat, latlng.lng);
-    } catch {
-      return null;
-    }
-    if (mapHexSet.has(cell)) return cell;
-    try {
-      const detailCell = tacticalCellAt(latlng.lat, latlng.lng);
-      const parent = strategicParentOf(detailCell);
-      return mapHexSet.has(parent) ? parent : null;
-    } catch {
-      return null;
-    }
-  }
-  function hitTestTacticalHexAtContainerPixel(x, y, tactical) {
-    const map = getMainLeafletMap();
-    if (!map) return null;
-    const L = getLeafletGlobal();
-    if (!L) return null;
-    const latlng = map.containerPointToLatLng(L.point(x, y));
-    let tacticalIndex;
-    try {
-      tacticalIndex = tacticalCellAt(latlng.lat, latlng.lng);
-    } catch {
-      return null;
-    }
-    if (tactical.tacticalChildH3Indexes.includes(tacticalIndex)) return tacticalIndex;
-    try {
-      const strategic = strategicCellAt(latlng.lat, latlng.lng);
-      if (strategic === tactical.enclosingStrategicH3Index) return tactical.enclosingStrategicH3Index;
-    } catch {
-      return null;
-    }
-    return null;
-  }
-  function hitTestMapHexAtContainerPoint(x, y, gameState) {
-    const tb = rendererSharedState.tacticalBattleSnapshot;
-    if (tb) return hitTestTacticalHexAtContainerPixel(x, y, tb);
-    return hitTestHexAtContainerPixel(x, y, new Set(gameState.hexes.map((h) => h.h3Index)));
-  }
-  function hitTestMapHexAtClientPoint(clientX, clientY) {
-    if (!rendererSharedState.gameState) return null;
-    const map = getMainLeafletMap();
-    if (!map) return null;
-    const rect2 = map.getContainer().getBoundingClientRect();
-    return hitTestMapHexAtContainerPoint(clientX - rect2.left, clientY - rect2.top, rendererSharedState.gameState);
-  }
-
-  // src/renderer/rendering/renderGeometry.ts
-  function projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight) {
-    if (pts.length === 0) return false;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
-  }
-  function spanForProjectedHex(pts) {
-    if (pts.length === 0) return 1;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    return Math.max(1, Math.min(maxX - minX, maxY - minY));
-  }
-  function getMapZoomStrokeScale(zoom) {
-    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-  }
-
-  // src/renderer/map/terrainView.ts
-  function computeStrategicHexFillFraction() {
-    if (!rendererSharedState.gameState || rendererSharedState.gameState.hexes.length === 0) return 0;
-    const map = getMainLeafletMap();
-    if (!map) return 0;
-    const L = getLeafletGlobal();
-    const container = map.getContainer();
-    const center = {
-      x: Math.max(1, container.clientWidth) * 0.5,
-      y: Math.max(1, container.clientHeight) * 0.5
-    };
-    const centerLatLng = map.containerPointToLatLng(L.point(center.x, center.y));
-    let sampleH3;
-    try {
-      sampleH3 = strategicCellAt(centerLatLng.lat, centerLatLng.lng);
-    } catch {
-      sampleH3 = rendererSharedState.gameState.hexes[0].h3Index;
-    }
-    if (!rendererSharedState.gameState.hexes.some((h) => h.h3Index === sampleH3)) {
-      sampleH3 = rendererSharedState.gameState.hexes[0].h3Index;
-    }
-    const sampleBoundary = getHexBoundaryLatLngForLeafletOverlay(sampleH3);
-    const pts = sampleBoundary.map(([lat, lng]) => map.latLngToContainerPoint(L.latLng(lat, lng)));
-    if (pts.length === 0) return 0;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const viewW = Math.max(1, container.clientWidth);
-    const viewH = Math.max(1, container.clientHeight);
-    return Math.max((maxX - minX) / viewW, (maxY - minY) / viewH);
-  }
-  function shouldRenderTacticalHexes() {
-    if (rendererSharedState.tacticalBattleSnapshot) return true;
-    const fillFraction = computeStrategicHexFillFraction();
-    if (rendererSharedState.tacticalVisible) {
-      if (fillFraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) rendererSharedState.tacticalVisible = false;
-      return rendererSharedState.tacticalVisible;
-    }
-    if (fillFraction >= TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION) rendererSharedState.tacticalVisible = true;
-    return rendererSharedState.tacticalVisible;
-  }
-  function shouldHideStrategicMapUnitsForZoom() {
-    return shouldRenderTacticalHexes() && !rendererSharedState.tacticalBattleSnapshot;
-  }
-  function shouldShowBuildEntryZoom() {
-    const map = getMainLeafletMap();
-    if (!map) return false;
-    const currentZoom = map.getZoom();
-    if (!Number.isFinite(currentZoom)) return false;
-    if (rendererSharedState.buildEntryDefaultMapZoom == null) {
-      rendererSharedState.buildEntryDefaultMapZoom = currentZoom;
-    }
-    const threshold = rendererSharedState.buildEntryDefaultMapZoom + BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT * MAIN_MAP_WHEEL_ZOOM_STEP;
-    return currentZoom >= threshold;
-  }
-  function hideBuildEntryLayer(layer, clearHtml = true) {
-    layer.classList.add("hidden");
-    layer.setAttribute("aria-hidden", "true");
-    if (clearHtml) {
-      layer.innerHTML = "";
-    }
-    rendererSharedState.buildEntryButtonPointerInside = false;
-    rendererSharedState.lastBuildEntryLayerKey = null;
-  }
-  function projectHexBoundaryToContainerPoints(h3Index, map, leaflet) {
-    const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
-    return boundary.map(([lat, lng]) => {
-      const p = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
-      return { x: p.x, y: p.y };
-    });
-  }
-  function shouldConsiderTacticalChildrenForViewport(parentStrategicH3Index, map, leaflet, viewportWidth, viewportHeight) {
-    const parentPts = projectHexBoundaryToContainerPoints(parentStrategicH3Index, map, leaflet);
-    return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
-  }
-  function shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight) {
-    return projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight);
-  }
-
-  // src/renderer/rendering/unitDrawing.ts
-  var TOKEN_ICON_FIT_RATIO = 0.9;
+  // src/renderer/rendering/unitIconPaths.ts
   var UNIT_ICON_FILE_BY_TYPE = {
     /**
        * Documents the object literal property `infantry` (infantry: 'infantry.svg').
@@ -18368,244 +16482,12 @@
        */
     mixed: "mixed.svg"
   };
-  var unitIconCache = /* @__PURE__ */ new Map();
   function iconPathForType(unitType) {
     return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
   }
   function unitIconPathForUnitType(unitType) {
     const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
     return iconPathForType(known ? unitType : "mixed");
-  }
-  function getOrStartUnitIconLoad(unitType) {
-    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => {
-    };
-    img.onerror = () => {
-      unitIconCache.set(unitType, null);
-    };
-    img.src = iconPathForType(unitType);
-    unitIconCache.set(unitType, img);
-    return img;
-  }
-  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
-    const img = getOrStartUnitIconLoad(unitType);
-    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
-    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
-    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
-    const width = img.naturalWidth * iconScale;
-    const height = img.naturalHeight * iconScale;
-    const drawX = centerX - width / 2;
-    const drawY = centerY - height / 2;
-    const shouldFlip = flipForOpponent && unitPlayer != null && unitPlayer !== "" && unitPlayer !== HUMAN_SEAT_ID;
-    const neutralGlyph = unitPlayer != null && isNeutralOwnerId(unitPlayer);
-    ctx.save();
-    if (neutralGlyph) ctx.filter = "brightness(0.85)";
-    if (shouldFlip) {
-      ctx.translate(centerX, centerY);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, -width / 2, -height / 2, width, height);
-    } else {
-      ctx.drawImage(img, drawX, drawY, width, height);
-    }
-    ctx.restore();
-    return true;
-  }
-  function drawUnitTypeGlyph(ctx, centerX, centerY, unitType, sizePx, player) {
-    if (!Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType) || unitType === "mixed") return false;
-    const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
-    return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
-  }
-  function drawSelectionRing(ctx, x, y) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
-    ctx.strokeStyle = SELECTION_RING_COLOR;
-    ctx.lineWidth = SELECTION_RING_WIDTH;
-    ctx.stroke();
-    ctx.restore();
-  }
-  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
-    const stackedNeutral = color === MULTI_PLAYER_FILL;
-    ctx.beginPath();
-    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    if (strokeColor === SELECTION_RING_COLOR) {
-      drawSelectionRing(ctx, x, y);
-    } else {
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    ctx.save();
-    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
-    ctx.fillStyle = color === NEUTRAL_PALETTE.map ? NEUTRAL_PALETTE.text : "#fff";
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === UNIT_TYPE_LABELS.missile && drawUnitSvgIcon(ctx, x, y, "missile", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
-    if (!drewIcon) ctx.fillText(label, x, y);
-    ctx.restore();
-  }
-  function drawStackCountBadge(ctx, count, x, y) {
-    const badgeX = x + COUNT_BADGE_OFFSET;
-    const badgeY = y - COUNT_BADGE_OFFSET;
-    ctx.font = "bold 13px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.strokeText(String(count), badgeX, badgeY);
-    ctx.fillStyle = "#000";
-    ctx.fillText(String(count), badgeX, badgeY);
-  }
-  function drawUnits(ctx, units, movingUnitIds) {
-    const byHex = /* @__PURE__ */ new Map();
-    for (const u of units) {
-      if (movingUnitIds?.has(u.id)) continue;
-      const list = byHex.get(u.h3Index) ?? [];
-      list.push(u);
-      byHex.set(u.h3Index, list);
-    }
-    const selectedUnitIds = new Set(rendererSharedState.selectedUnitIds);
-    const tokens = [...byHex].map(([h3Index, hexUnits]) => {
-      const { x, y } = hexCenterPx(h3Index);
-      const count = hexUnits.length;
-      return {
-        x,
-        y,
-        count,
-        top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
-        selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
-        units: hexUnits
-      };
-    });
-    for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
-      const types = new Set(hexUnits.map((u) => u.unitType));
-      const players = new Set(hexUnits.map((u) => u.player));
-      const mixedType = types.size > 1;
-      const multiPlayer = players.size > 1;
-      const ownerId = hexUnits[0].player;
-      const neutralOnly = !multiPlayer && isNeutralOwnerId(ownerId);
-      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId)?.map ?? "#333";
-      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : neutralOnly ? NEUTRAL_PALETTE.text : "#fff";
-      const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
-      const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
-      drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0].player);
-      if (count > 1) {
-        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0].player);
-      }
-    }
-    for (const { x, y, count } of tokens) {
-      if (count < 2) continue;
-      drawStackCountBadge(ctx, count, x, y);
-    }
-    for (const token of tokens) {
-      if (!token.units.some((unit) => unit.isMercenary === true)) continue;
-      drawMercenaryBadge(ctx, token.top.x, token.top.y);
-    }
-  }
-  function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
-    const viewer = staleIntelViewer(state.playerPerspective);
-    if (viewer === null) {
-      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-      return;
-    }
-    const hasFogData = Array.isArray(state.visibleHexes);
-    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== viewer);
-    const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
-    for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
-      if (currentlyVisibleEnemyIds.has(unitId)) continue;
-      if (!rendererSharedState.clientStaleEnemyIntelByUnitId.has(unitId)) {
-        const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
-        rendererSharedState.clientStaleEnemyIntelByUnitId.set(unitId, {
-          unitId,
-          lastKnownH3Index: prevSeen.h3Index,
-          lastSeenTurn,
-          staleUntilTurn: lastSeenTurn + 2
-        });
-      }
-    }
-    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-    for (const enemy of currentlyVisibleEnemies) {
-      rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
-        h3Index: enemy.h3Index,
-        lastSeenTurn: state.turnNumber
-      });
-    }
-    if (shouldHideStrategicMapUnitsForZoom()) return;
-    if (!hasFogData) return;
-    const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
-    const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
-      unitId: row.unitId,
-      lastKnownH3Index: row.lastKnownH3Index,
-      intelState: "stale",
-      lastSeenTurn: row.lastSeenTurn,
-      staleUntilTurn: row.staleUntilTurn,
-      player: row.player
-    }));
-    const byUnitId = /* @__PURE__ */ new Map();
-    for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
-    for (const row of persistedIntel) {
-      if (row.intelState !== "stale") continue;
-      byUnitId.set(row.unitId, {
-        unitId: row.unitId,
-        lastKnownH3Index: row.lastKnownH3Index,
-        intelState: "stale",
-        lastSeenTurn: row.lastSeenTurn,
-        staleUntilTurn: row.staleUntilTurn,
-        player: row.player
-      });
-    }
-    for (const unitId of [...byUnitId.keys()]) {
-      if (state.units.some((unit) => unit.id === unitId && unit.player === viewer)) {
-        rendererSharedState.clientStaleEnemyIntelByUnitId.delete(unitId);
-        byUnitId.delete(unitId);
-      }
-    }
-    const intel = Array.from(byUnitId.values());
-    if (intel.length === 0) return;
-    const visibleHexes = new Set(state.visibleHexes);
-    const stale = intel.filter((row) => row.intelState === "stale");
-    if (stale.length === 0) return;
-    const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
-    const staleByHex = /* @__PURE__ */ new Map();
-    for (const row of stale) {
-      if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
-      if (visibleHexes.has(row.lastKnownH3Index)) continue;
-      const list = staleByHex.get(row.lastKnownH3Index) ?? [];
-      list.push(row);
-      staleByHex.set(row.lastKnownH3Index, list);
-    }
-    for (const [h3Index, rows] of staleByHex) {
-      const age = Math.max(0, state.turnNumber - rows[0].lastSeenTurn);
-      const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
-      if (alpha <= 0) continue;
-      const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
-      const label = types.size === 1 ? [...types][0] : "*";
-      const owners = new Set(rows.map((row) => row.player ?? unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
-      const ownerId = owners.size === 1 ? [...owners][0] : null;
-      const mixedOwners = owners.size > 1;
-      const fillColor = mixedOwners ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? "#333";
-      const strokeColor = !mixedOwners && ownerId != null && isNeutralOwnerId(ownerId) ? NEUTRAL_PALETTE.text : "#fff";
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, ownerId ?? AI_SEAT_IDS[0]);
-      ctx.restore();
-    }
-  }
-  function drawUnknownBattleMarkers(ctx, hexes, opacity) {
-    if (hexes.length === 0 || opacity <= 0) return;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    for (const h3Index of hexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
-    }
-    ctx.restore();
   }
 
   // src/renderer/chrome/toastInlineMarks.ts
@@ -20780,6 +18662,87 @@
     return byOwner;
   }
 
+  // src/shared/codeUnitOrder.ts
+  function compareCodeUnits(left, right) {
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  }
+
+  // src/shared/unitIds.ts
+  var UNIT_TYPE_ID_CODES = {
+    infantry: "i",
+    armor: "t",
+    naval: "n",
+    air: "a",
+    missile: "m"
+  };
+  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itnam])(\d+)$/;
+  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
+  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
+    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
+  );
+  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
+  function isPositiveInteger(value) {
+    return Number.isInteger(value) && value > 0;
+  }
+  function hasForbiddenLeadingZero(digits) {
+    return digits.startsWith("0");
+  }
+  function parseStrategicUnitId(unitId) {
+    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const playerLetter = match[1];
+    const playerIndexDigits = match[2];
+    const typeCode = match[3];
+    const ordinalDigits = match[4];
+    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
+    const playerIndex = Number.parseInt(playerIndexDigits, 10);
+    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
+    if (!unitType) return null;
+    const ordinal = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal)) return null;
+    if (playerLetter === "h") {
+      if (playerIndex !== 1) return null;
+      return { player: HUMAN_SEAT_ID, unitType, ordinal };
+    }
+    if (playerIndex < 1 || playerIndex > 4) return null;
+    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal };
+  }
+  function parseTacticalSubUnitId(unitId) {
+    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const parentUnitId = match[1];
+    const slotDigits = match[2];
+    if (hasForbiddenLeadingZero(slotDigits)) return null;
+    const slot = Number.parseInt(slotDigits, 10);
+    if (!isPositiveInteger(slot)) return null;
+    return { parentUnitId, slot };
+  }
+  function unitTypeFromUnitId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.unitType;
+    if (unitId.includes("-infantry-")) return "infantry";
+    if (unitId.includes("-armor-")) return "armor";
+    if (unitId.includes("-naval-")) return "naval";
+    if (unitId.includes("-air-")) return "air";
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
+    return null;
+  }
+  function unitIdOwnerFromId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.player;
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) {
+      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
+      if (parentOwner) return parentOwner;
+    }
+    if (unitId.startsWith("opponent-")) return AI_SEAT_IDS[0];
+    if (unitId.startsWith("human-")) return HUMAN_SEAT_ID;
+    return null;
+  }
+
   // src/shared/unitDisplayNames.ts
   var UNIT_TYPE_NOUN_BY_TYPE = {
     /**
@@ -21234,6 +19197,11 @@
     const label = formatWeatherLabel(weather);
     const src = escapeHtmlText(weatherIconAssetPath(weather));
     return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
+  }
+
+  // src/shared/landUnitType.ts
+  function isLandUnitType(unitType) {
+    return unitType === "infantry" || unitType === "armor";
   }
 
   // src/shared/missileRules.ts
@@ -22035,6 +20003,267 @@ ${bonuses}`;
     }
   }
 
+  // src/shared/consoleReportLog.ts
+  var CONSOLE_REPORT_KIND_LABELS = Object.freeze({
+    turn: "Turn report",
+    message: "Message",
+    notice: "Notice"
+  });
+  var MAX_CONSOLE_REPORTS = 200;
+  function formatConsoleReportTag(turnNumber, battleBeat) {
+    if (battleBeat != null) return `B${battleBeat}`;
+    if (turnNumber != null) return `T${turnNumber}`;
+    return "";
+  }
+  function consoleReportVisible(kind, senderSeatId, filterSeatId) {
+    if (filterSeatId === "") return true;
+    if (kind !== "message") return true;
+    return senderSeatId === filterSeatId;
+  }
+
+  // src/shared/observeModeControls.ts
+  function activeHumanSeatId(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
+  }
+  function isObservingRoster(seats) {
+    return seats.length > 0 && activeHumanSeatId(seats) === null;
+  }
+  function observeModeControls(seats) {
+    const observing = isObservingRoster(seats);
+    return {
+      observing,
+      ordersEnabled: !observing,
+      buildEnabled: false,
+      forcesEnabled: false,
+      unitSelectionEnabled: !observing,
+      magnifierEnabled: !observing,
+      hexOnlySelection: observing
+    };
+  }
+  function readoutViewerSeatId(seats, viewAs) {
+    if (seats.length === 0) return void 0;
+    if (!observeModeControls(seats).observing) {
+      return activeHumanSeatId(seats);
+    }
+    if (viewAs === "all") return null;
+    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
+    return chosen?.seatId ?? null;
+  }
+  function staleIntelViewer(playerPerspective) {
+    if (playerPerspective === "all") return null;
+    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
+    return HUMAN_SEAT_ID;
+  }
+  function deferTacticalEntryUntilStrategicPlayback(observing, battleHex, needsAnimation) {
+    return observing && typeof battleHex === "string" && battleHex.length > 0 && needsAnimation;
+  }
+
+  // src/shared/sideMessageView.ts
+  var SIDE_MESSAGES_TITLE = "Messages";
+  var SIDE_MESSAGE_ARROW = "\u2192";
+  function groupSideMessagesByTurn(messages, seatOrderOf2) {
+    const byTurn = /* @__PURE__ */ new Map();
+    for (const message of messages) {
+      const existing = byTurn.get(message.turnNumber);
+      if (existing) existing.push(message);
+      else byTurn.set(message.turnNumber, [message]);
+    }
+    return [...byTurn.entries()].sort((left, right) => left[0] - right[0]).map(([turnNumber, group]) => ({
+      turnNumber,
+      heading: `Turn ${turnNumber}`,
+      messages: [...group].sort((left, right) => seatOrderOf2(left.fromSeatId) - seatOrderOf2(right.fromSeatId) || seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId) || left.messageId - right.messageId)
+    }));
+  }
+  function sideMessagePartyLabel(seatId, viewerSeatId2, nameOf) {
+    if (viewerSeatId2 !== null && seatId === viewerSeatId2) return "You";
+    return nameOf(seatId);
+  }
+  function dispatchMessagesInSideOrder(messages, seatOrderOf2) {
+    return [...messages].sort((left, right) => seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId));
+  }
+
+  // src/renderer/chrome/frameTooltipText.ts
+  var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
+  var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
+  var commandersTabTooltipText = `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
+  function unavailableTooltipText(name) {
+    return `${name} is not available in this version.`;
+  }
+  var productionStatTooltipText = "The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.";
+  var forcesStatTooltipLead = "Units you have fielded, out of the most this game size allows";
+  var allSidesProductionStatTooltipText = "The production every side's cities can add each turn, added together. A city adds its share only while it is building, and a city on the neutral border adds none.";
+  var allSidesForcesStatTooltipLead = "Units every side still playing has fielded, out of the most this game size allows them";
+  function forcesStatTooltipText(breakdown, lead = forcesStatTooltipLead) {
+    return `${lead}: ${breakdown}.`;
+  }
+  var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
+  var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
+  var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
+  var mapModeTabsShowTooltipText = "Show the map-mode buttons under the overview.";
+  var mapModeTabsHideTooltipText = "Hide the map-mode buttons. Hiding them also closes the terrain legend.";
+
+  // src/renderer/chrome/consoleReports.ts
+  var reportSenderFilter = "";
+  var unreadCount = 0;
+  var reportsVisible = false;
+  var listeners = [];
+  function messageReportBody(meta) {
+    const wrap = document.createElement("div");
+    const line = document.createElement("div");
+    line.className = "console-report-sender";
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const seat = seats.find((row) => row.seatId === meta.senderSeatId);
+    const flag = meta.senderSeatId ? createSideNumberFlag(meta.senderSeatId, seats) : null;
+    const mark = flag ?? document.createElement("span");
+    if (!flag) {
+      mark.className = "console-report-dot";
+      mark.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
+    }
+    const name = document.createElement("span");
+    const home = seat ? sideDisplayName(seat) : "Commander";
+    name.textContent = home;
+    line.append(mark, name);
+    wrap.append(line);
+    const viewerSeatId2 = activeHumanSeatId(seats);
+    const lines = dispatchMessagesInSideOrder(meta.messages ?? [], (seatId) => seats.find((row) => row.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER);
+    for (const row of lines) {
+      const text = row.text.trim();
+      if (text.length === 0) continue;
+      const item = document.createElement("p");
+      item.className = "console-report-message";
+      const label = sideMessagePartyLabel(row.toSeatId, viewerSeatId2, (seatId) => {
+        const named = seats.find((candidate) => candidate.seatId === seatId);
+        return named ? sideDisplayName(named) : seatId;
+      });
+      if (label !== "You") {
+        const recipientFlag = createSideNumberFlag(row.toSeatId, seats);
+        if (recipientFlag) item.appendChild(recipientFlag);
+      }
+      const words = document.createElement("span");
+      words.textContent = `To ${label}: ${text}`;
+      item.appendChild(words);
+      wrap.append(item);
+    }
+    const strategyText = meta.strategyText?.trim() ?? "";
+    if (strategyText.length > 0) {
+      const strategy = document.createElement("p");
+      strategy.className = "console-report-strategy";
+      strategy.textContent = `Strategy: ${strategyText}`;
+      wrap.append(strategy);
+    }
+    return wrap;
+  }
+  function refreshReportSenderFilter() {
+    const select = document.getElementById("reports-sender-filter");
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (!select.dataset.bound) {
+      select.dataset.bound = "true";
+      select.addEventListener("change", () => setReportSenderFilter(select.value));
+    }
+    const current = select.value;
+    select.replaceChildren(filterOption("Everyone", ""));
+    for (const seat of rendererSharedState.gameState?.seats ?? []) select.append(filterOption(sideDisplayName(seat), seat.seatId));
+    if ([...select.options].some((row) => row.value === current)) select.value = current;
+  }
+  function filterOption(label, value) {
+    const row = document.createElement("option");
+    row.value = value;
+    row.textContent = label;
+    return row;
+  }
+  function setReportSenderFilter(seatId) {
+    reportSenderFilter = seatId;
+    document.querySelectorAll("#reports-list .console-report").forEach((entry) => {
+      if (!(entry instanceof HTMLElement)) return;
+      const kind = entry.dataset.reportKind ?? "notice";
+      entry.hidden = !consoleReportVisible(kind, entry.dataset.senderSeatId ?? null, reportSenderFilter);
+    });
+    const list = document.getElementById("reports-list");
+    if (list) syncReportsEmptyState(list);
+  }
+  function notifyReportsChanged() {
+    for (const listener of listeners) listener();
+  }
+  function syncReportsEmptyState(list) {
+    const anyVisible = [...list.querySelectorAll(".console-report")].some((entry) => entry instanceof HTMLElement && !entry.hidden);
+    document.getElementById("reports-empty")?.toggleAttribute("hidden", anyVisible);
+  }
+  function createReplayPlaceholder() {
+    const host = document.createElement("span");
+    host.className = "control-tooltip-host console-report-replay-host";
+    host.setAttribute("data-control-tooltip", unavailableTooltipText("Replay"));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "console-report-replay";
+    button.disabled = true;
+    button.textContent = "Replay";
+    host.append(button);
+    return host;
+  }
+  function currentConsoleReportTag() {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    return formatConsoleReportTag(rendererSharedState.gameState?.turnNumber ?? null, battle ? battle.tacticalTurnNumber : null);
+  }
+  function recordConsoleReport(kind, tag, body, meta) {
+    const list = document.getElementById("reports-list");
+    if (!list) return;
+    const entry = document.createElement("li");
+    entry.className = `console-report console-report-${kind}`;
+    entry.dataset.fresh = "true";
+    entry.dataset.reportKind = kind;
+    if (meta?.senderSeatId) entry.dataset.senderSeatId = meta.senderSeatId;
+    const head2 = document.createElement("div");
+    head2.className = "console-report-head";
+    if (tag) {
+      const tagEl = document.createElement("span");
+      tagEl.className = "console-report-tag";
+      tagEl.textContent = tag;
+      head2.append(tagEl);
+    }
+    const kindEl = document.createElement("span");
+    kindEl.className = "console-report-kind";
+    kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
+    head2.append(kindEl);
+    if (meta?.modelLabel) {
+      const model = document.createElement("span");
+      model.className = "console-report-model";
+      model.textContent = meta.modelLabel;
+      head2.append(model);
+    }
+    if (kind === "turn") head2.append(createReplayPlaceholder());
+    const content = document.createElement("div");
+    content.className = "console-report-body";
+    if (meta?.messages !== void 0) content.append(messageReportBody(meta));
+    else content.append(...Array.from(body.cloneNode(true).childNodes));
+    entry.append(head2, content);
+    entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
+    list.prepend(entry);
+    while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
+    syncReportsEmptyState(list);
+    if (!reportsVisible) unreadCount = Math.min(unreadCount + 1, list.childElementCount);
+    notifyReportsChanged();
+  }
+  function unreadConsoleReportCount() {
+    return unreadCount;
+  }
+  function setConsoleReportsVisible(visible) {
+    if (visible === reportsVisible) return;
+    reportsVisible = visible;
+    if (visible) unreadCount = 0;
+    else document.querySelectorAll("#reports-list [data-fresh]").forEach((entry) => entry.removeAttribute("data-fresh"));
+    notifyReportsChanged();
+  }
+  function clearConsoleReports() {
+    const list = document.getElementById("reports-list");
+    list?.replaceChildren();
+    if (list) syncReportsEmptyState(list);
+    unreadCount = 0;
+    notifyReportsChanged();
+  }
+  function onConsoleReportsChanged(listener) {
+    listeners.push(listener);
+  }
+
   // src/shared/chatPanelState.ts
   function stagedMessagesInSeatOrder(staged, recipientSeatIds) {
     const order = new Map(recipientSeatIds.map((seatId, index) => [seatId, index]));
@@ -22061,787 +20290,6 @@ ${bonuses}`;
   }
   function chatPanelShouldShow(input) {
     return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance && !input.replayActive;
-  }
-
-  // src/renderer/core/matchEpoch.ts
-  var rendererMatchEpoch = 0;
-  function advanceRendererMatchEpoch() {
-    rendererMatchEpoch += 1;
-    return rendererMatchEpoch;
-  }
-  function currentRendererMatchEpoch() {
-    return rendererMatchEpoch;
-  }
-  function rendererMatchEpochCurrent(captured) {
-    return captured === rendererMatchEpoch;
-  }
-
-  // src/renderer/chat/chatPanelClient.ts
-  var EMPTY_THREAD = {
-    viewerSeatId: null,
-    canSend: false,
-    recipientSeatIds: [],
-    messages: [],
-    staged: []
-  };
-  var snapshot = EMPTY_THREAD;
-  var recipientSeatId = null;
-  var listeners = [];
-  function chatSnapshot() {
-    return snapshot;
-  }
-  function chatRecipientSeatId() {
-    return recipientSeatId;
-  }
-  function setChatRecipient(seatId) {
-    recipientSeatId = seatId;
-  }
-  function subscribeChatThread(listener) {
-    listeners.push(listener);
-    return () => {
-      const index = listeners.indexOf(listener);
-      if (index >= 0) listeners.splice(index, 1);
-    };
-  }
-  function notifyChatThread() {
-    for (const listener of listeners) listener();
-  }
-  function repaintChatThread() {
-    notifyChatThread();
-  }
-  async function refreshChatThread() {
-    const read = window.gameApi?.readSideMessages;
-    if (!read) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    try {
-      const next = await read();
-      if (!rendererMatchEpochCurrent(matchEpoch)) return;
-      snapshot = next;
-      recipientSeatId = nextRecipientSeatId(recipientSeatId, next.recipientSeatIds);
-      notifyChatThread();
-    } catch (err) {
-      console.error("readSideMessages failed", err);
-    }
-  }
-  async function stageChatMessage(text) {
-    const stage = window.gameApi?.stageSideMessage;
-    if (!stage || recipientSeatId == null) return "Invalid message.";
-    try {
-      const result = await stage({ toSeatId: recipientSeatId, text });
-      await refreshChatThread();
-      return result.success ? null : result.reason;
-    } catch (err) {
-      console.error("stageSideMessage failed", err);
-      return "Invalid message.";
-    }
-  }
-  async function cancelStagedChatMessage(toSeatId) {
-    const cancel = window.gameApi?.cancelStagedSideMessage;
-    if (!cancel) return;
-    try {
-      await cancel({ toSeatId });
-      await refreshChatThread();
-    } catch (err) {
-      console.error("cancelStagedSideMessage failed", err);
-    }
-  }
-
-  // src/shared/commanderMessageTabs.ts
-  function compareCommanderMessageTabs(left, right) {
-    const leftIndex = aiIndexForSeatId(left.seatId) ?? Number.MAX_SAFE_INTEGER;
-    const rightIndex = aiIndexForSeatId(right.seatId) ?? Number.MAX_SAFE_INTEGER;
-    return leftIndex - rightIndex || left.seatId.localeCompare(right.seatId, "en");
-  }
-  function initialCommanderMessageTabs(seats) {
-    const tabs = seats.map((seat) => ({
-      seatId: seat.seatId,
-      label: seat.label,
-      enabled: false,
-      message: null,
-      messages: [],
-      strategy: null,
-      consultedWithoutProse: false,
-      fromAbsence: false
-    })).sort(compareCommanderMessageTabs);
-    return { tabs, selectedSeatId: null };
-  }
-  function applyCommanderMessage(state, arrival) {
-    const message = proseOrNull(arrival.message ?? null);
-    const strategy = proseOrNull(arrival.strategy);
-    const messages = (arrival.messages ?? []).flatMap((row) => {
-      const text = proseOrNull(row.text);
-      return text ? [{ toSeatId: row.toSeatId, text }] : [];
-    });
-    if (!message && !strategy && messages.length === 0) return state;
-    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
-    if (index < 0) return state;
-    const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, messages, strategy, consultedWithoutProse: false, fromAbsence: false } : tab
-    );
-    return { tabs, selectedSeatId: arrival.seatId };
-  }
-  function commanderDispatchHasProse(input) {
-    if (proseOrNull(input.strategy ?? null) !== null) return true;
-    return (input.messages ?? []).some((row) => proseOrNull(row.text) !== null);
-  }
-  function proseOrNull(value) {
-    const trimmed = value?.trim() ?? "";
-    return trimmed.length > 0 ? trimmed : null;
-  }
-  function seatOutsideTacticalConsult(seatId, opposingPartyId, opponentTheater) {
-    if (!opposingPartyId || seatId === opposingPartyId) return false;
-    return opponentTheater === "tactical";
-  }
-  function resolveCommanderTabAbsence(input) {
-    if (input.outTurn !== null || input.status === "out") return "knocked_out";
-    if (input.status === "no_model") return "no_model";
-    if (input.status === "timed_out") return "timed_out";
-    if (input.consultedWithoutProse) return null;
-    if (input.status === "planning") return null;
-    if (input.tacticalOtherSeat) return "not_in_battle";
-    return input.storedReason;
-  }
-  function formatCommanderAbsenceMessage(reason, turnNumber) {
-    const turn = turnNumber !== null && Number.isFinite(turnNumber) && turnNumber > 0 ? turnNumber : null;
-    switch (reason) {
-      case "knocked_out":
-        return turn === null ? "Knocked out." : `Knocked out on turn ${turn}.`;
-      case "no_model":
-        return "No commander model is set.";
-      case "timed_out":
-        return turn === null ? "No reply in time, so its standing orders ran instead." : `No reply in time on turn ${turn}, so its standing orders ran instead.`;
-      case "no_new_consult":
-        return "No new consult was required, so its standing orders still apply.";
-      case "not_in_battle":
-        return "Not in this battle.";
-      case "no_units_in_battle":
-        return "No units left in this battle.";
-      case "consult_failed":
-        return "The consult failed.";
-    }
-  }
-  function noteCommanderConsultWithoutProse(state, seatId) {
-    const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
-    if (index < 0) return state;
-    const current = state.tabs[index];
-    if (!current || current.enabled && !current.fromAbsence) return state;
-    if (current.consultedWithoutProse && !current.fromAbsence) return state;
-    const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? {
-        ...tab,
-        consultedWithoutProse: true,
-        enabled: false,
-        message: current.fromAbsence ? null : tab.message,
-        messages: current.fromAbsence ? [] : tab.messages,
-        strategy: null,
-        fromAbsence: false
-      } : tab
-    );
-    const selectedSeatId = state.selectedSeatId === seatId && current.fromAbsence ? null : state.selectedSeatId;
-    return { tabs, selectedSeatId };
-  }
-  function applyCommanderAbsence(state, seatId, message) {
-    const line = proseOrNull(message);
-    if (!line) return state;
-    const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
-    if (index < 0) return state;
-    const current = state.tabs[index];
-    if (!current || current.enabled && !current.fromAbsence) return state;
-    const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message: line, messages: [], strategy: null, fromAbsence: true, consultedWithoutProse: false } : tab
-    );
-    return { tabs, selectedSeatId: state.selectedSeatId };
-  }
-  function resetCommanderConsultMarks(state) {
-    if (!state.tabs.some((tab) => tab.consultedWithoutProse)) return state;
-    return {
-      tabs: state.tabs.map((tab) => tab.consultedWithoutProse ? { ...tab, consultedWithoutProse: false } : tab),
-      selectedSeatId: state.selectedSeatId
-    };
-  }
-
-  // src/renderer/core/matchSnapshotClient.ts
-  function matchViewArgument() {
-    if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return void 0;
-    return rendererSharedState.viewAs;
-  }
-  function fetchMatchSnapshot() {
-    const api = window.gameApi;
-    if (!api?.getGameState) return Promise.reject(new Error("getGameState is unavailable"));
-    return api.getGameState(matchViewArgument());
-  }
-
-  // src/renderer/replay/replayState.ts
-  var lastReplaySession = 0;
-  function nextReplaySession() {
-    lastReplaySession += 1;
-    return lastReplaySession;
-  }
-  var replayState = null;
-  var replayListeners = [];
-  var replayLeaver = null;
-  function replayActive() {
-    return replayState !== null;
-  }
-  function currentReplay() {
-    return replayState;
-  }
-  function setReplay(next) {
-    replayState = next;
-    for (const listener of [...replayListeners]) {
-      try {
-        listener();
-      } catch (error) {
-        console.error("replay listener failed", error);
-      }
-    }
-  }
-  function onReplayChange(listener) {
-    replayListeners.push(listener);
-  }
-  function registerReplayLeaver(leave) {
-    replayLeaver = leave;
-  }
-  async function requestReplayLeave() {
-    if (replayState === null || replayLeaver === null) return;
-    await replayLeaver();
-  }
-  function abandonReplay() {
-    if (replayState === null) return;
-    setReplay(null);
-    delete document.body.dataset.replay;
-  }
-  function waitForReplayIdle() {
-    return new Promise((resolve) => {
-      const settled = () => replayState === null || !replayState.busy;
-      if (settled()) {
-        resolve();
-        return;
-      }
-      const listener = () => {
-        if (!settled()) return;
-        replayListeners.splice(replayListeners.indexOf(listener), 1);
-        resolve();
-      };
-      replayListeners.push(listener);
-    });
-  }
-  async function waitForStepToSettle() {
-    for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
-      await waitForReplayIdle();
-      await new Promise((resolve) => {
-        setTimeout(resolve, 0);
-      });
-    }
-  }
-
-  // src/renderer/openRouter/openRouterToolCountLabels.ts
-  function updateOpenRouterToolCountLabels() {
-    for (const group of rendererSharedState.openRouterToolGroups) {
-      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
-      if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-    }
-  }
-  function applyCommanderToolCountSum(counts) {
-    rendererSharedState.toolInvocationCounts = { ...counts };
-    updateOpenRouterToolCountLabels();
-  }
-
-  // src/shared/newGameBannerText.ts
-  function newGameBannerText(kind, tab) {
-    if (kind === "startup") return `Start the ${tab} game when ready.`;
-    return `Start a new ${tab} game when ready.`;
-  }
-
-  // src/renderer/gameplay/newGameBanner.ts
-  var bannerKind = null;
-  function writeNewGameBanner(text) {
-    const messageEl = document.getElementById("game-over-message");
-    if (!messageEl) return;
-    messageEl.textContent = text;
-    messageEl.style.display = "";
-  }
-  function showNewGameBanner(kind, tab) {
-    bannerKind = kind;
-    writeNewGameBanner(newGameBannerText(kind, tab));
-  }
-  function showGameOverBanner(text) {
-    bannerKind = null;
-    writeNewGameBanner(text);
-  }
-  function syncNewGameBannerToTab(tab) {
-    if (bannerKind === null) return;
-    writeNewGameBanner(newGameBannerText(bannerKind, tab));
-  }
-  function isNewGameOverlayOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
-  }
-
-  // src/renderer/chrome/controlTooltip.ts
-  var controlTooltipAttr = "data-control-tooltip";
-  var controlTooltipElementId = "control-tooltip";
-  var richContentByHost = /* @__PURE__ */ new WeakMap();
-  var installed = false;
-  var delayTimer = null;
-  var currentHost = null;
-  var pointerInside = false;
-  var placeFromPointer = false;
-  var suppressedHost = null;
-  var lastClientX = 0;
-  var lastClientY = 0;
-  function tipElement() {
-    return document.getElementById(controlTooltipElementId);
-  }
-  function clearDelayTimer() {
-    if (delayTimer !== null) {
-      clearTimeout(delayTimer);
-      delayTimer = null;
-    }
-  }
-  function hideTip() {
-    clearDelayTimer();
-    const el = tipElement();
-    if (!el) return;
-    el.classList.add("hidden");
-    el.setAttribute("aria-hidden", "true");
-    el.textContent = "";
-  }
-  function orderTipVisible() {
-    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
-      const el = document.getElementById(id);
-      if (el && !el.classList.contains("hidden")) return true;
-    }
-    return false;
-  }
-  function hostFromTarget(target) {
-    if (!(target instanceof Element)) return null;
-    const closest = target.closest(`[${controlTooltipAttr}]`);
-    if (closest instanceof HTMLElement) return closest;
-    if (target instanceof HTMLLabelElement && target.htmlFor) {
-      const linked = document.getElementById(target.htmlFor);
-      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
-    }
-    const label = target.closest("label");
-    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
-    return descendant instanceof HTMLElement ? descendant : null;
-  }
-  function hostText(host) {
-    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
-  }
-  function keyOpensNativeList(ev) {
-    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
-    if (ev.key === "ArrowDown" && ev.altKey) return true;
-    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
-    return false;
-  }
-  function selectForTip(target) {
-    if (!(target instanceof Element)) return null;
-    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
-    if (!(select instanceof HTMLSelectElement)) return null;
-    return hostFromTarget(select) ? select : null;
-  }
-  function placeTip(el, x, y) {
-    el.style.left = "0px";
-    el.style.top = "0px";
-    const { width, height } = el.getBoundingClientRect();
-    const fitsRight = x + TOOLTIP_OFFSET_PX + width <= window.innerWidth;
-    const fitsBelow = y + TOOLTIP_OFFSET_PX + height <= window.innerHeight;
-    const left = fitsRight ? x + TOOLTIP_OFFSET_PX : Math.max(0, x - TOOLTIP_OFFSET_PX - width);
-    const top = fitsBelow ? y + TOOLTIP_OFFSET_PX : Math.max(0, y - TOOLTIP_OFFSET_PX - height);
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  }
-  function showTip(host, text) {
-    const el = tipElement();
-    if (!el) return;
-    clearTerrainTooltipTimer();
-    hideTerrainTooltipVisual();
-    let x = lastClientX;
-    let y = lastClientY;
-    if (!placeFromPointer) {
-      const rect2 = host.getBoundingClientRect();
-      x = rect2.left;
-      y = rect2.top;
-    }
-    const build = richContentByHost.get(host);
-    if (build) el.replaceChildren(build());
-    else el.textContent = text;
-    el.classList.remove("hidden");
-    placeTip(el, x, y);
-    el.setAttribute("aria-hidden", "false");
-    el.setAttribute("role", "tooltip");
-  }
-  function scheduleShow(host) {
-    clearDelayTimer();
-    if (suppressedHost === host) return;
-    const text = hostText(host);
-    if (!text) {
-      hideTip();
-      return;
-    }
-    delayTimer = setTimeout(() => {
-      delayTimer = null;
-      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
-      if (orderTipVisible()) return;
-      const next = hostText(host);
-      if (!next) {
-        hideTip();
-        return;
-      }
-      showTip(host, next);
-    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
-  }
-  function suppressHost(host) {
-    suppressedHost = host;
-    hideTip();
-  }
-  function adoptHost(host, fromPointer, clientX, clientY) {
-    if (fromPointer && host === currentHost) {
-      pointerInside = true;
-      placeFromPointer = true;
-      lastClientX = clientX;
-      lastClientY = clientY;
-      moveVisibleTip(lastClientX, lastClientY);
-      return;
-    }
-    if (!fromPointer && host === currentHost) return;
-    if (currentHost !== host) {
-      hideTip();
-      suppressedHost = null;
-    }
-    currentHost = host;
-    if (fromPointer) {
-      pointerInside = true;
-      placeFromPointer = true;
-      lastClientX = clientX;
-      lastClientY = clientY;
-    } else {
-      pointerInside = pointerIsOn(host);
-      placeFromPointer = pointerInside;
-    }
-    if (suppressedHost === host) return;
-    scheduleShow(host);
-  }
-  function releaseHost(host) {
-    if (suppressedHost === host) suppressedHost = null;
-    if (currentHost !== host) return;
-    pointerInside = false;
-    currentHost = null;
-    hideTip();
-  }
-  function relatedStaysInside(host, related) {
-    if (!(related instanceof Element)) return false;
-    const next = hostFromTarget(related);
-    if (next === host) return true;
-    if (next) return false;
-    return related === host || host.contains(related);
-  }
-  function pointerIsOn(host) {
-    return host.matches(":hover");
-  }
-  function focusIsOn(host) {
-    const active2 = document.activeElement;
-    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
-    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
-  }
-  function hostIsAvailable(host) {
-    if (!host.isConnected || host.getClientRects().length === 0) return false;
-    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
-    if (controls.length === 0) return true;
-    return controls.some((control) => control.getClientRects().length > 0);
-  }
-  function setRichControlTooltip(host, text, build) {
-    host.setAttribute(controlTooltipAttr, text);
-    richContentByHost.set(host, build);
-  }
-  function dismissStaleControlTooltip() {
-    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
-  }
-  function moveVisibleTip(clientX, clientY) {
-    const el = tipElement();
-    if (!el || el.classList.contains("hidden")) return;
-    placeTip(el, clientX, clientY);
-  }
-  function installControlTooltip() {
-    if (installed) return;
-    installed = true;
-    document.addEventListener(
-      "pointerover",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host) return;
-        adoptHost(host, true, ev.clientX, ev.clientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointerout",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
-        releaseHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointermove",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (orderTipVisible()) {
-          if (currentHost) releaseHost(currentHost);
-          return;
-        }
-        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
-        if (host && host !== currentHost) {
-          adoptHost(host, true, ev.clientX, ev.clientY);
-          return;
-        }
-        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
-          releaseHost(currentHost);
-        }
-        if (!host || host !== currentHost) return;
-        lastClientX = ev.clientX;
-        lastClientY = ev.clientY;
-        placeFromPointer = true;
-        pointerInside = true;
-        moveVisibleTip(lastClientX, lastClientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointerdown",
-      (ev) => {
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "keydown",
-      (ev) => {
-        if (!keyOpensNativeList(ev)) return;
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "change",
-      (ev) => {
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "focusin",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host) return;
-        adoptHost(host, false, lastClientX, lastClientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "focusout",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
-        if (pointerInside && currentHost === host) return;
-        releaseHost(host);
-      },
-      true
-    );
-  }
-
-  // src/renderer/map/mapExtent.ts
-  var active = "world";
-  function loadedMapExtentTarget() {
-    return active;
-  }
-  var appliedKey2 = "";
-  var resizeListenerAttached = false;
-  var activeBounds = null;
-  var lockedMinZoom = null;
-  function applyLoadedMapExtent(target, fit = true) {
-    const maps = extentMaps();
-    if (!maps) return false;
-    active = target;
-    if (target === "world") {
-      activeBounds = null;
-      lockedMinZoom = null;
-      setMapExtentReferenceLng(null);
-      const bounds2 = worldBounds(maps.leaflet);
-      applyToMap(maps.main, bounds2, 1.5, fit);
-      applyToMap(maps.mini, bounds2, 0, fit);
-      return true;
-    }
-    setMapExtentReferenceLng(target.referenceLng);
-    const bounds = maps.leaflet.latLngBounds(
-      maps.leaflet.latLng(target.south, target.west, true),
-      maps.leaflet.latLng(target.north, target.east, true)
-    );
-    activeBounds = bounds;
-    if (fit) maps.main.setMinZoom?.(0);
-    applyToMap(maps.main, bounds, null, fit);
-    applyToMap(maps.mini, bounds, 0, fit);
-    if (fit && maps.main.getZoom && maps.main.setMinZoom) {
-      lockedMinZoom = maps.main.getZoom();
-      maps.main.setMinZoom(lockedMinZoom);
-    } else if (lockedMinZoom != null) {
-      maps.main.setMinZoom?.(lockedMinZoom);
-    }
-    attachResize(maps.main);
-    return true;
-  }
-  function restoreLoadedMapExtent(fit = false) {
-    applyLoadedMapExtent(active, fit);
-  }
-  function enterBattleLongitudeFrame(childTacticalH3Indexes, matchExtent) {
-    const regionalReferenceLng = matchExtent === "world" ? null : matchExtent.referenceLng;
-    let referenceLng = null;
-    try {
-      referenceLng = battleDrawReferenceLng(childTacticalH3Indexes, regionalReferenceLng);
-    } catch (err) {
-      console.error("battle longitude frame skipped: footprint cell could not be read", {
-        cellCount: childTacticalH3Indexes.length,
-        err
-      });
-    }
-    setBattleDrawReferenceLng(referenceLng);
-    console.debug("battle longitude frame", {
-      cellCount: childTacticalH3Indexes.length,
-      regionalReferenceLng,
-      referenceLng
-    });
-  }
-  function exitBattleLongitudeFrame() {
-    setBattleDrawReferenceLng(null);
-    console.debug("battle longitude frame cleared");
-  }
-  function syncMapExtentToSnapshot(state, options) {
-    const mapId = state.gameMap?.id ?? "global";
-    if (!isNewGameOverlayOpen()) setBasemapGameMap(mapId);
-    const key = loadedMapExtentKey(
-      mapId,
-      state.hexes.map((hex) => hex.h3Index)
-    );
-    if (!extentMaps()) return;
-    if (!shouldApplyLoadedMapExtent(appliedKey2, key, options?.refit === true)) return;
-    if (mapId === "global" || state.hexes.length === 0) {
-      applyLoadedMapExtent("world", true);
-      appliedKey2 = key;
-      return;
-    }
-    const longitudes = state.hexes.map((hex) => cellToLatLng(hex.h3Index)[1]);
-    const box = mapExtentBoxForHexes(
-      longitudeIntervalFromCenters(longitudes),
-      state.hexes.map((hex) => hex.h3Index)
-    );
-    if (!box) return;
-    applyLoadedMapExtent(box, true);
-    appliedKey2 = key;
-  }
-  function extentMaps() {
-    const leaflet = globalThis.L;
-    const main = getMainLeafletMap();
-    if (!leaflet || !main) return null;
-    const mini = getMiniLeafletMap();
-    return { leaflet, main, mini };
-  }
-  function worldBounds(leaflet) {
-    return leaflet.latLngBounds(
-      leaflet.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      leaflet.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-  }
-  function applyToMap(map, bounds, minZoom, fit) {
-    if (!map) return;
-    map.setMaxBounds?.(bounds);
-    if (minZoom != null) map.setMinZoom?.(minZoom);
-    if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });
-  }
-  function attachResize(map) {
-    if (resizeListenerAttached || !map.on) return;
-    resizeListenerAttached = true;
-    let recomputing = false;
-    map.on("resize", () => {
-      if (recomputing || active === "world" || activeBounds == null) return;
-      recomputing = true;
-      try {
-        const view2 = map;
-        const zoom = view2.getZoom?.() ?? 0;
-        const center = view2.getCenter?.();
-        view2.setMinZoom?.(0);
-        view2.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
-        const fitted = view2.getZoom?.() ?? zoom;
-        view2.setMinZoom?.(fitted);
-        if (center && view2.setView) view2.setView(center, Math.max(fitted, zoom));
-      } finally {
-        recomputing = false;
-      }
-    });
-  }
-
-  // src/renderer/map/mainMapCameraReturn.ts
-  var saved = null;
-  function saveMainMapCameraForReturn() {
-    setBattleDrawReferenceSuspended(true);
-    const map = getMainLeafletMap();
-    if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
-      saved = null;
-      return;
-    }
-    saved = {
-      extent: loadedMapExtentTarget(),
-      center: map.getCenter(),
-      zoom: map.getZoom(),
-      minZoom: map.getMinZoom(),
-      maxZoom: map.getMaxZoom(),
-      maxBounds: map.options?.maxBounds ?? null
-    };
-  }
-  function matchMapExtentTarget() {
-    return saved?.extent ?? loadedMapExtentTarget();
-  }
-  function returnMainMapCamera() {
-    setBattleDrawReferenceSuspended(false);
-    const camera = saved;
-    saved = null;
-    const map = getMainLeafletMap();
-    if (!camera || !map) return false;
-    applyLoadedMapExtent(camera.extent, true);
-    map.setMaxBounds?.(camera.maxBounds);
-    map.setMinZoom?.(camera.minZoom);
-    map.setMaxZoom?.(camera.maxZoom);
-    map.setView?.(camera.center, camera.zoom, { animate: false });
-    return true;
-  }
-  function forgetMainMapCameraForReturn() {
-    saved = null;
-    setBattleDrawReferenceSuspended(false);
-  }
-
-  // src/renderer/chrome/panelSlideHelpers.ts
-  var PANEL_SLIDE_MS = 150;
-  function reducedMotionRequested() {
-    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  }
-  function startPanelHeightSlide(panel, from, to, onFinish) {
-    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") return null;
-    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-      duration: PANEL_SLIDE_MS,
-      easing: "ease-out"
-    });
-    running.onfinish = () => onFinish(running);
-    return running;
   }
 
   // src/shared/mapChromePlacement.ts
@@ -22965,1749 +20413,88 @@ ${bonuses}`;
     return Math.ceil(buttonsWidth + dismissWidth + padding + gap + border2);
   }
 
-  // src/renderer/gameplay/newGameDialogMove.ts
-  var dragStart = null;
-  function dialogAndArea() {
-    const panel = document.getElementById("game-over-overlay");
-    const area = document.getElementById("app-body");
-    if (!panel || !area) return null;
-    return { panel, area };
+  // src/renderer/core/matchEpoch.ts
+  var rendererMatchEpoch = 0;
+  function advanceRendererMatchEpoch() {
+    rendererMatchEpoch += 1;
+    return rendererMatchEpoch;
   }
-  function applyOffset(panel, area, left, top, panelHeight = panel.offsetHeight) {
-    const place = floatingPanelOffset({
-      left,
-      top,
-      panelWidth: panel.offsetWidth,
-      panelHeight,
-      mapWidth: area.clientWidth,
-      mapHeight: area.clientHeight
-    });
-    panel.style.left = `${place.left}px`;
-    panel.style.top = `${place.top}px`;
+  function currentRendererMatchEpoch() {
+    return rendererMatchEpoch;
   }
-  function placeNewGameDialogAtInset() {
-    dragStart = null;
-    const parts = dialogAndArea();
-    if (!parts) return;
-    parts.panel.style.removeProperty("left");
-    parts.panel.style.removeProperty("top");
-    layoutMapChrome();
-  }
-  function keepNewGameDialogOnMap(panelHeight) {
-    const parts = dialogAndArea();
-    if (!parts || parts.panel.style.left === "" || parts.panel.classList.contains("hidden")) return;
-    applyOffset(parts.panel, parts.area, parts.panel.offsetLeft, parts.panel.offsetTop, panelHeight ?? parts.panel.offsetHeight);
-  }
-  function endDrag() {
-    if (!dragStart) return;
-    dragStart = null;
-    layoutMapChrome();
-  }
-  function wireNewGameDialogMove() {
-    const grip = document.getElementById("new-game-panel-grip");
-    if (!grip) return;
-    grip.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      const parts = dialogAndArea();
-      if (!parts) return;
-      event.preventDefault();
-      dragStart = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
-      grip.setPointerCapture(event.pointerId);
-    });
-    grip.addEventListener("pointermove", (event) => {
-      const parts = dialogAndArea();
-      if (!dragStart || !parts) return;
-      applyOffset(parts.panel, parts.area, dragStart.left + event.clientX - dragStart.x, dragStart.top + event.clientY - dragStart.y);
-    });
-    grip.addEventListener("pointerup", endDrag);
-    grip.addEventListener("pointercancel", endDrag);
-    window.addEventListener("resize", () => keepNewGameDialogOnMap());
+  function rendererMatchEpochCurrent(captured) {
+    return captured === rendererMatchEpoch;
   }
 
-  // src/shared/popoverPlacement.ts
-  function placeBelowAnchor(anchor3, popover3, viewport) {
-    const gap = 6;
-    const margin = 8;
-    const left = Math.max(margin, Math.min(anchor3.left, viewport.width - popover3.width - margin));
-    let top = anchor3.bottom + gap;
-    if (top + popover3.height > viewport.height - margin) top = anchor3.top - popover3.height - gap;
-    if (top < margin) top = margin;
-    return { top, left };
+  // src/renderer/replay/replayState.ts
+  var lastReplaySession = 0;
+  function nextReplaySession() {
+    lastReplaySession += 1;
+    return lastReplaySession;
   }
-
-  // src/renderer/chrome/anchoredPopoverLifecycle.ts
-  function attachAnchoredPopoverListeners(hooks) {
-    const onKey = (event) => {
-      if (event.key === "Escape") hooks.close();
-    };
-    const onPointer = (event) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (hooks.containsTarget(target)) return;
-      hooks.close();
-    };
-    const onMove = () => hooks.reposition();
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("scroll", onMove, true);
-    window.addEventListener("resize", onMove);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("scroll", onMove, true);
-      window.removeEventListener("resize", onMove);
-    };
+  var replayState = null;
+  var replayListeners = [];
+  var replayLeaver = null;
+  function replayActive() {
+    return replayState !== null;
   }
-  function placePopoverBelowAnchor(popover3, anchor3) {
-    const rect2 = anchor3.getBoundingClientRect();
-    const box = popover3.getBoundingClientRect();
-    const placed = placeBelowAnchor(
-      { top: rect2.top, bottom: rect2.bottom, left: rect2.left },
-      { width: box.width, height: box.height },
-      { width: window.innerWidth, height: window.innerHeight }
-    );
-    popover3.style.top = `${placed.top}px`;
-    popover3.style.left = `${placed.left}px`;
+  function currentReplay() {
+    return replayState;
   }
-
-  // src/shared/openRouterProviderSort.ts
-  var PROVIDER_SORT_CHOICES = Object.freeze([
-    "throughput",
-    "price",
-    "latency",
-    "nitro"
-  ]);
-  var PROVIDER_SORT_LABELS = Object.freeze({
-    throughput: "Highest Throughput",
-    price: "Lowest Price",
-    latency: "Lowest Latency",
-    nitro: "Priority Service (Nitro)"
-  });
-  var DEFAULT_PROVIDER_SORT = "throughput";
-
-  // src/shared/newGameSides.ts
-  function nicknameForHome(homeKey, homes) {
-    const home = homes.find((option2) => option2.key === homeKey);
-    return home ? defaultAiNickname(home.label, "") : "";
-  }
-  function initialSidesState(args) {
-    const requested = args.rowCount ?? MIN_SEATS;
-    const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
-    const rows = args.homes.slice(0, count).map((home, index) => ({
-      kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
-      homeKey: home.key,
-      commander: index === 0 ? null : { ...args.defaultCommander, nickname: nicknameForHome(home.key, args.homes) }
-    }));
-    return { mapKind: args.mapKind, observeOnly: false, rows };
-  }
-  function setObserveOnly(state, on2, defaultCommander2, homes) {
-    if (state.rows.length === 0) return { ...state, observeOnly: on2 };
-    const first = state.rows[0];
-    const nextFirst = on2 ? {
-      ...first,
-      kind: AI_SEAT_KIND,
-      commander: {
-        ...first.commander ?? defaultCommander2,
-        nickname: nicknameForHome(first.homeKey ?? "", homes)
+  function setReplay(next) {
+    replayState = next;
+    for (const listener of [...replayListeners]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error("replay listener failed", error);
       }
-    } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
-    return { ...state, observeOnly: on2, rows: [nextFirst, ...state.rows.slice(1)] };
-  }
-  function sidesHaveAnyModel(state) {
-    if (!state) return false;
-    return state.rows.some((row) => row.kind === AI_SEAT_KIND && Boolean(row.commander?.modelId?.trim()));
-  }
-  function addSideRow(state, homes, defaultCommander2) {
-    if (addRowBlockedReason(state, homes)) return state;
-    const taken = new Set(state.rows.map((row2) => row2.homeKey));
-    const free = homes.find((home) => !taken.has(home.key));
-    if (!free) return state;
-    const source = [...state.rows].reverse().find((row2) => row2.kind === AI_SEAT_KIND && row2.commander != null);
-    const copied = source?.commander;
-    const commander = {
-      modelId: copied?.modelId ?? defaultCommander2.modelId,
-      reasoningEffort: copied?.reasoningEffort ?? defaultCommander2.reasoningEffort,
-      providerSort: copied?.providerSort ?? defaultCommander2.providerSort,
-      doctrineChoice: copied?.doctrineChoice ?? defaultCommander2.doctrineChoice,
-      apiKey: copied ? (copied.apiKey ?? "").trim() : defaultCommander2.apiKey,
-      nickname: nicknameForHome(free.key, homes)
-    };
-    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander };
-    return { ...state, rows: [...state.rows, row] };
-  }
-  function removeSideRow(state, index) {
-    if (state.rows.length <= MIN_SEATS) return state;
-    if (index < 0 || index >= state.rows.length) return state;
-    return { ...state, rows: state.rows.filter((_2, rowIndex) => rowIndex !== index) };
-  }
-  function setRowHome(state, index, homeKey, homes) {
-    if (index < 0 || index >= state.rows.length) return state;
-    const current = state.rows[index];
-    if (current.homeKey === homeKey) return state;
-    const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
-    if (taken) return state;
-    const commander = current.kind === AI_SEAT_KIND && current.commander ? { ...current.commander, nickname: nicknameForHome(homeKey, homes) } : current.commander;
-    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey, commander } : row);
-    return { ...state, rows };
-  }
-  function randomizeRowHome(state, index, homes, random) {
-    if (index < 0 || index >= state.rows.length) return state;
-    const current = state.rows[index].homeKey;
-    const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
-    if (free.length === 0) return state;
-    const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))];
-    return setRowHome(state, index, picked.key, homes);
-  }
-  function setRowCommander(state, index, commander) {
-    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== AI_SEAT_KIND) return state;
-    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, commander } : row);
-    return { ...state, rows };
-  }
-  function rowLabel(state, index) {
-    if (index < 0 || index >= state.rows.length) return "";
-    if (state.observeOnly) return `Side ${index + 1}`;
-    if (state.rows[index].kind === HUMAN_SEAT_KIND) return "You";
-    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === AI_SEAT_KIND).length;
-    return `Opponent ${opponentNumber}`;
-  }
-  function homeOptionsForRow(state, index, homes) {
-    return homes.map((home) => {
-      const taker = state.rows.findIndex((row, rowIndex) => rowIndex !== index && row.homeKey === home.key);
-      return {
-        key: home.key,
-        label: home.label,
-        disabled: taker >= 0,
-        takenBy: taker >= 0 ? rowLabel(state, taker) : null
-      };
-    });
-  }
-  function sidesCaption(state, homes) {
-    const max2 = Math.min(MAX_SEATS, homes.length);
-    const noun = state.observeOnly ? `${state.rows.length} of ${max2} sides, all AI` : `${state.rows.length} of ${max2} sides in play`;
-    return noun;
-  }
-  function addRowBlockedReason(state, homes) {
-    if (state.rows.length >= MAX_SEATS) return "Up to 4 sides";
-    const taken = new Set(state.rows.map((row) => row.homeKey));
-    const free = homes.some((home) => !taken.has(home.key));
-    if (!free) return "No free side on this map";
-    return null;
-  }
-  function startBlockedReason(state) {
-    if (!state || state.rows.length < MIN_SEATS) return "At least 2 sides";
-    if (state.rows.some((row) => !row.homeKey)) return "Each side needs a home";
-    const keys = state.rows.map((row) => row.homeKey);
-    if (new Set(keys).size !== keys.length) return "Two sides share a home";
-    return null;
-  }
-  function buildSeatsPayload(state) {
-    return state.rows.map((row) => {
-      const home = row.homeKey ?? void 0;
-      const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
-      if (row.kind === AI_SEAT_KIND && row.commander) {
-        return { ...seat, nickname: row.commander.nickname ?? "", commander: row.commander };
-      }
-      return seat;
-    });
-  }
-
-  // src/shared/commanderSetupCopy.ts
-  function commanderApiKey(commander) {
-    return commander?.apiKey?.trim() ?? "";
-  }
-  function prefillFirstAiApiKey(state, apiKey) {
-    const index = state.rows.findIndex((row2) => row2.kind === AI_SEAT_KIND);
-    if (index < 0) return state;
-    const row = state.rows[index];
-    const commander = row.commander ?? {
-      modelId: null,
-      reasoningEffort: null,
-      providerSort: DEFAULT_PROVIDER_SORT,
-      doctrineChoice: "balanced",
-      nickname: ""
-    };
-    const rows = state.rows.map(
-      (entry, rowIndex) => rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
-    );
-    return { ...state, rows };
-  }
-  function commanderFromRemembered(remembered) {
-    return {
-      modelId: remembered.modelId,
-      reasoningEffort: remembered.reasoningEffort,
-      providerSort: remembered.providerSort,
-      doctrineChoice: remembered.doctrineChoice,
-      apiKey: remembered.apiKey,
-      nickname: remembered.nickname
-    };
-  }
-  function previousAiRowIndex(state, index) {
-    if (index < 0 || index >= state.rows.length) return null;
-    if (state.rows[index]?.kind !== AI_SEAT_KIND) return null;
-    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-      if (state.rows[cursor]?.kind === AI_SEAT_KIND) return cursor;
-    }
-    return null;
-  }
-  function copyButtonState(state, index, hasPreviousMatch) {
-    if (index < 0 || index >= state.rows.length) return null;
-    if (state.rows[index]?.kind !== AI_SEAT_KIND) return null;
-    const previous = previousAiRowIndex(state, index);
-    if (previous === null) {
-      if (!hasPreviousMatch) return { label: "No previous game", disabled: true, source: "previous-match" };
-      return { label: `Copy from Last Game (${rowLabel(state, index)})`, disabled: false, source: "previous-match" };
-    }
-    return { label: `Copy from ${rowLabel(state, previous)}`, disabled: false, source: "previous-opponent" };
-  }
-
-  // src/shared/openRouterReasoningEffort.ts
-  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
-    "max",
-    "xhigh",
-    "high",
-    "medium",
-    "low",
-    "minimal",
-    "none"
-  ]);
-  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
-    ["none", "None"],
-    ["minimal", "Min"],
-    ["low", "Low"],
-    ["medium", "Med"],
-    ["high", "High"],
-    ["xhigh", "Xhigh"],
-    ["max", "Max"]
-  ]);
-  function capitalizeReasoningEffortName(effort) {
-    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
-  }
-  function abbreviateReasoningEffort(effort) {
-    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
-  }
-  function sortReasoningEffortsAscending(efforts) {
-    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
-    return [...efforts].sort((a, b) => rank(b) - rank(a));
-  }
-  function listSelectableReasoningEfforts(model) {
-    const reasoning = model?.reasoning;
-    if (!reasoning || reasoning.supported_efforts === void 0) return [];
-    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
-    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
-  }
-  function resolveDefaultReasoningEffort(model) {
-    const defaultEffort = model?.reasoning?.default_effort;
-    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
-  }
-  function resolveRequestedReasoningEffort(model, persistedEffort) {
-    const trimmed = persistedEffort.trim();
-    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
-  }
-  function isReasoningEffortSelectable(model) {
-    return listSelectableReasoningEfforts(model).length >= 2;
-  }
-
-  // src/renderer/chrome/controlTooltipText.ts
-  var humanNicknameFieldTooltipText = "The name shown for you during a match. Saved on this computer, and used the next time a game starts.";
-  var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
-  var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
-  function newGameButtonTooltipText(startGame) {
-    return startGame ? startGameButtonTooltipText : newMatchButtonTooltipText;
-  }
-  var rangedAimTooltipText = "Aim a ranged attack. Turn this on, then double-click the target on the map.";
-  var rangedStopTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
-  var strikeAimTooltipText = "Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.";
-  var strikeStopTooltipText = "Stop aiming an air strike. Strikes already in the list stay there.";
-  var airDropAimTooltipText = "Aim an air drop. Double-click a land hex within strike range. The carried infantry lands there, and the air unit returns to its airport.";
-  var airDropStopTooltipText = "Stop aiming an air drop. Drops already in the list stay there.";
-  var airDropDisabledTooltipText = "Air drop needs every selected air unit to be carrying infantry.";
-  var launchAimTooltipText = "Aim a missile launch. Turn this on, then double-click any explored hex in range. Each missile launches once.";
-  var launchStopTooltipText = "Stop aiming a missile launch. Launches already in the list stay there.";
-  function supportButtonTooltipText(kind, aiming) {
-    if (kind === "strike") return aiming ? strikeStopTooltipText : strikeAimTooltipText;
-    if (kind === "launch") return aiming ? launchStopTooltipText : launchAimTooltipText;
-    return aiming ? rangedStopTooltipText : rangedAimTooltipText;
-  }
-  var apiKeyTooltipText = "Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.";
-  var commanderNicknameTooltipText = "The name shown for this side during a match. It starts as the short home name and resets when this side's home changes.";
-  var refreshModelsTooltipText = "Load the model list again. If that fails, the message appears in the AI activity log.";
-  var runDisabledTooltipText = "Turn planning on or off for every commander. Give at least one commander an API key and a model first.";
-  var runEnabledTooltipText = "Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.";
-  function runButtonTooltipText(enabled) {
-    return enabled ? runEnabledTooltipText : runDisabledTooltipText;
-  }
-  var newGameCommanderTooltipText = "Change this side's nickname, API key, model, reasoning, and doctrine.";
-  var newGameItemOpenTooltipText = "The new-game screen is already open.";
-  var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
-  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses in this consult, for every commander, and the button stays pressed while this is on.";
-  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses in this consult, for every commander.";
-  var planningTooltipText = "Let the opponent plan routes, measure distances, and look up the map and the rules. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
-  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
-  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
-  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
-  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
-  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
-  function toolGroupTooltipText(groupId) {
-    switch (groupId) {
-      case "precomputation":
-        return precomputationTooltipText;
-      case "events":
-        return eventsTooltipText;
-      case "planning":
-        return planningTooltipText;
-      case "assessment":
-        return assessmentTooltipText;
-      case "estimation":
-        return estimationTooltipText;
-      case "memory":
-        return memoryTooltipText;
-      case "orders":
-        return ordersTooltipText;
-      case "production":
-        return productionTooltipText;
-      default:
-        return null;
     }
   }
-  var mapThemeTooltipText = "Pick the map colors for land, water, coastlines, borders, roads, rails, and place names. The choices are Standard, Topographic, Nautical, and Night.";
-  function buildEntryTooltipTextFor(canHire) {
-    return canHire ? "Build/Hire Units" : "Build Units";
+  function onReplayChange(listener) {
+    replayListeners.push(listener);
   }
-  var tacticalEntryTooltipText = "Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.";
-  var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
-  var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
-  var buildCountTooltipText = "Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
-  var KEEP_BUILDING_FORTIFICATION_NOTE = "A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.";
-  var keepBuildingTooltipText = `After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
-  var multiBuildAddTooltipText = "Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.";
-  var multiBuildTypeTooltipText = "Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.";
-  var multiBuildCountTooltipText = "Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
-  var multiKeepBuildingTooltipText = `After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
-  var sealiftSelectTooltipText = "Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.";
-  var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
-  var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
-  var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
-  var annihilationExitTooltipText = "Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.";
-  var aiOnlyResultOkTooltipText = "Close this result and return to the world map. The next turn does not start until you press Ready.";
-  var aiOnlyTimedResultOkTooltipText = 'Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.';
-  var chatStagedEditTooltipText = "Put this message back in the text field to change it.";
-  var chatStagedCancelTooltipText = "Discard this message. It has not been sent.";
-
-  // src/renderer/openRouter/openRouterModelRefresh.ts
-  var refreshModels = null;
-  var onModelListUpdated = null;
-  var reportLine = null;
-  function setOpenRouterModelRefresh(refresh) {
-    refreshModels = refresh;
+  function registerReplayLeaver(leave) {
+    replayLeaver = leave;
   }
-  function refreshOpenRouterModels(key) {
-    return refreshModels?.(key) ?? Promise.resolve();
+  var leaveRunning = false;
+  function setReplayLeaveRunning(running) {
+    leaveRunning = running;
   }
-  function setOpenRouterModelListListener(listener) {
-    onModelListUpdated = listener;
+  function replayLeaveRunning() {
+    return leaveRunning;
   }
-  function notifyOpenRouterModelListUpdated() {
-    onModelListUpdated?.();
+  async function requestReplayLeave() {
+    if (replayState === null && !leaveRunning || replayLeaver === null) return;
+    await replayLeaver();
   }
-  function setOpenRouterPopoverLog(report) {
-    reportLine = report;
+  function abandonReplay() {
+    if (replayState === null) return;
+    setReplay(null);
+    delete document.body.dataset.replay;
   }
-  function reportOpenRouterPopoverLine(line, isError) {
-    reportLine?.(line, isError);
-  }
-
-  // src/shared/doctrineDescriptions.ts
-  var DOCTRINE_CHOICE_LABELS = {
-    aggressive: "Aggressive",
-    balanced: "Balanced",
-    cautious: "Cautious",
-    random: "Random"
-  };
-  var DOCTRINE_CHOICE_DESCRIPTIONS = {
-    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
-    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
-    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
-    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
-  };
-
-  // src/renderer/openRouter/commanderPopoverLabels.ts
-  var popoverLabelWidthText = "Reasoning";
-  var POPOVER_CONTROL_IDS = {
-    nickname: "commander-popover-nickname",
-    apiKey: "commander-popover-api-key",
-    model: "commander-popover-model",
-    reasoning: "commander-popover-reasoning",
-    provider: "commander-popover-provider",
-    doctrine: "commander-popover-doctrine"
-  };
-  function fieldLabel(id, text) {
-    const label = document.createElement("label");
-    label.className = "commander-popover-label";
-    label.htmlFor = id;
-    const sizer = document.createElement("span");
-    sizer.className = "commander-popover-label-sizer";
-    sizer.setAttribute("aria-hidden", "true");
-    sizer.textContent = popoverLabelWidthText;
-    const shown = document.createElement("span");
-    shown.textContent = text;
-    label.append(sizer, shown);
-    return label;
-  }
-  function choicePair(id, text, control) {
-    const pair = document.createElement("div");
-    pair.className = "commander-popover-choice";
-    pair.append(fieldLabel(id, text), control);
-    return pair;
-  }
-
-  // src/renderer/openRouter/commanderPopoverChoices.ts
-  function choiceSelect(input) {
-    const select = document.createElement("select");
-    select.id = input.id;
-    select.setAttribute("aria-label", input.label);
-    for (const choice of input.options) select.appendChild(new Option(input.optionLabel(choice), choice));
-    select.value = input.selected;
-    select.addEventListener("change", () => {
-      input.onChange(select.value);
-    });
-    return {
-      pair: choicePair(input.id, input.label, select),
-      show: (next) => {
-        select.value = next;
-      }
-    };
-  }
-  function doctrineChoiceControl(input) {
-    const description = document.createElement("p");
-    description.className = "commander-popover-doctrine";
-    const control = choiceSelect({
-      id: POPOVER_CONTROL_IDS.doctrine,
-      label: "Doctrine",
-      options: DOCTRINE_CHOICES,
-      optionLabel: (choice) => DOCTRINE_CHOICE_LABELS[choice],
-      selected: input.selected,
-      onChange: (choice) => {
-        description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[choice];
-        input.onChange(choice);
-      }
-    });
-    const show = (next) => {
-      control.show(next);
-      description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[next];
-    };
-    show(input.selected);
-    const row = document.createElement("div");
-    row.className = "commander-popover-doctrine-row";
-    row.append(control.pair, description);
-    return { row, show };
-  }
-  function providerChoiceControl(input) {
-    return choiceSelect({
-      id: POPOVER_CONTROL_IDS.provider,
-      label: "Provider",
-      options: PROVIDER_SORT_CHOICES,
-      optionLabel: (choice) => PROVIDER_SORT_LABELS[choice],
-      selected: input.selected,
-      onChange: input.onChange
-    });
-  }
-
-  // src/renderer/openRouter/openRouterModelCatalog.ts
-  var modelsById = /* @__PURE__ */ new Map();
-  function replaceOpenRouterModelCatalog(models) {
-    modelsById.clear();
-    for (const model of models) modelsById.set(model.id, model);
-  }
-  function clearOpenRouterModelCatalog() {
-    modelsById.clear();
-  }
-  function openRouterModelById(modelId) {
-    return modelsById.get(modelId);
-  }
-
-  // src/renderer/openRouter/reasoningEffortSelect.ts
-  function formatReasoningEffortOptionLabel(effort, isDefault) {
-    const label = capitalizeReasoningEffortName(effort);
-    return isDefault ? `${label} (default)` : label;
-  }
-  function attachReasoningEffortSelect(args) {
-    const { select, onEffortChange } = args;
-    let currentDefault = null;
-    select.addEventListener("change", () => {
-      onEffortChange(select.value === currentDefault ? "" : select.value);
-    });
-    return {
-      showForModel(model, persistedEffort) {
-        const efforts = listSelectableReasoningEfforts(model);
-        const defaultEffort = resolveDefaultReasoningEffort(model);
-        currentDefault = defaultEffort;
-        select.replaceChildren();
-        if (efforts.length === 0 || defaultEffort === null) {
-          select.appendChild(new Option(capitalizeReasoningEffortName("model default"), ""));
-        }
-        efforts.forEach((effort) => {
-          select.appendChild(new Option(formatReasoningEffortOptionLabel(effort, effort === defaultEffort), effort));
-        });
-        select.value = resolveRequestedReasoningEffort(model, persistedEffort) ?? defaultEffort ?? "";
-        select.disabled = !isReasoningEffortSelectable(model);
-      }
-    };
-  }
-
-  // src/renderer/openRouter/commanderPopover.ts
-  var popover = null;
-  var anchor = null;
-  var detachListeners = null;
-  var notifyClosed = null;
-  var applyOpenDraft = null;
-  function openCommanderPopover(request) {
-    closeCommanderPopover();
-    anchor = request.anchor;
-    notifyClosed = request.onClose ?? null;
-    const draft = {
-      modelId: request.commander.modelId,
-      reasoningEffort: request.commander.reasoningEffort,
-      providerSort: request.commander.providerSort,
-      doctrineChoice: request.commander.doctrineChoice,
-      apiKey: commanderApiKey(request.commander),
-      nickname: nicknameFieldValue(request.commander.nickname, request.defaultNickname)
-    };
-    const root = document.createElement("div");
-    root.className = "commander-popover";
-    root.setAttribute("role", "dialog");
-    root.setAttribute("aria-label", request.title);
-    root.append(popoverHeader(request.title), popoverFields(draft, request));
-    document.body.appendChild(root);
-    popover = root;
-    placeCommanderPopover();
-    detachListeners = attachAnchoredPopoverListeners({
-      containsTarget: (target) => !!(popover?.contains(target) || anchor?.contains(target)),
-      close: closeCommanderPopover,
-      reposition: placeCommanderPopover
-    });
-  }
-  function closeCommanderPopover() {
-    detachListeners?.();
-    detachListeners = null;
-    popover?.remove();
-    popover = null;
-    anchor = null;
-    applyOpenDraft = null;
-    setOpenRouterModelListListener(null);
-    const closed = notifyClosed;
-    notifyClosed = null;
-    closed?.();
-  }
-  function reanchorCommanderPopover(next) {
-    if (!popover) return;
-    anchor = next;
-    placeCommanderPopover();
-  }
-  function commanderPopoverIsOpen() {
-    return popover != null;
-  }
-  function replaceOpenCommanderDraft(commander) {
-    applyOpenDraft?.(commander);
-  }
-  function popoverHeader(title) {
-    const header = document.createElement("div");
-    header.className = "commander-popover-header";
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "commander-popover-close";
-    close.textContent = "\xD7";
-    close.setAttribute("aria-label", "Close");
-    close.addEventListener("click", () => closeCommanderPopover());
-    header.append(heading, close);
-    return header;
-  }
-  function popoverFields(draft, request) {
-    const fields = document.createElement("div");
-    fields.className = "commander-popover-fields";
-    const nicknameInput2 = document.createElement("input");
-    nicknameInput2.id = POPOVER_CONTROL_IDS.nickname;
-    nicknameInput2.type = "text";
-    nicknameInput2.maxLength = SIDE_NICKNAME_MAX_LENGTH;
-    nicknameInput2.autocomplete = "off";
-    nicknameInput2.spellcheck = false;
-    nicknameInput2.setAttribute("aria-label", "Nickname");
-    nicknameInput2.value = draft.nickname;
-    nicknameInput2.setAttribute("data-control-tooltip", commanderNicknameTooltipText);
-    const keyInput = document.createElement("input");
-    keyInput.id = POPOVER_CONTROL_IDS.apiKey;
-    keyInput.type = "password";
-    keyInput.autocomplete = "off";
-    keyInput.setAttribute("aria-label", "API key");
-    keyInput.value = commanderApiKey(draft);
-    keyInput.setAttribute("data-control-tooltip", apiKeyTooltipText);
-    const model = document.createElement("select");
-    model.id = POPOVER_CONTROL_IDS.model;
-    model.setAttribute("aria-label", "Model");
-    copyModelOptions(model, draft.modelId);
-    const modelControls = document.createElement("span");
-    modelControls.className = "commander-popover-model-controls";
-    const refresh = document.createElement("button");
-    refresh.type = "button";
-    refresh.className = "openrouter-refresh-btn";
-    refresh.setAttribute("aria-label", "Refresh model list");
-    refresh.setAttribute("data-control-tooltip", refreshModelsTooltipText);
-    modelControls.append(model, refresh);
-    const keyModel = document.createElement("div");
-    keyModel.className = "commander-popover-key-model";
-    keyModel.append(
-      fieldLabel(POPOVER_CONTROL_IDS.nickname, "Nickname"),
-      nicknameInput2,
-      fieldLabel(POPOVER_CONTROL_IDS.apiKey, "API key"),
-      keyInput,
-      fieldLabel(POPOVER_CONTROL_IDS.model, "Model"),
-      modelControls
-    );
-    const reasoning = document.createElement("select");
-    reasoning.id = POPOVER_CONTROL_IDS.reasoning;
-    reasoning.setAttribute("aria-label", "Reasoning");
-    const current = () => {
-      draft.nickname = nicknameFieldValue(nicknameInput2.value, request.defaultNickname);
-      draft.apiKey = keyInput.value.trim();
-      return { ...draft };
-    };
-    const reasoningSelect = attachReasoningEffortSelect({
-      select: reasoning,
-      onEffortChange: (effort) => {
-        draft.reasoningEffort = effort ? effort : null;
-        request.onChange(current());
-      }
-    });
-    const showReasoning = () => {
-      const modelId = draft.modelId ?? "";
-      const record = modelId ? openRouterModelById(modelId) : void 0;
-      reasoningSelect.showForModel(record, draft.reasoningEffort ?? "");
-      const efforts = listSelectableReasoningEfforts(record);
-      const modelKnown = modelId.length > 0 && record != null;
-      if (!modelId || modelKnown && efforts.length === 0) draft.reasoningEffort = null;
-      placeCommanderPopover();
-    };
-    model.addEventListener("change", () => {
-      draft.modelId = model.value ? model.value : null;
-      draft.reasoningEffort = null;
-      saveAppWideModel(draft.modelId);
-      showReasoning();
-      request.onChange(current());
-    });
-    showReasoning();
-    const emitNicknameIfChanged = () => {
-      const next = nicknameFieldValue(nicknameInput2.value, request.defaultNickname);
-      nicknameInput2.value = next;
-      if (next === draft.nickname) return;
-      draft.nickname = next;
-      request.onChange(current());
-    };
-    nicknameInput2.addEventListener("blur", emitNicknameIfChanged);
-    nicknameInput2.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") emitNicknameIfChanged();
-    });
-    const emitKeyIfChanged = () => {
-      const next = keyInput.value.trim();
-      if (next === (draft.apiKey ?? "")) return;
-      draft.apiKey = next;
-      request.onChange({ ...draft });
-    };
-    keyInput.addEventListener("blur", emitKeyIfChanged);
-    keyInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") emitKeyIfChanged();
-    });
-    refresh.addEventListener("click", () => {
-      const key = keyInput.value.trim();
-      if (!key) {
-        reportOpenRouterPopoverLine("No API key set.", true);
+  function waitForReplayIdle() {
+    return new Promise((resolve) => {
+      const settled = () => replayState === null || !replayState.busy;
+      if (settled()) {
+        resolve();
         return;
       }
-      draft.apiKey = key;
-      request.onChange({ ...draft });
-      void refreshOpenRouterModels(key);
-    });
-    setOpenRouterModelListListener(() => {
-      copyModelOptions(model, draft.modelId);
-      showReasoning();
-    });
-    const provider = providerChoiceControl({
-      selected: draft.providerSort,
-      onChange: (choice) => {
-        draft.providerSort = choice;
-        request.onChange(current());
-      }
-    });
-    const doctrine = doctrineChoiceControl({
-      selected: draft.doctrineChoice,
-      onChange: (choice) => {
-        draft.doctrineChoice = choice;
-        request.onChange(current());
-      }
-    });
-    const choices = document.createElement("div");
-    choices.className = "commander-popover-choices";
-    choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), provider.pair);
-    applyOpenDraft = (commander) => {
-      draft.modelId = commander.modelId;
-      draft.reasoningEffort = commander.reasoningEffort;
-      draft.providerSort = commander.providerSort;
-      draft.doctrineChoice = commander.doctrineChoice;
-      draft.apiKey = commanderApiKey(commander);
-      draft.nickname = nicknameFieldValue(commander.nickname, request.defaultNickname);
-      nicknameInput2.value = draft.nickname;
-      keyInput.value = draft.apiKey ?? "";
-      copyModelOptions(model, draft.modelId);
-      showReasoning();
-      provider.show(commander.providerSort);
-      doctrine.show(commander.doctrineChoice);
-    };
-    const copy2 = copyButton(request.copyButton);
-    fields.append(keyModel, choices, doctrine.row);
-    if (copy2) fields.append(copy2);
-    return fields;
-  }
-  function copyButton(button) {
-    if (!button) return null;
-    const apply = document.createElement("button");
-    apply.type = "button";
-    apply.className = "commander-popover-apply";
-    apply.textContent = button.label;
-    apply.disabled = button.disabled;
-    apply.addEventListener("click", () => {
-      if (apply.disabled) return;
-      button.onCopy();
-    });
-    return apply;
-  }
-  function copyModelOptions(select, modelId) {
-    select.replaceChildren();
-    const source = document.getElementById("openrouter-model");
-    if (!source) {
-      select.appendChild(new Option("\u2014 Select model \u2014", ""));
-      return;
-    }
-    for (const option2 of source.options) select.appendChild(new Option(option2.text, option2.value));
-    if (modelId && ![...select.options].some((option2) => option2.value === modelId)) {
-      select.appendChild(new Option(modelId, modelId));
-    }
-    select.value = modelId ?? "";
-  }
-  function saveAppWideModel(modelId) {
-    const select = document.getElementById("openrouter-model");
-    const next = modelId ?? "";
-    if (!select) {
-      void window.gameApi?.openRouter?.setSelectedModel(next);
-      return;
-    }
-    if (select.value === next) return;
-    select.value = next;
-    select.dispatchEvent(new Event("change"));
-  }
-  function placeCommanderPopover() {
-    if (!popover || !anchor) return;
-    placePopoverBelowAnchor(popover, anchor);
-  }
-
-  // src/renderer/gameplay/newGameOptionsPopover.ts
-  var popover2 = null;
-  var anchor2 = null;
-  var detachListeners2 = null;
-  function newGameOptionsPopoverIsOpen() {
-    return popover2 != null && !popover2.hidden;
-  }
-  function popoverInMatchMode() {
-    return document.getElementById("new-game-options-popover")?.dataset.mode === "match";
-  }
-  function closeNewGameOptionsPopover() {
-    if (popoverInMatchMode()) return;
-    detachListeners2?.();
-    detachListeners2 = null;
-    if (popover2) popover2.hidden = true;
-    popover2 = null;
-    anchor2 = null;
-  }
-  function toggleNewGameOptionsPopover(button) {
-    if (popoverInMatchMode()) return;
-    if (newGameOptionsPopoverIsOpen()) {
-      closeNewGameOptionsPopover();
-      return;
-    }
-    const root = document.getElementById("new-game-options-popover");
-    if (!(root instanceof HTMLElement)) return;
-    closeCommanderPopover();
-    popover2 = root;
-    anchor2 = button;
-    root.hidden = false;
-    placeNewGameOptionsPopover();
-    detachListeners2 = attachAnchoredPopoverListeners({
-      containsTarget: (target) => !!(popover2?.contains(target) || anchor2?.contains(target)),
-      close: () => {
-        if (!popoverInMatchMode()) closeNewGameOptionsPopover();
-      },
-      reposition: placeNewGameOptionsPopover
-    });
-  }
-  function wireNewGameOptionsPopover() {
-    const button = document.getElementById("new-game-options-btn");
-    if (button instanceof HTMLButtonElement) {
-      button.addEventListener("click", () => toggleNewGameOptionsPopover(button));
-    }
-    document.querySelector("#new-game-options-popover .commander-popover-close")?.addEventListener("click", () => {
-      if (popoverInMatchMode()) return;
-      closeNewGameOptionsPopover();
-    });
-    document.getElementById("new-game-panel-grip")?.addEventListener("pointerdown", () => {
-      closeNewGameOptionsPopover();
-    });
-  }
-  function placeNewGameOptionsPopover() {
-    if (!popover2 || popover2.hidden || !anchor2) return;
-    placePopoverBelowAnchor(popover2, anchor2);
-  }
-
-  // src/renderer/gameplay/newGameDialogCollapse.ts
-  var EXPANDED_LABEL = "Hide the new game choices";
-  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
-  var COLLAPSED_LABEL = "Show the new game choices";
-  var COLLAPSED_TOOLTIP = "Show the new game choices.";
-  var expanded = true;
-  var slide = null;
-  function newGameOverlayIsOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
-  }
-  function dialogParts() {
-    const panel = document.getElementById("game-over-overlay");
-    const header = document.getElementById("new-game-panel-header");
-    const button = document.getElementById("new-game-dialog-collapse");
-    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
-    return { panel, header, button };
-  }
-  function syncCollapseControl(button) {
-    button.setAttribute("aria-expanded", String(expanded));
-    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
-    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
-  }
-  function placeStartButton(state) {
-    const button = document.getElementById("new-game-btn");
-    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
-    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
-    if (state === "compact") {
-      const close = document.getElementById("new-game-dialog-close");
-      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
-      return;
-    }
-    parent.appendChild(button);
-  }
-  function setPanelState(panel, state) {
-    placeStartButton(state);
-    panel.dataset.state = state;
-    applyPendingNewGameScroll();
-  }
-  function settle(panel) {
-    slide?.cancel();
-    slide = null;
-    setPanelState(panel, expanded ? "expanded" : "compact");
-  }
-  function slideTo(panel, from, to) {
-    slide = startPanelHeightSlide(panel, from, to, (finished) => {
-      if (slide === finished) settle(panel);
-    });
-    if (!slide) settle(panel);
-  }
-  function expandNewGameDialog() {
-    const parts = dialogParts();
-    if (!parts) return;
-    expanded = true;
-    syncCollapseControl(parts.button);
-    settle(parts.panel);
-  }
-  function toggleNewGameDialogCollapsed() {
-    const parts = dialogParts();
-    if (!parts) return;
-    const { panel, header, button } = parts;
-    const from = panel.getBoundingClientRect().height;
-    slide?.cancel();
-    slide = null;
-    expanded = !expanded;
-    syncCollapseControl(button);
-    if (expanded) {
-      setPanelState(panel, "expanding");
-      const to = panel.getBoundingClientRect().height;
-      keepNewGameDialogOnMap(to);
-      slideTo(panel, from, to);
-      return;
-    }
-    closeNewGameOptionsPopover();
-    const active2 = document.activeElement;
-    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
-    setPanelState(panel, "collapsing");
-    const borders = panel.offsetHeight - panel.clientHeight;
-    slideTo(panel, from, header.offsetHeight + borders);
-  }
-  var scrollToTopWhenShown = false;
-  function applyPendingNewGameScroll() {
-    if (!scrollToTopWhenShown) return;
-    const body = document.getElementById("game-over-dialog");
-    if (!(body instanceof HTMLElement) || body.getClientRects().length === 0) return;
-    body.scrollTop = 0;
-    scrollToTopWhenShown = false;
-  }
-  function scrollNewGameDialogToTop() {
-    const body = document.getElementById("game-over-dialog");
-    if (!(body instanceof HTMLElement)) return;
-    scrollToTopWhenShown = true;
-    applyPendingNewGameScroll();
-  }
-  function syncNewGameDialogMapPointer() {
-    const overlay = document.getElementById("game-over-overlay");
-    const map = document.getElementById("main-map");
-    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
-    if (overlay.classList.contains("hidden")) return;
-    map.style.pointerEvents = "auto";
-  }
-
-  // src/renderer/gameplay/newGameReturn.ts
-  var matchWaiting = false;
-  function syncCloseControl() {
-    const close = document.getElementById("new-game-dialog-close");
-    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
-  }
-  function isMatchWaitingUnderNewGame() {
-    return matchWaiting;
-  }
-  function holdMatchUnderNewGame() {
-    matchWaiting = true;
-    saveMainMapCameraForReturn();
-    syncCloseControl();
-  }
-  function forgetMatchUnderNewGame() {
-    matchWaiting = false;
-    forgetMainMapCameraForReturn();
-    syncCloseControl();
-  }
-  function closeNewGameOverlayToMatch(deps) {
-    if (!matchWaiting || !newGameOverlayIsOpen()) return;
-    matchWaiting = false;
-    closeNewGameOptionsPopover();
-    syncCloseControl();
-    document.getElementById("game-over-overlay")?.classList.add("hidden");
-    dismissStaleControlTooltip();
-    deps.setMainUIControlsEnabled(true);
-    invalidateLeafletMapSizes();
-    setBasemapGameMap(rendererSharedState.gameState?.gameMap?.id ?? "global");
-    returnMainMapCamera();
-    deps.updateReadyButtonState();
-    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
-    deps.resizeAndRedraw();
-  }
-
-  // src/renderer/openRouter/commanderPoolClient.ts
-  var POLL_MS = 1e3;
-  var snapshot2 = { statuses: [], dispatches: [], toolInvocationCounts: {} };
-  var pollTimer = null;
-  var showToast = null;
-  var fileMessage = null;
-  var onPoolChanged = null;
-  var poolListeners = /* @__PURE__ */ new Set();
-  function notifyPoolChanged() {
-    onPoolChanged?.();
-    for (const listener of poolListeners) listener();
-  }
-  function bindCommanderPoolScreen(deps) {
-    showToast = deps.showCommanderMessages;
-    fileMessage = deps.fileCommanderMessage;
-    onPoolChanged = deps.updateReadyButtonState;
-  }
-  function anyCommanderIsPlanning() {
-    return snapshot2.statuses.some((row) => row.status === "planning");
-  }
-  var commanderStartDepth = 0;
-  function commanderStartIsSettling() {
-    return commanderStartDepth > 0;
-  }
-  function longestPlanningElapsedMs() {
-    let longest = 0;
-    for (const row of snapshot2.statuses) {
-      if (row.status !== "planning" || row.planningElapsedMs == null) continue;
-      if (row.planningElapsedMs > longest) longest = row.planningElapsedMs;
-    }
-    return longest;
-  }
-  function commanderSeatCostUsd() {
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    return seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
-  }
-  async function startCommanderPlanningIfAllowed() {
-    commanderStartDepth += 1;
-    try {
-      if (!rendererSharedState.runButtonOn) return;
-      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
-      if (rendererSharedState.tacticalBattleSnapshot?.aiOnlyEndReason != null) return;
-      if (isNewGameOverlayOpen()) return;
-      if (rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult) return;
-      if (!window.gameApi?.startCommanderPlanning) return;
-      const tactical = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning;
-      if (rendererSharedState.gameState?.phase !== "planning" && !tactical) return;
-      const mode = tactical ? "tactical" : "strategic";
-      const matchEpoch = currentRendererMatchEpoch();
-      try {
-        const next = await window.gameApi.startCommanderPlanning({ mode });
-        if (!poolReplyIsCurrent(matchEpoch)) return;
-        snapshot2 = next;
-        applyCommanderToolCountSum(next.toolInvocationCounts);
-      } catch (err) {
-        console.error("startCommanderPlanning failed", err);
-      }
-      if (!poolReplyIsCurrent(matchEpoch)) return;
-      syncCommanderPoolPolling();
-      notifyPoolChanged();
-    } finally {
-      commanderStartDepth -= 1;
-      notifyPoolChanged();
-    }
-  }
-  async function stopCommanderPlanningFromScreen(reason) {
-    try {
-      await window.gameApi?.stopCommanderPlanning?.(reason);
-      await readCommanderPoolAndApply(true);
-    } catch (err) {
-      console.error("stopCommanderPlanning failed", reason, err);
-    }
-  }
-  function messageLines(dispatches) {
-    const kept = [];
-    for (const dispatch of dispatches) {
-      if (!commanderDispatchHasProse(dispatch)) continue;
-      fileMessage?.(dispatch);
-      kept.push(dispatch);
-    }
-    return kept;
-  }
-  async function readCommanderPoolAndApply(drain, showMessages = true) {
-    if (!window.gameApi?.readCommanderPool) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    const wasPlanning = anyCommanderIsPlanning();
-    try {
-      const next = await window.gameApi.readCommanderPool(drain);
-      if (!poolReplyIsCurrent(matchEpoch)) return;
-      snapshot2 = next;
-      applyCommanderToolCountSum(next.toolInvocationCounts);
-      const consultFinished = wasPlanning && !anyCommanderIsPlanning();
-      if (drain && (next.dispatches.length > 0 || consultFinished)) {
-        void refreshChatThread();
-        messageLines(next.dispatches);
-        if (showMessages) showToast?.(next.dispatches, next.statuses);
-        await refreshSeatCosts();
-      }
-    } catch (err) {
-      console.error("readCommanderPool failed", err);
-    }
-    if (!poolReplyIsCurrent(matchEpoch)) return;
-    notifyPoolChanged();
-    syncCommanderPoolPolling();
-  }
-  function commanderPoolStatuses() {
-    return snapshot2.statuses;
-  }
-  function subscribeCommanderPool(listener) {
-    poolListeners.add(listener);
-  }
-  function syncCommanderPoolPolling() {
-    if (!shouldPoll()) {
-      if (pollTimer !== null) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      return;
-    }
-    if (pollTimer !== null) return;
-    pollTimer = setInterval(() => {
-      void readCommanderPoolAndApply(true);
-    }, POLL_MS);
-  }
-  function shouldPoll() {
-    if (!rendererSharedState.runButtonOn || rendererSharedState.gameState?.gameOver) return false;
-    if (rendererSharedState.gameState?.phase === "planning") return true;
-    if (rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning) return true;
-    if (anyCommanderIsPlanning()) return true;
-    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
-  }
-  async function refreshCommanderSeatCosts() {
-    await refreshSeatCosts();
-  }
-  async function refreshSeatCosts() {
-    if (!window.gameApi?.getGameState || !rendererSharedState.gameState || replayActive()) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    try {
-      const next = await fetchMatchSnapshot();
-      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats || replayActive()) return;
-      rendererSharedState.gameState.seats = next.seats;
-    } catch (err) {
-      console.error("commander pool cost refresh failed", err);
-    }
-  }
-  function poolReplyIsCurrent(matchEpoch) {
-    return rendererMatchEpochCurrent(matchEpoch) || isMatchWaitingUnderNewGame();
-  }
-
-  // src/renderer/openRouter/aiPlanningState.ts
-  function isDeferredResolutionPlaybackConsultPending() {
-    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
-  }
-  function isDeferredResolutionConsultRunning() {
-    return isDeferredResolutionPlaybackConsultPending() && rendererSharedState.deferredResolutionConsultNotifySent;
-  }
-  function isWaitingForPrecomputedAiOrders() {
-    return anyCommanderIsPlanning();
-  }
-
-  // src/shared/commanderCardState.ts
-  function formatCommanderClock(ms) {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1e3));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
-  }
-  function commanderCardPresentation(input) {
-    if (input.status === "out" || input.outTurn !== null) {
-      const turn = input.outTurn ?? input.timedOutTurn;
-      return {
-        chip: turn === null ? "Out" : `Out, turn ${turn}`,
-        detail: null,
-        dimmed: true,
-        summaryDisabled: true
+      const listener = () => {
+        if (!settled()) return;
+        replayListeners.splice(replayListeners.indexOf(listener), 1);
+        resolve();
       };
-    }
-    if (input.status === "planning") {
-      return { chip: `Planning ${formatCommanderClock(input.planningElapsedMs)}`, detail: null, dimmed: false, summaryDisabled: false };
-    }
-    if (input.status === "timed_out") {
-      const waited = formatCommanderClock(input.planningElapsedMs || AI_CONSULTATION_WALL_CLOCK_MS);
-      const cap = formatCommanderClock(AI_CONSULTATION_WALL_CLOCK_MS);
-      const turn = input.timedOutTurn ?? 0;
-      return {
-        chip: "Timed out",
-        detail: `No reply in ${waited} of ${cap} on turn ${turn}. Its standing orders ran instead.`,
-        dimmed: false,
-        summaryDisabled: false
-      };
-    }
-    if (input.status === "no_model") {
-      return { chip: "Standing orders", detail: null, dimmed: false, summaryDisabled: false };
-    }
-    return { chip: "Ready", detail: null, dimmed: false, summaryDisabled: false };
-  }
-
-  // src/shared/commanderPlanningStatus.ts
-  var NO_MODEL_LABEL = "No model";
-  function commanderPlanningStatus(runOn, planning) {
-    if (!runOn) return "off";
-    return planning ? "planning" : "on";
-  }
-  function planningToggleLabel(planningOn) {
-    return planningOn ? "Stop" : "Start";
-  }
-  function commanderPlanningSentence(runOn, commanderCount) {
-    return runOn ? `Planning is on for all ${commanderCount} commanders.` : "Planning is off.";
-  }
-  function commanderFooterLabel(counts) {
-    if (counts.status === "off") return "Commanders off";
-    if (counts.status !== "planning") return "Commanders ready";
-    const progress = `${counts.ready} of ${counts.active} ready`;
-    return counts.observing ? `Planning \xB7 ${progress}` : `Commanders planning \xB7 ${progress}`;
-  }
-  function modelNameFromOptionLabel(optionLabel2) {
-    const bracket = optionLabel2.indexOf(" [");
-    const name = (bracket >= 0 ? optionLabel2.slice(0, bracket) : optionLabel2).trim();
-    return name || NO_MODEL_LABEL;
-  }
-
-  // src/shared/commanderSummary.ts
-  var NO_MODEL_SUMMARY = "No model \xB7 standing orders only";
-  var NO_MODEL_BUTTON_LABEL = "Select Model";
-  function formatCommanderSummary(input) {
-    const modelName = displayModelName(input.modelLabel);
-    if (!modelName) return NO_MODEL_SUMMARY;
-    const parts = [modelName];
-    const effort = input.reasoningEffort?.trim();
-    if (effort) parts.push(capitalizeReasoningEffortName(effort));
-    parts.push(doctrineSegment(input.doctrineChoice, input.revealedDoctrine));
-    return parts.join(" \xB7 ");
-  }
-  function formatCommanderButtonLabel(input) {
-    const summary = formatCommanderSummary(input);
-    return summary === NO_MODEL_SUMMARY ? NO_MODEL_BUTTON_LABEL : summary;
-  }
-  function displayModelName(modelLabel2) {
-    if (!modelLabel2?.trim()) return "";
-    const withoutSuffix = modelNameFromOptionLabel(modelLabel2);
-    if (withoutSuffix === NO_MODEL_LABEL) return "";
-    const colon = withoutSuffix.indexOf(": ");
-    return (colon >= 0 ? withoutSuffix.slice(colon + 2) : withoutSuffix).trim();
-  }
-  function doctrineSegment(choice, revealed) {
-    if (choice === "random" && revealed) return `Random, drew ${DOCTRINE_CHOICE_LABELS[revealed]}`;
-    return DOCTRINE_CHOICE_LABELS[choice];
-  }
-
-  // src/renderer/openRouter/openRouterRunToggle.ts
-  function setPlanningTogglePressed(button, planningOn) {
-    button.setAttribute("aria-pressed", planningOn ? "true" : "false");
-    button.textContent = planningToggleLabel(planningOn);
-  }
-  var syncRunToggle = null;
-  function setOpenRouterRunToggleSync(sync) {
-    syncRunToggle = sync;
-  }
-  function syncOpenRouterRunToggle() {
-    return syncRunToggle?.() ?? Promise.resolve();
-  }
-
-  // src/renderer/openRouter/commanderCardsUi.ts
-  var logSeatFilter = "";
-  function markCommanderLogLine(line) {
-    const owner = line.dataset.seatId ?? "";
-    line.hidden = logSeatFilter !== "" && owner !== logSeatFilter;
-  }
-  function setCommanderLogSeatFilter(seatId) {
-    logSeatFilter = seatId;
-    const log = document.getElementById("openrouter-log");
-    if (!log) return;
-    for (const child of log.children) {
-      if (child instanceof HTMLElement) markCommanderLogLine(child);
-    }
-  }
-  function renderCommanderCards() {
-    const host = document.getElementById("commander-cards");
-    if (!host) return;
-    const seats = sortSeatsByOrder((rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND));
-    syncLogFilter(seats);
-    const openSeat = host.querySelector('.commander-card-summary[aria-expanded="true"]')?.dataset.seatId ?? null;
-    host.replaceChildren();
-    for (const seat of seats) host.append(cardElement(seat));
-    const nextAnchor = openSeat ? host.querySelector(`[data-seat-id="${openSeat}"]`) : null;
-    if (nextAnchor && commanderPopoverIsOpen()) {
-      nextAnchor.setAttribute("aria-expanded", "true");
-      reanchorCommanderPopover(nextAnchor);
-    }
-  }
-  function syncLogFilter(seats) {
-    const select = document.getElementById("commander-log-filter");
-    if (!(select instanceof HTMLSelectElement)) return;
-    if (!select.dataset.bound) {
-      select.dataset.bound = "true";
-      select.addEventListener("change", () => setCommanderLogSeatFilter(select.value));
-    }
-    const current = select.value;
-    select.replaceChildren(option("All commanders", ""));
-    for (const seat of seats) select.append(option(sideDisplayName(seat), seat.seatId));
-    if ([...select.options].some((row) => row.value === current)) select.value = current;
-  }
-  function option(label, value) {
-    const row = document.createElement("option");
-    row.value = value;
-    row.textContent = label;
-    return row;
-  }
-  function cardElement(seat) {
-    const status = statusOf(seat);
-    const presentation = commanderCardPresentation({
-      status,
-      planningElapsedMs: commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.planningElapsedMs ?? 0,
-      timedOutTurn: commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.timedOutTurn ?? null,
-      outTurn: seat.outTurn
-    });
-    const card = document.createElement("article");
-    card.className = presentation.dimmed ? "commander-card is-out" : "commander-card";
-    const dot = document.createElement("span");
-    dot.className = "commander-card-dot";
-    dot.style.background = paletteForOwner(seat.seatId, rendererSharedState.gameState?.seats ?? [])?.map ?? "#115E59";
-    const name = document.createElement("span");
-    name.className = "commander-card-name";
-    const shownName = sideDisplayName(seat);
-    name.textContent = shownName;
-    name.title = shownName;
-    const chip = document.createElement("span");
-    chip.className = "commander-card-chip";
-    chip.textContent = presentation.chip;
-    const cost = document.createElement("span");
-    cost.className = "commander-card-cost";
-    cost.textContent = formatCost(seat.costUsd);
-    const summary = document.createElement("button");
-    summary.type = "button";
-    summary.className = "commander-card-summary";
-    summary.dataset.seatId = seat.seatId;
-    summary.textContent = summaryText(seat);
-    summary.disabled = presentation.summaryDisabled || replayActive();
-    summary.addEventListener("click", () => void openSeatCommander(seat, summary));
-    card.append(dot, name, chip, cost, summary);
-    if (presentation.detail) {
-      const detail = document.createElement("p");
-      detail.className = "commander-card-detail";
-      detail.textContent = presentation.detail;
-      card.append(detail);
-    }
-    return card;
-  }
-  function statusOf(seat) {
-    if (seat.outTurn !== null) return "out";
-    return commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.status ?? (seat.commander?.modelId ? "ready" : "no_model");
-  }
-  function summaryText(seat) {
-    const commander = seat.commander;
-    return formatCommanderButtonLabel({
-      modelLabel: modelLabel(commander?.modelId ?? null),
-      reasoningEffort: commander?.reasoningEffort ?? null,
-      doctrineChoice: commander?.doctrineChoice ?? "balanced",
-      revealedDoctrine: commander?.doctrine ?? null
+      replayListeners.push(listener);
     });
   }
-  function modelLabel(modelId) {
-    if (!modelId) return null;
-    const select = document.getElementById("openrouter-model");
-    if (!(select instanceof HTMLSelectElement)) return modelId;
-    const optionRow = [...select.options].find((row) => row.value === modelId);
-    return optionRow?.textContent?.trim() || modelId;
-  }
-  async function openSeatCommander(seat, anchor3) {
-    if (replayActive() || !seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
-    const seatId = seat.seatId;
-    let includeKey = false;
-    let apiKey = "";
-    try {
-      const loaded = await window.gameApi?.openRouter?.getSeatApiKey(seatId);
-      if (typeof loaded === "string") {
-        apiKey = loaded;
-        includeKey = true;
-      }
-    } catch (err) {
-      console.error("getSeatApiKey failed", seatId, err);
-    }
-    if (!anchor3.isConnected || replayActive()) return;
-    const commander = {
-      modelId: seat.commander.modelId,
-      reasoningEffort: seat.commander.reasoningEffort,
-      providerSort: seat.commander.providerSort,
-      doctrineChoice: seat.commander.doctrineChoice,
-      nickname: sideDisplayName(seat),
-      ...includeKey ? { apiKey } : {}
-    };
-    openCommanderPopover({
-      anchor: anchor3,
-      title: `${sideDisplayName(seat)} commander`,
-      commander,
-      defaultNickname: defaultAiNickname(seat.homeRegion, seat.seatId),
-      copyButton: null,
-      onChange: (next) => {
-        if (!includeKey && (next.apiKey ?? "") === "") {
-          void saveCommander(seatId, {
-            modelId: next.modelId,
-            reasoningEffort: next.reasoningEffort,
-            providerSort: next.providerSort,
-            doctrineChoice: next.doctrineChoice,
-            nickname: next.nickname
-          });
-          return;
-        }
-        includeKey = true;
-        void saveCommander(seatId, next);
-      }
-    });
-    anchor3.setAttribute("aria-expanded", "true");
-  }
-  async function saveCommander(seatId, commander) {
-    if (replayActive()) return;
-    try {
-      const updated = await window.gameApi?.setSeatCommander(seatId, commander);
-      if (!updated || !rendererSharedState.gameState?.seats || replayActive()) return;
-      rendererSharedState.gameState = { ...rendererSharedState.gameState, seats: rendererSharedState.gameState.seats.map((seat) => seat.seatId === updated.seatId ? updated : seat) };
-      renderCommanderCards();
-      repaintChatThread();
-      void syncOpenRouterRunToggle();
-    } catch (err) {
-      console.error("setSeatCommander failed", seatId, err);
-    }
-  }
-  function formatCost(dollars) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dollars);
-  }
-  subscribeCommanderPool(() => {
-    renderCommanderCards();
-  });
-  var cardsPaintedForReplay = false;
-  onReplayChange(() => {
-    if (replayActive() === cardsPaintedForReplay) return;
-    cardsPaintedForReplay = replayActive();
-    renderCommanderCards();
-  });
-
-  // src/shared/readyAiWaitLabel.ts
-  function readyAiWaitLabel(elapsedLabel, pendingCount) {
-    const shown = pendingCount < 1 ? 1 : pendingCount;
-    return `AI: ${elapsedLabel} (x${shown})`;
-  }
-
-  // src/renderer/openRouter/readyButtonLabel.ts
-  function formatElapsedMmSs(ms) {
-    const totalSeconds = Math.floor(ms / 1e3);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-  var READY_CHECK_ICON_PATH = "M3 8.5l3.2 3.2L13 4.8";
-  function buildReadyCheckIcon() {
-    const svgNs = "http://www.w3.org/2000/svg";
-    const icon = document.createElementNS(svgNs, "svg");
-    icon.setAttribute("class", "chrome-icon ready-btn-check");
-    icon.setAttribute("viewBox", "0 0 16 16");
-    icon.setAttribute("aria-hidden", "true");
-    const path = document.createElementNS(svgNs, "path");
-    path.setAttribute("d", READY_CHECK_ICON_PATH);
-    icon.appendChild(path);
-    return icon;
-  }
-  function setReadyButtonLabelReady(readyBtn) {
-    if (readyBtn.querySelector(".ready-btn-check")) return;
-    const label = document.createElement("span");
-    label.className = "ready-btn-label";
-    label.textContent = "Ready";
-    readyBtn.replaceChildren(buildReadyCheckIcon(), label);
-  }
-  function setReadyButtonLabelAiWait(readyBtn, elapsedMs, planningCount = 1) {
-    const text = readyAiWaitLabel(formatElapsedMmSs(elapsedMs), planningCount);
-    let label = readyBtn.querySelector(".ready-btn-ai-label");
-    if (!label) {
-      label = document.createElement("span");
-      label.className = "ready-btn-ai-label";
-      readyBtn.replaceChildren(label);
-    }
-    if (label.textContent !== text) label.textContent = text;
-  }
-
-  // src/shared/consoleReportLog.ts
-  var CONSOLE_REPORT_KIND_LABELS = Object.freeze({
-    turn: "Turn report",
-    message: "Message",
-    notice: "Notice"
-  });
-  var MAX_CONSOLE_REPORTS = 200;
-  function formatConsoleReportTag(turnNumber, battleBeat) {
-    if (battleBeat != null) return `B${battleBeat}`;
-    if (turnNumber != null) return `T${turnNumber}`;
-    return "";
-  }
-  function consoleReportVisible(kind, senderSeatId, filterSeatId) {
-    if (filterSeatId === "") return true;
-    if (kind !== "message") return true;
-    return senderSeatId === filterSeatId;
-  }
-
-  // src/shared/sideMessageView.ts
-  var SIDE_MESSAGES_TITLE = "Messages";
-  var SIDE_MESSAGE_ARROW = "\u2192";
-  function groupSideMessagesByTurn(messages, seatOrderOf2) {
-    const byTurn = /* @__PURE__ */ new Map();
-    for (const message of messages) {
-      const existing = byTurn.get(message.turnNumber);
-      if (existing) existing.push(message);
-      else byTurn.set(message.turnNumber, [message]);
-    }
-    return [...byTurn.entries()].sort((left, right) => left[0] - right[0]).map(([turnNumber, group]) => ({
-      turnNumber,
-      heading: `Turn ${turnNumber}`,
-      messages: [...group].sort((left, right) => seatOrderOf2(left.fromSeatId) - seatOrderOf2(right.fromSeatId) || seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId) || left.messageId - right.messageId)
-    }));
-  }
-  function sideMessagePartyLabel(seatId, viewerSeatId2, nameOf) {
-    if (viewerSeatId2 !== null && seatId === viewerSeatId2) return "You";
-    return nameOf(seatId);
-  }
-  function dispatchMessagesInSideOrder(messages, seatOrderOf2) {
-    return [...messages].sort((left, right) => seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId));
-  }
-
-  // src/renderer/chrome/frameTooltipText.ts
-  var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
-  var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
-  var commandersTabTooltipText = `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
-  function unavailableTooltipText(name) {
-    return `${name} is not available in this version.`;
-  }
-  var productionStatTooltipText = "The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.";
-  var forcesStatTooltipLead = "Units you have fielded, out of the most this game size allows";
-  var allSidesProductionStatTooltipText = "The production every side's cities can add each turn, added together. A city adds its share only while it is building, and a city on the neutral border adds none.";
-  var allSidesForcesStatTooltipLead = "Units every side still playing has fielded, out of the most this game size allows them";
-  function forcesStatTooltipText(breakdown, lead = forcesStatTooltipLead) {
-    return `${lead}: ${breakdown}.`;
-  }
-  var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
-  var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
-  var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
-  var mapModeTabsShowTooltipText = "Show the map-mode buttons under the overview.";
-  var mapModeTabsHideTooltipText = "Hide the map-mode buttons. Hiding them also closes the terrain legend.";
-
-  // src/renderer/chrome/consoleReports.ts
-  var reportSenderFilter = "";
-  var unreadCount = 0;
-  var reportsVisible = false;
-  var listeners2 = [];
-  function messageReportBody(meta) {
-    const wrap = document.createElement("div");
-    const line = document.createElement("div");
-    line.className = "console-report-sender";
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    const seat = seats.find((row) => row.seatId === meta.senderSeatId);
-    const flag = meta.senderSeatId ? createSideNumberFlag(meta.senderSeatId, seats) : null;
-    const mark = flag ?? document.createElement("span");
-    if (!flag) {
-      mark.className = "console-report-dot";
-      mark.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
-    }
-    const name = document.createElement("span");
-    const home = seat ? sideDisplayName(seat) : "Commander";
-    name.textContent = home;
-    line.append(mark, name);
-    wrap.append(line);
-    const viewerSeatId2 = activeHumanSeatId(seats);
-    const lines = dispatchMessagesInSideOrder(meta.messages ?? [], (seatId) => seats.find((row) => row.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER);
-    for (const row of lines) {
-      const text = row.text.trim();
-      if (text.length === 0) continue;
-      const item = document.createElement("p");
-      item.className = "console-report-message";
-      const label = sideMessagePartyLabel(row.toSeatId, viewerSeatId2, (seatId) => {
-        const named = seats.find((candidate) => candidate.seatId === seatId);
-        return named ? sideDisplayName(named) : seatId;
+  async function waitForStepToSettle() {
+    for (let state = currentReplay(); state?.busy && rendererMatchEpochCurrent(state.matchEpoch); state = currentReplay()) {
+      await waitForReplayIdle();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
       });
-      if (label !== "You") {
-        const recipientFlag = createSideNumberFlag(row.toSeatId, seats);
-        if (recipientFlag) item.appendChild(recipientFlag);
-      }
-      const words = document.createElement("span");
-      words.textContent = `To ${label}: ${text}`;
-      item.appendChild(words);
-      wrap.append(item);
     }
-    const strategyText = meta.strategyText?.trim() ?? "";
-    if (strategyText.length > 0) {
-      const strategy = document.createElement("p");
-      strategy.className = "console-report-strategy";
-      strategy.textContent = `Strategy: ${strategyText}`;
-      wrap.append(strategy);
-    }
-    return wrap;
-  }
-  function refreshReportSenderFilter() {
-    const select = document.getElementById("reports-sender-filter");
-    if (!(select instanceof HTMLSelectElement)) return;
-    if (!select.dataset.bound) {
-      select.dataset.bound = "true";
-      select.addEventListener("change", () => setReportSenderFilter(select.value));
-    }
-    const current = select.value;
-    select.replaceChildren(filterOption("Everyone", ""));
-    for (const seat of rendererSharedState.gameState?.seats ?? []) select.append(filterOption(sideDisplayName(seat), seat.seatId));
-    if ([...select.options].some((row) => row.value === current)) select.value = current;
-  }
-  function filterOption(label, value) {
-    const row = document.createElement("option");
-    row.value = value;
-    row.textContent = label;
-    return row;
-  }
-  function setReportSenderFilter(seatId) {
-    reportSenderFilter = seatId;
-    document.querySelectorAll("#reports-list .console-report").forEach((entry) => {
-      if (!(entry instanceof HTMLElement)) return;
-      const kind = entry.dataset.reportKind ?? "notice";
-      entry.hidden = !consoleReportVisible(kind, entry.dataset.senderSeatId ?? null, reportSenderFilter);
-    });
-    const list = document.getElementById("reports-list");
-    if (list) syncReportsEmptyState(list);
-  }
-  function notifyReportsChanged() {
-    for (const listener of listeners2) listener();
-  }
-  function syncReportsEmptyState(list) {
-    const anyVisible = [...list.querySelectorAll(".console-report")].some((entry) => entry instanceof HTMLElement && !entry.hidden);
-    document.getElementById("reports-empty")?.toggleAttribute("hidden", anyVisible);
-  }
-  function createReplayPlaceholder() {
-    const host = document.createElement("span");
-    host.className = "control-tooltip-host console-report-replay-host";
-    host.setAttribute("data-control-tooltip", unavailableTooltipText("Replay"));
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "console-report-replay";
-    button.disabled = true;
-    button.textContent = "Replay";
-    host.append(button);
-    return host;
-  }
-  function currentConsoleReportTag() {
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    return formatConsoleReportTag(rendererSharedState.gameState?.turnNumber ?? null, battle ? battle.tacticalTurnNumber : null);
-  }
-  function recordConsoleReport(kind, tag, body, meta) {
-    const list = document.getElementById("reports-list");
-    if (!list) return;
-    const entry = document.createElement("li");
-    entry.className = `console-report console-report-${kind}`;
-    entry.dataset.fresh = "true";
-    entry.dataset.reportKind = kind;
-    if (meta?.senderSeatId) entry.dataset.senderSeatId = meta.senderSeatId;
-    const head2 = document.createElement("div");
-    head2.className = "console-report-head";
-    if (tag) {
-      const tagEl = document.createElement("span");
-      tagEl.className = "console-report-tag";
-      tagEl.textContent = tag;
-      head2.append(tagEl);
-    }
-    const kindEl = document.createElement("span");
-    kindEl.className = "console-report-kind";
-    kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
-    head2.append(kindEl);
-    if (meta?.modelLabel) {
-      const model = document.createElement("span");
-      model.className = "console-report-model";
-      model.textContent = meta.modelLabel;
-      head2.append(model);
-    }
-    if (kind === "turn") head2.append(createReplayPlaceholder());
-    const content = document.createElement("div");
-    content.className = "console-report-body";
-    if (meta?.messages !== void 0) content.append(messageReportBody(meta));
-    else content.append(...Array.from(body.cloneNode(true).childNodes));
-    entry.append(head2, content);
-    entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
-    list.prepend(entry);
-    while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
-    syncReportsEmptyState(list);
-    if (!reportsVisible) unreadCount = Math.min(unreadCount + 1, list.childElementCount);
-    notifyReportsChanged();
-  }
-  function unreadConsoleReportCount() {
-    return unreadCount;
-  }
-  function setConsoleReportsVisible(visible) {
-    if (visible === reportsVisible) return;
-    reportsVisible = visible;
-    if (visible) unreadCount = 0;
-    else document.querySelectorAll("#reports-list [data-fresh]").forEach((entry) => entry.removeAttribute("data-fresh"));
-    notifyReportsChanged();
-  }
-  function clearConsoleReports() {
-    const list = document.getElementById("reports-list");
-    list?.replaceChildren();
-    if (list) syncReportsEmptyState(list);
-    unreadCount = 0;
-    notifyReportsChanged();
-  }
-  function onConsoleReportsChanged(listener) {
-    listeners2.push(listener);
   }
 
   // src/renderer/chat/chatPanelVisibility.ts
@@ -24729,107 +20516,8 @@ ${bonuses}`;
     layoutMapChrome();
   }
 
-  // src/renderer/openRouter/openRouterUiHelpers.ts
-  function updateReadyButtonState() {
-    const readyBtn = document.getElementById("ready-btn");
-    if (!readyBtn) return;
-    const gameOver = rendererSharedState.gameState?.gameOver ?? false;
-    const deferredConsult = isDeferredResolutionPlaybackConsultPending();
-    const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null;
-    readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen || replayActive();
-    const deferredClock = rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;
-    if (waitingOnAi) {
-      clearReadyAiWaitClock();
-      setReadyButtonLabelAiWait(readyBtn, longestPlanningElapsedMs(), planningCommanderCount());
-    } else if (deferredClock) {
-      const now = Date.now();
-      if (rendererSharedState.readyBtnAiWaitStartTime === null) {
-        rendererSharedState.readyBtnAiWaitStartTime = now;
-        rendererSharedState.readyBtnAiWaitIntervalId = setInterval(() => {
-          if (rendererSharedState.readyBtnAiWaitStartTime === null) return;
-          const btn = document.getElementById("ready-btn");
-          if (btn) setReadyButtonLabelAiWait(btn, Date.now() - rendererSharedState.readyBtnAiWaitStartTime, planningCommanderCount());
-        }, 1e3);
-      }
-      setReadyButtonLabelAiWait(readyBtn, now - (rendererSharedState.readyBtnAiWaitStartTime ?? now), planningCommanderCount());
-    } else {
-      clearReadyAiWaitClock();
-      setReadyButtonLabelReady(readyBtn);
-    }
-    renderOpponentStatus();
-  }
-  function clearReadyAiWaitClock() {
-    if (rendererSharedState.readyBtnAiWaitIntervalId !== null) {
-      clearInterval(rendererSharedState.readyBtnAiWaitIntervalId);
-      rendererSharedState.readyBtnAiWaitIntervalId = null;
-    }
-    rendererSharedState.readyBtnAiWaitStartTime = null;
-  }
-  function renderOpponentStatus() {
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    const active2 = seats.length === 0 ? [] : activeAiSeats(seats);
-    const statuses = commanderPoolStatuses();
-    const ready = active2.filter((seat) => statuses.find((row) => row.seatId === seat.seatId)?.status === "ready").length;
-    const status = commanderPlanningStatus(rendererSharedState.runButtonOn, isWaitingForPrecomputedAiOrders());
-    const observing = isObservingRoster(seats);
-    const sentence = document.getElementById("commander-status-text");
-    if (sentence) sentence.textContent = commanderPlanningSentence(rendererSharedState.runButtonOn, active2.length || 1);
-    document.getElementById("commander-status-line")?.setAttribute("data-status", status);
-    const label = document.getElementById("commander-status-label");
-    if (label) label.textContent = commanderFooterLabel({ status, ready, active: active2.length, observing });
-    renderCommanderCards();
-    const modelSelect = document.getElementById("openrouter-model");
-    const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : void 0;
-    const model = document.getElementById("commander-status-model");
-    if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? "");
-    const cost = document.getElementById("commander-status-cost");
-    if (cost) cost.textContent = formatOpenRouterCost(commanderSeatCostUsd());
-  }
-  function formatOpenRouterCost(dollars) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(dollars);
-  }
-  function updateOpenRouterCostLabel() {
-    const el = document.getElementById("openrouter-cost");
-    if (el) el.textContent = formatOpenRouterCost(commanderSeatCostUsd());
-    renderOpponentStatus();
-  }
-  function appendOpenRouterLog(line, isError = false, seatId) {
-    const el = document.getElementById("openrouter-log");
-    if (!el) return;
-    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString();
-    const span = document.createElement("div");
-    if (seatId) span.dataset.seatId = seatId;
-    span.textContent = `${time} ${activitySeatPrefix(seatId)}${line}`;
-    if (isError) span.className = "chrome-error";
-    markCommanderLogLine(span);
-    el.appendChild(span);
-    scrollOpenRouterLogToEnd();
-  }
-  function activitySeatPrefix(seatId) {
-    if (!seatId) return "";
-    const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId);
-    const name = seat ? sideDisplayName(seat) : seatId;
-    const turn = rendererSharedState.gameState?.turnNumber;
-    return `${turn ? `T${turn} ` : ""}${name} `;
-  }
-  function planningCommanderCount() {
-    return commanderPoolStatuses().filter((row) => row.status === "planning").length;
-  }
-  function scrollOpenRouterLogToEnd() {
-    const el = document.getElementById("openrouter-log");
-    if (el) el.scrollTop = el.scrollHeight;
-  }
-  function clearOpenRouterLog() {
-    const el = document.getElementById("openrouter-log");
-    if (el) el.textContent = "";
-  }
-  function showToast2(el, textEl, textContentBuilder, isInfo) {
+  // src/renderer/chrome/mapToasts.ts
+  function showToast(el, textEl, textContentBuilder, isInfo) {
     textEl.textContent = "";
     textContentBuilder(textEl);
     el.classList.toggle("toast-info", isInfo);
@@ -24843,7 +20531,7 @@ ${bonuses}`;
     const el = document.getElementById("map-toast");
     const textEl = document.getElementById("map-toast-text");
     if (el && textEl) {
-      showToast2(
+      showToast(
         el,
         textEl,
         (target) => {
@@ -24878,7 +20566,7 @@ ${bonuses}`;
     const el = document.getElementById("ai-strategy-toast");
     const textEl = document.getElementById("ai-strategy-toast-text");
     if (el && textEl) {
-      showToast2(el, textEl, build, true);
+      showToast(el, textEl, build, true);
       layoutMapChrome();
       if (fileReport) recordConsoleReport("message", currentConsoleReportTag(), textEl);
     }
@@ -24915,20 +20603,6 @@ ${bonuses}`;
   function hidePlanningChromeToasts() {
     hideMapToast();
     hideAiStrategyToast();
-  }
-  async function callReadyWithTimeout(payload2) {
-    if (!window.gameApi?.ready) {
-      throw new Error("Ready action unavailable.");
-    }
-    return Promise.race([
-      window.gameApi.ready(payload2),
-      new Promise((_resolve, reject) => {
-        setTimeout(
-          () => reject(new Error(`Ready request timed out after ${READY_REQUEST_TIMEOUT_MS}ms`)),
-          READY_REQUEST_TIMEOUT_MS
-        );
-      })
-    ]);
   }
 
   // src/renderer/core/selection.ts
@@ -25024,6 +20698,1731 @@ ${bonuses}`;
     if (!rendererSharedState.gameState) return false;
     const explored = getExploredHexSet(rendererSharedState.gameState);
     return explored.has(h3Index);
+  }
+
+  // src/shared/webMercator.ts
+  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
+  function alignLongitudeToReference(lng, refLng) {
+    let shifted = lng;
+    while (shifted - refLng > 180) shifted -= 360;
+    while (refLng - shifted > 180) shifted += 360;
+    return shifted;
+  }
+  function alignRingToReference(ring, centerLng, referenceLng) {
+    const shift = referenceLng == null ? 0 : alignLongitudeToReference(centerLng, referenceLng) - centerLng;
+    return ring.map(([lat, lng]) => [lat, alignLongitudeToReference(lng, centerLng) + shift]);
+  }
+  function alignLatLngRun(points2, anchorLng) {
+    const aligned = [];
+    let previousLng = anchorLng;
+    for (const [lat, lng] of points2) {
+      const alignedLng = previousLng == null ? lng : alignLongitudeToReference(lng, previousLng);
+      aligned.push([lat, alignedLng]);
+      previousLng = alignedLng;
+    }
+    return aligned;
+  }
+
+  // src/shared/mapExtent.ts
+  var extentReferenceLng = null;
+  var battleReferenceLng = null;
+  var battleReferenceSuspended = false;
+  function setMapExtentReferenceLng(lng) {
+    extentReferenceLng = lng;
+  }
+  function setBattleDrawReferenceLng(lng) {
+    battleReferenceLng = lng;
+  }
+  function setBattleDrawReferenceSuspended(suspended) {
+    battleReferenceSuspended = suspended;
+  }
+  function drawReferenceLng() {
+    if (battleReferenceLng != null && !battleReferenceSuspended) return battleReferenceLng;
+    return extentReferenceLng;
+  }
+  function battleDrawReferenceLng(h3Indexes, regionalReferenceLng) {
+    const interval = longitudeIntervalFromCenters(h3Indexes.map((h3) => cellToLatLng(h3)[1]));
+    if (!interval) return null;
+    return regionalReferenceLng == null ? interval.referenceLng : alignLongitudeToReference(interval.referenceLng, regionalReferenceLng);
+  }
+  function loadedMapExtentKey(mapId, h3Indexes) {
+    if (h3Indexes.length === 0) return `${mapId}:empty`;
+    return `${mapId}:${h3Indexes.length}:${h3Indexes[0]}:${h3Indexes[h3Indexes.length - 1]}`;
+  }
+  function shouldApplyLoadedMapExtent(appliedKey3, nextKey, refit) {
+    return refit || appliedKey3 !== nextKey;
+  }
+  function longitudeIntervalFromCenters(longitudes) {
+    const sorted = longitudes.filter((lng) => Number.isFinite(lng)).sort((a, b) => a - b);
+    if (sorted.length === 0) return null;
+    let largestGap = sorted[0] + 360 - sorted[sorted.length - 1];
+    let west = sorted[0];
+    let east = sorted[sorted.length - 1];
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const gap = sorted[i + 1] - sorted[i];
+      if (gap > largestGap) {
+        largestGap = gap;
+        west = sorted[i + 1];
+        east = sorted[i] + 360;
+      }
+    }
+    const crossesAntimeridian = east > 180 || west < -180;
+    return {
+      west,
+      east,
+      referenceLng: (west + east) / 2,
+      crossesAntimeridian
+    };
+  }
+  function mapExtentBoxForHexes(interval, h3Indexes) {
+    if (!interval) return null;
+    let south = 90;
+    let north = -90;
+    let west = interval.west;
+    let east = interval.east;
+    for (const h3 of h3Indexes) {
+      const [, centerLng] = cellToLatLng(h3);
+      for (const [lat, lng] of cellToBoundary(h3)) {
+        const alignedToCell = alignLongitudeToReference(lng, centerLng);
+        const aligned = alignLongitudeToReference(alignedToCell, interval.referenceLng);
+        const clampedLat = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, Math.min(WEB_MERCATOR_MAX_ABS_LAT, lat));
+        south = Math.min(south, clampedLat);
+        north = Math.max(north, clampedLat);
+        west = Math.min(west, aligned);
+        east = Math.max(east, aligned);
+      }
+    }
+    if (south > north) {
+      south = -WEB_MERCATOR_MAX_ABS_LAT;
+      north = WEB_MERCATOR_MAX_ABS_LAT;
+    }
+    return { south, west, north, east, referenceLng: interval.referenceLng };
+  }
+
+  // src/renderer/map/hexGrid.ts
+  function clampLatForWebMercatorDisplay(lat) {
+    if (lat > WEB_MERCATOR_MAX_ABS_LAT) return WEB_MERCATOR_MAX_ABS_LAT;
+    if (lat < -WEB_MERCATOR_MAX_ABS_LAT) return -WEB_MERCATOR_MAX_ABS_LAT;
+    return lat;
+  }
+  function alignLngToReference(lng, refLng) {
+    const reference = drawReferenceLng() ?? refLng;
+    return alignLongitudeToReference(lng, reference);
+  }
+  function alignLngToDrawReference(lng) {
+    const reference = drawReferenceLng();
+    return reference == null ? lng : alignLongitudeToReference(lng, reference);
+  }
+  function alignLatLngRunToDrawReference(points2, anchorLng) {
+    return alignLatLngRun(points2, anchorLng ?? drawReferenceLng());
+  }
+  function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
+    const [, centerLng] = cellToLatLng(h3Index);
+    return alignRingToReference(cellToBoundary(h3Index), centerLng, drawReferenceLng()).map(
+      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), lng]
+    );
+  }
+
+  // src/shared/mapLabelRules.ts
+  var COUNTRY_LABEL_MIN_ZOOM = 4;
+  var LABEL_MIN_ZOOM_SLACK = 1.5;
+  var COUNTRY_LABEL_ZOOM_DELAY = 1;
+  var STATE_LABEL_MIN_RADIUS_PX = 40;
+  var WATER_LABEL_ZOOM_DELAY = 1;
+  var WATER_LABEL_MIN_RADIUS_PX = 40;
+  var NARROW_WATER_ZOOM_DELAY = 2;
+  var WATER_LABEL_OPACITY = 1;
+  var MAX_LABELS_PER_FRAME = 150;
+  var LABEL_COLLISION_PADDING_PX = 4;
+  var LABEL_VIEW_INSET_PX = 24;
+  var WATER_LABEL_KINDS = ["ocean", "major_water", "minor_water"];
+  function isWaterLabelKind(kind) {
+    return WATER_LABEL_KINDS.includes(kind);
+  }
+  function visibleLabelKinds(zoom, tacticalView) {
+    if (tacticalView) return ["country", "state"];
+    if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["continent"];
+    return ["continent", "country"];
+  }
+  function visibleWaterLabelKinds(zoom, tacticalView) {
+    if (tacticalView) return ["major_water", "minor_water"];
+    if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["ocean"];
+    return ["ocean", "major_water"];
+  }
+  function annotationViewIsDetail(input) {
+    return input.overlayOpen ? input.previewAtDetailZoom : input.readMatchDetailView();
+  }
+  var COUNTRY_LABEL_OPACITY = 1;
+  var CONTINENT_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
+  var STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
+  var CONTINENT_BESIDE_COUNTRY_OPACITY = 4 / 5;
+  var COUNTRY_BESIDE_STATE_OPACITY = 3 / 5;
+  function labelKindOpacity(kind, zoom, tacticalView) {
+    if (isWaterLabelKind(kind)) return WATER_LABEL_OPACITY;
+    if (kind === "country") return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
+    if (kind === "state") return STATE_LABEL_OPACITY;
+    if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
+    return CONTINENT_LABEL_OPACITY;
+  }
+  var METERS_PER_PIXEL_Z0 = 156543.03392804097;
+  var MAP_LABEL_KIND_STYLES = {
+    continent: { sizePx: 18, weight: 600, fontStyle: "normal", letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
+    country: { sizePx: 13, weight: 600, fontStyle: "normal", letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
+    state: { sizePx: 11, weight: 400, fontStyle: "normal", letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
+    ocean: { sizePx: 12, weight: 400, fontStyle: "italic", letterSpacingEm: 0.3, haloWidthPx: 2, uppercase: true },
+    major_water: { sizePx: 9.75, weight: 400, fontStyle: "italic", letterSpacingEm: 0.06, haloWidthPx: 1.5, uppercase: false },
+    minor_water: { sizePx: 8.25, weight: 400, fontStyle: "italic", letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false }
+  };
+  var CONTINENT_BESIDE_COUNTRY_SIZE_PX = 27;
+  var COUNTRY_BESIDE_STATE_SIZE_PX = 19.5;
+  var continentBesideCountryStyle = {
+    ...MAP_LABEL_KIND_STYLES.continent,
+    sizePx: CONTINENT_BESIDE_COUNTRY_SIZE_PX
+  };
+  var countryBesideStateStyle = {
+    ...MAP_LABEL_KIND_STYLES.country,
+    sizePx: COUNTRY_BESIDE_STATE_SIZE_PX
+  };
+  function mapLabelStyleForView(kind, zoom, tacticalView) {
+    if (kind === "continent" && !tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return continentBesideCountryStyle;
+    if (kind === "country" && tacticalView) return countryBesideStateStyle;
+    return MAP_LABEL_KIND_STYLES[kind];
+  }
+  function labelDisplayText(feature) {
+    return MAP_LABEL_KIND_STYLES[feature.kind].uppercase ? feature.name.toLocaleUpperCase("en") : feature.name;
+  }
+  function mercatorMetersPerPixel(zoom) {
+    return METERS_PER_PIXEL_Z0 / 2 ** zoom;
+  }
+
+  // src/shared/adminBorderRules.ts
+  var NATIONAL_BORDER_OPACITY = 4 / 5;
+  var STATE_BORDER_OPACITY = 3 / 5;
+  function adminBorderGroupsForView(zoom, tacticalView) {
+    const kinds = visibleLabelKinds(zoom, tacticalView);
+    const groups = [];
+    if (kinds.includes("country")) groups.push("country", "country_disputed");
+    if (kinds.includes("state")) groups.push("state", "state_disputed");
+    return groups;
+  }
+  function borderLineOpacity(id) {
+    return id === "state" || id === "state_disputed" ? STATE_BORDER_OPACITY : NATIONAL_BORDER_OPACITY;
+  }
+
+  // src/shared/objectGuards.ts
+  function isNonArrayObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
+  // src/shared/vectorPackTypes.ts
+  var ADMIN_BORDER_GROUP_IDS = ["country", "country_disputed", "state", "state_disputed"];
+
+  // src/shared/vectorPackDecode.ts
+  var SCHEMA_VERSION = "1.0.0";
+  var LONGITUDE_WINDOWS = [
+    { lo: -540, hi: -180, offset: -360 },
+    { lo: -180, hi: 180, offset: 0 },
+    { lo: 180, hi: 540, offset: 360 }
+  ];
+  function decodePart(part2, quantumDeg, lngOffset) {
+    if (part2.length < 4 || part2.length % 2 !== 0) return [];
+    const points2 = [];
+    let lat = part2[0] * quantumDeg;
+    let lng = part2[1] * quantumDeg + lngOffset;
+    points2.push([lat, lng]);
+    for (let index = 2; index < part2.length; index += 2) {
+      lat += part2[index] * quantumDeg;
+      lng += part2[index + 1] * quantumDeg;
+      points2.push([lat, lng]);
+    }
+    return points2;
+  }
+  function coastlineLodForZoom(pack, zoom) {
+    return pack.lods.find((lod) => lod.minZoom <= zoom && (lod.maxZoom === null || zoom < lod.maxZoom)) ?? null;
+  }
+  function visibleCellRefs(view2, cellDeg, maxCells) {
+    if (maxCells <= 0 || view2.south > view2.north) return [];
+    const south = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, view2.south);
+    const north = Math.min(WEB_MERCATOR_MAX_ABS_LAT, view2.north);
+    if (south > north) return [];
+    const west = view2.west;
+    let east = view2.east;
+    if (east < west) east += 360;
+    if (cellDeg >= 360) return [{ key: "0:0", lngOffset: 0 }];
+    const refs = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const window2 of LONGITUDE_WINDOWS) {
+      const lo = Math.max(west, window2.lo);
+      const hi = Math.min(east, window2.hi);
+      if (!(hi > lo)) continue;
+      appendCells(refs, seen, south, north, lo - window2.offset, hi - window2.offset, window2.offset, cellDeg, maxCells);
+      if (refs.length >= maxCells) break;
+    }
+    return refs;
+  }
+  function parseCoastlinePack(value) {
+    const record = requireRecord(value, "coastlines");
+    requireIdentity(record, "coastlines");
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      kind: "coastlines",
+      quantumDeg: requireNumber(record, "quantum_deg"),
+      lods: requireLods(record)
+    };
+  }
+  function parseCoastEdgeMaskPack(value) {
+    const record = requireRecord(value, "coast_edge_mask");
+    requireIdentity(record, "coast_edge_mask");
+    const cellsValue = record.cells;
+    if (!isNonArrayObject(cellsValue)) throw new Error("cells is not an object");
+    const cells = {};
+    for (const [key, cell] of Object.entries(cellsValue)) {
+      if (!isNonArrayObject(cell)) throw new Error(`cells ${key} is not an object`);
+      cells[key] = {
+        water: requirePolygons(cell.water, "water"),
+        land: requirePolygons(cell.land, "land")
+      };
+    }
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      kind: "coast_edge_mask",
+      quantumDeg: requireNumber(record, "quantum_deg"),
+      cellDeg: requireNumber(record, "cell_deg"),
+      cells
+    };
+  }
+  function parseAdminBorderPack(value) {
+    const record = requireRecord(value, "admin_borders");
+    requireIdentity(record, "admin_borders");
+    const groupsValue = record.groups;
+    if (!Array.isArray(groupsValue)) throw new Error("groups is not an array");
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const group of groupsValue) {
+      if (!isNonArrayObject(group)) throw new Error("group is not an object");
+      const id = group.id;
+      if (!isBorderGroupId(id)) throw new Error(`id ${String(id)} is not a border group`);
+      byId2.set(id, parseLodList(group.lods));
+    }
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      kind: "admin_borders",
+      quantumDeg: requireNumber(record, "quantum_deg"),
+      groups: ADMIN_BORDER_GROUP_IDS.map((id) => ({ id, lods: byId2.get(id) ?? [] }))
+    };
+  }
+  function appendCells(refs, seen, south, north, lo, hi, lngOffset, cellDeg, maxCells) {
+    const start = Math.max(lo, -180);
+    const end = Math.min(hi, 180);
+    if (!(end > start)) return;
+    const row0 = rowOf(south, cellDeg);
+    const row1 = rowOf(north, cellDeg);
+    const col0 = Math.floor((start + 180) / cellDeg);
+    const col1 = Math.floor((end - 1e-9 + 180) / cellDeg);
+    for (let row = row0; row <= row1; row += 1) {
+      for (let col = col0; col <= col1; col += 1) {
+        const key = `${row}:${col}`;
+        const id = `${lngOffset}:${key}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        refs.push({ key, lngOffset });
+        if (refs.length >= maxCells) return;
+      }
+    }
+  }
+  function rowOf(lat, cellDeg) {
+    const lastRow = Math.floor(180 / cellDeg) - 1;
+    const row = Math.floor((lat + 90) / cellDeg);
+    if (row < 0) return 0;
+    if (row > lastRow) return lastRow;
+    return row;
+  }
+  function requireRecord(value, label) {
+    if (!isNonArrayObject(value)) throw new Error(`${label} document is not an object`);
+    return value;
+  }
+  function requireIdentity(record, kind) {
+    if (record.schema_version !== SCHEMA_VERSION) {
+      throw new Error(`schema_version ${String(record.schema_version)} is not ${SCHEMA_VERSION}`);
+    }
+    if (record.kind !== kind) throw new Error(`kind ${String(record.kind)} is not ${kind}`);
+  }
+  function requireNumber(record, field) {
+    const value = record[field];
+    if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${field} is not a number`);
+    return value;
+  }
+  function isBorderGroupId(value) {
+    return typeof value === "string" && ADMIN_BORDER_GROUP_IDS.includes(value);
+  }
+  function requireLods(record) {
+    return parseLodList(record.lods);
+  }
+  function parseLodList(value) {
+    if (!Array.isArray(value)) throw new Error("lods is not an array");
+    return value.map((lod) => {
+      if (!isNonArrayObject(lod)) throw new Error("lod is not an object");
+      const minZoom = lod.min_zoom;
+      const maxZoom = lod.max_zoom;
+      const cellDeg = lod.cell_deg;
+      if (typeof minZoom !== "number") throw new Error("min_zoom is not a number");
+      if (maxZoom !== null && typeof maxZoom !== "number") throw new Error("max_zoom is not a number or null");
+      if (typeof cellDeg !== "number") throw new Error("cell_deg is not a number");
+      return { minZoom, maxZoom, cellDeg, cells: parseCells(lod.cells) };
+    });
+  }
+  function parseCells(value) {
+    if (!isNonArrayObject(value)) throw new Error("cells is not an object");
+    const cells = {};
+    for (const [key, parts] of Object.entries(value)) {
+      if (!Array.isArray(parts)) throw new Error(`cells ${key} is not an array`);
+      cells[key] = parts.map((part2) => {
+        if (!Array.isArray(part2) || part2.some((item) => typeof item !== "number")) throw new Error("part is not a number list");
+        return part2;
+      });
+    }
+    return cells;
+  }
+  function requirePolygons(value, field) {
+    if (!Array.isArray(value)) throw new Error(`${field} is not an array`);
+    return value.map((polygon) => {
+      if (!Array.isArray(polygon)) throw new Error(`${field} polygon is not an array`);
+      return polygon.map((ring) => {
+        if (!Array.isArray(ring) || ring.some((item) => typeof item !== "number")) {
+          throw new Error(`${field} ring is not a number list`);
+        }
+        return ring;
+      });
+    });
+  }
+
+  // src/shared/mapThemes.ts
+  var LIGHT_THEME_TRANSPORT_LINE_COLORS = {
+    roadCenter: "#ffffff",
+    roadOutline: "#000000",
+    railCenter: "#000000",
+    railHalo: "#ffffff"
+  };
+  var MAP_THEMES = [
+    {
+      id: "standard",
+      label: "Standard",
+      waterColor: "rgb(163, 199, 223)",
+      landShadowRgb: [92, 90, 85],
+      landHighlightRgb: [251, 250, 247],
+      coastlineColor: "#6d8ea6",
+      countryBorderColor: "#4e6273",
+      stateBorderColor: "#4e6273",
+      gridLineColor: "rgba(48, 56, 64, 0.15)",
+      hexPaletteId: "default",
+      labelFont: "sans",
+      labelColors: {
+        continent: "#3b3f46",
+        country: "#3b3f46",
+        state: "#3b3f46",
+        halo: "rgba(255, 255, 255, 0.85)"
+      },
+      waterLabelColors: { ink: "#2a5676", halo: "rgba(163, 199, 223, 0.8)" },
+      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
+    },
+    {
+      id: "topographic",
+      label: "Topographic",
+      waterColor: "rgb(166, 217, 239)",
+      landShadowRgb: [107, 85, 54],
+      landHighlightRgb: [251, 246, 228],
+      coastlineColor: "#3f8fc0",
+      countryBorderColor: "#6e5340",
+      stateBorderColor: "#6e5340",
+      gridLineColor: "rgba(48, 56, 64, 0.15)",
+      hexPaletteId: "default",
+      labelFont: "serif",
+      labelColors: {
+        continent: "#4a3a28",
+        country: "#4a3a28",
+        state: "#4a3a28",
+        halo: "rgba(251, 246, 228, 0.9)"
+      },
+      waterLabelColors: { ink: "#1f5a80", halo: "rgba(166, 217, 239, 0.8)" },
+      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
+    },
+    {
+      id: "nautical",
+      label: "Nautical",
+      waterColor: "rgb(227, 241, 248)",
+      landShadowRgb: [122, 100, 51],
+      landHighlightRgb: [251, 231, 166],
+      coastlineColor: "#2f3a40",
+      countryBorderColor: "#1e4d78",
+      stateBorderColor: "#1e4d78",
+      gridLineColor: "rgba(48, 56, 64, 0.15)",
+      hexPaletteId: "default",
+      labelFont: "serif",
+      labelColors: {
+        continent: "#2b2f33",
+        country: "#2b2f33",
+        state: "#2b2f33",
+        halo: "rgba(251, 236, 180, 0.9)"
+      },
+      waterLabelColors: { ink: "#3d6a8a", halo: "rgba(227, 241, 248, 0.8)" },
+      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
+    },
+    {
+      id: "night",
+      label: "Night",
+      waterColor: "rgb(15, 26, 38)",
+      landShadowRgb: [16, 19, 23],
+      landHighlightRgb: [74, 82, 92],
+      coastlineColor: "#7d97ad",
+      countryBorderColor: "#9eb4c8",
+      stateBorderColor: "#9eb4c8",
+      gridLineColor: "rgba(210, 216, 228, 0.12)",
+      hexPaletteId: "wargame",
+      labelFont: "sans",
+      labelColors: {
+        continent: "#d7dde5",
+        country: "#d7dde5",
+        state: "#d7dde5",
+        halo: "rgba(10, 14, 20, 0.85)"
+      },
+      waterLabelColors: { ink: "#8fb0c9", halo: "rgba(15, 26, 38, 0.8)" },
+      transportLineColors: {
+        roadCenter: "#8b95a3",
+        roadOutline: "#0a0e14",
+        railCenter: "#dfe6ee",
+        railHalo: "#0a0e14"
+      }
+    }
+  ];
+  var DEFAULT_MAP_THEME_ID = "standard";
+  var LAND_TILE_CONTRAST = 1.4;
+  var FLAT_LAND_GRAY = 210;
+  var STANDARD_THEME = MAP_THEMES[0];
+  function mapThemeById(id) {
+    return MAP_THEMES.find((theme) => theme.id === id) ?? STANDARD_THEME;
+  }
+  function labelPaintColors(theme, kind) {
+    if (isWaterLabelKind(kind)) return { fill: theme.waterLabelColors.ink, halo: theme.waterLabelColors.halo };
+    return { fill: theme.labelColors[kind], halo: theme.labelColors.halo };
+  }
+  function landTransferFunctions(theme) {
+    const channel = (index) => ({
+      slope: (theme.landHighlightRgb[index] - theme.landShadowRgb[index]) / 255,
+      intercept: theme.landShadowRgb[index] / 255
+    });
+    return { r: channel(0), g: channel(1), b: channel(2) };
+  }
+
+  // src/renderer/map/activeMapTheme.ts
+  var activeTheme = mapThemeById(DEFAULT_MAP_THEME_ID);
+  function getActiveMapTheme() {
+    return activeTheme;
+  }
+  function setActiveMapThemeId(id) {
+    const next = mapThemeById(id);
+    if (next.id === activeTheme.id) return false;
+    activeTheme = next;
+    return true;
+  }
+
+  // src/renderer/map/bucketedVectorLayer.ts
+  function ignoreRedrawWithoutContext(renderer) {
+    if (!renderer) return;
+    const names = ["_update", "_clear", "_draw", "_redraw"];
+    for (const name of names) {
+      const original = renderer[name];
+      if (typeof original !== "function") continue;
+      renderer[name] = function redrawWhenContextExists() {
+        if (!this._ctx) return;
+        original.call(this);
+      };
+    }
+  }
+  function createBucketedVectorLayer(options) {
+    const pane = options.map.getPane?.(options.paneName) ?? options.map.createPane?.(options.paneName);
+    if (pane) {
+      pane.style.zIndex = String(options.paneZIndex);
+      pane.style.pointerEvents = "none";
+    }
+    const renderer = options.leaflet.canvas?.({ pane: options.paneName, padding: 0.5 });
+    ignoreRedrawWithoutContext(renderer);
+    const paths = /* @__PURE__ */ new Map();
+    let source = null;
+    let style = {
+      color: "#000000",
+      weight: 1,
+      dashArray: null,
+      smoothFactor: 0,
+      seamWeightPx: null
+    };
+    let enabled = true;
+    let loggedSyncError = false;
+    let loggedMissingConstructor = false;
+    function pathOptions() {
+      if (options.shape === "polygon") {
+        return {
+          renderer,
+          interactive: false,
+          smoothFactor: 0,
+          fill: true,
+          fillColor: style.color,
+          fillOpacity: 1,
+          stroke: style.seamWeightPx != null,
+          color: style.color,
+          weight: style.seamWeightPx ?? 0
+        };
+      }
+      const line = {
+        renderer,
+        interactive: false,
+        smoothFactor: style.smoothFactor,
+        stroke: true,
+        color: style.color,
+        weight: style.weight,
+        opacity: style.opacity ?? 1,
+        lineCap: "round",
+        lineJoin: "round",
+        fill: false
+      };
+      if (style.dashArray != null) line.dashArray = style.dashArray;
+      return line;
+    }
+    function clearPaths() {
+      for (const path of paths.values()) path.remove?.();
+      paths.clear();
+      renderer?.remove?.();
+    }
+    function syncUncaught() {
+      if (!enabled || !source) {
+        clearPaths();
+        return;
+      }
+      const bounds = options.map.getBounds?.();
+      if (!bounds || !renderer) {
+        if (!renderer && !loggedMissingConstructor) {
+          loggedMissingConstructor = true;
+          console.error("[agent-wars] vector layer has no canvas renderer", options.paneName);
+        }
+        return;
+      }
+      const view2 = {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      };
+      const cells = source(view2, options.map.getZoom?.() ?? 0);
+      const live = /* @__PURE__ */ new Set();
+      const paint2 = pathOptions();
+      for (const cell of cells) {
+        live.add(cell.cacheKey);
+        if (paths.has(cell.cacheKey)) continue;
+        const geometry = cell.build();
+        if (geometry.length === 0) continue;
+        const path = options.shape === "line" ? options.leaflet.polyline?.(geometry, paint2) : options.leaflet.polygon?.(geometry, paint2);
+        if (!path) continue;
+        path.addTo?.(options.map);
+        paths.set(cell.cacheKey, path);
+      }
+      for (const [key, path] of paths) {
+        if (live.has(key)) continue;
+        path.remove?.();
+        paths.delete(key);
+      }
+      if (paths.size === 0) renderer.remove?.();
+    }
+    function sync() {
+      try {
+        syncUncaught();
+      } catch (error) {
+        if (loggedSyncError) return;
+        loggedSyncError = true;
+        console.error("[agent-wars] vector layer sync failed", options.paneName, error);
+      }
+    }
+    return {
+      setSource(next) {
+        source = next;
+        clearPaths();
+        sync();
+      },
+      setStyle(next) {
+        style = next;
+        const paint2 = pathOptions();
+        for (const path of paths.values()) path.setStyle?.(paint2);
+      },
+      setEnabled(next) {
+        enabled = next;
+        sync();
+      },
+      setPaneFilter(filter) {
+        const target = options.map.getPane?.(options.paneName);
+        if (target) target.style.filter = filter;
+      },
+      sync
+    };
+  }
+
+  // src/renderer/map/vectorLayerGeometry.ts
+  var VECTOR_CELL_CAP = 800;
+  var cellCapLogged = false;
+  function noteVectorCellCap(count) {
+    if (count !== VECTOR_CELL_CAP || cellCapLogged) return;
+    cellCapLogged = true;
+    console.error("[agent-wars] vector cell cap reached", count);
+  }
+  async function loadBasemapVectorText(name) {
+    const ask = window.gameApi?.basemapVectorDocument;
+    if (!ask) {
+      console.error("[agent-wars] basemap vector document unavailable", name);
+      return null;
+    }
+    try {
+      return await ask(name);
+    } catch (error) {
+      console.error("[agent-wars] basemap vector document failed", name, error);
+      return null;
+    }
+  }
+  function vectorLines(parts, quantumDeg, lngOffset) {
+    const lines = [];
+    for (const part2 of parts) {
+      const decoded = decodePart(part2, quantumDeg, lngOffset);
+      if (decoded.length >= 2) lines.push(decoded);
+    }
+    return lines;
+  }
+  function vectorPolygons(polygons, quantumDeg, lngOffset) {
+    const shapes = [];
+    for (const polygon of polygons) {
+      const rings = [];
+      for (const ring of polygon) {
+        const decoded = decodePart(ring, quantumDeg, lngOffset);
+        if (decoded.length >= 3) rings.push(decoded);
+      }
+      if (rings.length > 0) shapes.push(rings);
+    }
+    return shapes;
+  }
+
+  // src/renderer/map/adminBorderLayers.ts
+  var BORDER_DRAW_ORDER = [
+    "state",
+    "state_disputed",
+    "country",
+    "country_disputed"
+  ];
+  function borderWeight(id) {
+    return id === "country" || id === "country_disputed" ? 1.25 : 1;
+  }
+  function borderDash(id) {
+    if (id === "country_disputed" || id === "state_disputed") return "1 3";
+    if (id === "state") return "4 3";
+    return null;
+  }
+  function borderColor(theme, id) {
+    return id === "state" || id === "state_disputed" ? theme.stateBorderColor : theme.countryBorderColor;
+  }
+  var borderPack = null;
+  var bound = false;
+  var mainMap = null;
+  var readTacticalView = () => false;
+  var borderLayers = [];
+  function borderCells(id, view2, zoom) {
+    const pack = borderPack;
+    const group = pack?.groups.find((candidate) => candidate.id === id);
+    if (!pack || !group) return [];
+    const lod = coastlineLodForZoom(group, zoom);
+    if (!lod) return [];
+    const lodIndex = group.lods.indexOf(lod);
+    const refs = visibleCellRefs(view2, lod.cellDeg, VECTOR_CELL_CAP);
+    noteVectorCellCap(refs.length);
+    return refs.map((ref) => ({
+      cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
+      build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
+    }));
+  }
+  function setAdminBorderTacticalReader(reader) {
+    readTacticalView = reader;
+  }
+  function bindAdminBorderLayers(leaflet, main) {
+    if (bound) return;
+    bound = true;
+    mainMap = main;
+    for (const id of BORDER_DRAW_ORDER) {
+      const layer = createBucketedVectorLayer({
+        map: main,
+        leaflet,
+        paneName: "basemapBorders",
+        paneZIndex: 270,
+        shape: "line"
+      });
+      layer.setSource((view2, zoom) => borderCells(id, view2, zoom));
+      borderLayers.push({ id, layer });
+    }
+    applyAdminBorderTheme(getActiveMapTheme());
+    main.on?.("moveend", syncAdminBorderLayers);
+    main.on?.("zoomend", syncAdminBorderLayers);
+    syncAdminBorderLayers();
+    void loadBorders();
+  }
+  async function loadBorders() {
+    const text = await loadBasemapVectorText("admin_borders");
+    if (text == null) return;
+    try {
+      borderPack = parseAdminBorderPack(JSON.parse(text));
+    } catch (error) {
+      console.error("[agent-wars] admin borders document rejected", error);
+      return;
+    }
+    syncAdminBorderLayers();
+  }
+  function syncAdminBorderLayers() {
+    if (!mainMap) return;
+    let groups;
+    try {
+      groups = adminBorderGroupsForView(mainMap.getZoom?.() ?? 0, readTacticalView());
+    } catch (error) {
+      console.error("[agent-wars] admin border visibility failed", error);
+      return;
+    }
+    const visible = new Set(groups);
+    for (const entry of borderLayers) entry.layer.setEnabled(visible.has(entry.id));
+  }
+  function applyAdminBorderTheme(theme) {
+    for (const entry of borderLayers) {
+      const style = {
+        color: borderColor(theme, entry.id),
+        weight: borderWeight(entry.id),
+        dashArray: borderDash(entry.id),
+        smoothFactor: 0.5,
+        seamWeightPx: null,
+        opacity: borderLineOpacity(entry.id)
+      };
+      entry.layer.setStyle(style);
+    }
+  }
+
+  // src/renderer/map/mapThemeFilters.ts
+  var SVG_ID = "map-theme-filters";
+  function ensureMapThemeSvgFilters() {
+    if (document.getElementById(SVG_ID)) return;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.id = SVG_ID;
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", "0");
+    svg.setAttribute("height", "0");
+    svg.style.position = "absolute";
+    for (const theme of MAP_THEMES) {
+      const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+      filter.id = `map-theme-land-${theme.id}`;
+      filter.setAttribute("color-interpolation-filters", "sRGB");
+      const transfer = document.createElementNS("http://www.w3.org/2000/svg", "feComponentTransfer");
+      const functions = landTransferFunctions(theme);
+      for (const [name, channel] of [
+        ["feFuncR", functions.r],
+        ["feFuncG", functions.g],
+        ["feFuncB", functions.b]
+      ]) {
+        const fn = document.createElementNS("http://www.w3.org/2000/svg", name);
+        fn.setAttribute("type", "linear");
+        fn.setAttribute("slope", String(channel.slope));
+        fn.setAttribute("intercept", String(channel.intercept));
+        transfer.appendChild(fn);
+      }
+      filter.appendChild(transfer);
+      svg.appendChild(filter);
+    }
+    document.body.appendChild(svg);
+  }
+  function landTileFilterCss(theme) {
+    return `url(#map-theme-land-${theme.id})`;
+  }
+  function landUnderlayFilterCss(theme) {
+    return `contrast(${LAND_TILE_CONTRAST}) ${landTileFilterCss(theme)}`;
+  }
+
+  // src/renderer/map/basemapLayer.ts
+  var OFFLINE_HILLSHADE_ID = "offline_hillshade";
+  var WATER_PANE = "basemapWater";
+  var GRID_PANE = "basemapGrid";
+  var GRID_DASH = "2 3";
+  var SOURCE_MERIDIANS = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180];
+  var SOURCE_PARALLELS = [-70, -50, -30, -10, 0, 10, 30, 50, 70];
+  var leafletRef = null;
+  var mainMap2 = null;
+  var miniMap = null;
+  var mainLayer = null;
+  var miniLayer = null;
+  var gameMapId = "global";
+  var appliedKey = "";
+  var requestSerial = 0;
+  var basemapErrorShown = false;
+  var publishedNativeZoom = 7;
+  var gridLines = [];
+  var nativeZoomListeners = /* @__PURE__ */ new Set();
+  function onBasemapNativeZoomChanged(listener) {
+    nativeZoomListeners.add(listener);
+  }
+  function publishBasemapNativeZoom(nativeZoom2) {
+    publishedNativeZoom = nativeZoom2;
+    for (const listener of nativeZoomListeners) listener(nativeZoom2);
+  }
+  function bindOfflineBasemap(leaflet, main, mini) {
+    leafletRef = leaflet;
+    mainMap2 = main;
+    miniMap = mini;
+    ensureWaterPane(main);
+    ensureWaterPane(mini);
+    ensureSourceGrid(leaflet, main);
+    void applyGameMap(gameMapId);
+  }
+  function setBasemapGameMap(nextMapId) {
+    const mapId = nextMapId || "global";
+    gameMapId = mapId;
+    void applyGameMap(mapId);
+  }
+  function applyBasemapTheme(theme) {
+    for (const map of [mainMap2, miniMap]) {
+      const water = map?.getPane?.(WATER_PANE);
+      if (water) water.style.background = theme.waterColor;
+      applyTileTheme(map?.getPanes?.()?.tilePane, landTileFilterCss(theme));
+    }
+    const grid2 = mainMap2?.getPane?.(GRID_PANE);
+    if (grid2) grid2.style.filter = "";
+    for (const line of gridLines) line.setStyle?.({ color: theme.gridLineColor });
+  }
+  async function applyGameMap(mapId) {
+    const serial = ++requestSerial;
+    const nativeZoom2 = await nativeZoomFor(mapId);
+    if (serial !== requestSerial || !leafletRef || !mainMap2 || !miniMap) return;
+    publishBasemapNativeZoom(nativeZoom2);
+    const key = `${mapId}:${nativeZoom2}`;
+    if (key === appliedKey && mainLayer && miniLayer) return;
+    appliedKey = key;
+    const url = `agentwars-basemap://tiles/${mapId}/{z}/{x}/{y}.webp`;
+    mainLayer = replaceLayer(leafletRef, mainMap2, mainLayer, url, nativeZoom2);
+    miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom2);
+  }
+  function replaceLayer(leaflet, map, current, url, nativeZoom2) {
+    if (current) {
+      current.off("tileerror", onTileError);
+      try {
+        map.removeLayer?.(current);
+      } catch {
+      }
+    }
+    const layer = leaflet.tileLayer(url, {
+      maxZoom: 16,
+      maxNativeZoom: nativeZoom2,
+      minZoom: 0
+    });
+    layer.addTo?.(map);
+    layer.on("tileerror", onTileError);
+    return layer;
+  }
+  function ensureSourceGrid(leaflet, map) {
+    if (!leaflet.polyline || map.getPane?.(GRID_PANE)) return;
+    const pane = map.createPane?.(GRID_PANE);
+    if (!pane) return;
+    pane.style.zIndex = "250";
+    pane.style.pointerEvents = "none";
+    for (const longitude of SOURCE_MERIDIANS) {
+      const line = leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180));
+      line?.addTo?.(map);
+      if (line) gridLines.push(line);
+    }
+    for (const latitude of SOURCE_PARALLELS) {
+      const line = leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0));
+      line?.addTo?.(map);
+      if (line) gridLines.push(line);
+    }
+  }
+  function meridianPositions(longitude) {
+    return [
+      [-WEB_MERCATOR_MAX_ABS_LAT, longitude],
+      [WEB_MERCATOR_MAX_ABS_LAT, longitude]
+    ];
+  }
+  function parallelPositions(latitude) {
+    return [
+      [latitude, -180],
+      [latitude, 180]
+    ];
+  }
+  function gridStroke(solid) {
+    const stroke = {
+      pane: GRID_PANE,
+      color: mapThemeById(DEFAULT_MAP_THEME_ID).gridLineColor,
+      weight: 1,
+      opacity: 1,
+      interactive: false,
+      smoothFactor: 0
+    };
+    if (!solid) stroke.dashArray = GRID_DASH;
+    return stroke;
+  }
+  function ensureWaterPane(map) {
+    if (map.getPane?.(WATER_PANE)) return;
+    const pane = map.createPane?.(WATER_PANE);
+    if (!pane) return;
+    const container = map.getContainer?.();
+    if (container) container.insertBefore(pane, container.firstChild);
+    pane.style.position = "absolute";
+    pane.style.inset = "0";
+    pane.style.width = "100%";
+    pane.style.height = "100%";
+    pane.style.zIndex = "190";
+    pane.style.pointerEvents = "none";
+    pane.style.background = mapThemeById(DEFAULT_MAP_THEME_ID).waterColor;
+  }
+  function applyTileTheme(pane, filter) {
+    if (!pane) return;
+    const filtered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
+    for (const el of filtered) el.style.filter = "";
+    pane.style.filter = filter;
+  }
+  function onTileError() {
+    if (basemapErrorShown) return;
+    basemapErrorShown = true;
+    showMapToast("Some map tiles failed to load. The game remains playable; try again later.", { isError: false });
+  }
+  async function nativeZoomFor(mapId) {
+    const ask = window.gameApi?.basemapNativeZoom;
+    if (!ask) return 7;
+    try {
+      const result = await ask(mapId);
+      return result?.nativeZoom === 9 ? 9 : 7;
+    } catch (err) {
+      console.error("[agent-wars] basemap native zoom failed", err);
+      return 7;
+    }
+  }
+
+  // src/renderer/map/coastlineLayers.ts
+  var COASTLINE_WEIGHT_PX = 1.5;
+  var MINIMAP_COASTLINE_WEIGHT_PX = 1;
+  var MASK_SEAM_WEIGHT_PX = 1;
+  var coastPack = null;
+  var maskPack = null;
+  var nativeZoom = 7;
+  var maskLoadStarted = false;
+  var bound2 = false;
+  var mainMap3 = null;
+  var coastLayer = null;
+  var underlayLayer = null;
+  var maskLayer = null;
+  var miniLayer2 = null;
+  function flatLandColor() {
+    return `rgb(${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY})`;
+  }
+  function coastCells(view2, zoom, firstBandOnly) {
+    const pack = coastPack;
+    if (!pack) return [];
+    const lod = firstBandOnly ? pack.lods[0] ?? null : coastlineLodForZoom(pack, zoom);
+    if (!lod) return [];
+    const lodIndex = pack.lods.indexOf(lod);
+    const refs = visibleCellRefs(view2, lod.cellDeg, VECTOR_CELL_CAP);
+    noteVectorCellCap(refs.length);
+    return refs.map((ref) => ({
+      cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
+      build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
+    }));
+  }
+  function maskCells(view2, side) {
+    const pack = maskPack;
+    if (!pack) return [];
+    const refs = visibleCellRefs(view2, pack.cellDeg, VECTOR_CELL_CAP);
+    noteVectorCellCap(refs.length);
+    return refs.map((ref) => ({
+      cacheKey: `mask|${ref.key}|${ref.lngOffset}`,
+      build: () => vectorPolygons(pack.cells[ref.key]?.[side] ?? [], pack.quantumDeg, ref.lngOffset)
+    }));
+  }
+  function refreshCoastLayers() {
+    if (!mainMap3) return;
+    const pastNative = (mainMap3.getZoom?.() ?? 0) > nativeZoom;
+    if (pastNative) void ensureMaskLoaded();
+    underlayLayer?.setEnabled(pastNative);
+    maskLayer?.setEnabled(pastNative);
+    coastLayer?.sync();
+    miniLayer2?.sync();
+  }
+  async function ensureMaskLoaded() {
+    if (maskLoadStarted) return;
+    maskLoadStarted = true;
+    const text = await loadBasemapVectorText("coast_edge_mask");
+    if (text == null) return;
+    try {
+      maskPack = parseCoastEdgeMaskPack(JSON.parse(text));
+    } catch (error) {
+      console.error("[agent-wars] coast edge mask document rejected", error);
+      return;
+    }
+    underlayLayer?.sync();
+    maskLayer?.sync();
+  }
+  async function loadCoastlines() {
+    const text = await loadBasemapVectorText("coastlines");
+    if (text == null) return;
+    try {
+      coastPack = parseCoastlinePack(JSON.parse(text));
+    } catch (error) {
+      console.error("[agent-wars] coastlines document rejected", error);
+      return;
+    }
+    coastLayer?.sync();
+    miniLayer2?.sync();
+  }
+  function bindCoastlineLayers(leaflet, main, mini) {
+    if (bound2) return;
+    bound2 = true;
+    mainMap3 = main;
+    coastLayer = createBucketedVectorLayer({
+      map: main,
+      leaflet,
+      paneName: "basemapCoast",
+      paneZIndex: 260,
+      shape: "line"
+    });
+    underlayLayer = createBucketedVectorLayer({
+      map: main,
+      leaflet,
+      paneName: "basemapLandUnderlay",
+      paneZIndex: 150,
+      shape: "polygon"
+    });
+    maskLayer = createBucketedVectorLayer({
+      map: main,
+      leaflet,
+      paneName: "basemapWaterMask",
+      paneZIndex: 230,
+      shape: "polygon"
+    });
+    miniLayer2 = createBucketedVectorLayer({
+      map: mini,
+      leaflet,
+      paneName: "basemapCoast",
+      paneZIndex: 260,
+      shape: "line"
+    });
+    coastLayer.setSource((view2, zoom) => coastCells(view2, zoom, false));
+    underlayLayer.setSource((view2) => maskCells(view2, "land"));
+    maskLayer.setSource((view2) => maskCells(view2, "water"));
+    miniLayer2.setSource((view2, zoom) => coastCells(view2, zoom, true));
+    underlayLayer.setEnabled(false);
+    maskLayer.setEnabled(false);
+    applyCoastlineTheme(getActiveMapTheme());
+    main.on?.("moveend", refreshCoastLayers);
+    main.on?.("zoomend", refreshCoastLayers);
+    mini.on?.("moveend", () => miniLayer2?.sync());
+    mini.on?.("zoomend", () => miniLayer2?.sync());
+    refreshCoastLayers();
+    void loadCoastlines();
+  }
+  function setCoastEdgeMaskNativeZoom(zoom) {
+    nativeZoom = zoom;
+    refreshCoastLayers();
+  }
+  function applyCoastlineTheme(theme) {
+    const coastStyle = {
+      color: theme.coastlineColor,
+      weight: COASTLINE_WEIGHT_PX,
+      dashArray: null,
+      smoothFactor: 0,
+      seamWeightPx: null
+    };
+    const seam = (color) => ({
+      color,
+      weight: 0,
+      dashArray: null,
+      smoothFactor: 0,
+      seamWeightPx: MASK_SEAM_WEIGHT_PX
+    });
+    coastLayer?.setStyle(coastStyle);
+    miniLayer2?.setStyle({ ...coastStyle, weight: MINIMAP_COASTLINE_WEIGHT_PX });
+    underlayLayer?.setStyle(seam(flatLandColor()));
+    underlayLayer?.setPaneFilter(landUnderlayFilterCss(theme));
+    maskLayer?.setStyle(seam(theme.waterColor));
+  }
+
+  // src/shared/mapKeyboardZoom.ts
+  var MAP_KEYBOARD_ZOOM_STEP = 0.5;
+  function mapZoomKeyStep(args) {
+    if (args.ctrlKey || args.altKey || args.metaKey) return null;
+    if (args.key === "+" || args.key === "=" || args.code === "NumpadAdd") return 1;
+    if (args.key === "-" || args.code === "NumpadSubtract") return -1;
+    return null;
+  }
+
+  // src/renderer/map/worldLeafletMap.ts
+  var mainMap4 = null;
+  var miniMap2 = null;
+  var viewportRect = null;
+  var onMainViewChanged = null;
+  function notifyMainViewChanged() {
+    syncMinimapViewportRect();
+    onMainViewChanged?.();
+  }
+  function getL() {
+    const leafletRef2 = globalThis.L;
+    if (!leafletRef2) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
+    return leafletRef2;
+  }
+  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
+    onMainViewChanged = onViewChanged;
+    const leafletRef2 = getL();
+    const mainEl = document.getElementById(mainContainerId);
+    const miniEl = document.getElementById(minimapContainerId);
+    if (!mainEl || !miniEl) {
+      console.error("[agent-wars] initWorldLeafletMaps: missing map container elements", {
+        mainContainerId,
+        minimapContainerId,
+        hasMain: !!mainEl,
+        hasMinimap: !!miniEl
+      });
+      return;
+    }
+    const worldBounds2 = leafletRef2.latLngBounds(
+      leafletRef2.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leafletRef2.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+    mainMap4 = leafletRef2.map(mainEl, {
+      minZoom: 1.5,
+      maxZoom: 12,
+      zoomSnap: 0.25,
+      zoomDelta: MAP_KEYBOARD_ZOOM_STEP,
+      wheelPxPerZoomLevel: 80,
+      /* Max bounds keep the world view inside ±180°; the drag wrap would pull a battle drawn past 180° to another copy. */
+      worldCopyJump: false,
+      maxBounds: worldBounds2,
+      maxBoundsViscosity: 1,
+      /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
+      keyboard: false,
+      /* The main map zooms from the wheel, from Shift-drag, and from the zoom keys. There is no on-screen control. */
+      zoomControl: false,
+      /* Elevation and Natural Earth credits stay in the notices file. The map does not print them. */
+      attributionControl: false,
+      /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
+      zoomAnimation: false,
+      fadeAnimation: false,
+      inertia: false
+    });
+    const initialId = initialBasemapProviderId ?? "offline_hillshade";
+    if (initialId !== "offline_hillshade") {
+      console.error("[agent-wars] the hillshade is the only basemap", initialId);
+    }
+    mainMap4.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
+    mainMap4.doubleClickZoom.disable();
+    try {
+      leafletRef2.control.scale({
+        position: "bottomright",
+        metric: true,
+        imperial: true,
+        maxWidth: 120
+      }).addTo(mainMap4);
+    } catch {
+    }
+    miniMap2 = leafletRef2.map(miniEl, {
+      minZoom: 0,
+      maxZoom: 2,
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false
+    });
+    bindOfflineBasemap(leafletRef2, mainMap4, miniMap2);
+    const vectorLeaflet = leafletRef2;
+    const vectorMain = mainMap4;
+    bindCoastlineLayers(vectorLeaflet, vectorMain, miniMap2);
+    bindAdminBorderLayers(vectorLeaflet, vectorMain);
+    onBasemapNativeZoomChanged(setCoastEdgeMaskNativeZoom);
+    miniMap2.fitBounds(worldBounds2, { padding: [1, 1], animate: false });
+    miniMap2.setZoom(miniMap2.getZoom());
+    mainMap4.on("move", notifyMainViewChanged);
+    mainMap4.on("zoom", notifyMainViewChanged);
+    mainMap4.on("moveend", notifyMainViewChanged);
+    mainMap4.on("zoomend", notifyMainViewChanged);
+    syncMinimapViewportRect();
+  }
+  function syncMinimapViewportRect() {
+    if (!mainMap4 || !miniMap2) return;
+    const leafletRef2 = getL();
+    const mainBounds = mainMap4.getBounds();
+    const miniBounds = miniMap2.getBounds();
+    const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
+    const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
+    const zoomedIn = mainSpan < miniSpan * 0.92;
+    if (!zoomedIn) {
+      if (viewportRect) {
+        viewportRect.remove();
+        viewportRect = null;
+      }
+      return;
+    }
+    if (!viewportRect) {
+      viewportRect = leafletRef2.rectangle(mainBounds, {
+        color: getComputedStyle(document.documentElement).getPropertyValue("--chrome-border").trim() || "#5a7090",
+        weight: 2,
+        opacity: 1,
+        fill: false,
+        interactive: false
+      }).addTo(miniMap2);
+    } else {
+      viewportRect.setBounds(mainBounds);
+    }
+  }
+  function getMainLeafletMap() {
+    return mainMap4;
+  }
+  function zoomMainMapByKeyStep(step) {
+    if (!mainMap4) return;
+    mainMap4.setZoom(mainMap4.getZoom() + step * MAP_KEYBOARD_ZOOM_STEP);
+  }
+  function getMiniLeafletMap() {
+    return miniMap2;
+  }
+  function hexCenterToOverlayPoint(h3Index, latLngFn) {
+    if (!mainMap4) return { x: 0, y: 0 };
+    const leafletRef2 = getL();
+    const [lat, lng] = latLngFn(h3Index);
+    const p = mainMap4.latLngToContainerPoint(leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
+    return { x: p.x, y: p.y };
+  }
+  function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
+    if (!mainMap4) return { x: 0, y: 0 };
+    const leafletRef2 = getL();
+    const [lat, lng] = latLngFn(h3Index);
+    const lngAligned = alignLngToReference(lng, referenceLngDegrees);
+    const p = mainMap4.latLngToContainerPoint(
+      leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+    );
+    return { x: p.x, y: p.y };
+  }
+  function invalidateLeafletMapSizes() {
+    mainMap4?.invalidateSize({ animate: false });
+    miniMap2?.invalidateSize({ animate: false });
+    notifyMainViewChanged();
+  }
+
+  // src/shared/mapKeyboardPanLogic.ts
+  var MAP_PAN_BASELINE_INTERVAL_MS = 200;
+  var MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
+  var STRATEGIC_KEYBOARD_PAN_SPEED = 0.5;
+  var TACTICAL_KEYBOARD_PAN_SPEED = STRATEGIC_KEYBOARD_PAN_SPEED;
+  function panKeyToDirection(key) {
+    switch (key.toLowerCase()) {
+      case "w":
+      case "arrowup":
+        return "north";
+      case "s":
+      case "arrowdown":
+        return "south";
+      case "a":
+      case "arrowleft":
+        return "west";
+      case "d":
+      case "arrowright":
+        return "east";
+      default:
+        return null;
+    }
+  }
+  function panCodeToDirection(code) {
+    switch (code) {
+      case "KeyW":
+      case "ArrowUp":
+        return "north";
+      case "KeyS":
+      case "ArrowDown":
+        return "south";
+      case "KeyA":
+      case "ArrowLeft":
+        return "west";
+      case "KeyD":
+      case "ArrowRight":
+        return "east";
+      default:
+        return null;
+    }
+  }
+  function panBindingToDirection(code, key) {
+    return panCodeToDirection(code) ?? panKeyToDirection(key);
+  }
+  function panPhysicalKeyId(code, key) {
+    return code || key;
+  }
+  var RANGE_INPUT_KEYS = /* @__PURE__ */ new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+  function rangeInputOwnsKey(key) {
+    return RANGE_INPUT_KEYS.has(key);
+  }
+  function resolveNetPanAxes(held2) {
+    const north = held2.has("north");
+    const south = held2.has("south");
+    const east = held2.has("east");
+    const west = held2.has("west");
+    const ns = north === south ? 0 : north ? 1 : -1;
+    const ew = east === west ? 0 : east ? 1 : -1;
+    return { ns, ew };
+  }
+  function netPanAxesEqual(a, b) {
+    return a.ns === b.ns && a.ew === b.ew;
+  }
+  function scoreNeighborForPanAxes(deltaLat, deltaLng, ns, ew) {
+    return ns * deltaLat + ew * deltaLng;
+  }
+  function isNetPanAxesZero(axes) {
+    return axes.ns === 0 && axes.ew === 0;
+  }
+  function netAxesToScreenPanDelta(ns, ew, stepPixels) {
+    if (ns === 0 && ew === 0) return { dx: 0, dy: 0 };
+    if (!Number.isFinite(stepPixels) || stepPixels <= 0) return { dx: 0, dy: 0 };
+    const length = ns !== 0 && ew !== 0 ? stepPixels / Math.SQRT2 : stepPixels;
+    return { dx: ew === 0 ? 0 : ew * length, dy: ns === 0 ? 0 : -ns * length };
+  }
+  function keyboardPanModeSpeed(tactical) {
+    return tactical ? TACTICAL_KEYBOARD_PAN_SPEED : STRATEGIC_KEYBOARD_PAN_SPEED;
+  }
+  function directionsFromPhysicalKeys(heldPhysical) {
+    return new Set(heldPhysical.values());
+  }
+  function createMapKeyboardPanHandler(deps) {
+    const heldPhysical = /* @__PURE__ */ new Map();
+    let intervalHandle = null;
+    const stopInterval = () => {
+      if (intervalHandle !== null) {
+        deps.clearInterval(intervalHandle);
+        intervalHandle = null;
+      }
+    };
+    const startInterval = () => {
+      stopInterval();
+      intervalHandle = deps.setInterval(() => {
+        if (heldPhysical.size === 0) {
+          stopInterval();
+          return;
+        }
+        const axes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+        if (isNetPanAxesZero(axes)) {
+          stopInterval();
+          return;
+        }
+        deps.pan(axes.ns, axes.ew);
+      }, MAP_PAN_HOLD_INTERVAL_MS);
+    };
+    const panImmediateAndSchedule = (axes) => {
+      deps.pan(axes.ns, axes.ew);
+      startInterval();
+    };
+    const syncAfterPhysicalChange = (previousAxes) => {
+      if (heldPhysical.size === 0) {
+        stopInterval();
+        return;
+      }
+      const nextAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+      if (netPanAxesEqual(previousAxes, nextAxes)) {
+        if (!isNetPanAxesZero(nextAxes) && intervalHandle === null) {
+          startInterval();
+        }
+        return;
+      }
+      if (isNetPanAxesZero(nextAxes)) {
+        stopInterval();
+        return;
+      }
+      panImmediateAndSchedule(nextAxes);
+    };
+    return {
+      onPanKeyDown(physicalKeyId, direction) {
+        if (heldPhysical.has(physicalKeyId)) return;
+        const previousAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+        heldPhysical.set(physicalKeyId, direction);
+        syncAfterPhysicalChange(previousAxes);
+      },
+      onPanKeyUp(physicalKeyId) {
+        if (!heldPhysical.has(physicalKeyId)) return;
+        const previousAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+        heldPhysical.delete(physicalKeyId);
+        syncAfterPhysicalChange(previousAxes);
+      },
+      clear() {
+        heldPhysical.clear();
+        stopInterval();
+      }
+    };
+  }
+
+  // src/renderer/map/mapHelpers.ts
+  function shouldIgnoreGlobalKeydown(e) {
+    const target = e.target;
+    if (!target) return false;
+    const tag = target.tagName.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
+  }
+  function isEditableKeyboardTarget(target) {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
+  }
+  function isRangeInputTarget(target) {
+    return target instanceof HTMLInputElement && target.type === "range";
+  }
+  function getNeighborForPanAxes(centerH3, ns, ew) {
+    if (ns === 0 && ew === 0) return null;
+    const [centerLat, centerLng] = cellToLatLng(centerH3);
+    const neighbors = Array.from(gridDisk(centerH3, 1)).filter((h3) => h3 !== centerH3);
+    if (neighbors.length === 0) return null;
+    let bestH3 = null;
+    let bestScore = -Infinity;
+    for (const h3 of neighbors) {
+      const [lat, lng] = cellToLatLng(h3);
+      const alignedLng = alignLongitudeToReference(lng, centerLng);
+      const score = scoreNeighborForPanAxes(lat - centerLat, alignedLng - centerLng, ns, ew);
+      if (score > bestScore) {
+        bestScore = score;
+        bestH3 = h3;
+      }
+    }
+    return bestH3;
+  }
+  function panMapByNetAxes(ns, ew) {
+    if (isNetPanAxesZero({ ns, ew })) return;
+    const map = getMainLeafletMap();
+    const leafletRef2 = globalThis.L;
+    if (!map || !leafletRef2) return;
+    const center = map.getCenter();
+    const tactical = rendererSharedState.tacticalBattleSnapshot != null;
+    let centerH3;
+    try {
+      centerH3 = tactical ? tacticalCellAt(center.lat, center.lng) : strategicCellAt(center.lat, center.lng);
+    } catch {
+      return;
+    }
+    const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
+    if (!neighbor) return;
+    const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
+    const neighborLng = alignLongitudeToReference(neighborLngRaw, center.lng);
+    const centerPt = map.latLngToContainerPoint(leafletRef2.latLng(center.lat, center.lng));
+    const neighborPt = map.latLngToContainerPoint(
+      leafletRef2.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
+    );
+    const hexPixels = Math.hypot(neighborPt.x - centerPt.x, neighborPt.y - centerPt.y);
+    const stepPixels = hexPixels * keyboardPanModeSpeed(tactical);
+    const { dx, dy } = netAxesToScreenPanDelta(ns, ew, stepPixels);
+    if (dx === 0 && dy === 0) return;
+    map.panBy([dx, dy], { animate: false });
+  }
+  function applyInitialCameraForState(state) {
+    const map = getMainLeafletMap();
+    const leafletRef2 = globalThis.L;
+    if (!map || !leafletRef2) return;
+    const humanGround = state.units.filter(
+      (u) => u.player === HUMAN_SEAT_ID && isLandUnitType(u.unitType)
+    );
+    const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === HUMAN_SEAT_ID);
+    if (anchors.length === 0) return;
+    const [, anchorLng] = cellToLatLng(anchors[0].h3Index);
+    let latSum = 0;
+    let lngSum = 0;
+    for (const unit of anchors) {
+      const [lat, lng] = cellToLatLng(unit.h3Index);
+      latSum += lat;
+      lngSum += alignLngToReference(lng, anchorLng);
+    }
+    const centerLat = latSum / anchors.length;
+    const centerLng = lngSum / anchors.length;
+    const maxZoom = typeof map.getMaxZoom === "function" ? map.getMaxZoom() : 12;
+    const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
+    map.setView(leafletRef2.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
+    const ctr = typeof map.getCenter === "function" ? map.getCenter() : null;
+    if (ctr) {
+      rendererSharedState.strategicScenarioInitialLeafletView = { lat: ctr.lat, lng: ctr.lng, zoom: map.getZoom() };
+    }
+    rendererSharedState.initialCameraApplied = true;
+  }
+  function getLeafletGlobal() {
+    return globalThis.L;
+  }
+  function hexCenterPx(h3Index) {
+    return hexCenterToOverlayPoint(h3Index, cellToLatLng);
+  }
+  function hexCenterPxRelativeTo(fromH3Index, toH3Index) {
+    const [, refLng] = cellToLatLng(fromH3Index);
+    return hexCenterToOverlayPointWithReferenceLng(toH3Index, refLng, cellToLatLng);
+  }
+  function hitTestHexAtContainerPixel(x, y, mapHexSet) {
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const L = getLeafletGlobal();
+    const latlng = map.containerPointToLatLng(L.point(x, y));
+    let cell;
+    try {
+      cell = strategicCellAt(latlng.lat, latlng.lng);
+    } catch {
+      return null;
+    }
+    if (mapHexSet.has(cell)) return cell;
+    try {
+      const detailCell = tacticalCellAt(latlng.lat, latlng.lng);
+      const parent = strategicParentOf(detailCell);
+      return mapHexSet.has(parent) ? parent : null;
+    } catch {
+      return null;
+    }
+  }
+  function hitTestTacticalHexAtContainerPixel(x, y, tactical) {
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const L = getLeafletGlobal();
+    if (!L) return null;
+    const latlng = map.containerPointToLatLng(L.point(x, y));
+    let tacticalIndex;
+    try {
+      tacticalIndex = tacticalCellAt(latlng.lat, latlng.lng);
+    } catch {
+      return null;
+    }
+    if (tactical.tacticalChildH3Indexes.includes(tacticalIndex)) return tacticalIndex;
+    try {
+      const strategic = strategicCellAt(latlng.lat, latlng.lng);
+      if (strategic === tactical.enclosingStrategicH3Index) return tactical.enclosingStrategicH3Index;
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  function hitTestMapHexAtContainerPoint(x, y, gameState) {
+    const tb = rendererSharedState.tacticalBattleSnapshot;
+    if (tb) return hitTestTacticalHexAtContainerPixel(x, y, tb);
+    return hitTestHexAtContainerPixel(x, y, new Set(gameState.hexes.map((h) => h.h3Index)));
+  }
+  function hitTestMapHexAtClientPoint(clientX, clientY) {
+    if (!rendererSharedState.gameState) return null;
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const rect2 = map.getContainer().getBoundingClientRect();
+    return hitTestMapHexAtContainerPoint(clientX - rect2.left, clientY - rect2.top, rendererSharedState.gameState);
+  }
+
+  // src/renderer/rendering/renderGeometry.ts
+  function projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight) {
+    if (pts.length === 0) return false;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
+  }
+  function spanForProjectedHex(pts) {
+    if (pts.length === 0) return 1;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.max(1, Math.min(maxX - minX, maxY - minY));
+  }
+  function getMapZoomStrokeScale(zoom) {
+    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+  }
+
+  // src/renderer/map/terrainView.ts
+  function computeStrategicHexFillFraction() {
+    if (!rendererSharedState.gameState || rendererSharedState.gameState.hexes.length === 0) return 0;
+    const map = getMainLeafletMap();
+    if (!map) return 0;
+    const L = getLeafletGlobal();
+    const container = map.getContainer();
+    const center = {
+      x: Math.max(1, container.clientWidth) * 0.5,
+      y: Math.max(1, container.clientHeight) * 0.5
+    };
+    const centerLatLng = map.containerPointToLatLng(L.point(center.x, center.y));
+    let sampleH3;
+    try {
+      sampleH3 = strategicCellAt(centerLatLng.lat, centerLatLng.lng);
+    } catch {
+      sampleH3 = rendererSharedState.gameState.hexes[0].h3Index;
+    }
+    if (!rendererSharedState.gameState.hexes.some((h) => h.h3Index === sampleH3)) {
+      sampleH3 = rendererSharedState.gameState.hexes[0].h3Index;
+    }
+    const sampleBoundary = getHexBoundaryLatLngForLeafletOverlay(sampleH3);
+    const pts = sampleBoundary.map(([lat, lng]) => map.latLngToContainerPoint(L.latLng(lat, lng)));
+    if (pts.length === 0) return 0;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const viewW = Math.max(1, container.clientWidth);
+    const viewH = Math.max(1, container.clientHeight);
+    return Math.max((maxX - minX) / viewW, (maxY - minY) / viewH);
+  }
+  function shouldRenderTacticalHexes() {
+    if (rendererSharedState.tacticalBattleSnapshot) return true;
+    const fillFraction = computeStrategicHexFillFraction();
+    if (rendererSharedState.tacticalVisible) {
+      if (fillFraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) rendererSharedState.tacticalVisible = false;
+      return rendererSharedState.tacticalVisible;
+    }
+    if (fillFraction >= TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION) rendererSharedState.tacticalVisible = true;
+    return rendererSharedState.tacticalVisible;
+  }
+  function shouldHideStrategicMapUnitsForZoom() {
+    return shouldRenderTacticalHexes() && !rendererSharedState.tacticalBattleSnapshot;
+  }
+  function shouldShowBuildEntryZoom() {
+    const map = getMainLeafletMap();
+    if (!map) return false;
+    const currentZoom = map.getZoom();
+    if (!Number.isFinite(currentZoom)) return false;
+    if (rendererSharedState.buildEntryDefaultMapZoom == null) {
+      rendererSharedState.buildEntryDefaultMapZoom = currentZoom;
+    }
+    const threshold = rendererSharedState.buildEntryDefaultMapZoom + BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT * MAIN_MAP_WHEEL_ZOOM_STEP;
+    return currentZoom >= threshold;
+  }
+  function hideBuildEntryLayer(layer, clearHtml = true) {
+    layer.classList.add("hidden");
+    layer.setAttribute("aria-hidden", "true");
+    if (clearHtml) {
+      layer.innerHTML = "";
+    }
+    rendererSharedState.buildEntryButtonPointerInside = false;
+    rendererSharedState.lastBuildEntryLayerKey = null;
+  }
+  function projectHexBoundaryToContainerPoints(h3Index, map, leaflet) {
+    const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+    return boundary.map(([lat, lng]) => {
+      const p = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
+      return { x: p.x, y: p.y };
+    });
+  }
+  function shouldConsiderTacticalChildrenForViewport(parentStrategicH3Index, map, leaflet, viewportWidth, viewportHeight) {
+    const parentPts = projectHexBoundaryToContainerPoints(parentStrategicH3Index, map, leaflet);
+    return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
+  }
+  function shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight) {
+    return projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight);
   }
 
   // src/shared/navalStrategicEdges.ts
@@ -26155,6 +23554,37 @@ ${bonuses}`;
     productionDetailChosen = chosen;
   }
 
+  // src/shared/newGameBannerText.ts
+  function newGameBannerText(kind, tab) {
+    if (kind === "startup") return `Start the ${tab} game when ready.`;
+    return `Start a new ${tab} game when ready.`;
+  }
+
+  // src/renderer/gameplay/newGameBanner.ts
+  var bannerKind = null;
+  function writeNewGameBanner(text) {
+    const messageEl = document.getElementById("game-over-message");
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.style.display = "";
+  }
+  function showNewGameBanner(kind, tab) {
+    bannerKind = kind;
+    writeNewGameBanner(newGameBannerText(kind, tab));
+  }
+  function showGameOverBanner(text) {
+    bannerKind = null;
+    writeNewGameBanner(text);
+  }
+  function syncNewGameBannerToTab(tab) {
+    if (bannerKind === null) return;
+    writeNewGameBanner(newGameBannerText(bannerKind, tab));
+  }
+  function isNewGameOverlayOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+
   // src/renderer/gameplay/productionOverlayHelpers.ts
   function getControllerForHex(state, h3Index) {
     const row = state.strategicControl?.find((entry) => entry.h3Index === h3Index);
@@ -26733,6 +24163,19 @@ ${bonuses}`;
     return { x, y };
   }
 
+  // src/renderer/rendering/ownerColors.ts
+  function paletteSeats() {
+    return rendererSharedState.gameState?.seats ?? [];
+  }
+  function paletteForCurrentOwner(ownerId) {
+    if (ownerId == null || ownerId === "") return null;
+    const seats = paletteSeats();
+    const palette = paletteForOwner(ownerId, seats);
+    if (palette) return palette;
+    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
+    return null;
+  }
+
   // src/renderer/rendering/polygonOutline.ts
   function drawClosedPolygonPath(ctx, points2) {
     ctx.beginPath();
@@ -26978,6 +24421,92 @@ ${bonuses}`;
     applyRubbleSwatchPaint(swatch, paletteId);
     appendLegendRow(container, swatch, "Rubble");
   }
+
+  // src/renderer/chrome/controlTooltipText.ts
+  var humanNicknameFieldTooltipText = "The name shown for you during a match. Saved on this computer, and used the next time a game starts.";
+  var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
+  var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
+  function newGameButtonTooltipText(startGame) {
+    return startGame ? startGameButtonTooltipText : newMatchButtonTooltipText;
+  }
+  var rangedAimTooltipText = "Aim a ranged attack. Turn this on, then double-click the target on the map.";
+  var rangedStopTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
+  var strikeAimTooltipText = "Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.";
+  var strikeStopTooltipText = "Stop aiming an air strike. Strikes already in the list stay there.";
+  var airDropAimTooltipText = "Aim an air drop. Double-click a land hex within strike range. The carried infantry lands there, and the air unit returns to its airport.";
+  var airDropStopTooltipText = "Stop aiming an air drop. Drops already in the list stay there.";
+  var airDropDisabledTooltipText = "Air drop needs every selected air unit to be carrying infantry.";
+  var launchAimTooltipText = "Aim a missile launch. Turn this on, then double-click any explored hex in range. Each missile launches once.";
+  var launchStopTooltipText = "Stop aiming a missile launch. Launches already in the list stay there.";
+  function supportButtonTooltipText(kind, aiming) {
+    if (kind === "strike") return aiming ? strikeStopTooltipText : strikeAimTooltipText;
+    if (kind === "launch") return aiming ? launchStopTooltipText : launchAimTooltipText;
+    return aiming ? rangedStopTooltipText : rangedAimTooltipText;
+  }
+  var apiKeyTooltipText = "Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.";
+  var commanderNicknameTooltipText = "The name shown for this side during a match. It starts as the short home name and resets when this side's home changes.";
+  var refreshModelsTooltipText = "Load the model list again. If that fails, the message appears in the AI activity log.";
+  var runDisabledTooltipText = "Turn planning on or off for every commander. Give at least one commander an API key and a model first.";
+  var runEnabledTooltipText = "Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.";
+  function runButtonTooltipText(enabled) {
+    return enabled ? runEnabledTooltipText : runDisabledTooltipText;
+  }
+  var newGameCommanderTooltipText = "Change this side's nickname, API key, model, reasoning, and doctrine.";
+  var newGameItemOpenTooltipText = "The new-game screen is already open.";
+  var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
+  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses in this consult, for every commander, and the button stays pressed while this is on.";
+  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses in this consult, for every commander.";
+  var planningTooltipText = "Let the opponent plan routes, measure distances, and look up the map and the rules. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  function toolGroupTooltipText(groupId) {
+    switch (groupId) {
+      case "precomputation":
+        return precomputationTooltipText;
+      case "events":
+        return eventsTooltipText;
+      case "planning":
+        return planningTooltipText;
+      case "assessment":
+        return assessmentTooltipText;
+      case "estimation":
+        return estimationTooltipText;
+      case "memory":
+        return memoryTooltipText;
+      case "orders":
+        return ordersTooltipText;
+      case "production":
+        return productionTooltipText;
+      default:
+        return null;
+    }
+  }
+  var mapThemeTooltipText = "Pick the map colors for land, water, coastlines, borders, roads, rails, and place names. The choices are Standard, Topographic, Nautical, and Night.";
+  function buildEntryTooltipTextFor(canHire) {
+    return canHire ? "Build/Hire Units" : "Build Units";
+  }
+  var tacticalEntryTooltipText = "Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.";
+  var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
+  var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
+  var buildCountTooltipText = "Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
+  var KEEP_BUILDING_FORTIFICATION_NOTE = "A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.";
+  var keepBuildingTooltipText = `After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
+  var multiBuildAddTooltipText = "Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.";
+  var multiBuildTypeTooltipText = "Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.";
+  var multiBuildCountTooltipText = "Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
+  var multiKeepBuildingTooltipText = `After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
+  var sealiftSelectTooltipText = "Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.";
+  var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
+  var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
+  var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
+  var annihilationExitTooltipText = "Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.";
+  var aiOnlyResultOkTooltipText = "Close this result and return to the world map. The next turn does not start until you press Ready.";
+  var aiOnlyTimedResultOkTooltipText = 'Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.';
+  var chatStagedEditTooltipText = "Put this message back in the text field to change it.";
+  var chatStagedCancelTooltipText = "Discard this message. It has not been sent.";
 
   // src/renderer/rendering/terrainHexPalettes.ts
   var TERRAIN_HEX_PALETTES = {
@@ -28346,6 +25875,2236 @@ ${bonuses}`;
       else row.slot1UnitId = e.unitId;
     }
     return { ...base, navalRows: rows };
+  }
+
+  // src/renderer/chat/chatPanelClient.ts
+  var EMPTY_THREAD = {
+    viewerSeatId: null,
+    canSend: false,
+    recipientSeatIds: [],
+    messages: [],
+    staged: []
+  };
+  var snapshot = EMPTY_THREAD;
+  var recipientSeatId = null;
+  var listeners2 = [];
+  function chatSnapshot() {
+    return snapshot;
+  }
+  function chatRecipientSeatId() {
+    return recipientSeatId;
+  }
+  function setChatRecipient(seatId) {
+    recipientSeatId = seatId;
+  }
+  function subscribeChatThread(listener) {
+    listeners2.push(listener);
+    return () => {
+      const index = listeners2.indexOf(listener);
+      if (index >= 0) listeners2.splice(index, 1);
+    };
+  }
+  function notifyChatThread() {
+    for (const listener of listeners2) listener();
+  }
+  function repaintChatThread() {
+    notifyChatThread();
+  }
+  async function refreshChatThread() {
+    const read = window.gameApi?.readSideMessages;
+    if (!read) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    try {
+      const next = await read();
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      snapshot = next;
+      recipientSeatId = nextRecipientSeatId(recipientSeatId, next.recipientSeatIds);
+      notifyChatThread();
+    } catch (err) {
+      console.error("readSideMessages failed", err);
+    }
+  }
+  async function stageChatMessage(text) {
+    const stage = window.gameApi?.stageSideMessage;
+    if (!stage || recipientSeatId == null) return "Invalid message.";
+    try {
+      const result = await stage({ toSeatId: recipientSeatId, text });
+      await refreshChatThread();
+      return result.success ? null : result.reason;
+    } catch (err) {
+      console.error("stageSideMessage failed", err);
+      return "Invalid message.";
+    }
+  }
+  async function cancelStagedChatMessage(toSeatId) {
+    const cancel = window.gameApi?.cancelStagedSideMessage;
+    if (!cancel) return;
+    try {
+      await cancel({ toSeatId });
+      await refreshChatThread();
+    } catch (err) {
+      console.error("cancelStagedSideMessage failed", err);
+    }
+  }
+
+  // src/shared/commanderMessageTabs.ts
+  function compareCommanderMessageTabs(left, right) {
+    const leftIndex = aiIndexForSeatId(left.seatId) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = aiIndexForSeatId(right.seatId) ?? Number.MAX_SAFE_INTEGER;
+    return leftIndex - rightIndex || left.seatId.localeCompare(right.seatId, "en");
+  }
+  function initialCommanderMessageTabs(seats) {
+    const tabs = seats.map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      enabled: false,
+      message: null,
+      messages: [],
+      strategy: null,
+      consultedWithoutProse: false,
+      fromAbsence: false
+    })).sort(compareCommanderMessageTabs);
+    return { tabs, selectedSeatId: null };
+  }
+  function applyCommanderMessage(state, arrival) {
+    const message = proseOrNull(arrival.message ?? null);
+    const strategy = proseOrNull(arrival.strategy);
+    const messages = (arrival.messages ?? []).flatMap((row) => {
+      const text = proseOrNull(row.text);
+      return text ? [{ toSeatId: row.toSeatId, text }] : [];
+    });
+    if (!message && !strategy && messages.length === 0) return state;
+    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
+    if (index < 0) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, messages, strategy, consultedWithoutProse: false, fromAbsence: false } : tab
+    );
+    return { tabs, selectedSeatId: arrival.seatId };
+  }
+  function commanderDispatchHasProse(input) {
+    if (proseOrNull(input.strategy ?? null) !== null) return true;
+    return (input.messages ?? []).some((row) => proseOrNull(row.text) !== null);
+  }
+  function proseOrNull(value) {
+    const trimmed = value?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  function seatOutsideTacticalConsult(seatId, opposingPartyId, opponentTheater) {
+    if (!opposingPartyId || seatId === opposingPartyId) return false;
+    return opponentTheater === "tactical";
+  }
+  function resolveCommanderTabAbsence(input) {
+    if (input.outTurn !== null || input.status === "out") return "knocked_out";
+    if (input.status === "no_model") return "no_model";
+    if (input.status === "timed_out") return "timed_out";
+    if (input.consultedWithoutProse) return null;
+    if (input.status === "planning") return null;
+    if (input.tacticalOtherSeat) return "not_in_battle";
+    return input.storedReason;
+  }
+  function formatCommanderAbsenceMessage(reason, turnNumber) {
+    const turn = turnNumber !== null && Number.isFinite(turnNumber) && turnNumber > 0 ? turnNumber : null;
+    switch (reason) {
+      case "knocked_out":
+        return turn === null ? "Knocked out." : `Knocked out on turn ${turn}.`;
+      case "no_model":
+        return "No commander model is set.";
+      case "timed_out":
+        return turn === null ? "No reply in time, so its standing orders ran instead." : `No reply in time on turn ${turn}, so its standing orders ran instead.`;
+      case "no_new_consult":
+        return "No new consult was required, so its standing orders still apply.";
+      case "not_in_battle":
+        return "Not in this battle.";
+      case "no_units_in_battle":
+        return "No units left in this battle.";
+      case "consult_failed":
+        return "The consult failed.";
+    }
+  }
+  function noteCommanderConsultWithoutProse(state, seatId) {
+    const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
+    if (index < 0) return state;
+    const current = state.tabs[index];
+    if (!current || current.enabled && !current.fromAbsence) return state;
+    if (current.consultedWithoutProse && !current.fromAbsence) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? {
+        ...tab,
+        consultedWithoutProse: true,
+        enabled: false,
+        message: current.fromAbsence ? null : tab.message,
+        messages: current.fromAbsence ? [] : tab.messages,
+        strategy: null,
+        fromAbsence: false
+      } : tab
+    );
+    const selectedSeatId = state.selectedSeatId === seatId && current.fromAbsence ? null : state.selectedSeatId;
+    return { tabs, selectedSeatId };
+  }
+  function applyCommanderAbsence(state, seatId, message) {
+    const line = proseOrNull(message);
+    if (!line) return state;
+    const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
+    if (index < 0) return state;
+    const current = state.tabs[index];
+    if (!current || current.enabled && !current.fromAbsence) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message: line, messages: [], strategy: null, fromAbsence: true, consultedWithoutProse: false } : tab
+    );
+    return { tabs, selectedSeatId: state.selectedSeatId };
+  }
+  function resetCommanderConsultMarks(state) {
+    if (!state.tabs.some((tab) => tab.consultedWithoutProse)) return state;
+    return {
+      tabs: state.tabs.map((tab) => tab.consultedWithoutProse ? { ...tab, consultedWithoutProse: false } : tab),
+      selectedSeatId: state.selectedSeatId
+    };
+  }
+
+  // src/renderer/core/matchSnapshotClient.ts
+  function matchViewArgument() {
+    if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return void 0;
+    return rendererSharedState.viewAs;
+  }
+  function fetchMatchSnapshot() {
+    const api = window.gameApi;
+    if (!api?.getGameState) return Promise.reject(new Error("getGameState is unavailable"));
+    return api.getGameState(matchViewArgument());
+  }
+
+  // src/renderer/openRouter/openRouterToolCountLabels.ts
+  function updateOpenRouterToolCountLabels() {
+    for (const group of rendererSharedState.openRouterToolGroups) {
+      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
+      if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+    }
+  }
+  function applyCommanderToolCountSum(counts) {
+    rendererSharedState.toolInvocationCounts = { ...counts };
+    updateOpenRouterToolCountLabels();
+  }
+
+  // src/renderer/chrome/controlTooltip.ts
+  var controlTooltipAttr = "data-control-tooltip";
+  var controlTooltipElementId = "control-tooltip";
+  var richContentByHost = /* @__PURE__ */ new WeakMap();
+  var installed = false;
+  var delayTimer = null;
+  var currentHost = null;
+  var pointerInside = false;
+  var placeFromPointer = false;
+  var suppressedHost = null;
+  var lastClientX = 0;
+  var lastClientY = 0;
+  function tipElement() {
+    return document.getElementById(controlTooltipElementId);
+  }
+  function clearDelayTimer() {
+    if (delayTimer !== null) {
+      clearTimeout(delayTimer);
+      delayTimer = null;
+    }
+  }
+  function hideTip() {
+    clearDelayTimer();
+    const el = tipElement();
+    if (!el) return;
+    el.classList.add("hidden");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }
+  function orderTipVisible() {
+    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains("hidden")) return true;
+    }
+    return false;
+  }
+  function hostFromTarget(target) {
+    if (!(target instanceof Element)) return null;
+    const closest = target.closest(`[${controlTooltipAttr}]`);
+    if (closest instanceof HTMLElement) return closest;
+    if (target instanceof HTMLLabelElement && target.htmlFor) {
+      const linked = document.getElementById(target.htmlFor);
+      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
+    }
+    const label = target.closest("label");
+    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
+    return descendant instanceof HTMLElement ? descendant : null;
+  }
+  function hostText(host) {
+    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
+  }
+  function keyOpensNativeList(ev) {
+    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
+    if (ev.key === "ArrowDown" && ev.altKey) return true;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
+    return false;
+  }
+  function selectForTip(target) {
+    if (!(target instanceof Element)) return null;
+    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
+    if (!(select instanceof HTMLSelectElement)) return null;
+    return hostFromTarget(select) ? select : null;
+  }
+  function placeTip(el, x, y) {
+    el.style.left = "0px";
+    el.style.top = "0px";
+    const { width, height } = el.getBoundingClientRect();
+    const fitsRight = x + TOOLTIP_OFFSET_PX + width <= window.innerWidth;
+    const fitsBelow = y + TOOLTIP_OFFSET_PX + height <= window.innerHeight;
+    const left = fitsRight ? x + TOOLTIP_OFFSET_PX : Math.max(0, x - TOOLTIP_OFFSET_PX - width);
+    const top = fitsBelow ? y + TOOLTIP_OFFSET_PX : Math.max(0, y - TOOLTIP_OFFSET_PX - height);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
+  function showTip(host, text) {
+    const el = tipElement();
+    if (!el) return;
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+    let x = lastClientX;
+    let y = lastClientY;
+    if (!placeFromPointer) {
+      const rect2 = host.getBoundingClientRect();
+      x = rect2.left;
+      y = rect2.top;
+    }
+    const build = richContentByHost.get(host);
+    if (build) el.replaceChildren(build());
+    else el.textContent = text;
+    el.classList.remove("hidden");
+    placeTip(el, x, y);
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function scheduleShow(host) {
+    clearDelayTimer();
+    if (suppressedHost === host) return;
+    const text = hostText(host);
+    if (!text) {
+      hideTip();
+      return;
+    }
+    delayTimer = setTimeout(() => {
+      delayTimer = null;
+      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
+      if (orderTipVisible()) return;
+      const next = hostText(host);
+      if (!next) {
+        hideTip();
+        return;
+      }
+      showTip(host, next);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  }
+  function suppressHost(host) {
+    suppressedHost = host;
+    hideTip();
+  }
+  function adoptHost(host, fromPointer, clientX, clientY) {
+    if (fromPointer && host === currentHost) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+      moveVisibleTip(lastClientX, lastClientY);
+      return;
+    }
+    if (!fromPointer && host === currentHost) return;
+    if (currentHost !== host) {
+      hideTip();
+      suppressedHost = null;
+    }
+    currentHost = host;
+    if (fromPointer) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+    } else {
+      pointerInside = pointerIsOn(host);
+      placeFromPointer = pointerInside;
+    }
+    if (suppressedHost === host) return;
+    scheduleShow(host);
+  }
+  function releaseHost(host) {
+    if (suppressedHost === host) suppressedHost = null;
+    if (currentHost !== host) return;
+    pointerInside = false;
+    currentHost = null;
+    hideTip();
+  }
+  function relatedStaysInside(host, related) {
+    if (!(related instanceof Element)) return false;
+    const next = hostFromTarget(related);
+    if (next === host) return true;
+    if (next) return false;
+    return related === host || host.contains(related);
+  }
+  function pointerIsOn(host) {
+    return host.matches(":hover");
+  }
+  function focusIsOn(host) {
+    const active2 = document.activeElement;
+    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
+    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
+  }
+  function hostIsAvailable(host) {
+    if (!host.isConnected || host.getClientRects().length === 0) return false;
+    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
+    if (controls.length === 0) return true;
+    return controls.some((control) => control.getClientRects().length > 0);
+  }
+  function setRichControlTooltip(host, text, build) {
+    host.setAttribute(controlTooltipAttr, text);
+    richContentByHost.set(host, build);
+  }
+  function dismissStaleControlTooltip() {
+    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+  }
+  function moveVisibleTip(clientX, clientY) {
+    const el = tipElement();
+    if (!el || el.classList.contains("hidden")) return;
+    placeTip(el, clientX, clientY);
+  }
+  function installControlTooltip() {
+    if (installed) return;
+    installed = true;
+    document.addEventListener(
+      "pointerover",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, true, ev.clientX, ev.clientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        releaseHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointermove",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (orderTipVisible()) {
+          if (currentHost) releaseHost(currentHost);
+          return;
+        }
+        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+        if (host && host !== currentHost) {
+          adoptHost(host, true, ev.clientX, ev.clientY);
+          return;
+        }
+        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
+          releaseHost(currentHost);
+        }
+        if (!host || host !== currentHost) return;
+        lastClientX = ev.clientX;
+        lastClientY = ev.clientY;
+        placeFromPointer = true;
+        pointerInside = true;
+        moveVisibleTip(lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerdown",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "keydown",
+      (ev) => {
+        if (!keyOpensNativeList(ev)) return;
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "change",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusin",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, false, lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        if (pointerInside && currentHost === host) return;
+        releaseHost(host);
+      },
+      true
+    );
+  }
+
+  // src/renderer/map/mapExtent.ts
+  var active = "world";
+  function loadedMapExtentTarget() {
+    return active;
+  }
+  var appliedKey2 = "";
+  var resizeListenerAttached = false;
+  var activeBounds = null;
+  var lockedMinZoom = null;
+  function applyLoadedMapExtent(target, fit = true) {
+    const maps = extentMaps();
+    if (!maps) return false;
+    active = target;
+    if (target === "world") {
+      activeBounds = null;
+      lockedMinZoom = null;
+      setMapExtentReferenceLng(null);
+      const bounds2 = worldBounds(maps.leaflet);
+      applyToMap(maps.main, bounds2, 1.5, fit);
+      applyToMap(maps.mini, bounds2, 0, fit);
+      return true;
+    }
+    setMapExtentReferenceLng(target.referenceLng);
+    const bounds = maps.leaflet.latLngBounds(
+      maps.leaflet.latLng(target.south, target.west, true),
+      maps.leaflet.latLng(target.north, target.east, true)
+    );
+    activeBounds = bounds;
+    if (fit) maps.main.setMinZoom?.(0);
+    applyToMap(maps.main, bounds, null, fit);
+    applyToMap(maps.mini, bounds, 0, fit);
+    if (fit && maps.main.getZoom && maps.main.setMinZoom) {
+      lockedMinZoom = maps.main.getZoom();
+      maps.main.setMinZoom(lockedMinZoom);
+    } else if (lockedMinZoom != null) {
+      maps.main.setMinZoom?.(lockedMinZoom);
+    }
+    attachResize(maps.main);
+    return true;
+  }
+  function restoreLoadedMapExtent(fit = false) {
+    applyLoadedMapExtent(active, fit);
+  }
+  function enterBattleLongitudeFrame(childTacticalH3Indexes, matchExtent) {
+    const regionalReferenceLng = matchExtent === "world" ? null : matchExtent.referenceLng;
+    let referenceLng = null;
+    try {
+      referenceLng = battleDrawReferenceLng(childTacticalH3Indexes, regionalReferenceLng);
+    } catch (err) {
+      console.error("battle longitude frame skipped: footprint cell could not be read", {
+        cellCount: childTacticalH3Indexes.length,
+        err
+      });
+    }
+    setBattleDrawReferenceLng(referenceLng);
+    console.debug("battle longitude frame", {
+      cellCount: childTacticalH3Indexes.length,
+      regionalReferenceLng,
+      referenceLng
+    });
+  }
+  function exitBattleLongitudeFrame() {
+    setBattleDrawReferenceLng(null);
+    console.debug("battle longitude frame cleared");
+  }
+  function syncMapExtentToSnapshot(state, options) {
+    const mapId = state.gameMap?.id ?? "global";
+    if (!isNewGameOverlayOpen()) setBasemapGameMap(mapId);
+    const key = loadedMapExtentKey(
+      mapId,
+      state.hexes.map((hex) => hex.h3Index)
+    );
+    if (!extentMaps()) return;
+    if (!shouldApplyLoadedMapExtent(appliedKey2, key, options?.refit === true)) return;
+    if (mapId === "global" || state.hexes.length === 0) {
+      applyLoadedMapExtent("world", true);
+      appliedKey2 = key;
+      return;
+    }
+    const longitudes = state.hexes.map((hex) => cellToLatLng(hex.h3Index)[1]);
+    const box = mapExtentBoxForHexes(
+      longitudeIntervalFromCenters(longitudes),
+      state.hexes.map((hex) => hex.h3Index)
+    );
+    if (!box) return;
+    applyLoadedMapExtent(box, true);
+    appliedKey2 = key;
+  }
+  function extentMaps() {
+    const leaflet = globalThis.L;
+    const main = getMainLeafletMap();
+    if (!leaflet || !main) return null;
+    const mini = getMiniLeafletMap();
+    return { leaflet, main, mini };
+  }
+  function worldBounds(leaflet) {
+    return leaflet.latLngBounds(
+      leaflet.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leaflet.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+  }
+  function applyToMap(map, bounds, minZoom, fit) {
+    if (!map) return;
+    map.setMaxBounds?.(bounds);
+    if (minZoom != null) map.setMinZoom?.(minZoom);
+    if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });
+  }
+  function attachResize(map) {
+    if (resizeListenerAttached || !map.on) return;
+    resizeListenerAttached = true;
+    let recomputing = false;
+    map.on("resize", () => {
+      if (recomputing || active === "world" || activeBounds == null) return;
+      recomputing = true;
+      try {
+        const view2 = map;
+        const zoom = view2.getZoom?.() ?? 0;
+        const center = view2.getCenter?.();
+        view2.setMinZoom?.(0);
+        view2.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
+        const fitted = view2.getZoom?.() ?? zoom;
+        view2.setMinZoom?.(fitted);
+        if (center && view2.setView) view2.setView(center, Math.max(fitted, zoom));
+      } finally {
+        recomputing = false;
+      }
+    });
+  }
+
+  // src/renderer/map/mainMapCameraReturn.ts
+  var saved = null;
+  function saveMainMapCameraForReturn() {
+    setBattleDrawReferenceSuspended(true);
+    const map = getMainLeafletMap();
+    if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
+      saved = null;
+      return;
+    }
+    saved = {
+      extent: loadedMapExtentTarget(),
+      center: map.getCenter(),
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      maxBounds: map.options?.maxBounds ?? null
+    };
+  }
+  function matchMapExtentTarget() {
+    return saved?.extent ?? loadedMapExtentTarget();
+  }
+  function returnMainMapCamera() {
+    setBattleDrawReferenceSuspended(false);
+    const camera = saved;
+    saved = null;
+    const map = getMainLeafletMap();
+    if (!camera || !map) return false;
+    applyLoadedMapExtent(camera.extent, true);
+    map.setMaxBounds?.(camera.maxBounds);
+    map.setMinZoom?.(camera.minZoom);
+    map.setMaxZoom?.(camera.maxZoom);
+    map.setView?.(camera.center, camera.zoom, { animate: false });
+    return true;
+  }
+  function forgetMainMapCameraForReturn() {
+    saved = null;
+    setBattleDrawReferenceSuspended(false);
+  }
+
+  // src/renderer/chrome/panelSlideHelpers.ts
+  var PANEL_SLIDE_MS = 150;
+  function reducedMotionRequested() {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  }
+  function startPanelHeightSlide(panel, from, to, onFinish) {
+    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") return null;
+    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: PANEL_SLIDE_MS,
+      easing: "ease-out"
+    });
+    running.onfinish = () => onFinish(running);
+    return running;
+  }
+
+  // src/renderer/gameplay/newGameDialogMove.ts
+  var dragStart = null;
+  function dialogAndArea() {
+    const panel = document.getElementById("game-over-overlay");
+    const area = document.getElementById("app-body");
+    if (!panel || !area) return null;
+    return { panel, area };
+  }
+  function applyOffset(panel, area, left, top, panelHeight = panel.offsetHeight) {
+    const place = floatingPanelOffset({
+      left,
+      top,
+      panelWidth: panel.offsetWidth,
+      panelHeight,
+      mapWidth: area.clientWidth,
+      mapHeight: area.clientHeight
+    });
+    panel.style.left = `${place.left}px`;
+    panel.style.top = `${place.top}px`;
+  }
+  function placeNewGameDialogAtInset() {
+    dragStart = null;
+    const parts = dialogAndArea();
+    if (!parts) return;
+    parts.panel.style.removeProperty("left");
+    parts.panel.style.removeProperty("top");
+    layoutMapChrome();
+  }
+  function keepNewGameDialogOnMap(panelHeight) {
+    const parts = dialogAndArea();
+    if (!parts || parts.panel.style.left === "" || parts.panel.classList.contains("hidden")) return;
+    applyOffset(parts.panel, parts.area, parts.panel.offsetLeft, parts.panel.offsetTop, panelHeight ?? parts.panel.offsetHeight);
+  }
+  function endDrag() {
+    if (!dragStart) return;
+    dragStart = null;
+    layoutMapChrome();
+  }
+  function wireNewGameDialogMove() {
+    const grip = document.getElementById("new-game-panel-grip");
+    if (!grip) return;
+    grip.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const parts = dialogAndArea();
+      if (!parts) return;
+      event.preventDefault();
+      dragStart = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
+      grip.setPointerCapture(event.pointerId);
+    });
+    grip.addEventListener("pointermove", (event) => {
+      const parts = dialogAndArea();
+      if (!dragStart || !parts) return;
+      applyOffset(parts.panel, parts.area, dragStart.left + event.clientX - dragStart.x, dragStart.top + event.clientY - dragStart.y);
+    });
+    grip.addEventListener("pointerup", endDrag);
+    grip.addEventListener("pointercancel", endDrag);
+    window.addEventListener("resize", () => keepNewGameDialogOnMap());
+  }
+
+  // src/shared/popoverPlacement.ts
+  function placeBelowAnchor(anchor3, popover3, viewport) {
+    const gap = 6;
+    const margin = 8;
+    const left = Math.max(margin, Math.min(anchor3.left, viewport.width - popover3.width - margin));
+    let top = anchor3.bottom + gap;
+    if (top + popover3.height > viewport.height - margin) top = anchor3.top - popover3.height - gap;
+    if (top < margin) top = margin;
+    return { top, left };
+  }
+
+  // src/renderer/chrome/anchoredPopoverLifecycle.ts
+  function attachAnchoredPopoverListeners(hooks) {
+    const onKey = (event) => {
+      if (event.key === "Escape") hooks.close();
+    };
+    const onPointer = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (hooks.containsTarget(target)) return;
+      hooks.close();
+    };
+    const onMove = () => hooks.reposition();
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }
+  function placePopoverBelowAnchor(popover3, anchor3) {
+    const rect2 = anchor3.getBoundingClientRect();
+    const box = popover3.getBoundingClientRect();
+    const placed = placeBelowAnchor(
+      { top: rect2.top, bottom: rect2.bottom, left: rect2.left },
+      { width: box.width, height: box.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    popover3.style.top = `${placed.top}px`;
+    popover3.style.left = `${placed.left}px`;
+  }
+
+  // src/shared/openRouterProviderSort.ts
+  var PROVIDER_SORT_CHOICES = Object.freeze([
+    "throughput",
+    "price",
+    "latency",
+    "nitro"
+  ]);
+  var PROVIDER_SORT_LABELS = Object.freeze({
+    throughput: "Highest Throughput",
+    price: "Lowest Price",
+    latency: "Lowest Latency",
+    nitro: "Priority Service (Nitro)"
+  });
+  var DEFAULT_PROVIDER_SORT = "throughput";
+
+  // src/shared/newGameSides.ts
+  function nicknameForHome(homeKey, homes) {
+    const home = homes.find((option2) => option2.key === homeKey);
+    return home ? defaultAiNickname(home.label, "") : "";
+  }
+  function initialSidesState(args) {
+    const requested = args.rowCount ?? MIN_SEATS;
+    const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
+    const rows = args.homes.slice(0, count).map((home, index) => ({
+      kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
+      homeKey: home.key,
+      commander: index === 0 ? null : { ...args.defaultCommander, nickname: nicknameForHome(home.key, args.homes) }
+    }));
+    return { mapKind: args.mapKind, observeOnly: false, rows };
+  }
+  function setObserveOnly(state, on2, defaultCommander2, homes) {
+    if (state.rows.length === 0) return { ...state, observeOnly: on2 };
+    const first = state.rows[0];
+    const nextFirst = on2 ? {
+      ...first,
+      kind: AI_SEAT_KIND,
+      commander: {
+        ...first.commander ?? defaultCommander2,
+        nickname: nicknameForHome(first.homeKey ?? "", homes)
+      }
+    } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
+    return { ...state, observeOnly: on2, rows: [nextFirst, ...state.rows.slice(1)] };
+  }
+  function sidesHaveAnyModel(state) {
+    if (!state) return false;
+    return state.rows.some((row) => row.kind === AI_SEAT_KIND && Boolean(row.commander?.modelId?.trim()));
+  }
+  function addSideRow(state, homes, defaultCommander2) {
+    if (addRowBlockedReason(state, homes)) return state;
+    const taken = new Set(state.rows.map((row2) => row2.homeKey));
+    const free = homes.find((home) => !taken.has(home.key));
+    if (!free) return state;
+    const source = [...state.rows].reverse().find((row2) => row2.kind === AI_SEAT_KIND && row2.commander != null);
+    const copied = source?.commander;
+    const commander = {
+      modelId: copied?.modelId ?? defaultCommander2.modelId,
+      reasoningEffort: copied?.reasoningEffort ?? defaultCommander2.reasoningEffort,
+      providerSort: copied?.providerSort ?? defaultCommander2.providerSort,
+      doctrineChoice: copied?.doctrineChoice ?? defaultCommander2.doctrineChoice,
+      apiKey: copied ? (copied.apiKey ?? "").trim() : defaultCommander2.apiKey,
+      nickname: nicknameForHome(free.key, homes)
+    };
+    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander };
+    return { ...state, rows: [...state.rows, row] };
+  }
+  function removeSideRow(state, index) {
+    if (state.rows.length <= MIN_SEATS) return state;
+    if (index < 0 || index >= state.rows.length) return state;
+    return { ...state, rows: state.rows.filter((_2, rowIndex) => rowIndex !== index) };
+  }
+  function setRowHome(state, index, homeKey, homes) {
+    if (index < 0 || index >= state.rows.length) return state;
+    const current = state.rows[index];
+    if (current.homeKey === homeKey) return state;
+    const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
+    if (taken) return state;
+    const commander = current.kind === AI_SEAT_KIND && current.commander ? { ...current.commander, nickname: nicknameForHome(homeKey, homes) } : current.commander;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey, commander } : row);
+    return { ...state, rows };
+  }
+  function randomizeRowHome(state, index, homes, random) {
+    if (index < 0 || index >= state.rows.length) return state;
+    const current = state.rows[index].homeKey;
+    const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
+    if (free.length === 0) return state;
+    const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))];
+    return setRowHome(state, index, picked.key, homes);
+  }
+  function setRowCommander(state, index, commander) {
+    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== AI_SEAT_KIND) return state;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, commander } : row);
+    return { ...state, rows };
+  }
+  function rowLabel(state, index) {
+    if (index < 0 || index >= state.rows.length) return "";
+    if (state.observeOnly) return `Side ${index + 1}`;
+    if (state.rows[index].kind === HUMAN_SEAT_KIND) return "You";
+    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === AI_SEAT_KIND).length;
+    return `Opponent ${opponentNumber}`;
+  }
+  function homeOptionsForRow(state, index, homes) {
+    return homes.map((home) => {
+      const taker = state.rows.findIndex((row, rowIndex) => rowIndex !== index && row.homeKey === home.key);
+      return {
+        key: home.key,
+        label: home.label,
+        disabled: taker >= 0,
+        takenBy: taker >= 0 ? rowLabel(state, taker) : null
+      };
+    });
+  }
+  function sidesCaption(state, homes) {
+    const max2 = Math.min(MAX_SEATS, homes.length);
+    const noun = state.observeOnly ? `${state.rows.length} of ${max2} sides, all AI` : `${state.rows.length} of ${max2} sides in play`;
+    return noun;
+  }
+  function addRowBlockedReason(state, homes) {
+    if (state.rows.length >= MAX_SEATS) return "Up to 4 sides";
+    const taken = new Set(state.rows.map((row) => row.homeKey));
+    const free = homes.some((home) => !taken.has(home.key));
+    if (!free) return "No free side on this map";
+    return null;
+  }
+  function startBlockedReason(state) {
+    if (!state || state.rows.length < MIN_SEATS) return "At least 2 sides";
+    if (state.rows.some((row) => !row.homeKey)) return "Each side needs a home";
+    const keys = state.rows.map((row) => row.homeKey);
+    if (new Set(keys).size !== keys.length) return "Two sides share a home";
+    return null;
+  }
+  function buildSeatsPayload(state) {
+    return state.rows.map((row) => {
+      const home = row.homeKey ?? void 0;
+      const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
+      if (row.kind === AI_SEAT_KIND && row.commander) {
+        return { ...seat, nickname: row.commander.nickname ?? "", commander: row.commander };
+      }
+      return seat;
+    });
+  }
+
+  // src/shared/commanderSetupCopy.ts
+  function commanderApiKey(commander) {
+    return commander?.apiKey?.trim() ?? "";
+  }
+  function prefillFirstAiApiKey(state, apiKey) {
+    const index = state.rows.findIndex((row2) => row2.kind === AI_SEAT_KIND);
+    if (index < 0) return state;
+    const row = state.rows[index];
+    const commander = row.commander ?? {
+      modelId: null,
+      reasoningEffort: null,
+      providerSort: DEFAULT_PROVIDER_SORT,
+      doctrineChoice: "balanced",
+      nickname: ""
+    };
+    const rows = state.rows.map(
+      (entry, rowIndex) => rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
+    );
+    return { ...state, rows };
+  }
+  function commanderFromRemembered(remembered) {
+    return {
+      modelId: remembered.modelId,
+      reasoningEffort: remembered.reasoningEffort,
+      providerSort: remembered.providerSort,
+      doctrineChoice: remembered.doctrineChoice,
+      apiKey: remembered.apiKey,
+      nickname: remembered.nickname
+    };
+  }
+  function previousAiRowIndex(state, index) {
+    if (index < 0 || index >= state.rows.length) return null;
+    if (state.rows[index]?.kind !== AI_SEAT_KIND) return null;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (state.rows[cursor]?.kind === AI_SEAT_KIND) return cursor;
+    }
+    return null;
+  }
+  function copyButtonState(state, index, hasPreviousMatch) {
+    if (index < 0 || index >= state.rows.length) return null;
+    if (state.rows[index]?.kind !== AI_SEAT_KIND) return null;
+    const previous = previousAiRowIndex(state, index);
+    if (previous === null) {
+      if (!hasPreviousMatch) return { label: "No previous game", disabled: true, source: "previous-match" };
+      return { label: `Copy from Last Game (${rowLabel(state, index)})`, disabled: false, source: "previous-match" };
+    }
+    return { label: `Copy from ${rowLabel(state, previous)}`, disabled: false, source: "previous-opponent" };
+  }
+
+  // src/shared/openRouterReasoningEffort.ts
+  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
+    "max",
+    "xhigh",
+    "high",
+    "medium",
+    "low",
+    "minimal",
+    "none"
+  ]);
+  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
+    ["none", "None"],
+    ["minimal", "Min"],
+    ["low", "Low"],
+    ["medium", "Med"],
+    ["high", "High"],
+    ["xhigh", "Xhigh"],
+    ["max", "Max"]
+  ]);
+  function capitalizeReasoningEffortName(effort) {
+    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
+  }
+  function abbreviateReasoningEffort(effort) {
+    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
+  }
+  function sortReasoningEffortsAscending(efforts) {
+    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
+    return [...efforts].sort((a, b) => rank(b) - rank(a));
+  }
+  function listSelectableReasoningEfforts(model) {
+    const reasoning = model?.reasoning;
+    if (!reasoning || reasoning.supported_efforts === void 0) return [];
+    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
+    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
+  }
+  function resolveDefaultReasoningEffort(model) {
+    const defaultEffort = model?.reasoning?.default_effort;
+    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
+  }
+  function resolveRequestedReasoningEffort(model, persistedEffort) {
+    const trimmed = persistedEffort.trim();
+    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
+  }
+  function isReasoningEffortSelectable(model) {
+    return listSelectableReasoningEfforts(model).length >= 2;
+  }
+
+  // src/renderer/openRouter/openRouterModelRefresh.ts
+  var refreshModels = null;
+  var onModelListUpdated = null;
+  var reportLine = null;
+  function setOpenRouterModelRefresh(refresh) {
+    refreshModels = refresh;
+  }
+  function refreshOpenRouterModels(key) {
+    return refreshModels?.(key) ?? Promise.resolve();
+  }
+  function setOpenRouterModelListListener(listener) {
+    onModelListUpdated = listener;
+  }
+  function notifyOpenRouterModelListUpdated() {
+    onModelListUpdated?.();
+  }
+  function setOpenRouterPopoverLog(report) {
+    reportLine = report;
+  }
+  function reportOpenRouterPopoverLine(line, isError) {
+    reportLine?.(line, isError);
+  }
+
+  // src/shared/doctrineDescriptions.ts
+  var DOCTRINE_CHOICE_LABELS = {
+    aggressive: "Aggressive",
+    balanced: "Balanced",
+    cautious: "Cautious",
+    random: "Random"
+  };
+  var DOCTRINE_CHOICE_DESCRIPTIONS = {
+    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
+    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
+    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
+    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
+  };
+
+  // src/renderer/openRouter/commanderPopoverLabels.ts
+  var popoverLabelWidthText = "Reasoning";
+  var POPOVER_CONTROL_IDS = {
+    nickname: "commander-popover-nickname",
+    apiKey: "commander-popover-api-key",
+    model: "commander-popover-model",
+    reasoning: "commander-popover-reasoning",
+    provider: "commander-popover-provider",
+    doctrine: "commander-popover-doctrine"
+  };
+  function fieldLabel(id, text) {
+    const label = document.createElement("label");
+    label.className = "commander-popover-label";
+    label.htmlFor = id;
+    const sizer = document.createElement("span");
+    sizer.className = "commander-popover-label-sizer";
+    sizer.setAttribute("aria-hidden", "true");
+    sizer.textContent = popoverLabelWidthText;
+    const shown = document.createElement("span");
+    shown.textContent = text;
+    label.append(sizer, shown);
+    return label;
+  }
+  function choicePair(id, text, control) {
+    const pair = document.createElement("div");
+    pair.className = "commander-popover-choice";
+    pair.append(fieldLabel(id, text), control);
+    return pair;
+  }
+
+  // src/renderer/openRouter/commanderPopoverChoices.ts
+  function choiceSelect(input) {
+    const select = document.createElement("select");
+    select.id = input.id;
+    select.setAttribute("aria-label", input.label);
+    for (const choice of input.options) select.appendChild(new Option(input.optionLabel(choice), choice));
+    select.value = input.selected;
+    select.addEventListener("change", () => {
+      input.onChange(select.value);
+    });
+    return {
+      pair: choicePair(input.id, input.label, select),
+      show: (next) => {
+        select.value = next;
+      }
+    };
+  }
+  function doctrineChoiceControl(input) {
+    const description = document.createElement("p");
+    description.className = "commander-popover-doctrine";
+    const control = choiceSelect({
+      id: POPOVER_CONTROL_IDS.doctrine,
+      label: "Doctrine",
+      options: DOCTRINE_CHOICES,
+      optionLabel: (choice) => DOCTRINE_CHOICE_LABELS[choice],
+      selected: input.selected,
+      onChange: (choice) => {
+        description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[choice];
+        input.onChange(choice);
+      }
+    });
+    const show = (next) => {
+      control.show(next);
+      description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[next];
+    };
+    show(input.selected);
+    const row = document.createElement("div");
+    row.className = "commander-popover-doctrine-row";
+    row.append(control.pair, description);
+    return { row, show };
+  }
+  function providerChoiceControl(input) {
+    return choiceSelect({
+      id: POPOVER_CONTROL_IDS.provider,
+      label: "Provider",
+      options: PROVIDER_SORT_CHOICES,
+      optionLabel: (choice) => PROVIDER_SORT_LABELS[choice],
+      selected: input.selected,
+      onChange: input.onChange
+    });
+  }
+
+  // src/renderer/openRouter/openRouterModelCatalog.ts
+  var modelsById = /* @__PURE__ */ new Map();
+  function replaceOpenRouterModelCatalog(models) {
+    modelsById.clear();
+    for (const model of models) modelsById.set(model.id, model);
+  }
+  function clearOpenRouterModelCatalog() {
+    modelsById.clear();
+  }
+  function openRouterModelById(modelId) {
+    return modelsById.get(modelId);
+  }
+
+  // src/renderer/openRouter/reasoningEffortSelect.ts
+  function formatReasoningEffortOptionLabel(effort, isDefault) {
+    const label = capitalizeReasoningEffortName(effort);
+    return isDefault ? `${label} (default)` : label;
+  }
+  function attachReasoningEffortSelect(args) {
+    const { select, onEffortChange } = args;
+    let currentDefault = null;
+    select.addEventListener("change", () => {
+      onEffortChange(select.value === currentDefault ? "" : select.value);
+    });
+    return {
+      showForModel(model, persistedEffort) {
+        const efforts = listSelectableReasoningEfforts(model);
+        const defaultEffort = resolveDefaultReasoningEffort(model);
+        currentDefault = defaultEffort;
+        select.replaceChildren();
+        if (efforts.length === 0 || defaultEffort === null) {
+          select.appendChild(new Option(capitalizeReasoningEffortName("model default"), ""));
+        }
+        efforts.forEach((effort) => {
+          select.appendChild(new Option(formatReasoningEffortOptionLabel(effort, effort === defaultEffort), effort));
+        });
+        select.value = resolveRequestedReasoningEffort(model, persistedEffort) ?? defaultEffort ?? "";
+        select.disabled = !isReasoningEffortSelectable(model);
+      }
+    };
+  }
+
+  // src/renderer/openRouter/commanderPopover.ts
+  var popover = null;
+  var anchor = null;
+  var detachListeners = null;
+  var notifyClosed = null;
+  var applyOpenDraft = null;
+  function openCommanderPopover(request) {
+    closeCommanderPopover();
+    anchor = request.anchor;
+    notifyClosed = request.onClose ?? null;
+    const draft = {
+      modelId: request.commander.modelId,
+      reasoningEffort: request.commander.reasoningEffort,
+      providerSort: request.commander.providerSort,
+      doctrineChoice: request.commander.doctrineChoice,
+      apiKey: commanderApiKey(request.commander),
+      nickname: nicknameFieldValue(request.commander.nickname, request.defaultNickname)
+    };
+    const root = document.createElement("div");
+    root.className = "commander-popover";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-label", request.title);
+    root.append(popoverHeader(request.title), popoverFields(draft, request));
+    document.body.appendChild(root);
+    popover = root;
+    placeCommanderPopover();
+    detachListeners = attachAnchoredPopoverListeners({
+      containsTarget: (target) => !!(popover?.contains(target) || anchor?.contains(target)),
+      close: closeCommanderPopover,
+      reposition: placeCommanderPopover
+    });
+  }
+  function closeCommanderPopover() {
+    detachListeners?.();
+    detachListeners = null;
+    popover?.remove();
+    popover = null;
+    anchor = null;
+    applyOpenDraft = null;
+    setOpenRouterModelListListener(null);
+    const closed = notifyClosed;
+    notifyClosed = null;
+    closed?.();
+  }
+  function reanchorCommanderPopover(next) {
+    if (!popover) return;
+    anchor = next;
+    placeCommanderPopover();
+  }
+  function commanderPopoverIsOpen() {
+    return popover != null;
+  }
+  function replaceOpenCommanderDraft(commander) {
+    applyOpenDraft?.(commander);
+  }
+  function popoverHeader(title) {
+    const header = document.createElement("div");
+    header.className = "commander-popover-header";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "commander-popover-close";
+    close.textContent = "\xD7";
+    close.setAttribute("aria-label", "Close");
+    close.addEventListener("click", () => closeCommanderPopover());
+    header.append(heading, close);
+    return header;
+  }
+  function popoverFields(draft, request) {
+    const fields = document.createElement("div");
+    fields.className = "commander-popover-fields";
+    const nicknameInput2 = document.createElement("input");
+    nicknameInput2.id = POPOVER_CONTROL_IDS.nickname;
+    nicknameInput2.type = "text";
+    nicknameInput2.maxLength = SIDE_NICKNAME_MAX_LENGTH;
+    nicknameInput2.autocomplete = "off";
+    nicknameInput2.spellcheck = false;
+    nicknameInput2.setAttribute("aria-label", "Nickname");
+    nicknameInput2.value = draft.nickname;
+    nicknameInput2.setAttribute("data-control-tooltip", commanderNicknameTooltipText);
+    const keyInput = document.createElement("input");
+    keyInput.id = POPOVER_CONTROL_IDS.apiKey;
+    keyInput.type = "password";
+    keyInput.autocomplete = "off";
+    keyInput.setAttribute("aria-label", "API key");
+    keyInput.value = commanderApiKey(draft);
+    keyInput.setAttribute("data-control-tooltip", apiKeyTooltipText);
+    const model = document.createElement("select");
+    model.id = POPOVER_CONTROL_IDS.model;
+    model.setAttribute("aria-label", "Model");
+    copyModelOptions(model, draft.modelId);
+    const modelControls = document.createElement("span");
+    modelControls.className = "commander-popover-model-controls";
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "openrouter-refresh-btn";
+    refresh.setAttribute("aria-label", "Refresh model list");
+    refresh.setAttribute("data-control-tooltip", refreshModelsTooltipText);
+    modelControls.append(model, refresh);
+    const keyModel = document.createElement("div");
+    keyModel.className = "commander-popover-key-model";
+    keyModel.append(
+      fieldLabel(POPOVER_CONTROL_IDS.nickname, "Nickname"),
+      nicknameInput2,
+      fieldLabel(POPOVER_CONTROL_IDS.apiKey, "API key"),
+      keyInput,
+      fieldLabel(POPOVER_CONTROL_IDS.model, "Model"),
+      modelControls
+    );
+    const reasoning = document.createElement("select");
+    reasoning.id = POPOVER_CONTROL_IDS.reasoning;
+    reasoning.setAttribute("aria-label", "Reasoning");
+    const current = () => {
+      draft.nickname = nicknameFieldValue(nicknameInput2.value, request.defaultNickname);
+      draft.apiKey = keyInput.value.trim();
+      return { ...draft };
+    };
+    const reasoningSelect = attachReasoningEffortSelect({
+      select: reasoning,
+      onEffortChange: (effort) => {
+        draft.reasoningEffort = effort ? effort : null;
+        request.onChange(current());
+      }
+    });
+    const showReasoning = () => {
+      const modelId = draft.modelId ?? "";
+      const record = modelId ? openRouterModelById(modelId) : void 0;
+      reasoningSelect.showForModel(record, draft.reasoningEffort ?? "");
+      const efforts = listSelectableReasoningEfforts(record);
+      const modelKnown = modelId.length > 0 && record != null;
+      if (!modelId || modelKnown && efforts.length === 0) draft.reasoningEffort = null;
+      placeCommanderPopover();
+    };
+    model.addEventListener("change", () => {
+      draft.modelId = model.value ? model.value : null;
+      draft.reasoningEffort = null;
+      saveAppWideModel(draft.modelId);
+      showReasoning();
+      request.onChange(current());
+    });
+    showReasoning();
+    const emitNicknameIfChanged = () => {
+      const next = nicknameFieldValue(nicknameInput2.value, request.defaultNickname);
+      nicknameInput2.value = next;
+      if (next === draft.nickname) return;
+      draft.nickname = next;
+      request.onChange(current());
+    };
+    nicknameInput2.addEventListener("blur", emitNicknameIfChanged);
+    nicknameInput2.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") emitNicknameIfChanged();
+    });
+    const emitKeyIfChanged = () => {
+      const next = keyInput.value.trim();
+      if (next === (draft.apiKey ?? "")) return;
+      draft.apiKey = next;
+      request.onChange({ ...draft });
+    };
+    keyInput.addEventListener("blur", emitKeyIfChanged);
+    keyInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") emitKeyIfChanged();
+    });
+    refresh.addEventListener("click", () => {
+      const key = keyInput.value.trim();
+      if (!key) {
+        reportOpenRouterPopoverLine("No API key set.", true);
+        return;
+      }
+      draft.apiKey = key;
+      request.onChange({ ...draft });
+      void refreshOpenRouterModels(key);
+    });
+    setOpenRouterModelListListener(() => {
+      copyModelOptions(model, draft.modelId);
+      showReasoning();
+    });
+    const provider = providerChoiceControl({
+      selected: draft.providerSort,
+      onChange: (choice) => {
+        draft.providerSort = choice;
+        request.onChange(current());
+      }
+    });
+    const doctrine = doctrineChoiceControl({
+      selected: draft.doctrineChoice,
+      onChange: (choice) => {
+        draft.doctrineChoice = choice;
+        request.onChange(current());
+      }
+    });
+    const choices = document.createElement("div");
+    choices.className = "commander-popover-choices";
+    choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), provider.pair);
+    applyOpenDraft = (commander) => {
+      draft.modelId = commander.modelId;
+      draft.reasoningEffort = commander.reasoningEffort;
+      draft.providerSort = commander.providerSort;
+      draft.doctrineChoice = commander.doctrineChoice;
+      draft.apiKey = commanderApiKey(commander);
+      draft.nickname = nicknameFieldValue(commander.nickname, request.defaultNickname);
+      nicknameInput2.value = draft.nickname;
+      keyInput.value = draft.apiKey ?? "";
+      copyModelOptions(model, draft.modelId);
+      showReasoning();
+      provider.show(commander.providerSort);
+      doctrine.show(commander.doctrineChoice);
+    };
+    const copy2 = copyButton(request.copyButton);
+    fields.append(keyModel, choices, doctrine.row);
+    if (copy2) fields.append(copy2);
+    return fields;
+  }
+  function copyButton(button) {
+    if (!button) return null;
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "commander-popover-apply";
+    apply.textContent = button.label;
+    apply.disabled = button.disabled;
+    apply.addEventListener("click", () => {
+      if (apply.disabled) return;
+      button.onCopy();
+    });
+    return apply;
+  }
+  function copyModelOptions(select, modelId) {
+    select.replaceChildren();
+    const source = document.getElementById("openrouter-model");
+    if (!source) {
+      select.appendChild(new Option("\u2014 Select model \u2014", ""));
+      return;
+    }
+    for (const option2 of source.options) select.appendChild(new Option(option2.text, option2.value));
+    if (modelId && ![...select.options].some((option2) => option2.value === modelId)) {
+      select.appendChild(new Option(modelId, modelId));
+    }
+    select.value = modelId ?? "";
+  }
+  function saveAppWideModel(modelId) {
+    const select = document.getElementById("openrouter-model");
+    const next = modelId ?? "";
+    if (!select) {
+      void window.gameApi?.openRouter?.setSelectedModel(next);
+      return;
+    }
+    if (select.value === next) return;
+    select.value = next;
+    select.dispatchEvent(new Event("change"));
+  }
+  function placeCommanderPopover() {
+    if (!popover || !anchor) return;
+    placePopoverBelowAnchor(popover, anchor);
+  }
+
+  // src/renderer/gameplay/newGameOptionsPopover.ts
+  var popover2 = null;
+  var anchor2 = null;
+  var detachListeners2 = null;
+  function newGameOptionsPopoverIsOpen() {
+    return popover2 != null && !popover2.hidden;
+  }
+  function popoverInMatchMode() {
+    return document.getElementById("new-game-options-popover")?.dataset.mode === "match";
+  }
+  function closeNewGameOptionsPopover() {
+    if (popoverInMatchMode()) return;
+    detachListeners2?.();
+    detachListeners2 = null;
+    if (popover2) popover2.hidden = true;
+    popover2 = null;
+    anchor2 = null;
+  }
+  function toggleNewGameOptionsPopover(button) {
+    if (popoverInMatchMode()) return;
+    if (newGameOptionsPopoverIsOpen()) {
+      closeNewGameOptionsPopover();
+      return;
+    }
+    const root = document.getElementById("new-game-options-popover");
+    if (!(root instanceof HTMLElement)) return;
+    closeCommanderPopover();
+    popover2 = root;
+    anchor2 = button;
+    root.hidden = false;
+    placeNewGameOptionsPopover();
+    detachListeners2 = attachAnchoredPopoverListeners({
+      containsTarget: (target) => !!(popover2?.contains(target) || anchor2?.contains(target)),
+      close: () => {
+        if (!popoverInMatchMode()) closeNewGameOptionsPopover();
+      },
+      reposition: placeNewGameOptionsPopover
+    });
+  }
+  function wireNewGameOptionsPopover() {
+    const button = document.getElementById("new-game-options-btn");
+    if (button instanceof HTMLButtonElement) {
+      button.addEventListener("click", () => toggleNewGameOptionsPopover(button));
+    }
+    document.querySelector("#new-game-options-popover .commander-popover-close")?.addEventListener("click", () => {
+      if (popoverInMatchMode()) return;
+      closeNewGameOptionsPopover();
+    });
+    document.getElementById("new-game-panel-grip")?.addEventListener("pointerdown", () => {
+      closeNewGameOptionsPopover();
+    });
+  }
+  function placeNewGameOptionsPopover() {
+    if (!popover2 || popover2.hidden || !anchor2) return;
+    placePopoverBelowAnchor(popover2, anchor2);
+  }
+
+  // src/renderer/gameplay/newGameDialogCollapse.ts
+  var EXPANDED_LABEL = "Hide the new game choices";
+  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
+  var COLLAPSED_LABEL = "Show the new game choices";
+  var COLLAPSED_TOOLTIP = "Show the new game choices.";
+  var expanded = true;
+  var slide = null;
+  function newGameOverlayIsOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+  function dialogParts() {
+    const panel = document.getElementById("game-over-overlay");
+    const header = document.getElementById("new-game-panel-header");
+    const button = document.getElementById("new-game-dialog-collapse");
+    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
+    return { panel, header, button };
+  }
+  function syncCollapseControl(button) {
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
+    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
+  }
+  function placeStartButton(state) {
+    const button = document.getElementById("new-game-btn");
+    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
+    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
+    if (state === "compact") {
+      const close = document.getElementById("new-game-dialog-close");
+      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
+      return;
+    }
+    parent.appendChild(button);
+  }
+  function setPanelState(panel, state) {
+    placeStartButton(state);
+    panel.dataset.state = state;
+    applyPendingNewGameScroll();
+  }
+  function settle(panel) {
+    slide?.cancel();
+    slide = null;
+    setPanelState(panel, expanded ? "expanded" : "compact");
+  }
+  function slideTo(panel, from, to) {
+    slide = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide === finished) settle(panel);
+    });
+    if (!slide) settle(panel);
+  }
+  function expandNewGameDialog() {
+    const parts = dialogParts();
+    if (!parts) return;
+    expanded = true;
+    syncCollapseControl(parts.button);
+    settle(parts.panel);
+  }
+  function toggleNewGameDialogCollapsed() {
+    const parts = dialogParts();
+    if (!parts) return;
+    const { panel, header, button } = parts;
+    const from = panel.getBoundingClientRect().height;
+    slide?.cancel();
+    slide = null;
+    expanded = !expanded;
+    syncCollapseControl(button);
+    if (expanded) {
+      setPanelState(panel, "expanding");
+      const to = panel.getBoundingClientRect().height;
+      keepNewGameDialogOnMap(to);
+      slideTo(panel, from, to);
+      return;
+    }
+    closeNewGameOptionsPopover();
+    const active2 = document.activeElement;
+    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
+    setPanelState(panel, "collapsing");
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slideTo(panel, from, header.offsetHeight + borders);
+  }
+  var scrollToTopWhenShown = false;
+  function applyPendingNewGameScroll() {
+    if (!scrollToTopWhenShown) return;
+    const body = document.getElementById("game-over-dialog");
+    if (!(body instanceof HTMLElement) || body.getClientRects().length === 0) return;
+    body.scrollTop = 0;
+    scrollToTopWhenShown = false;
+  }
+  function scrollNewGameDialogToTop() {
+    const body = document.getElementById("game-over-dialog");
+    if (!(body instanceof HTMLElement)) return;
+    scrollToTopWhenShown = true;
+    applyPendingNewGameScroll();
+  }
+  function syncNewGameDialogMapPointer() {
+    const overlay = document.getElementById("game-over-overlay");
+    const map = document.getElementById("main-map");
+    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
+    if (overlay.classList.contains("hidden")) return;
+    map.style.pointerEvents = "auto";
+  }
+
+  // src/renderer/gameplay/newGameReturn.ts
+  var matchWaiting = false;
+  function syncCloseControl() {
+    const close = document.getElementById("new-game-dialog-close");
+    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
+  }
+  function isMatchWaitingUnderNewGame() {
+    return matchWaiting;
+  }
+  function holdMatchUnderNewGame() {
+    matchWaiting = true;
+    saveMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function forgetMatchUnderNewGame() {
+    matchWaiting = false;
+    forgetMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function closeNewGameOverlayToMatch(deps) {
+    if (!matchWaiting || !newGameOverlayIsOpen()) return;
+    matchWaiting = false;
+    closeNewGameOptionsPopover();
+    syncCloseControl();
+    document.getElementById("game-over-overlay")?.classList.add("hidden");
+    dismissStaleControlTooltip();
+    deps.setMainUIControlsEnabled(true);
+    invalidateLeafletMapSizes();
+    setBasemapGameMap(rendererSharedState.gameState?.gameMap?.id ?? "global");
+    returnMainMapCamera();
+    deps.updateReadyButtonState();
+    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    deps.resizeAndRedraw();
+  }
+
+  // src/renderer/openRouter/commanderPoolClient.ts
+  var POLL_MS = 1e3;
+  var snapshot2 = { statuses: [], dispatches: [], toolInvocationCounts: {} };
+  var pollTimer = null;
+  var showToast2 = null;
+  var fileMessage = null;
+  var onPoolChanged = null;
+  var poolListeners = /* @__PURE__ */ new Set();
+  function notifyPoolChanged() {
+    onPoolChanged?.();
+    for (const listener of poolListeners) listener();
+  }
+  function bindCommanderPoolScreen(deps) {
+    showToast2 = deps.showCommanderMessages;
+    fileMessage = deps.fileCommanderMessage;
+    onPoolChanged = deps.updateReadyButtonState;
+  }
+  function anyCommanderIsPlanning() {
+    return snapshot2.statuses.some((row) => row.status === "planning");
+  }
+  var commanderStartDepth = 0;
+  function commanderStartIsSettling() {
+    return commanderStartDepth > 0;
+  }
+  function longestPlanningElapsedMs() {
+    let longest = 0;
+    for (const row of snapshot2.statuses) {
+      if (row.status !== "planning" || row.planningElapsedMs == null) continue;
+      if (row.planningElapsedMs > longest) longest = row.planningElapsedMs;
+    }
+    return longest;
+  }
+  function commanderSeatCostUsd() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    return seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
+  }
+  async function startCommanderPlanningIfAllowed() {
+    commanderStartDepth += 1;
+    try {
+      if (!rendererSharedState.runButtonOn) return;
+      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
+      if (rendererSharedState.tacticalBattleSnapshot?.aiOnlyEndReason != null) return;
+      if (isNewGameOverlayOpen()) return;
+      if (rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult) return;
+      if (!window.gameApi?.startCommanderPlanning) return;
+      const tactical = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning;
+      if (rendererSharedState.gameState?.phase !== "planning" && !tactical) return;
+      const mode = tactical ? "tactical" : "strategic";
+      const matchEpoch = currentRendererMatchEpoch();
+      try {
+        const next = await window.gameApi.startCommanderPlanning({ mode });
+        if (!poolReplyIsCurrent(matchEpoch)) return;
+        snapshot2 = next;
+        applyCommanderToolCountSum(next.toolInvocationCounts);
+      } catch (err) {
+        console.error("startCommanderPlanning failed", err);
+      }
+      if (!poolReplyIsCurrent(matchEpoch)) return;
+      syncCommanderPoolPolling();
+      notifyPoolChanged();
+    } finally {
+      commanderStartDepth -= 1;
+      notifyPoolChanged();
+    }
+  }
+  async function stopCommanderPlanningFromScreen(reason) {
+    try {
+      await window.gameApi?.stopCommanderPlanning?.(reason);
+      await readCommanderPoolAndApply(true);
+    } catch (err) {
+      console.error("stopCommanderPlanning failed", reason, err);
+    }
+  }
+  function messageLines(dispatches) {
+    const kept = [];
+    for (const dispatch of dispatches) {
+      if (!commanderDispatchHasProse(dispatch)) continue;
+      fileMessage?.(dispatch);
+      kept.push(dispatch);
+    }
+    return kept;
+  }
+  async function readCommanderPoolAndApply(drain, showMessages = true) {
+    if (!window.gameApi?.readCommanderPool) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    const wasPlanning = anyCommanderIsPlanning();
+    try {
+      const next = await window.gameApi.readCommanderPool(drain);
+      if (!poolReplyIsCurrent(matchEpoch)) return;
+      snapshot2 = next;
+      applyCommanderToolCountSum(next.toolInvocationCounts);
+      const consultFinished = wasPlanning && !anyCommanderIsPlanning();
+      if (drain && (next.dispatches.length > 0 || consultFinished)) {
+        void refreshChatThread();
+        messageLines(next.dispatches);
+        if (showMessages) showToast2?.(next.dispatches, next.statuses);
+        await refreshSeatCosts();
+      }
+    } catch (err) {
+      console.error("readCommanderPool failed", err);
+    }
+    if (!poolReplyIsCurrent(matchEpoch)) return;
+    notifyPoolChanged();
+    syncCommanderPoolPolling();
+  }
+  function commanderPoolStatuses() {
+    return snapshot2.statuses;
+  }
+  function subscribeCommanderPool(listener) {
+    poolListeners.add(listener);
+  }
+  function syncCommanderPoolPolling() {
+    if (!shouldPoll()) {
+      if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      return;
+    }
+    if (pollTimer !== null) return;
+    pollTimer = setInterval(() => {
+      void readCommanderPoolAndApply(true);
+    }, POLL_MS);
+  }
+  function shouldPoll() {
+    if (!rendererSharedState.runButtonOn || rendererSharedState.gameState?.gameOver) return false;
+    if (rendererSharedState.gameState?.phase === "planning") return true;
+    if (rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning) return true;
+    if (anyCommanderIsPlanning()) return true;
+    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  }
+  async function refreshCommanderSeatCosts() {
+    await refreshSeatCosts();
+  }
+  async function refreshSeatCosts() {
+    if (!window.gameApi?.getGameState || !rendererSharedState.gameState || replayActive()) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    try {
+      const next = await fetchMatchSnapshot();
+      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats || replayActive()) return;
+      rendererSharedState.gameState.seats = next.seats;
+    } catch (err) {
+      console.error("commander pool cost refresh failed", err);
+    }
+  }
+  function poolReplyIsCurrent(matchEpoch) {
+    return rendererMatchEpochCurrent(matchEpoch) || isMatchWaitingUnderNewGame();
+  }
+
+  // src/renderer/openRouter/aiPlanningState.ts
+  function isDeferredResolutionPlaybackConsultPending() {
+    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  }
+  function isDeferredResolutionConsultRunning() {
+    return isDeferredResolutionPlaybackConsultPending() && rendererSharedState.deferredResolutionConsultNotifySent;
+  }
+  function isWaitingForPrecomputedAiOrders() {
+    return anyCommanderIsPlanning();
+  }
+
+  // src/shared/aiConsultationLimits.ts
+  var AI_MODEL_REQUEST_TIMEOUT_MS = 18e4;
+  var AI_MODEL_REQUEST_RETRY_COUNT = 1;
+  var AI_CONSULTATION_WALL_CLOCK_MS = 6e5;
+  var AI_TALK_ROUND_TIMEOUT_MS = 75e3;
+  var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS + AI_TALK_ROUND_TIMEOUT_MS;
+
+  // src/shared/commanderCardState.ts
+  function formatCommanderClock(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1e3));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+  function commanderCardPresentation(input) {
+    if (input.status === "out" || input.outTurn !== null) {
+      const turn = input.outTurn ?? input.timedOutTurn;
+      return {
+        chip: turn === null ? "Out" : `Out, turn ${turn}`,
+        detail: null,
+        dimmed: true,
+        summaryDisabled: true
+      };
+    }
+    if (input.status === "planning") {
+      return { chip: `Planning ${formatCommanderClock(input.planningElapsedMs)}`, detail: null, dimmed: false, summaryDisabled: false };
+    }
+    if (input.status === "timed_out") {
+      const waited = formatCommanderClock(input.planningElapsedMs || AI_CONSULTATION_WALL_CLOCK_MS);
+      const cap = formatCommanderClock(AI_CONSULTATION_WALL_CLOCK_MS);
+      const turn = input.timedOutTurn ?? 0;
+      return {
+        chip: "Timed out",
+        detail: `No reply in ${waited} of ${cap} on turn ${turn}. Its standing orders ran instead.`,
+        dimmed: false,
+        summaryDisabled: false
+      };
+    }
+    if (input.status === "no_model") {
+      return { chip: "Standing orders", detail: null, dimmed: false, summaryDisabled: false };
+    }
+    return { chip: "Ready", detail: null, dimmed: false, summaryDisabled: false };
+  }
+
+  // src/shared/commanderPlanningStatus.ts
+  var NO_MODEL_LABEL = "No model";
+  function commanderPlanningStatus(runOn, planning) {
+    if (!runOn) return "off";
+    return planning ? "planning" : "on";
+  }
+  function planningToggleLabel(planningOn) {
+    return planningOn ? "Stop" : "Start";
+  }
+  function commanderPlanningSentence(runOn, commanderCount) {
+    return runOn ? `Planning is on for all ${commanderCount} commanders.` : "Planning is off.";
+  }
+  function commanderFooterLabel(counts) {
+    if (counts.status === "off") return "Commanders off";
+    if (counts.status !== "planning") return "Commanders ready";
+    const progress = `${counts.ready} of ${counts.active} ready`;
+    return counts.observing ? `Planning \xB7 ${progress}` : `Commanders planning \xB7 ${progress}`;
+  }
+  function modelNameFromOptionLabel(optionLabel2) {
+    const bracket = optionLabel2.indexOf(" [");
+    const name = (bracket >= 0 ? optionLabel2.slice(0, bracket) : optionLabel2).trim();
+    return name || NO_MODEL_LABEL;
+  }
+
+  // src/shared/commanderSummary.ts
+  var NO_MODEL_SUMMARY = "No model \xB7 standing orders only";
+  var NO_MODEL_BUTTON_LABEL = "Select Model";
+  function formatCommanderSummary(input) {
+    const modelName = displayModelName(input.modelLabel);
+    if (!modelName) return NO_MODEL_SUMMARY;
+    const parts = [modelName];
+    const effort = input.reasoningEffort?.trim();
+    if (effort) parts.push(capitalizeReasoningEffortName(effort));
+    parts.push(doctrineSegment(input.doctrineChoice, input.revealedDoctrine));
+    return parts.join(" \xB7 ");
+  }
+  function formatCommanderButtonLabel(input) {
+    const summary = formatCommanderSummary(input);
+    return summary === NO_MODEL_SUMMARY ? NO_MODEL_BUTTON_LABEL : summary;
+  }
+  function displayModelName(modelLabel2) {
+    if (!modelLabel2?.trim()) return "";
+    const withoutSuffix = modelNameFromOptionLabel(modelLabel2);
+    if (withoutSuffix === NO_MODEL_LABEL) return "";
+    const colon = withoutSuffix.indexOf(": ");
+    return (colon >= 0 ? withoutSuffix.slice(colon + 2) : withoutSuffix).trim();
+  }
+  function doctrineSegment(choice, revealed) {
+    if (choice === "random" && revealed) return `Random, drew ${DOCTRINE_CHOICE_LABELS[revealed]}`;
+    return DOCTRINE_CHOICE_LABELS[choice];
+  }
+
+  // src/renderer/openRouter/openRouterRunToggle.ts
+  function setPlanningTogglePressed(button, planningOn) {
+    button.setAttribute("aria-pressed", planningOn ? "true" : "false");
+    button.textContent = planningToggleLabel(planningOn);
+  }
+  var syncRunToggle = null;
+  function setOpenRouterRunToggleSync(sync) {
+    syncRunToggle = sync;
+  }
+  function syncOpenRouterRunToggle() {
+    return syncRunToggle?.() ?? Promise.resolve();
+  }
+
+  // src/renderer/openRouter/commanderCardsUi.ts
+  var logSeatFilter = "";
+  function markCommanderLogLine(line) {
+    const owner = line.dataset.seatId ?? "";
+    line.hidden = logSeatFilter !== "" && owner !== logSeatFilter;
+  }
+  function setCommanderLogSeatFilter(seatId) {
+    logSeatFilter = seatId;
+    const log = document.getElementById("openrouter-log");
+    if (!log) return;
+    for (const child of log.children) {
+      if (child instanceof HTMLElement) markCommanderLogLine(child);
+    }
+  }
+  function renderCommanderCards() {
+    const host = document.getElementById("commander-cards");
+    if (!host) return;
+    const seats = sortSeatsByOrder((rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND));
+    syncLogFilter(seats);
+    const openSeat = host.querySelector('.commander-card-summary[aria-expanded="true"]')?.dataset.seatId ?? null;
+    host.replaceChildren();
+    for (const seat of seats) host.append(cardElement(seat));
+    const nextAnchor = openSeat ? host.querySelector(`[data-seat-id="${openSeat}"]`) : null;
+    if (nextAnchor && commanderPopoverIsOpen()) {
+      nextAnchor.setAttribute("aria-expanded", "true");
+      reanchorCommanderPopover(nextAnchor);
+    }
+  }
+  function syncLogFilter(seats) {
+    const select = document.getElementById("commander-log-filter");
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (!select.dataset.bound) {
+      select.dataset.bound = "true";
+      select.addEventListener("change", () => setCommanderLogSeatFilter(select.value));
+    }
+    const current = select.value;
+    select.replaceChildren(option("All commanders", ""));
+    for (const seat of seats) select.append(option(sideDisplayName(seat), seat.seatId));
+    if ([...select.options].some((row) => row.value === current)) select.value = current;
+  }
+  function option(label, value) {
+    const row = document.createElement("option");
+    row.value = value;
+    row.textContent = label;
+    return row;
+  }
+  function cardElement(seat) {
+    const status = statusOf(seat);
+    const presentation = commanderCardPresentation({
+      status,
+      planningElapsedMs: commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.planningElapsedMs ?? 0,
+      timedOutTurn: commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.timedOutTurn ?? null,
+      outTurn: seat.outTurn
+    });
+    const card = document.createElement("article");
+    card.className = presentation.dimmed ? "commander-card is-out" : "commander-card";
+    const dot = document.createElement("span");
+    dot.className = "commander-card-dot";
+    dot.style.background = paletteForOwner(seat.seatId, rendererSharedState.gameState?.seats ?? [])?.map ?? "#115E59";
+    const name = document.createElement("span");
+    name.className = "commander-card-name";
+    const shownName = sideDisplayName(seat);
+    name.textContent = shownName;
+    name.title = shownName;
+    const chip = document.createElement("span");
+    chip.className = "commander-card-chip";
+    chip.textContent = presentation.chip;
+    const cost = document.createElement("span");
+    cost.className = "commander-card-cost";
+    cost.textContent = formatCost(seat.costUsd);
+    const summary = document.createElement("button");
+    summary.type = "button";
+    summary.className = "commander-card-summary";
+    summary.dataset.seatId = seat.seatId;
+    summary.textContent = summaryText(seat);
+    summary.disabled = presentation.summaryDisabled || replayActive();
+    summary.addEventListener("click", () => void openSeatCommander(seat, summary));
+    card.append(dot, name, chip, cost, summary);
+    if (presentation.detail) {
+      const detail = document.createElement("p");
+      detail.className = "commander-card-detail";
+      detail.textContent = presentation.detail;
+      card.append(detail);
+    }
+    return card;
+  }
+  function statusOf(seat) {
+    if (seat.outTurn !== null) return "out";
+    return commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.status ?? (seat.commander?.modelId ? "ready" : "no_model");
+  }
+  function summaryText(seat) {
+    const commander = seat.commander;
+    return formatCommanderButtonLabel({
+      modelLabel: modelLabel(commander?.modelId ?? null),
+      reasoningEffort: commander?.reasoningEffort ?? null,
+      doctrineChoice: commander?.doctrineChoice ?? "balanced",
+      revealedDoctrine: commander?.doctrine ?? null
+    });
+  }
+  function modelLabel(modelId) {
+    if (!modelId) return null;
+    const select = document.getElementById("openrouter-model");
+    if (!(select instanceof HTMLSelectElement)) return modelId;
+    const optionRow = [...select.options].find((row) => row.value === modelId);
+    return optionRow?.textContent?.trim() || modelId;
+  }
+  async function openSeatCommander(seat, anchor3) {
+    if (replayActive() || !seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
+    const seatId = seat.seatId;
+    let includeKey = false;
+    let apiKey = "";
+    try {
+      const loaded = await window.gameApi?.openRouter?.getSeatApiKey(seatId);
+      if (typeof loaded === "string") {
+        apiKey = loaded;
+        includeKey = true;
+      }
+    } catch (err) {
+      console.error("getSeatApiKey failed", seatId, err);
+    }
+    if (!anchor3.isConnected || replayActive()) return;
+    const commander = {
+      modelId: seat.commander.modelId,
+      reasoningEffort: seat.commander.reasoningEffort,
+      providerSort: seat.commander.providerSort,
+      doctrineChoice: seat.commander.doctrineChoice,
+      nickname: sideDisplayName(seat),
+      ...includeKey ? { apiKey } : {}
+    };
+    openCommanderPopover({
+      anchor: anchor3,
+      title: `${sideDisplayName(seat)} commander`,
+      commander,
+      defaultNickname: defaultAiNickname(seat.homeRegion, seat.seatId),
+      copyButton: null,
+      onChange: (next) => {
+        if (!includeKey && (next.apiKey ?? "") === "") {
+          void saveCommander(seatId, {
+            modelId: next.modelId,
+            reasoningEffort: next.reasoningEffort,
+            providerSort: next.providerSort,
+            doctrineChoice: next.doctrineChoice,
+            nickname: next.nickname
+          });
+          return;
+        }
+        includeKey = true;
+        void saveCommander(seatId, next);
+      }
+    });
+    anchor3.setAttribute("aria-expanded", "true");
+  }
+  async function saveCommander(seatId, commander) {
+    if (replayActive()) return;
+    try {
+      const updated = await window.gameApi?.setSeatCommander(seatId, commander);
+      if (!updated || !rendererSharedState.gameState?.seats || replayActive()) return;
+      rendererSharedState.gameState = { ...rendererSharedState.gameState, seats: rendererSharedState.gameState.seats.map((seat) => seat.seatId === updated.seatId ? updated : seat) };
+      renderCommanderCards();
+      repaintChatThread();
+      void syncOpenRouterRunToggle();
+    } catch (err) {
+      console.error("setSeatCommander failed", seatId, err);
+    }
+  }
+  function formatCost(dollars) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dollars);
+  }
+  subscribeCommanderPool(() => {
+    renderCommanderCards();
+  });
+  var cardsPaintedForReplay = false;
+  onReplayChange(() => {
+    if (replayActive() === cardsPaintedForReplay) return;
+    cardsPaintedForReplay = replayActive();
+    renderCommanderCards();
+  });
+
+  // src/shared/readyAiWaitLabel.ts
+  function readyAiWaitLabel(elapsedLabel, pendingCount) {
+    const shown = pendingCount < 1 ? 1 : pendingCount;
+    return `AI: ${elapsedLabel} (x${shown})`;
+  }
+
+  // src/renderer/openRouter/readyButtonLabel.ts
+  function formatElapsedMmSs(ms) {
+    const totalSeconds = Math.floor(ms / 1e3);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  var READY_CHECK_ICON_PATH = "M3 8.5l3.2 3.2L13 4.8";
+  function buildReadyCheckIcon() {
+    const svgNs = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(svgNs, "svg");
+    icon.setAttribute("class", "chrome-icon ready-btn-check");
+    icon.setAttribute("viewBox", "0 0 16 16");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(svgNs, "path");
+    path.setAttribute("d", READY_CHECK_ICON_PATH);
+    icon.appendChild(path);
+    return icon;
+  }
+  function setReadyButtonLabelReady(readyBtn) {
+    if (readyBtn.querySelector(".ready-btn-check")) return;
+    const label = document.createElement("span");
+    label.className = "ready-btn-label";
+    label.textContent = "Ready";
+    readyBtn.replaceChildren(buildReadyCheckIcon(), label);
+  }
+  function setReadyButtonLabelAiWait(readyBtn, elapsedMs, planningCount = 1) {
+    const text = readyAiWaitLabel(formatElapsedMmSs(elapsedMs), planningCount);
+    let label = readyBtn.querySelector(".ready-btn-ai-label");
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "ready-btn-ai-label";
+      readyBtn.replaceChildren(label);
+    }
+    if (label.textContent !== text) label.textContent = text;
+  }
+
+  // src/renderer/openRouter/openRouterUiHelpers.ts
+  function updateReadyButtonState() {
+    const readyBtn = document.getElementById("ready-btn");
+    if (!readyBtn) return;
+    const gameOver = rendererSharedState.gameState?.gameOver ?? false;
+    const deferredConsult = isDeferredResolutionPlaybackConsultPending();
+    const waitingOnAi = isWaitingForPrecomputedAiOrders();
+    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null;
+    readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen || replayActive();
+    const deferredClock = rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;
+    if (waitingOnAi) {
+      clearReadyAiWaitClock();
+      setReadyButtonLabelAiWait(readyBtn, longestPlanningElapsedMs(), planningCommanderCount());
+    } else if (deferredClock) {
+      const now = Date.now();
+      if (rendererSharedState.readyBtnAiWaitStartTime === null) {
+        rendererSharedState.readyBtnAiWaitStartTime = now;
+        rendererSharedState.readyBtnAiWaitIntervalId = setInterval(() => {
+          if (rendererSharedState.readyBtnAiWaitStartTime === null) return;
+          const btn = document.getElementById("ready-btn");
+          if (btn) setReadyButtonLabelAiWait(btn, Date.now() - rendererSharedState.readyBtnAiWaitStartTime, planningCommanderCount());
+        }, 1e3);
+      }
+      setReadyButtonLabelAiWait(readyBtn, now - (rendererSharedState.readyBtnAiWaitStartTime ?? now), planningCommanderCount());
+    } else {
+      clearReadyAiWaitClock();
+      setReadyButtonLabelReady(readyBtn);
+    }
+    renderOpponentStatus();
+  }
+  function clearReadyAiWaitClock() {
+    if (rendererSharedState.readyBtnAiWaitIntervalId !== null) {
+      clearInterval(rendererSharedState.readyBtnAiWaitIntervalId);
+      rendererSharedState.readyBtnAiWaitIntervalId = null;
+    }
+    rendererSharedState.readyBtnAiWaitStartTime = null;
+  }
+  function renderOpponentStatus() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const active2 = seats.length === 0 ? [] : activeAiSeats(seats);
+    const statuses = commanderPoolStatuses();
+    const ready = active2.filter((seat) => statuses.find((row) => row.seatId === seat.seatId)?.status === "ready").length;
+    const status = commanderPlanningStatus(rendererSharedState.runButtonOn, isWaitingForPrecomputedAiOrders());
+    const observing = isObservingRoster(seats);
+    const sentence = document.getElementById("commander-status-text");
+    if (sentence) sentence.textContent = commanderPlanningSentence(rendererSharedState.runButtonOn, active2.length || 1);
+    document.getElementById("commander-status-line")?.setAttribute("data-status", status);
+    const label = document.getElementById("commander-status-label");
+    if (label) label.textContent = commanderFooterLabel({ status, ready, active: active2.length, observing });
+    renderCommanderCards();
+    const modelSelect = document.getElementById("openrouter-model");
+    const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : void 0;
+    const model = document.getElementById("commander-status-model");
+    if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? "");
+    const cost = document.getElementById("commander-status-cost");
+    if (cost) cost.textContent = formatOpenRouterCost(commanderSeatCostUsd());
+  }
+  function formatOpenRouterCost(dollars) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(dollars);
+  }
+  function updateOpenRouterCostLabel() {
+    const el = document.getElementById("openrouter-cost");
+    if (el) el.textContent = formatOpenRouterCost(commanderSeatCostUsd());
+    renderOpponentStatus();
+  }
+  function appendOpenRouterLog(line, isError = false, seatId) {
+    const el = document.getElementById("openrouter-log");
+    if (!el) return;
+    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString();
+    const span = document.createElement("div");
+    if (seatId) span.dataset.seatId = seatId;
+    span.textContent = `${time} ${activitySeatPrefix(seatId)}${line}`;
+    if (isError) span.className = "chrome-error";
+    markCommanderLogLine(span);
+    el.appendChild(span);
+    scrollOpenRouterLogToEnd();
+  }
+  function activitySeatPrefix(seatId) {
+    if (!seatId) return "";
+    const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId);
+    const name = seat ? sideDisplayName(seat) : seatId;
+    const turn = rendererSharedState.gameState?.turnNumber;
+    return `${turn ? `T${turn} ` : ""}${name} `;
+  }
+  function planningCommanderCount() {
+    return commanderPoolStatuses().filter((row) => row.status === "planning").length;
+  }
+  function scrollOpenRouterLogToEnd() {
+    const el = document.getElementById("openrouter-log");
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+  function clearOpenRouterLog() {
+    const el = document.getElementById("openrouter-log");
+    if (el) el.textContent = "";
+  }
+  async function callReadyWithTimeout(payload2) {
+    if (!window.gameApi?.ready) {
+      throw new Error("Ready action unavailable.");
+    }
+    return Promise.race([
+      window.gameApi.ready(payload2),
+      new Promise((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`Ready request timed out after ${READY_REQUEST_TIMEOUT_MS}ms`)),
+          READY_REQUEST_TIMEOUT_MS
+        );
+      })
+    ]);
   }
 
   // src/renderer/map/stackCalloutSealift.ts
@@ -30962,6 +30721,13 @@ ${bonuses}`;
   function closeMatchOptionsDialogIfOpen() {
     if (matchOptionsDialogIsOpen()) registeredCloser?.();
   }
+  var registeredRefresher = null;
+  function registerMatchOptionsDialogRefresher(refresh) {
+    registeredRefresher = refresh;
+  }
+  function refreshMatchOptionsDialogIfOpen() {
+    if (matchOptionsDialogIsOpen()) registeredRefresher?.();
+  }
 
   // src/renderer/openRouter/resolutionPlaybackDeferral.ts
   var playbackCompleteNotifyQueue = [];
@@ -32172,6 +31938,7 @@ ${bonuses}`;
         previous(false);
       }
       bind2(dialog);
+      closeMatchOptionsDialogIfOpen();
       dialog.classList.remove("hidden");
       const focusId = ids.initialFocus === "confirm" ? ids.confirmId : ids.cancelId;
       const focusTarget = document.getElementById(focusId);
@@ -32272,6 +32039,14 @@ ${bonuses}`;
   var GAME_MENU_ID = "game-menu";
   var GAME_MENU_BUTTON_ID = "game-menu-btn";
   var NEW_GAME_ITEM_ID = "openrouter-new-btn";
+  var REPLAY_SAFE_BUTTON_IDS = /* @__PURE__ */ new Set(["game-menu-how-to-play-btn", "game-menu-quit-btn"]);
+  var menuActions = null;
+  var heldMenuClickPending = false;
+  var HOW_TO_PLAY_FAILED_TEXT = "The How to play guide could not be opened in the browser.";
+  function reportHowToPlayFailure(error) {
+    console.error("How to play: the guide could not be opened", error ?? "main reported false");
+    showMapToast(HOW_TO_PLAY_FAILED_TEXT, { isError: true });
+  }
   function isGameMenuOpen() {
     const menu = document.getElementById(GAME_MENU_ID);
     return menu !== null && !menu.hidden;
@@ -32283,13 +32058,20 @@ ${bonuses}`;
     item.disabled = screenOpen || rendererSharedState.readyRequestInFlight;
     item.parentElement?.setAttribute("data-control-tooltip", screenOpen ? newGameItemOpenTooltipText : newGameItemBusyTooltipText);
   }
+  function syncGameMenuViewItems() {
+    if (menuActions === null) return;
+    const playback = document.getElementById("game-menu-playback-check");
+    const charts = document.getElementById("game-menu-charts-check");
+    if (playback instanceof HTMLInputElement) playback.checked = menuActions.replayIsOpen();
+    if (charts instanceof HTMLInputElement) charts.checked = menuActions.chartsIsOpen();
+  }
   function openGameMenu() {
     const menu = document.getElementById(GAME_MENU_ID);
     const button = document.getElementById(GAME_MENU_BUTTON_ID);
     if (!menu || !button) return;
-    void requestReplayLeave();
     syncGameMenuNewGameItem();
     syncSaveLoadItems();
+    syncGameMenuViewItems();
     menu.hidden = false;
     button.setAttribute("aria-expanded", "true");
   }
@@ -32306,24 +32088,67 @@ ${bonuses}`;
     const menu = document.getElementById(GAME_MENU_ID);
     const button = document.getElementById(GAME_MENU_BUTTON_ID);
     if (!menu || !button) return;
+    menuActions = actions;
+    onReplayChange(syncGameMenuViewItems);
     button.addEventListener("click", () => {
       const topbar = document.getElementById("app-topbar");
       if (topbar instanceof HTMLElement && topbar.style.pointerEvents === "none") return;
       if (isGameMenuOpen()) closeGameMenu();
       else openGameMenu();
     });
+    let replayingClick = false;
+    menu.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const item = target?.closest("button");
+        if (replayingClick || !item) return;
+        if (heldMenuClickPending) {
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          return;
+        }
+        if (item.disabled || REPLAY_SAFE_BUTTON_IDS.has(item.id) || !(replayActive() || replayLeaveRunning())) return;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        heldMenuClickPending = true;
+        requestReplayLeave().then(() => {
+          if (item.disabled || !item.isConnected) return;
+          replayingClick = true;
+          try {
+            item.click();
+          } finally {
+            replayingClick = false;
+          }
+        }).catch((error) => {
+          console.error("game menu: leaving replay before a menu item failed", error);
+        }).finally(() => {
+          heldMenuClickPending = false;
+        });
+      },
+      true
+    );
     menu.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("button")) closeGameMenu();
     });
-    document.getElementById("game-menu-playback-btn")?.addEventListener("click", () => {
-      actions.openReplay();
-    });
-    document.getElementById("game-menu-metrics-btn")?.addEventListener("click", () => {
-      actions.openCharts();
-    });
+    const wireViewCheckbox = (id, open2, close) => {
+      document.getElementById(id)?.addEventListener("change", (event) => {
+        const box = event.target instanceof HTMLInputElement ? event.target : null;
+        if (box === null) return;
+        closeGameMenu({ restoreFocus: true });
+        if (box.checked) open2();
+        else close();
+      });
+    };
+    wireViewCheckbox("game-menu-playback-check", actions.openReplay, actions.closeReplay);
+    wireViewCheckbox("game-menu-charts-check", actions.openCharts, actions.closeCharts);
     document.getElementById("game-menu-how-to-play-btn")?.addEventListener("click", () => {
-      void window.gameApi?.openHowToPlay();
+      const opening = window.gameApi?.openHowToPlay();
+      if (opening === void 0) return;
+      opening.then((opened) => {
+        if (!opened) reportHowToPlayFailure();
+      }, reportHowToPlayFailure);
     });
     document.getElementById("game-menu-quit-btn")?.addEventListener("click", () => {
       window.close();
@@ -33659,6 +33484,257 @@ ${bonuses}`;
     };
   }
 
+  // src/renderer/rendering/mercenaryBadgeDrawing.ts
+  var MERCENARY_BADGE_TEXT = CREDITS_SYMBOL;
+  var MERCENARY_BADGE_FONT = "bold 14px system-ui, sans-serif";
+  function drawMercenaryBadge(ctx, x, y) {
+    ctx.save();
+    ctx.font = MERCENARY_BADGE_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.strokeText(MERCENARY_BADGE_TEXT, x, y);
+    ctx.fillStyle = "#000";
+    ctx.fillText(MERCENARY_BADGE_TEXT, x, y);
+    ctx.restore();
+  }
+
+  // src/renderer/rendering/unitDrawing.ts
+  var TOKEN_ICON_FIT_RATIO = 0.9;
+  var unitIconCache = /* @__PURE__ */ new Map();
+  function getOrStartUnitIconLoad(unitType) {
+    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+    };
+    img.onerror = () => {
+      unitIconCache.set(unitType, null);
+    };
+    img.src = iconPathForType(unitType);
+    unitIconCache.set(unitType, img);
+    return img;
+  }
+  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
+    const img = getOrStartUnitIconLoad(unitType);
+    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
+    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
+    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
+    const width = img.naturalWidth * iconScale;
+    const height = img.naturalHeight * iconScale;
+    const drawX = centerX - width / 2;
+    const drawY = centerY - height / 2;
+    const shouldFlip = flipForOpponent && unitPlayer != null && unitPlayer !== "" && unitPlayer !== HUMAN_SEAT_ID;
+    const neutralGlyph = unitPlayer != null && isNeutralOwnerId(unitPlayer);
+    ctx.save();
+    if (neutralGlyph) ctx.filter = "brightness(0.85)";
+    if (shouldFlip) {
+      ctx.translate(centerX, centerY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -width / 2, -height / 2, width, height);
+    } else {
+      ctx.drawImage(img, drawX, drawY, width, height);
+    }
+    ctx.restore();
+    return true;
+  }
+  function drawUnitTypeGlyph(ctx, centerX, centerY, unitType, sizePx, player) {
+    if (!Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType) || unitType === "mixed") return false;
+    const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
+    return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
+  }
+  function drawSelectionRing(ctx, x, y) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = SELECTION_RING_COLOR;
+    ctx.lineWidth = SELECTION_RING_WIDTH;
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
+    const stackedNeutral = color === MULTI_PLAYER_FILL;
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    if (strokeColor === SELECTION_RING_COLOR) {
+      drawSelectionRing(ctx, x, y);
+    } else {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.save();
+    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
+    ctx.fillStyle = color === NEUTRAL_PALETTE.map ? NEUTRAL_PALETTE.text : "#fff";
+    ctx.font = "bold 14px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === UNIT_TYPE_LABELS.missile && drawUnitSvgIcon(ctx, x, y, "missile", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
+    if (!drewIcon) ctx.fillText(label, x, y);
+    ctx.restore();
+  }
+  function drawStackCountBadge(ctx, count, x, y) {
+    const badgeX = x + COUNT_BADGE_OFFSET;
+    const badgeY = y - COUNT_BADGE_OFFSET;
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.strokeText(String(count), badgeX, badgeY);
+    ctx.fillStyle = "#000";
+    ctx.fillText(String(count), badgeX, badgeY);
+  }
+  function drawUnits(ctx, units, movingUnitIds) {
+    const byHex = /* @__PURE__ */ new Map();
+    for (const u of units) {
+      if (movingUnitIds?.has(u.id)) continue;
+      const list = byHex.get(u.h3Index) ?? [];
+      list.push(u);
+      byHex.set(u.h3Index, list);
+    }
+    const selectedUnitIds = new Set(rendererSharedState.selectedUnitIds);
+    const tokens = [...byHex].map(([h3Index, hexUnits]) => {
+      const { x, y } = hexCenterPx(h3Index);
+      const count = hexUnits.length;
+      return {
+        x,
+        y,
+        count,
+        top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
+        selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
+        units: hexUnits
+      };
+    });
+    for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
+      const types = new Set(hexUnits.map((u) => u.unitType));
+      const players = new Set(hexUnits.map((u) => u.player));
+      const mixedType = types.size > 1;
+      const multiPlayer = players.size > 1;
+      const ownerId = hexUnits[0].player;
+      const neutralOnly = !multiPlayer && isNeutralOwnerId(ownerId);
+      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId)?.map ?? "#333";
+      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : neutralOnly ? NEUTRAL_PALETTE.text : "#fff";
+      const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
+      const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
+      drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0].player);
+      if (count > 1) {
+        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0].player);
+      }
+    }
+    for (const { x, y, count } of tokens) {
+      if (count < 2) continue;
+      drawStackCountBadge(ctx, count, x, y);
+    }
+    for (const token of tokens) {
+      if (!token.units.some((unit) => unit.isMercenary === true)) continue;
+      drawMercenaryBadge(ctx, token.top.x, token.top.y);
+    }
+  }
+  function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
+    const viewer = staleIntelViewer(state.playerPerspective);
+    if (viewer === null) {
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+      return;
+    }
+    const hasFogData = Array.isArray(state.visibleHexes);
+    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== viewer);
+    const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
+    for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
+      if (currentlyVisibleEnemyIds.has(unitId)) continue;
+      if (!rendererSharedState.clientStaleEnemyIntelByUnitId.has(unitId)) {
+        const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
+        rendererSharedState.clientStaleEnemyIntelByUnitId.set(unitId, {
+          unitId,
+          lastKnownH3Index: prevSeen.h3Index,
+          lastSeenTurn,
+          staleUntilTurn: lastSeenTurn + 2
+        });
+      }
+    }
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+    for (const enemy of currentlyVisibleEnemies) {
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
+        h3Index: enemy.h3Index,
+        lastSeenTurn: state.turnNumber
+      });
+    }
+    if (shouldHideStrategicMapUnitsForZoom()) return;
+    if (!hasFogData) return;
+    const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
+    const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
+      unitId: row.unitId,
+      lastKnownH3Index: row.lastKnownH3Index,
+      intelState: "stale",
+      lastSeenTurn: row.lastSeenTurn,
+      staleUntilTurn: row.staleUntilTurn,
+      player: row.player
+    }));
+    const byUnitId = /* @__PURE__ */ new Map();
+    for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
+    for (const row of persistedIntel) {
+      if (row.intelState !== "stale") continue;
+      byUnitId.set(row.unitId, {
+        unitId: row.unitId,
+        lastKnownH3Index: row.lastKnownH3Index,
+        intelState: "stale",
+        lastSeenTurn: row.lastSeenTurn,
+        staleUntilTurn: row.staleUntilTurn,
+        player: row.player
+      });
+    }
+    for (const unitId of [...byUnitId.keys()]) {
+      if (state.units.some((unit) => unit.id === unitId && unit.player === viewer)) {
+        rendererSharedState.clientStaleEnemyIntelByUnitId.delete(unitId);
+        byUnitId.delete(unitId);
+      }
+    }
+    const intel = Array.from(byUnitId.values());
+    if (intel.length === 0) return;
+    const visibleHexes = new Set(state.visibleHexes);
+    const stale = intel.filter((row) => row.intelState === "stale");
+    if (stale.length === 0) return;
+    const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
+    const staleByHex = /* @__PURE__ */ new Map();
+    for (const row of stale) {
+      if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
+      if (visibleHexes.has(row.lastKnownH3Index)) continue;
+      const list = staleByHex.get(row.lastKnownH3Index) ?? [];
+      list.push(row);
+      staleByHex.set(row.lastKnownH3Index, list);
+    }
+    for (const [h3Index, rows] of staleByHex) {
+      const age = Math.max(0, state.turnNumber - rows[0].lastSeenTurn);
+      const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
+      if (alpha <= 0) continue;
+      const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
+      const label = types.size === 1 ? [...types][0] : "*";
+      const owners = new Set(rows.map((row) => row.player ?? unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
+      const ownerId = owners.size === 1 ? [...owners][0] : null;
+      const mixedOwners = owners.size > 1;
+      const fillColor = mixedOwners ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? "#333";
+      const strokeColor = !mixedOwners && ownerId != null && isNeutralOwnerId(ownerId) ? NEUTRAL_PALETTE.text : "#fff";
+      const { x, y } = hexCenterPx(h3Index);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, ownerId ?? AI_SEAT_IDS[0]);
+      ctx.restore();
+    }
+  }
+  function drawUnknownBattleMarkers(ctx, hexes, opacity) {
+    if (hexes.length === 0 || opacity <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    for (const h3Index of hexes) {
+      const { x, y } = hexCenterPx(h3Index);
+      drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
+    }
+    ctx.restore();
+  }
+
   // src/renderer/rendering/combatDiceChipDrawing.ts
   var CHIP_FONT = "bold 10px system-ui, sans-serif";
   var CHIP_LAYOUT = Object.freeze({
@@ -34689,6 +34765,7 @@ ${bonuses}`;
     const overlay = document.getElementById("tactical-annihilation-overlay");
     const messageEl = document.getElementById("tactical-annihilation-message");
     if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);
+    closeMatchOptionsDialogIfOpen();
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled(false);
     syncTacticalExitButtonElementVisibility();
@@ -34706,6 +34783,7 @@ ${bonuses}`;
       button.textContent = "Ok";
       button.setAttribute("data-control-tooltip", okTooltip);
     }
+    closeMatchOptionsDialogIfOpen();
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled(false);
     syncTacticalExitButtonElementVisibility();
@@ -38976,6 +39054,42 @@ ${bonuses}`;
     const optionsPopover = document.getElementById("new-game-options-popover");
     if (optionsPopover !== null && !optionsPopover.hidden) return true;
     return isGameMenuOpen() || commanderPopoverIsOpen();
+  }
+
+  // src/renderer/chrome/modalDialogKit.ts
+  function focusableControls(root) {
+    return Array.from(root.querySelectorAll("button, select, input, [tabindex]")).filter(
+      (element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
+    );
+  }
+  function trapTabWithin(event, root, options) {
+    const focusable = focusableControls(root);
+    const firstStop = options?.firstStop ?? focusable[0];
+    const last = focusable[focusable.length - 1] ?? options?.firstStop;
+    if (!firstStop || !last) return;
+    const active2 = document.activeElement;
+    if (event.shiftKey && (active2 === firstStop || !root.contains(active2))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active2 === last || !root.contains(active2))) {
+      event.preventDefault();
+      firstStop.focus();
+    }
+  }
+  function wireBackdropDismiss(backdrop, onDismiss) {
+    let pressStartedOnBackdrop = false;
+    backdrop.addEventListener("pointerdown", (event) => {
+      pressStartedOnBackdrop = event.target === backdrop;
+    });
+    backdrop.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const fromBackdrop = pressStartedOnBackdrop;
+      pressStartedOnBackdrop = false;
+      if (event.target === backdrop && fromBackdrop) onDismiss();
+    });
+    for (const type of ["pointerdown", "mousedown", "dblclick", "wheel"]) {
+      backdrop.addEventListener(type, (event) => event.stopPropagation());
+    }
   }
 
   // src/renderer/charts/chartSeatLookups.ts
@@ -43315,6 +43429,33 @@ ${bonuses}`;
     paths.spline = monotoneCubic;
   }
 
+  // src/shared/chartTurnWindow.ts
+  var INITIAL_VISIBLE_TURNS = 12;
+  var FIRST_TURN_WHEN_EMPTY = 1;
+  function initialTurnWindow(turns) {
+    const span = INITIAL_VISIBLE_TURNS - 1;
+    if (turns.length === 0) return { min: FIRST_TURN_WHEN_EMPTY, max: FIRST_TURN_WHEN_EMPTY + span };
+    const first = turns[0];
+    const last = turns[turns.length - 1];
+    if (last - first <= span) return { min: first, max: first + span };
+    return { min: last - span, max: last };
+  }
+  function zoomExtentTurnRange(turns) {
+    const opening = initialTurnWindow(turns);
+    if (turns.length === 0) return opening;
+    return { min: turns[0], max: Math.max(turns[turns.length - 1], opening.max) };
+  }
+  function sameTurnRange(a, b) {
+    return a.min === b.min && a.max === b.max;
+  }
+  function refreshedTurnView(args) {
+    const { view: view2, previousTurns, nextTurns, minSpan } = args;
+    if (view2 === null) return null;
+    const full = zoomExtentTurnRange(nextTurns);
+    const kept = sameTurnRange(view2, zoomExtentTurnRange(previousTurns)) ? full : zoomedTurnRange({ range: view2, full, anchor: view2.min, factor: 1, minSpan });
+    return sameTurnRange(kept, initialTurnWindow(nextTurns)) ? null : kept;
+  }
+
   // src/renderer/charts/chartZoom.ts
   var MIN_ZOOM_SPAN_TURNS = 2;
   var WHEEL_ZOOM_IN_FACTOR = 0.8;
@@ -43331,8 +43472,7 @@ ${bonuses}`;
     return [[...data.turns], ...data.series.map((series) => [...series.values])];
   }
   function fullTurnRange(data) {
-    if (data.turns.length < 2) return null;
-    return { min: data.turns[0], max: data.turns[data.turns.length - 1] };
+    return zoomExtentTurnRange(data.turns);
   }
   function chromeColor(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -43408,7 +43548,8 @@ ${bonuses}`;
             (u) => {
               const index = u.cursor.idx;
               const left = u.cursor.left ?? -1;
-              if (typeof index !== "number" || left < 0 || data.turns[index] === void 0) {
+              const overBlankSpace = typeof index === "number" && Math.abs(u.posToVal(left, "x") - data.turns[index]) > 0.5;
+              if (typeof index !== "number" || left < 0 || data.turns[index] === void 0 || overBlankSpace) {
                 tooltip.hidden = true;
                 return;
               }
@@ -43422,17 +43563,17 @@ ${bonuses}`;
       toUplotData(data),
       args.host
     );
+    const openingRange = () => initialTurnWindow(data.turns);
     const showRange = (range) => {
-      const full = fullTurnRange(data);
-      view2 = full !== null && range.min <= full.min && range.max >= full.max ? null : range;
+      view2 = sameTurnRange(range, openingRange()) ? null : range;
       plot.setScale("x", range);
     };
-    const currentRange = () => view2 ?? fullTurnRange(data);
+    const currentRange = () => view2 ?? openingRange();
+    plot.setScale("x", openingRange());
     const onWheel = (event) => {
       event.preventDefault();
       const full = fullTurnRange(data);
       const range = currentRange();
-      if (full === null || range === null) return;
       const anchor3 = plot.posToVal(event.clientX - plot.over.getBoundingClientRect().left, "x");
       const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
       showRange(zoomedTurnRange({ range, full, anchor: anchor3, factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
@@ -43440,13 +43581,13 @@ ${bonuses}`;
     let dragStart3 = null;
     const onPointerDown = (event) => {
       const range = currentRange();
-      if (range === null || event.button !== 0) return;
+      if (event.button !== 0) return;
       dragStart3 = { x: event.clientX, range };
       plot.over.setPointerCapture(event.pointerId);
     };
     const onPointerMove = (event) => {
       const full = fullTurnRange(data);
-      if (dragStart3 === null || full === null) return;
+      if (dragStart3 === null) return;
       const turnsPerPixel = (dragStart3.range.max - dragStart3.range.min) / Math.max(1, plot.over.clientWidth);
       const deltaTurns = -(event.clientX - dragStart3.x) * turnsPerPixel;
       showRange(pannedTurnRange({ range: dragStart3.range, full, deltaTurns }));
@@ -43455,8 +43596,7 @@ ${bonuses}`;
       dragStart3 = null;
     };
     const onDoubleClick = () => {
-      const full = fullTurnRange(data);
-      if (full !== null) showRange(full);
+      showRange(fullTurnRange(data));
     };
     plot.over.addEventListener("wheel", onWheel, { passive: false });
     plot.over.addEventListener("pointerdown", onPointerDown);
@@ -43466,15 +43606,10 @@ ${bonuses}`;
     plot.over.addEventListener("dblclick", onDoubleClick);
     return {
       update(next) {
+        const kept = refreshedTurnView({ view: view2, previousTurns: data.turns, nextTurns: next.turns, minSpan: MIN_ZOOM_SPAN_TURNS });
         data = next;
-        const full = fullTurnRange(next);
-        const keep = view2 !== null && full !== null ? view2 : null;
-        plot.setData(toUplotData(next), keep === null);
-        if (keep !== null && full !== null) {
-          showRange(zoomedTurnRange({ range: keep, full, anchor: keep.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }));
-        } else {
-          view2 = null;
-        }
+        plot.setData(toUplotData(next), false);
+        showRange(kept ?? openingRange());
       },
       resize(width, height) {
         plot.setSize({ width, height });
@@ -43687,8 +43822,9 @@ ${bonuses}`;
     tooltip.className = "charts-tooltip";
     tooltip.hidden = true;
     args.host.append(labels, canvas, empty, tooltip);
-    const fullRange = () => strip.turns.length === 0 ? null : { min: strip.turns[0], max: strip.turns[strip.turns.length - 1] };
-    const visibleRange = () => view2 ?? fullRange();
+    const fullRange = () => zoomExtentTurnRange(strip.turns);
+    const openingRange = () => initialTurnWindow(strip.turns);
+    const visibleRange = () => view2 ?? openingRange();
     const rowHeight = () => Math.min(ROW_HEIGHT_MAX, Math.max(ROW_HEIGHT_MIN, Math.floor((size.height - AXIS_HEIGHT) / Math.max(1, strip.rows.length))));
     const plotWidth = () => Math.max(1, size.width - LABEL_WIDTH);
     const drawLabels = () => {
@@ -43716,7 +43852,7 @@ ${bonuses}`;
       canvas.style.width = `${plotWidth()}px`;
       canvas.style.height = `${height}px`;
       const context = canvas.getContext("2d");
-      if (context === null || range === null) return;
+      if (context === null) return;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       const turnCount = range.max - range.min + 1;
       const cellWidth = plotWidth() / turnCount;
@@ -43765,14 +43901,12 @@ ${bonuses}`;
       draw();
     };
     const showRange = (range) => {
-      const full = fullRange();
-      const whole = full === null ? range : wholeTurnRange(range, full);
-      view2 = full !== null && whole.min <= full.min && whole.max >= full.max ? null : whole;
+      const whole = wholeTurnRange(range, fullRange());
+      view2 = sameTurnRange(whole, openingRange()) ? null : whole;
       render();
     };
     const turnAt = (clientX) => {
       const range = visibleRange();
-      if (range === null) return 0;
       const cellWidth = plotWidth() / (range.max - range.min + 1);
       return range.min + (clientX - canvas.getBoundingClientRect().left) / cellWidth - 0.5;
     };
@@ -43780,13 +43914,12 @@ ${bonuses}`;
       event.preventDefault();
       const full = fullRange();
       const range = visibleRange();
-      if (full === null || range === null) return;
       const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
       showRange(zoomedTurnRange({ range, full, anchor: turnAt(event.clientX), factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
     };
     const onPointerDown = (event) => {
       const range = visibleRange();
-      if (range === null || event.button !== 0) return;
+      if (event.button !== 0) return;
       dragStart3 = { x: event.clientX, range };
       canvas.setPointerCapture(event.pointerId);
     };
@@ -43818,7 +43951,7 @@ ${bonuses}`;
     };
     const onPointerMove = (event) => {
       const full = fullRange();
-      if (dragStart3 !== null && full !== null) {
+      if (dragStart3 !== null) {
         const turnsPerPixel = (dragStart3.range.max - dragStart3.range.min + 1) / plotWidth();
         showRange(pannedTurnRange({ range: dragStart3.range, full, deltaTurns: -(event.clientX - dragStart3.x) * turnsPerPixel }));
         return;
@@ -43832,8 +43965,7 @@ ${bonuses}`;
       tooltip.hidden = true;
     };
     const onDoubleClick = () => {
-      view2 = null;
-      render();
+      showRange(fullRange());
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -43844,15 +43976,9 @@ ${bonuses}`;
     canvas.addEventListener("dblclick", onDoubleClick);
     return {
       update(next) {
+        const kept = refreshedTurnView({ view: view2, previousTurns: strip.turns, nextTurns: next.turns, minSpan: MIN_ZOOM_SPAN_TURNS });
         strip = next;
-        const full = fullRange();
-        if (view2 !== null && full !== null) {
-          view2 = wholeTurnRange(zoomedTurnRange({ range: view2, full, anchor: view2.min, factor: 1, minSpan: MIN_ZOOM_SPAN_TURNS }), full);
-          if (view2.min <= full.min && view2.max >= full.max) view2 = null;
-        } else {
-          view2 = null;
-        }
-        render();
+        showRange(kept ?? openingRange());
       },
       resize(width, height) {
         size = { width, height };
@@ -43878,7 +44004,6 @@ ${bonuses}`;
   var openCounter = 0;
   var openEpoch = 0;
   var previousFocus = null;
-  var pressStartedOnBackdrop = false;
   function overlayElement() {
     return document.getElementById("charts-overlay");
   }
@@ -44064,18 +44189,7 @@ ${bonuses}`;
     const dialog = document.getElementById("charts-dialog");
     const close = document.getElementById("charts-dialog-close");
     if (dialog === null || close === null) return;
-    const focusable = Array.from(dialog.querySelectorAll("button, select, input, [tabindex]")).filter(
-      (element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
-    );
-    const last = focusable[focusable.length - 1] ?? close;
-    const active2 = document.activeElement;
-    if (event.shiftKey && (active2 === close || !dialog.contains(active2))) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && (active2 === last || !dialog.contains(active2))) {
-      event.preventDefault();
-      close.focus();
-    }
+    trapTabWithin(event, dialog, { firstStop: close });
   }
   function openDialog(overlay) {
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -44101,19 +44215,8 @@ ${bonuses}`;
     const overlay = overlayElement();
     if (overlay === null) return;
     document.getElementById("charts-dialog-close")?.addEventListener("click", () => closeDialog(overlay));
-    overlay.addEventListener("pointerdown", (event) => {
-      pressStartedOnBackdrop = event.target === overlay;
-    });
-    overlay.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const fromBackdrop = pressStartedOnBackdrop;
-      pressStartedOnBackdrop = false;
-      if (event.target === overlay && fromBackdrop) closeDialog(overlay);
-    });
+    wireBackdropDismiss(overlay, () => closeDialog(overlay));
     overlay.addEventListener("keydown", trapTabKey);
-    for (const type of ["pointerdown", "mousedown", "dblclick", "wheel"]) {
-      overlay.addEventListener(type, (event) => event.stopPropagation());
-    }
   }
   function chartsDialogIsOpen() {
     return open;
@@ -45631,8 +45734,10 @@ ${bonuses}`;
     if (replayLeaving !== null) return replayLeaving;
     const leaving = runLeaveReplay().finally(() => {
       replayLeaving = null;
+      setReplayLeaveRunning(false);
     });
     replayLeaving = leaving;
+    setReplayLeaveRunning(true);
     return leaving;
   }
   function abandonReplayForNewMatch() {
@@ -47770,6 +47875,7 @@ ${bonuses}`;
     title.textContent = copy2.title;
     lead.textContent = copy2.lead;
     place.textContent = copy2.placeLine;
+    closeMatchOptionsDialogIfOpen();
     dialog.classList.remove("hidden");
     setMainUIControlsEnabled(false);
     return new Promise((resolve) => {
@@ -47939,6 +48045,7 @@ ${bonuses}`;
           outcome = { decision: "fight", selectedH3Index: readyResult.aiOnlyBattleH3Index };
         } else if (readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()) {
           closeChartsDialogIfOpen();
+          closeMatchOptionsDialogIfOpen();
           outcome = await deps.openMeleeInterceptModal({
             candidates: readyResult.meleeInterceptCandidates ?? [],
             buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
@@ -47970,7 +48077,10 @@ ${bonuses}`;
       await deps.refreshTacticalTerrainOverridesForRenderer();
       const nextState = await fetchMatchSnapshot();
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
-      if ((readyResult.knockouts ?? []).some((knockout) => isHumanSeatId(knockout.seatId))) closeChartsDialogIfOpen();
+      if ((readyResult.knockouts ?? []).some((knockout) => isHumanSeatId(knockout.seatId))) {
+        closeChartsDialogIfOpen();
+        closeMatchOptionsDialogIfOpen();
+      }
       announceKnockouts(readyResult.knockouts ?? [], rendererSharedState.gameState, nextState.seats, readyResult.removedUnitIdsBySeat);
       const state = nextState;
       await deps.applyGameStateSnapshot(state, {
@@ -48113,6 +48223,7 @@ ${bonuses}`;
       holdObserveAutoAdvanceForBattleEntry(false);
       if (rendererMatchEpochCurrent(matchEpoch)) {
         rendererSharedState.readyRequestInFlight = false;
+        refreshMatchOptionsDialogIfOpen();
         void readCommanderPoolAndApply(true);
         deps.updateReadyButtonState();
         setTimeout(() => {
@@ -49993,6 +50104,13 @@ ${bonuses}`;
     if (!chartsDialogIsOpen()) toggleChartsDialog();
   }
 
+  // src/shared/matchTurnLimitRules.ts
+  function matchTurnLimitChoice(currentTurn, chosenLimit) {
+    const openLimits = TURN_LIMIT_OPTIONS.filter((turns) => turns >= currentTurn);
+    const selectedLimit = chosenLimit !== null && openLimits.includes(chosenLimit) ? chosenLimit : openLimits[0] ?? null;
+    return { openLimits, cityHexesAvailable: openLimits.length > 0, selectedLimit };
+  }
+
   // src/renderer/gameplay/matchOptionsControls.ts
   var ALWAYS_LOCKED_CONTROL_IDS = ["new-game-human-nickname", "new-game-fog-checkbox", "new-game-auto-start-checkbox"];
   var EDITABLE_CONTROL_IDS = [
@@ -50093,23 +50211,20 @@ ${bonuses}`;
       if (control instanceof HTMLSelectElement || control instanceof HTMLInputElement) control.disabled = false;
     }
     const victory = selectById(VICTORY_SELECT_ID);
-    const openLimits = TURN_LIMIT_OPTIONS.filter((turns) => turns >= currentTurn);
-    const cityOption = victory ? Array.from(victory.options).find((option2) => option2.value === CITY_HEXES_RULE) : void 0;
-    if (cityOption) cityOption.disabled = openLimits.length === 0;
     const limit = selectById(TURN_LIMIT_SELECT_ID);
-    if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, currentTurn);
+    const shownLimit = limit && limit.value !== "" && Number.isFinite(Number(limit.value)) ? Number(limit.value) : null;
+    const choice = matchTurnLimitChoice(currentTurn, shownLimit);
+    const cityOption = victory ? Array.from(victory.options).find((option2) => option2.value === CITY_HEXES_RULE) : void 0;
+    if (cityOption) cityOption.disabled = !choice.cityHexesAvailable;
+    if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, choice);
     const beatLimit = selectById(BEAT_LIMIT_SELECT_ID);
     if (beatLimit) beatLimit.disabled = selectById(AI_ONLY_SELECT_ID)?.value === "none";
   }
-  function lockTurnLimit(limit, cityHexes3, currentTurn) {
+  function lockTurnLimit(limit, cityHexes3, choice) {
     limit.disabled = !cityHexes3;
     if (!cityHexes3) return;
-    const options = Array.from(limit.options);
-    for (const option2 of options) option2.disabled = !(Number(option2.value) >= currentTurn);
-    if (limit.selectedOptions[0]?.disabled !== false) {
-      const firstOpen = options.find((option2) => !option2.disabled);
-      if (firstOpen) limit.value = firstOpen.value;
-    }
+    for (const option2 of Array.from(limit.options)) option2.disabled = !choice.openLimits.includes(Number(option2.value));
+    if (choice.selectedLimit !== null) limit.value = String(choice.selectedLimit);
   }
   function readMatchOptionsUpdate() {
     const { victoryRule, turnLimit } = readNewGameVictory();
@@ -50146,7 +50261,10 @@ ${bonuses}`;
   var liveTurn = 0;
   var openEpoch2 = 0;
   var openCounter2 = 0;
-  var pressStartedOnBackdrop2 = false;
+  var pendingApplyCounter = null;
+  function applyIsPending() {
+    return pendingApplyCounter === openCounter2;
+  }
   function part(id) {
     return document.getElementById(id);
   }
@@ -50163,32 +50281,13 @@ ${bonuses}`;
     note2.textContent = text ?? "";
     note2.hidden = text === null;
   }
-  function focusableControls(popover3) {
-    return Array.from(popover3.querySelectorAll("button, select, input, [tabindex]")).filter(
-      (element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0
-    );
-  }
-  function trapTabKey2(event, popover3) {
-    const focusable = focusableControls(popover3);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (!first || !last) return;
-    const active2 = document.activeElement;
-    if (event.shiftKey && (active2 === first || !popover3.contains(active2))) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && (active2 === last || !popover3.contains(active2))) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
   function handleDialogKey(event, popover3) {
     event.stopPropagation();
     if (event.key === "Escape") {
       event.preventDefault();
-      closeMatchOptionsDialog();
+      closeMatchOptionsDialogByPlayer();
     } else if (event.key === "Tab") {
-      trapTabKey2(event, popover3);
+      trapTabWithin(event, popover3);
     }
   }
   function onWindowKeydown(event) {
@@ -50196,6 +50295,40 @@ ${bonuses}`;
     if (!popover3 || !matchOptionsDialogIsOpen()) return;
     if (event.target instanceof Node && popover3.contains(event.target)) return;
     handleDialogKey(event, popover3);
+  }
+  function setCloseButtonsDisabled(disabled) {
+    const buttons = [part("match-options-cancel"), part("new-game-options-popover")?.querySelector(".commander-popover-close") ?? null];
+    for (const button of buttons) {
+      if (button instanceof HTMLButtonElement) button.disabled = disabled;
+    }
+  }
+  function showLiveSettings(live) {
+    fillOptionControlsFromMatch(live, rendererSharedState.runButtonOn);
+    editable = !replayActive() && live.phase === "planning" && !rendererSharedState.tacticalBattleSnapshot && !rendererSharedState.readyRequestInFlight && !live.gameOver;
+    liveTurn = live.turnNumber;
+    lockOptionControls(editable, liveTurn);
+    setNote(editable ? null : READ_ONLY_NOTE);
+    const apply = part("match-options-apply");
+    if (apply instanceof HTMLButtonElement) {
+      apply.hidden = !editable;
+      apply.disabled = false;
+    }
+    const cancel = part("match-options-cancel");
+    if (cancel) cancel.textContent = editable ? "Cancel" : "Close";
+    setCloseButtonsDisabled(false);
+  }
+  async function refreshMatchOptionsDialog() {
+    if (!matchOptionsDialogIsOpen() || editable) return;
+    const counter = openCounter2;
+    let live;
+    try {
+      live = await fetchMatchSnapshot();
+    } catch (error) {
+      console.error("Game Options could not re-read the live match", error);
+      return;
+    }
+    if (counter !== openCounter2 || !matchOptionsDialogIsOpen() || !rendererMatchEpochCurrent(openEpoch2) || live.hexes.length === 0) return;
+    showLiveSettings(live);
   }
   async function openMatchOptionsDialog() {
     if (openIsRefused()) return;
@@ -50213,18 +50346,8 @@ ${bonuses}`;
     if (!popover3 || counter !== openCounter2 || !rendererMatchEpochCurrent(epoch) || openIsRefused() || live.hexes.length === 0) return;
     openEpoch2 = epoch;
     savedControls = captureOptionControls();
-    fillOptionControlsFromMatch(live, rendererSharedState.runButtonOn);
-    editable = !replayActive() && live.phase === "planning" && !rendererSharedState.tacticalBattleSnapshot && !rendererSharedState.readyRequestInFlight && !live.gameOver;
-    liveTurn = live.turnNumber;
-    lockOptionControls(editable, liveTurn);
-    setNote(editable ? null : READ_ONLY_NOTE);
-    const apply = part("match-options-apply");
-    if (apply instanceof HTMLButtonElement) {
-      apply.hidden = !editable;
-      apply.disabled = false;
-    }
+    showLiveSettings(live);
     const cancel = part("match-options-cancel");
-    if (cancel) cancel.textContent = editable ? "Cancel" : "Close";
     popover3.dataset.mode = "match";
     popover3.setAttribute("aria-modal", "true");
     for (const side of ["left", "top", "right", "bottom"]) popover3.style.removeProperty(side);
@@ -50245,6 +50368,7 @@ ${bonuses}`;
     if (savedControls) restoreOptionControls(savedControls);
     savedControls = null;
     editable = false;
+    setCloseButtonsDisabled(false);
     delete popover3.dataset.mode;
     popover3.removeAttribute("aria-modal");
     for (const id of ["match-options-backdrop", "match-options-footer"]) {
@@ -50256,54 +50380,71 @@ ${bonuses}`;
     part("topbar-settings-btn")?.focus();
     void maybeObserveAutoAdvance();
   }
+  function closeMatchOptionsDialogByPlayer() {
+    if (applyIsPending()) return;
+    closeMatchOptionsDialog();
+  }
+  async function showStoredMatchOptions(epoch) {
+    try {
+      const live = await fetchMatchSnapshot();
+      if (rendererMatchEpochCurrent(epoch)) await dialogDeps?.applySnapshot(live, LIVE_SNAPSHOT_APPLY_OPTIONS);
+    } catch (error) {
+      console.error("Game Options could not show the new settings", error);
+    }
+  }
   async function applyMatchOptions() {
-    if (!matchOptionsDialogIsOpen() || !editable) return;
-    if (!rendererMatchEpochCurrent(openEpoch2)) {
+    if (!matchOptionsDialogIsOpen() || !editable || applyIsPending()) return;
+    const epoch = openEpoch2;
+    if (!rendererMatchEpochCurrent(epoch)) {
       closeMatchOptionsDialog();
       return;
     }
     const apply = part("match-options-apply");
-    if (apply instanceof HTMLButtonElement) apply.disabled = true;
     const counter = openCounter2;
-    const showFailure = (reason) => {
+    pendingApplyCounter = counter;
+    if (apply instanceof HTMLButtonElement) apply.disabled = true;
+    setCloseButtonsDisabled(true);
+    const endPending = () => {
+      if (pendingApplyCounter === counter) pendingApplyCounter = null;
       if (counter !== openCounter2) return;
-      setNote(reason);
       if (apply instanceof HTMLButtonElement) apply.disabled = false;
+      setCloseButtonsDisabled(false);
     };
     try {
       const api = window.gameApi;
       if (!api?.setMatchOptions) throw new Error("setMatchOptions is unavailable");
       const result = await api.setMatchOptions(readMatchOptionsUpdate());
       if (!result.ok) {
-        showFailure(result.reason);
+        endPending();
+        if (counter === openCounter2) setNote(result.reason);
         return;
       }
     } catch (error) {
       console.error("Game Options could not be applied", error);
-      showFailure(SAVE_FAILED_NOTE);
+      endPending();
+      if (counter === openCounter2) setNote(SAVE_FAILED_NOTE);
       return;
     }
-    try {
-      const live = await fetchMatchSnapshot();
-      if (counter === openCounter2 && rendererMatchEpochCurrent(openEpoch2)) await dialogDeps?.applySnapshot(live, LIVE_SNAPSHOT_APPLY_OPTIONS);
-    } catch (error) {
-      console.error("Game Options could not show the new settings", error);
-    }
+    await showStoredMatchOptions(epoch);
+    endPending();
     if (counter === openCounter2) closeMatchOptionsDialog();
   }
   function wireMatchOptionsDialog(deps) {
     dialogDeps = deps;
     registerMatchOptionsDialogCloser(closeMatchOptionsDialog);
+    registerMatchOptionsDialogRefresher(() => {
+      void refreshMatchOptionsDialog();
+    });
     part("topbar-settings-btn")?.addEventListener("click", () => {
       void openMatchOptionsDialog();
     });
     part("match-options-apply")?.addEventListener("click", () => {
       void applyMatchOptions();
     });
-    part("match-options-cancel")?.addEventListener("click", closeMatchOptionsDialog);
+    part("match-options-cancel")?.addEventListener("click", closeMatchOptionsDialogByPlayer);
     const popover3 = part("new-game-options-popover");
     popover3?.querySelector(".commander-popover-close")?.addEventListener("click", () => {
-      if (matchOptionsDialogIsOpen()) closeMatchOptionsDialog();
+      if (matchOptionsDialogIsOpen()) closeMatchOptionsDialogByPlayer();
     });
     popover3?.addEventListener("keydown", (event) => {
       if (matchOptionsDialogIsOpen()) handleDialogKey(event, popover3);
@@ -50314,18 +50455,7 @@ ${bonuses}`;
     });
     const backdrop = part("match-options-backdrop");
     if (!backdrop) return;
-    backdrop.addEventListener("pointerdown", (event) => {
-      pressStartedOnBackdrop2 = event.target === backdrop;
-    });
-    backdrop.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const fromBackdrop = pressStartedOnBackdrop2;
-      pressStartedOnBackdrop2 = false;
-      if (event.target === backdrop && fromBackdrop) closeMatchOptionsDialog();
-    });
-    for (const type of ["pointerdown", "mousedown", "dblclick", "wheel"]) {
-      backdrop.addEventListener(type, (event) => event.stopPropagation());
-    }
+    wireBackdropDismiss(backdrop, closeMatchOptionsDialogByPlayer);
   }
 
   // src/renderer/gameplay/formatTargetingValidationReason.ts
@@ -52161,7 +52291,7 @@ ${bonuses}`;
       if (turn === void 0 || !field) return;
       field.value = String(turn);
       field.removeAttribute("aria-invalid");
-      scheduler.request(Number(slider.value));
+      if (sliderDragging) scheduler.request(Number(slider.value));
     });
     slider.addEventListener("change", () => {
       sliderDragging = false;
@@ -52533,9 +52663,18 @@ ${bonuses}`;
       redrawMap: redraw,
       redrawSelectionPanel: renderSelectionPanel
     });
-    wireGameMenu({ openReplay: () => {
-      void openReplay();
-    }, openCharts: openChartsDialog });
+    wireGameMenu({
+      openReplay: () => {
+        void openReplay();
+      },
+      closeReplay: () => {
+        void requestReplayLeave();
+      },
+      replayIsOpen: replayActive,
+      openCharts: openChartsDialog,
+      closeCharts: closeChartsDialogIfOpen,
+      chartsIsOpen: chartsDialogIsOpen
+    });
     wireMatchOptionsDialog({ applySnapshot: applyGameStateSnapshot2 });
     wireChartsDialog();
     wireReplayPanel();
