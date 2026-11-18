@@ -4,6 +4,7 @@
   position: absolute;
   right: 12px;
   bottom: 12px;
+  /* Above the minimap panel (6050), below the selection panel (6200). A panel dragged large can reach over the minimap, and its grip must stay in reach. */
   z-index: 6100;
   width: 280px;
   max-width: calc(100% - 24px);
@@ -37,6 +38,33 @@ body:has(#game-over-overlay:not(.hidden)) #chat-panel {
 }
 .chat-panel[data-state="compact"] .chat-panel-history {
   display: none;
+}
+/* A dragged height replaces the half-the-map limit: the history fills the panel above the pending lines and the bar. */
+/* At a small dragged height the pending lines scroll, so they never push the bar out of the panel. */
+.chat-panel[data-dragged-height="true"] .chat-panel-staged {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.chat-panel[data-dragged-height="true"] .chat-panel-history {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+}
+
+/* ---------- Resize grip ---------- */
+/* The panel is anchored at its bottom-right, so the grip sits at the opposite, top-left corner. It shows in both states; over the compact bar it covers a corner of the expand control, clear of the chevron. */
+.chat-panel-grip {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 0 3px, var(--chrome-border) 3px 4px, transparent 4px 6px, var(--chrome-border) 6px 7px, transparent 7px);
+  border-top-left-radius: 6px;
 }
 
 .chat-panel-bar {
@@ -104,11 +132,12 @@ body:has(#game-over-overlay:not(.hidden)) #chat-panel {
   display: none;
 }
 .chat-panel-recipient {
-  flex: 0 1 auto;
+  /* The list never shrinks below its fitted width: the message field gives way, down to its minimum, before a name is cut. */
+  flex: 0 0 auto;
   width: max-content;
   min-width: 0;
-  /* 32 px expand, 8 px list margin, 80 px field, 32 px send. A longer name shrinks before the field does. */
-  max-width: calc(100% - 152px);
+  /* 32 px expand, 8 px list margin, 48 px field, 32 px send. Only a name too long even for that is cut, with an ellipsis. */
+  max-width: calc(100% - 120px);
   margin: 6px 0 6px 8px;
   padding: 0 4px;
   border: 1px solid var(--chrome-border);
@@ -120,11 +149,11 @@ body:has(#game-over-overlay:not(.hidden)) #chat-panel {
   text-overflow: ellipsis;
 }
 .chat-panel-input {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   align-self: center;
   width: auto;
   height: 38px;
-  min-width: 80px;
+  min-width: 48px;
   min-height: 0;
   box-sizing: border-box;
   margin: 0;

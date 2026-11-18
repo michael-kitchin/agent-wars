@@ -12,6 +12,7 @@ import { groupSideMessagesByTurn, SIDE_MESSAGE_ARROW, type SideMessageView } fro
 import { sideDisplayName, type SideDisplaySeat } from '../../shared/sideNicknames';
 import { chatStagedCancelTooltipText, chatStagedEditTooltipText } from '../chrome/controlTooltipText';
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
+import { applyDraggedChatHeight, clearChatPanelHeight, wireChatPanelResize } from './chatPanelResize';
 import { createMessagePartyFlag } from '../chrome/sideNumberFlag';
 import { rendererSharedState as S } from '../core/state';
 import { layoutMapChrome } from '../map/mapChromeLayout';
@@ -166,14 +167,14 @@ function syncExpandControl(button: HTMLElement): void {
  *
  * Purpose: One place leaves the panel settled after a slide or without one.
  * When to use: When a slide finishes, and when no slide is needed.
- * Expected outcome: `data-state` is `expanded` or `compact`, and no inline height remains.
+ * Expected outcome: `data-state` is `expanded` or `compact`. A compact panel has no inline height. An expanded panel keeps the height the player dragged it to, if any.
  * Exceptions: None.
  */
 function settleChat(panel: HTMLElement): void {
   slide?.cancel();
   slide = null;
   panel.dataset.state = expanded ? 'expanded' : 'compact';
-  panel.style.height = '';
+  if (!expanded) clearChatPanelHeight(panel);
 }
 
 /**
@@ -208,12 +209,14 @@ function toggleChatPanel(panel: HTMLElement, bar: HTMLElement, button: HTMLEleme
   if (expanded) {
     scrollHistoryToEnd = true;
     panel.dataset.state = 'expanding';
+    // The dragged height goes on first, so the render scrolls the history in its final size.
+    applyDraggedChatHeight(panel);
     renderChatPanel();
     slideChat(panel, from, panel.getBoundingClientRect().height);
     return;
   }
   panel.dataset.state = 'collapsing';
-  panel.style.height = '';
+  clearChatPanelHeight(panel);
   const borders = panel.offsetHeight - panel.clientHeight;
   slideChat(panel, from, bar.offsetHeight + borders);
 }
@@ -254,7 +257,8 @@ function fitRecipientToWidestOption(select: HTMLSelectElement): void {
     }),
   );
   probe.remove();
-  const paddingBordersAndArrow = 28;
+  // 8 px padding, 2 px borders, and the menu arrow's 20 px, plus 4 px so no engine's rounding cuts a letter.
+  const paddingBordersAndArrow = 34;
   select.style.width = `${widest + paddingBordersAndArrow}px`;
 }
 
@@ -566,6 +570,7 @@ export function wireChatPanel(): void {
     syncExpandControl(button);
     button.addEventListener('click', () => toggleChatPanel(panel, bar, button));
   }
+  wireChatPanelResize();
   const input = chatMessageField();
   if (input) {
     input.addEventListener('input', () => syncSendEnabled());

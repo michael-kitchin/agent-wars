@@ -24,6 +24,7 @@ const CHAT_IDS = [
   'chat-panel-recipient',
   'chat-panel-input',
   'chat-panel-send',
+  'chat-panel-grip',
 ] as const;
 
 /**
@@ -103,4 +104,38 @@ test('the map toast show and hide both sync the chat panel', () => {
     const body = getFunctionSource(source, name);
     assert.equal(body.includes('syncChatPanelVisibility'), true, name);
   }
+});
+
+test('the grip sits in the panel, shows in both states, and a dragged width survives the layout', () => {
+  const html = readRepoFile('static', 'index.html');
+  const css = readRepoFile('static', 'chatChrome.css');
+  const resize = readRendererSource('chat', 'chatPanelResize.ts');
+  const panel = readRendererSource('chat', 'chatPanel.ts');
+  const layout = readRendererSource('map', 'mapChromeLayout.ts');
+  assert.equal(html.split('id="chat-panel-grip"').length - 1, 1);
+  assert.ok(html.indexOf('id="chat-panel-grip"') > html.indexOf('id="chat-panel"') && html.indexOf('id="chat-panel-grip"') < html.indexOf('id="chat-panel-bar"'));
+  assert.equal(css.includes('.chat-panel:not([data-state="expanded"]) .chat-panel-grip'), false, 'the grip is never hidden');
+  assert.match(readRepoFile('static', 'shellChrome.css'), /\.minimap-panel \{[^}]*z-index: 6050;/, 'the minimap stays under the chat panel');
+  assert.equal(css.includes('cursor: nwse-resize'), true);
+  assert.equal(css.includes('.chat-panel[data-dragged-height="true"] .chat-panel-history'), true);
+  assert.equal(resize.includes("state !== 'expanded' && state !== 'compact'"), true);
+  assert.equal(resize.includes('dragStart.compact ? null : size.height'), true);
+  assert.equal(resize.includes('dragStart.width - (event.clientX - dragStart.x)'), true);
+  assert.equal(resize.includes('dragStart.height - (event.clientY - dragStart.y)'), true);
+  assert.equal(resize.includes('clampChatPanelSize'), true);
+  assert.equal(panel.includes('wireChatPanelResize()'), true);
+  assert.match(panel, /applyDraggedChatHeight\(panel\);\s+renderChatPanel\(\);/, 'the dragged height is on before the history scrolls to its end');
+  assert.equal(resize.includes("'lostpointercapture', endDrag"), true);
+  assert.equal(css.includes('.chat-panel[data-dragged-height="true"] .chat-panel-staged'), true);
+  assert.equal(getFunctionSource(panel, 'settleChat').includes('if (!expanded) clearChatPanelHeight(panel);'), true);
+  assert.equal(getFunctionSource(panel, 'toggleChatPanel').includes('applyDraggedChatHeight(panel);'), true);
+  assert.equal(getFunctionSource(layout, 'placeChatPanel').includes('chatPanelDraggedWidth() ?? place.width'), true);
+});
+
+test('the side list may take the field room down to 48 px, so a full nickname shows when closed', () => {
+  const css = readRepoFile('static', 'chatChrome.css');
+  assert.equal(css.includes('max-width: calc(100% - 120px);'), true);
+  assert.equal(css.includes('min-width: 48px;'), true);
+  assert.equal(css.includes('calc(100% - 152px)'), false);
+  assert.match(css, /flex: 0 0 auto;\s+width: max-content;/, 'the list does not shrink');
 });

@@ -16,9 +16,11 @@ Shown in Strategic planning and Tactical planning while a match is loaded, playb
 - The panel is as wide as the message dialog's band (`chatPanelPlacement` in `src/shared/mapChromePlacement.ts`, using the width `layoutMapChrome` computed). Its right edge is 12 px in from the map (`MAP_CHROME_INSET`). Its bottom edge is also 12 px in (`MAP_CHROME_INSET`), the same as the selection panel's, whether or not the scale is showing. The scale sits at the map's horizontal center, so the panel does not rise to clear it. On a map narrower than about 1024 px the panels cover the scale ([map-surface.md](map-surface.md)). The history's maximum height is half the map height, rounded down. The panel stays inside the map (`max-width: calc(100% - 24px)`). It draws under the selection panel (z-index 6100, under 6200) and hides while the map toast shows, so the toast is not covered by raising it.
 - The entry bar is one 50 px row at the bottom of the panel. From left to right, while the viewer can send:
   - The expand control, the bar's full height and 32 px wide. The chevron points up while the panel is compact and down while it is expanded.
-  - A drop-down of the AI sides still in the match, in seat order. Each option is that side's `sideDisplayName` (`src/shared/sideNicknames.ts`). The closed list is as wide as its widest name, plus its padding and menu arrow (`fitRecipientToWidestOption`). A name that would leave the field under 80 px ends in an ellipsis, and the list shrinks before the field does.
+  - A drop-down of the AI sides still in the match, in seat order. Each option is that side's `sideDisplayName` (`src/shared/sideNicknames.ts`). The closed list is as wide as its widest name, plus its padding and menu arrow (`fitRecipientToWidestOption`). The list does not shrink: the message field gives way to it, down to the field's 48 px minimum (`min-width` on `.chat-panel-input`). Only a name too long even for that ends in an ellipsis (`max-width` on `.chat-panel-recipient` in `static/chatChrome.css`). On a panel of the default 280 px that leaves room for a name of about 18 characters.
   - A message field, the same height as that drop-down, filling the rest of the row. Placeholder "Write a message", at most `SIDE_MESSAGE_MAX_CHARS` (280) characters. The text wraps. A line that does not fit scrolls inside the field.
   - A send button, a right-facing arrow.
+- The panel is drawn above the minimap panel (z-index 6050 in `static/shellChrome.css`, under the chat panel's 6100). A panel dragged large can cover part of the minimap, and its grip stays reachable, so the player can always drag it smaller.
+- A resize grip at the top-left corner, shown in both states. It is the selection panel's grip ([selection-panel.md](selection-panel.md)) mirrored: 14 px square, diagonal ridges, the `nwse-resize` cursor. Compact, it sits over the top-left corner of the expand control, clear of the chevron. Expanded, it sits over the history's top-left corner.
 - While the viewer cannot send (`data-can-send="false"`), the bar shows the expand control and the title "Messages". The drop-down, the text field, the send button, and the pending lines are hidden. An observer is that case. So is a player with no AI side left.
 - The pending lines sit above the bar, one per unsent draft, in the drop-down's order (`stagedMessagesInSeatOrder`). Each line is the human's seat-1 flag and `sideDisplayName`, `→`, that side's flag and `sideDisplayName`, `: `, and the text, ending in an ellipsis, with the full line as the row's title, then Edit and ×. The drop-down does not choose which lines appear. A draft whose side has left the match is last. The history is not filtered by the drop-down.
 - The history, while expanded, groups sent messages by turn, oldest at the top (`groupSideMessagesByTurn`). Each heading is `Turn N`. Under it, every message sent that turn, in the sender's `seatOrder`, and within one sender in the recipient's `seatOrder`. A row is the sender's flag and name, `→`, the recipient's flag and name, `: `, and the text. A message sent in a battle adds ` (battle)` after the recipient. The human is named the same way: the seat-1 flag from `createMessagePartyFlag` and `sideDisplayName`. The viewer's own rows are heavier. A long name wraps and does not widen the panel. With no messages the history reads "No messages yet."
@@ -30,6 +32,7 @@ Shown in Strategic planning and Tactical planning while a match is loaded, playb
 ### Mouse
 
 - The expand control toggles compact and expanded. The height slides unless reduced motion is requested (`startPanelHeightSlide`). Expanding scrolls the history to the latest message.
+- When the player drags the grip, in either state, the panel resizes. Its bottom-right corner stays put, so dragging left widens it and dragging up makes it taller. The width stays from 280 to 640 px and the height from 140 px to the map's height minus 24 px (`clampChatPanelSize` in `src/shared/chatPanelSize.ts`). A dragged width applies to both states and replaces the message dialog's band width (`placeChatPanel` in `src/renderer/map/mapChromeLayout.ts`). A drag on the compact panel changes the width only. A dragged height applies while the panel is expanded and replaces the half-the-map limit on the history, which then fills the panel above the pending lines and the bar. At a dragged height too small for every pending line, those lines scroll, so the bar stays in the panel. The size lasts until the app closes, including while the panel is hidden or compact. It is not saved. A press on the grip during the expand or collapse slide does nothing.
 - The drop-down picks the recipient for the next message. It does not change the pending lines. The list is rebuilt when the seat ids change or a side's name changes.
 - Edit on a pending line points the drop-down at that side, copies that text into the field, discards that draft, and puts the caret at the end. × discards that draft. Other drafts stay.
 - A click, a drag, or a wheel turn that starts on the panel does not reach the map, because the panel is a sibling of `#main-map`. The wheel scrolls the history when the history can scroll.
@@ -52,6 +55,7 @@ Shown in Strategic planning and Tactical planning while a match is loaded, playb
 - Compact, expanded, and the slide between them (`expanding`, `collapsing`).
 - Hidden, while the auto-advance checkbox is on, while playback runs, while `#map-toast` lacks the class `hidden`, while no match is loaded, and during New game and Game over.
 - Can send, or read only.
+- Resized: the panel keeps the size the player dragged it to.
 
 ## Invariants
 
@@ -96,6 +100,8 @@ The panel is the same in both theaters. A message sent on a battle beat is marke
 - `src/renderer/gameplay/observeChrome.ts` (the auto-advance checkbox, `stopObserveAutoAdvance`)
 - `src/renderer/gameplay/observeIntent.ts` (`chooseWatchTheRest`, `clearObserveAfterKnockout`)
 - `src/shared/chatPanelState.ts` (`stagedMessagesInSeatOrder`, `stagedMessageFor`, `nextRecipientSeatId`, `canStageText`, `chatPanelShouldShow`)
+- `src/renderer/chat/chatPanelResize.ts` (`wireChatPanelResize`, `chatPanelDraggedWidth`, `applyDraggedChatHeight`, `clearChatPanelHeight`)
+- `src/shared/chatPanelSize.ts` (`clampChatPanelSize`)
 - `src/shared/mapChromePlacement.ts` (`chatPanelPlacement`)
 - `src/renderer/map/mapChromeLayout.ts` (`layoutMapChrome`)
 - `src/shared/sideMessageView.ts` (`groupSideMessagesByTurn`)

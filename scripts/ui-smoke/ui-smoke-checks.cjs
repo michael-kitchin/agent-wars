@@ -23,6 +23,7 @@ const {
 const { CONSOLE_CHECKS } = require('./ui-smoke-console-checks.cjs');
 const { SCENARIO_CHECKS } = require('./ui-smoke-scenario-checks.cjs');
 const { MAP_CHROME_CHECKS } = require('./ui-smoke-map-chrome-checks.cjs');
+const { CHAT_CHECKS } = require('./ui-smoke-chat-checks.cjs');
 const { BATTLE_CHECKS } = require('./ui-smoke-battle-checks.cjs');
 const { NEW_GAME_CHECKS } = require('./ui-smoke-new-game-checks.cjs');
 
@@ -47,7 +48,7 @@ function probePage(selectors) {
    * Purpose: Every check reads elements the same way.
    * When to use: For each selector passed to `probePage`.
    * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size, top
-   *   border color, background color, and pointer events, its control tip sentence, and selected attributes, including
+   *   border color, background color, and pointer events, its control tip sentence, its inline `style.width` (`styleWidth`), and selected attributes, including
    *   its accessible name, its `data-mode`, a select's value and option texts, and the trimmed text of every match, or null when the selector matches nothing.
    * Exceptions: None.
    */
@@ -87,6 +88,7 @@ function probePage(selectors) {
       background: getComputedStyle(el).backgroundColor,
       pointerEvents: getComputedStyle(el).pointerEvents,
       tip: el.getAttribute('data-control-tooltip'),
+      styleWidth: el.style.width,
       ancestorIds,
     };
   };
@@ -508,6 +510,7 @@ const CHECKS = Object.freeze([
   ...CONSOLE_CHECKS,
   ...SCENARIO_CHECKS,
   ...MAP_CHROME_CHECKS,
+  ...CHAT_CHECKS,
   ...BATTLE_CHECKS,
   ...NEW_GAME_CHECKS,
 ]);

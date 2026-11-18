@@ -9,6 +9,7 @@
  *   message toast's tab row is wider than the gap.
  * Exceptions: None; missing elements are skipped.
  */
+import { chatPanelDraggedWidth } from '../chat/chatPanelResize';
 import { chatPanelPlacement, legendPopoverPosition, messageToastBandWidth, toastBandSpan } from '../../shared/mapChromePlacement';
 
 /**
@@ -78,7 +79,7 @@ export function layoutMapChrome(): void {
  *
  * Purpose: The panel matches the message dialog's width, and its bottom edge matches the selection panel's.
  * When to use: At the end of `layoutMapChrome`, after the band width is final.
- * Expected outcome: `#chat-panel` gets `width`, `right`, and `bottom`. `#chat-panel-history` gets `max-height`.
+ * Expected outcome: `#chat-panel` gets `width`, `right`, and `bottom`. The width is the one the player dragged the panel to, when there is one. `#chat-panel-history` gets `max-height`.
  * Exceptions: None. A missing panel is skipped.
  */
 function placeChatPanel(mapBox: DOMRect, bandWidth: number): void {
@@ -89,7 +90,7 @@ function placeChatPanel(mapBox: DOMRect, bandWidth: number): void {
     mapHeight: mapBox.height,
     bandWidth,
   });
-  panel.style.width = `${place.width}px`;
+  panel.style.width = `${chatPanelDraggedWidth() ?? place.width}px`;
   panel.style.right = `${place.right}px`;
   panel.style.bottom = `${place.bottom}px`;
   const history = document.getElementById('chat-panel-history');

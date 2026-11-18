@@ -89,6 +89,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Replay panel Pause, while playback runs: Stop after this turn.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
+- Chat panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
 - Selection panel expand control, while the panel is expanded: Hide the details. The bar stays.
 - Dismiss, on a mercenary in the selection panel: `DISMISS_MERCENARY_TOOLTIP`. Fire this mercenary. It becomes Neutral now.
@@ -225,7 +226,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/renderer/charts/chartsDialog.ts` (`buildLineChartBlock`, `buildBody`)
 - `static/index.html` (`#replay-panel-expand`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`, `#replay-follow-units`)
 - `src/renderer/replay/replayPanel.ts` (`SHOW_SEEK_TIP`, `HIDE_SEEK_TIP`, `PLAY_TIP`, `PAUSE_TIP`)
-- `static/index.html` (`#control-tooltip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)
+- `static/index.html` (`#control-tooltip`, `#chat-panel-grip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)
 - `src/renderer/chat/chatPanel.ts` (`syncExpandControl`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`

@@ -25,6 +25,7 @@ const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-che
 const { NEW_GAME_MOVE, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
 const { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const { checkNewGameOverBattleLabels } = require('./ui-smoke-map-label-checks.cjs');
+const { runChatPanelScenes } = require('./ui-smoke-chat-panel.cjs');
 const { runMatchOptionsScenes } = require('./ui-smoke-match-options.cjs');
 const { runMultiCommanderScenes } = require('./ui-smoke-multi.cjs');
 const {
@@ -330,6 +331,9 @@ async function runFirstSession(app, page, report, outDir) {
   await dragSelectionPanelGrip(page, -600, 600);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.selectionResizedMin);
+
+  // The chat panel's grip: expand the panel, drag it to its largest and smallest sizes, and collapse it again.
+  await runChatPanelScenes({ page, report, outDir, recordScene });
 
   // At the minimum window size, select the stack and drag the panel as large as it goes; it must stay on the map.
   await setViewport(app, page, SMALL_WINDOW);
