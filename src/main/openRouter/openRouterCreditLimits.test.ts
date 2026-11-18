@@ -6,19 +6,23 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import {
   formatOpenRouterChatApiError,
+  isOpenRouterSessionCreditsExhausted,
+  markOpenRouterSessionCreditsExhausted,
+  OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS,
+  OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE,
   noteOpenRouterAffordableMaxTokens,
   OPENROUTER_DEFAULT_COMPLETION_MAX_TOKENS,
   OPENROUTER_MIN_COMPLETION_MAX_TOKENS,
   OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
   parseAffordableMaxTokensFromOpenRouterError,
   resetOpenRouterSessionAffordableMaxTokensForTests,
-  resetOpenRouterSessionCreditsExhaustedForTests,
+  clearOpenRouterSessionCreditsExhausted,
   resolveEffectiveOpenRouterCompletionMaxTokens,
 } from './openRouterCreditLimits';
 
 afterEach(() => {
   resetOpenRouterSessionAffordableMaxTokensForTests();
-  resetOpenRouterSessionCreditsExhaustedForTests();
+  clearOpenRouterSessionCreditsExhausted();
 });
 
 /**
@@ -126,4 +130,26 @@ test('formatOpenRouterChatApiError includes the provider raw message', () => {
   });
   const formatted = formatOpenRouterChatApiError(400, body);
   assert.match(formatted, /tool_choice/);
+});
+
+/**
+ * Contract: a zero-balance 402 fails order requests fast, but only for 60 seconds, and a cleared latch ends it at once.
+ *
+ * Purpose: The 402 message tells the player to add credits and try again, so the fast-fail must not outlast that retry.
+ * When to use: After changing the credits latch or `OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS`.
+ * Expected outcome: False before a 402, true just after, false once the window has passed, and false after a clear.
+ * Exceptions: None.
+ */
+test('the insufficient-credits latch lasts one window and ends when it is cleared', () => {
+  const body = JSON.stringify({ error: { message: 'Insufficient credits. Add more using https://openrouter.ai/settings/credits' } });
+  const startMs = 1_000_000;
+  assert.equal(isOpenRouterSessionCreditsExhausted(startMs), false);
+  markOpenRouterSessionCreditsExhausted(startMs);
+  assert.equal(isOpenRouterSessionCreditsExhausted(startMs + OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS - 1), true);
+  assert.equal(isOpenRouterSessionCreditsExhausted(startMs + OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS), false);
+  markOpenRouterSessionCreditsExhausted(startMs);
+  clearOpenRouterSessionCreditsExhausted();
+  assert.equal(isOpenRouterSessionCreditsExhausted(startMs), false);
+  assert.equal(formatOpenRouterChatApiError(402, body), OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE);
+  assert.equal(isOpenRouterSessionCreditsExhausted(), true);
 });

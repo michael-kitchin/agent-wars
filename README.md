@@ -144,7 +144,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, air drops, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (2232 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, an import-cycle check (`npm run check:circular`), the main-process and tool tests (2232 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -272,7 +272,7 @@ npm run build
 npm start
 ```
 
-- **Build:** compiles the main process with TypeScript (`dist/`), bundles the preload script into `dist/main/preload.js` with esbuild (a sandboxed preload cannot load other local modules, so the bundle inlines the shared IPC channel names), and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
+- **Build:** compiles the main process with TypeScript (`dist/`), bundles the preload script into `dist/main/preload.js` with esbuild (a sandboxed preload cannot load other local modules, so the bundle inlines the shared IPC channel names; run `npm run build:main`, because plain `tsc` leaves a preload that cannot load), and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
 - **Start:** runs Electron on the last build (`npm start` does not rebuild); the window loads the renderer from `static/index.html`. Game state is stored in SQLite through **better-sqlite3** (a native module), in your Electron user-data directory.
 - **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's Inside](#whats-inside).
 - **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/2026-03/2026-03-11-packaging.md](.spec/completed/2026-03/2026-03-11-packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).

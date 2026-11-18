@@ -15,6 +15,7 @@ import {
   markSuccessfulConsultation as recordSuccessfulConsultation,
   settleConsultFailure,
 } from './requestOrdersConsultationMarks';
+import { isOpenRouterSessionCreditsExhausted, OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE } from './openRouterCreditLimits';
 import { parseOrdersResponse } from './orderResponseParsing';
 import { type EnvelopeGates } from './promptSpec/envelopeContract';
 import { createPathfindingSession } from '../tools/pathfinding';
@@ -183,6 +184,12 @@ export async function requestOrdersFlow(
     logDebug('openRouter requestOrders: no units remain in this battle', { seatId, absenceReason: rosterAbsence, onlyMissiles });
     if (onLog) onLog(onlyMissiles ? ONLY_MISSILES_REMAIN_IN_BATTLE_MESSAGE : 'No units remain in this battle.');
     return { success: true, orders: [], absenceReason: rosterAbsence };
+  }
+
+  if (isOpenRouterSessionCreditsExhausted()) {
+    logError('openRouter requestOrders: failing fast after a recent insufficient-credits response', { seatId });
+    if (onLog) onLog(OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE, true);
+    return failRequest(OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE);
   }
 
   const requestProfile = resolveOrdersRequestProfile?.(modelId, seatId) ?? BASELINE_ORDERS_REQUEST_PROFILE;

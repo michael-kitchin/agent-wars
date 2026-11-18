@@ -949,4 +949,8 @@ The pattern to follow is already in `main.ts`: a `register…IpcHandler` functio
 - Defect Inventory resolutions:
   - `tacticalDraftMarchOverlay.ts` is deleted, along with its contract assertion and the two UX document entries.
   - `strategicNamingRecords` is deleted from the terrain classification snapshot.
-  - `isOpenRouterSessionCreditsExhausted` was added in `c4222e5` and has never been read. `requestOrdersFlow` has no fast-fail, nothing calls `resetOpenRouterSessionCreditsExhaustedForTests` when a key is saved, and no key preflight sets the flag. The only effect is a debug log line. The owner decides whether to wire the fast-fail or delete the latch.
+  - `isOpenRouterSessionCreditsExhausted` was added in `c4222e5` and had never been read. The user chose to wire the fast-fail:
+    - `requestOrdersFlow` now returns the insufficient-credits message before building a prompt.
+    - The latch is global, because the 402 response does not say which key it was for. It expires after 60 seconds (`OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS`), so adding credits works without a restart, and it clears when any API key is stored (`saveKey`, `writeSeatApiKey`, `writeSeatApiKeys`).
+    - This is a user-visible behavior change, documented in `doc/ux/ai-activity-log.md`, and the one deliberate exception to the behavior-preserving scope.
+- Second review (fresh Opus reviewer over the whole range): no Critical or Important findings. Fixed: the README import-cycle check and `tsc` note, and a bundle test name that overstated what it checks. Open Minor: none.

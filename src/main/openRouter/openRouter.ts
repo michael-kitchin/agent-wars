@@ -66,7 +66,7 @@ import { buildOpenRouterModelList } from './buildOpenRouterModelList';
 import { openRouterModelsRequestHeaders } from './openRouterAttributionHeaders';
 import { getOpenRouterModelCapabilities, rememberOpenRouterModels } from './openRouterModelCapabilities';
 import { resolveOrdersRequestProfile, resolveSeatOrdersRequestProfile, type OrdersRequestProfile } from './ordersRequestProfile';
-import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
+import { clearOpenRouterSessionCreditsExhausted, OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
 import { readSecretString, writeSecretString } from './secretConfig';
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
@@ -201,6 +201,7 @@ export function saveKey(key: string): void {
   const configPath = getConfigPath();
   try {
     writeSecretString(OPENROUTER_KEY_DB_CONFIG_KEY, key);
+    clearOpenRouterSessionCreditsExhausted();
     if (!key.trim()) {
       if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
       return;

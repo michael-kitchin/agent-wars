@@ -38,6 +38,12 @@ import { resetActiveGameMap } from '../../shared/activeGameMap';
 import { setLoadedStrategicFootprint } from '../../shared/loadedStrategicFootprint';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
+import {
+  clearOpenRouterSessionCreditsExhausted,
+  markOpenRouterSessionCreditsExhausted,
+  OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS,
+  OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE,
+} from './openRouterCreditLimits';
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
 import { missileReachSet } from '../gameActions/missileReach';
 import { getValidDestinations } from '../oneStepMoveDestinations';
@@ -822,6 +828,73 @@ test('a failed consult keeps the tool counts it recorded', async (t) => {
       assert.equal(bare.toolInvocationCounts, undefined);
     });
   } finally {
+    restoreElectron();
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A recent zero-balance 402 fails an order request before any model call, until it expires or a key is saved.
+ *
+ * Purpose: The latch spares the prompt build while credits are gone, yet adding credits or a key must work without a restart.
+ * When to use: After changing the credits latch, `requestOrdersFlow`, or the places that store an API key.
+ * Expected outcome: The request returns the insufficient-credits message and the transport is not called. After `saveKey`, or once the window has passed, the transport is called again.
+ * Exceptions: Skips when the regional pack is not extracted.
+ */
+test('a recent insufficient-credits 402 fails fast until it expires or a key is saved', async (t) => {
+  const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
+  if (!map) {
+    t.skip('western_asia_north is not extracted');
+    return;
+  }
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-orders-credits-'));
+  const restoreElectron = installElectronMock(userData);
+  delete require.cache[require.resolve('./openRouter')];
+  const openRouter = require('./openRouter') as {
+    saveKey: (key: string) => void;
+    setChatTransportOverrideForTests: (override: ((payload: { key: string }) => Promise<{
+      ok: true;
+      status: number;
+      headers: Record<string, string>;
+      bodyText: string;
+    }>) | null) => void;
+    requestOrders: (
+      state: ReturnType<typeof getGameState>,
+      modelId: string,
+      options: { seatId: (typeof AI_SEAT_IDS)[number]; enabledToolNames: string[]; usePrecomputation: boolean }
+    ) => Promise<{ success: boolean; error?: string }>;
+  };
+  const bodyText = JSON.stringify({
+    choices: [{ message: { content: JSON.stringify({ message: 'hold', strategy: 'hold', orders: [], airStrikes: [], ferryOrders: [], callbacks: [] }) } }],
+  });
+  try {
+    await withThreeSeatMatch(async () => {
+      openRouter.saveKey('test-openrouter-key');
+      let transportCalls = 0;
+      openRouter.setChatTransportOverrideForTests(async () => {
+        transportCalls += 1;
+        return { ok: true, status: 200, headers: {}, bodyText };
+      });
+      const ask = () =>
+        openRouter.requestOrders(getGameState(), 'test-model', { seatId: AI_SEAT_IDS[0], enabledToolNames: [], usePrecomputation: false });
+
+      markOpenRouterSessionCreditsExhausted();
+      const blocked = await ask();
+      assert.equal(blocked.success, false);
+      assert.equal(blocked.error, OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE);
+      assert.equal(transportCalls, 0);
+
+      openRouter.saveKey('test-openrouter-key-2');
+      await ask();
+      assert.equal(transportCalls, 1, 'saving a key ends the fast-fail');
+
+      markOpenRouterSessionCreditsExhausted(Date.now() - OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS - 1);
+      await ask();
+      assert.equal(transportCalls, 2, 'an expired window makes one real attempt');
+    });
+  } finally {
+    clearOpenRouterSessionCreditsExhausted();
+    openRouter.setChatTransportOverrideForTests(null);
     restoreElectron();
     fs.rmSync(userData, { recursive: true, force: true });
   }

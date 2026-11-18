@@ -31,7 +31,7 @@ test('the only module the bundled preload requires is electron', () => {
   assert.deepStrictEqual([...names], ['electron']);
 });
 
-test('the bundle contains every shared channel name', () => {
+test('the bundle inlines the shared channel tables', () => {
   const text = readBundle();
   for (const value of [...Object.values(IPC_GAME), ...Object.values(IPC_OPENROUTER)]) {
     assert.ok(text.includes(`"${value}"`) || text.includes(`'${value}'`), `channel ${value} is in the bundle`);

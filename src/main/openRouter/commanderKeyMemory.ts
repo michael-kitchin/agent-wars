@@ -16,6 +16,7 @@ import { normalizeSideNickname, storedAiNickname } from '../../shared/sideNickna
 import { logDebug, logError, logTrace } from '../logger';
 import { readSeatApiKeyFlagMap, SEAT_API_KEY_FLAGS_CONFIG_KEY, writeSeatApiKeyFlags } from '../gameDb/seatApiKeyFlags';
 import { COMMANDER_MEMORY_CONFIG_KEY, SEAT_API_KEYS_CONFIG_KEY } from '../gameDb/machineLocalConfigKeys';
+import { clearOpenRouterSessionCreditsExhausted } from './openRouterCreditLimits';
 import { readSecretString, readStoredSecret, writeSecretString } from './secretConfig';
 
 /**
@@ -265,6 +266,7 @@ export function writeSeatApiKey(seatId: string, apiKey: string, legacyKey = ''):
     : { ...stored.keys };
   next[seatId] = trimmed;
   writeSecretString(SEAT_API_KEYS_CONFIG_KEY, JSON.stringify(next));
+  clearOpenRouterSessionCreditsExhausted();
   const flags: Record<string, boolean> = { ...readSeatApiKeyFlagMap() };
   if (stored.missing) {
     for (const id of AI_SEAT_IDS) flags[id] = (next[id] ?? '').length > 0;
@@ -291,6 +293,7 @@ export function writeSeatApiKeys(entries: readonly { seatId: string; apiKey: str
   }
   logDebug('commanderKeyMemory writeSeatApiKeys', { count: entries.length, flagsKey: SEAT_API_KEY_FLAGS_CONFIG_KEY });
   writeSecretString(SEAT_API_KEYS_CONFIG_KEY, JSON.stringify(keys));
+  clearOpenRouterSessionCreditsExhausted();
   writeSeatApiKeyFlags(flags);
 }
 

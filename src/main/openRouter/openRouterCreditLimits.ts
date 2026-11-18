@@ -42,50 +42,64 @@ export const OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE =
   'OpenRouter account has insufficient credits. Add credits at https://openrouter.ai/settings/credits and try again.';
 
 /**
- * Session flag set after OpenRouter returns a zero-balance 402 for this process lifetime.
+ * How long a zero-balance 402 keeps order requests failing fast.
+ *
+ * Purpose: Skips the expensive prompt build while credits are known to be gone, yet lets the player add credits and retry without restarting the app.
+ * When to use: `isOpenRouterSessionCreditsExhausted`.
+ * Expected outcome: 60 000 ms. After that, the next order request makes one real attempt.
+ * Exceptions: None.
+ */
+export const OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS = 60_000;
+
+/**
+ * When the last zero-balance 402 was seen, or null when none is pending.
  *
  * Purpose: Avoids rebuilding large prompts on every AI turn when credits are known to be exhausted.
- * When to use: Checked at the start of `requestOrdersFlow`; set by chat transport on insufficient-credit 402.
- * Expected outcome: False until the first insufficient-credit failure, then true until process restart or key change.
- * Exceptions: None.
+ * When to use: Read by `isOpenRouterSessionCreditsExhausted`; set by chat transport on an insufficient-credit 402.
+ * Expected outcome: Null until the first insufficient-credit failure, then the time of that failure until it expires or a key is saved.
+ * Exceptions: None. The latch covers every seat, because the 402 response does not say which key it was for.
  */
-let sessionCreditsExhausted = false;
+let creditsExhaustedAtMs: number | null = null;
 
 /**
- * Resets the session insufficient-credits latch (primarily for tests and after API key changes).
+ * Clears the insufficient-credits latch.
  *
- * Purpose: Allows a new key or fresh test run to attempt OpenRouter again without restarting the app.
- * When to use: Test teardown and `saveKey` when the user stores a new API key.
- * Expected outcome: Next order request performs a full credit preflight and API attempt.
+ * Purpose: A new or re-entered API key, or a test, must be able to reach OpenRouter again at once.
+ * When to use: After any API key is stored (`saveKey`, `writeSeatApiKey`, `writeSeatApiKeys`) and in test teardown.
+ * Expected outcome: The next order request performs a real API attempt.
  * Exceptions: None.
  */
-export function resetOpenRouterSessionCreditsExhaustedForTests(): void {
-  sessionCreditsExhausted = false;
+export function clearOpenRouterSessionCreditsExhausted(): void {
+  creditsExhaustedAtMs = null;
 }
 
 /**
- * Returns whether this app session has already observed an insufficient-credits OpenRouter failure.
+ * Returns whether a recent insufficient-credits OpenRouter failure should fail order requests fast.
  *
  * Purpose: Supports fast-fail before expensive prompt assembly in `requestOrdersFlow`.
- * When to use: Immediately after loading the API key in order requests.
- * Expected outcome: True only after `markOpenRouterSessionCreditsExhausted` was called.
+ * When to use: After the roster check in order requests.
+ * Expected outcome: True from `markOpenRouterSessionCreditsExhausted` until `OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS` have passed or the latch is cleared.
  * Exceptions: None.
+ *
+ * @param nowMs The current time in milliseconds; tests pass a fixed value.
  */
-export function isOpenRouterSessionCreditsExhausted(): boolean {
-  return sessionCreditsExhausted;
+export function isOpenRouterSessionCreditsExhausted(nowMs: number = Date.now()): boolean {
+  return creditsExhaustedAtMs !== null && nowMs - creditsExhaustedAtMs < OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS;
 }
 
 /**
- * Marks this app session as out of OpenRouter credits until restart or key reset.
+ * Starts the fast-fail window after an insufficient-credits 402.
  *
  * Purpose: Prevents repeated full prompt builds after a confirmed zero-balance 402.
- * When to use: Chat transport on insufficient-credit 402 and key preflight when limit_remaining is zero.
- * Expected outcome: Subsequent AI order requests fail fast with `OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE`.
+ * When to use: Chat transport, through `formatOpenRouterChatApiError`, on an insufficient-credit 402.
+ * Expected outcome: Order requests fail fast with `OPENROUTER_INSUFFICIENT_CREDITS_USER_MESSAGE` for the next `OPENROUTER_CREDITS_EXHAUSTED_FAST_FAIL_MS`.
  * Exceptions: None.
+ *
+ * @param nowMs The current time in milliseconds; tests pass a fixed value.
  */
-export function markOpenRouterSessionCreditsExhausted(): void {
-  sessionCreditsExhausted = true;
-  logDebug('openRouter markOpenRouterSessionCreditsExhausted: blocking further AI requests this session');
+export function markOpenRouterSessionCreditsExhausted(nowMs: number = Date.now()): void {
+  creditsExhaustedAtMs = nowMs;
+  logDebug('openRouter markOpenRouterSessionCreditsExhausted: failing AI order requests fast for a short window');
 }
 
 /**
