@@ -193,15 +193,6 @@ tacticalFeatureRows: ReadonlyArray<{
     isSeaport: boolean;
   }>;
     /**
-   * Specifies the contract for the `strategicNamingRecords` member (strategicNamingRecords: ReadonlyArray<TerrainNamingRecordStrategic>;).
-
-   * Contract: Parsed strategic naming rows from `terrain_res1_naming.json` retained for region/scenario helpers without a second file read.
-   * When to use: `regionScenario.buildRegionHexCache` and other callers needing country `region` per strategic hex.
-   * Expected outcome: Same records as `loadTerrainStrategicNamingBundled().records` at snapshot build time.
-   * Exceptions: None.
-   */
-strategicNamingRecords: ReadonlyArray<TerrainNamingRecordStrategic>;
-    /**
    * Specifies the contract for the `strategicLandMassByH3` member (strategicLandMassByH3: ReadonlyMap<string, StrategicLandMassRecord>;).
 
    * Contract: Precomputed continent/island membership and water fraction per res-1 hex for land-unit pathfinding.
@@ -421,7 +412,6 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     tacticalRoadRailOverlayByH3,
     tacticalTransportVectorOverlayRows,
     tacticalFeatureRows,
-    strategicNamingRecords: namingStrategicEnv.records as TerrainNamingRecordStrategic[],
     strategicLandMassByH3,
   };
 }

@@ -402,7 +402,8 @@ function testTacticalRubbleTooltipAndTerrainVariantContracts(): void {
 
   const terrainRenderingSource = fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainRendering.ts'), 'utf8');
   assert.ok(
-    drawTerrainHexesFn.length > 0 && terrainRenderingSource.includes('if (tacticalActive) return;'),
+    drawTerrainHexesFn.length > 0 &&
+      getFunctionSource(terrainRenderingSource, 'drawTerrainHexes').includes('if (tacticalActive) return;'),
     'res1 terrain fills/styles should be suppressed while res4 child hex rendering is active'
   );
   assert.ok(

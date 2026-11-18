@@ -88,6 +88,27 @@ function runOne(fileAbs) {
   }
 }
 
+/**
+ * Drops compiled tests whose TypeScript source no longer exists.
+ *
+ * Purpose: `npm test` does not clean `dist`, so a test deleted or renamed in `src` would otherwise keep running from an older build.
+ * When to use: On the list collected from `dist/main` and `dist/shared`, before the manifest-free run.
+ * Expected outcome: Only files with a `.test.ts` at the same path under `src` remain. Each skipped file is named on stderr.
+ * Exceptions: None.
+ *
+ * @param files Absolute paths of compiled `*.test.js` files under `dist`.
+ */
+function withoutStaleCompiledTests(files) {
+  const distRoot = path.join(repoRoot, 'dist');
+  return files.filter((file) => {
+    const relative = path.relative(distRoot, file).replace(/\.js$/, '.ts');
+    const hasSource = fs.existsSync(path.join(repoRoot, 'src', relative));
+    if (!hasSource) process.stderr.write(`run-main-node-tests: skipping ${path.relative(repoRoot, file)} (no source in src/)
+`);
+    return hasSource;
+  });
+}
+
 function main() {
   const args = process.argv.slice(2);
   const opts = parseArgs(args);
@@ -104,6 +125,7 @@ function main() {
     files = collectTestJsUnderDir(mainDist);
     const sharedDist = path.join(repoRoot, 'dist', 'shared');
     collectTestJsUnderDir(sharedDist, files);
+    files = withoutStaleCompiledTests(files);
     files.sort((a, b) => a.localeCompare(b));
     for (const extraName of [
       'collect-release-archives.test.cjs',

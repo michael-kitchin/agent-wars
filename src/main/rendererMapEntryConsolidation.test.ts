@@ -68,20 +68,18 @@ function testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule():
 }
 
 /**
- * Defines the `testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries` function shape.
+ * Defines the `testParityDiagnosticsBreadcrumbsCoverPlanningAndSelectionBoundaries` function shape.
 
- * Purpose: Guards parity diagnostics instrumentation around double-click planning and tactical draft-vs-committed source selection.
- * When to use: Regression signal when refactoring `mapDoubleClickHandler`, `mapClickSelectionPolicy`, or `tacticalDraftMarchOverlay`.
+ * Purpose: Guards parity diagnostics instrumentation around double-click planning and deferred single-select.
+ * When to use: Regression signal when refactoring `mapDoubleClickHandler` or `mapClickSelectionPolicy`.
  * Expected outcome: Breadcrumb helper imports and event keys remain wired at the parity-sensitive boundaries.
  * Exceptions: None.
  */
-function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries(): void {
+function testParityDiagnosticsBreadcrumbsCoverPlanningAndSelectionBoundaries(): void {
   const interactionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapDoubleClickHandler.ts');
   const selectionPolicyPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapClickSelectionPolicy.ts');
-  const tacticalOverlayPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalDraftMarchOverlay.ts');
   const interactionsSource = fs.readFileSync(interactionsPath, 'utf8');
   const selectionPolicySource = fs.readFileSync(selectionPolicyPath, 'utf8');
-  const tacticalOverlaySource = fs.readFileSync(tacticalOverlayPath, 'utf8');
   assert.ok(
     interactionsSource.includes('emitParityDiagnosticsBreadcrumb') &&
       interactionsSource.includes("'planning.doubleClickAccepted'") &&
@@ -94,11 +92,6 @@ function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundarie
       selectionPolicySource.includes("'selection.deferSingleSelect'") &&
       selectionPolicySource.includes("'selection.applyDeferredSingleSelect'"),
     'main map click-selection policy should emit parity breadcrumbs for deferred single-select behavior'
-  );
-  assert.ok(
-    tacticalOverlaySource.includes('emitParityDiagnosticsBreadcrumb') &&
-      tacticalOverlaySource.includes("'tactical.positionSourceSelection'"),
-    'tactical draft overlay helpers should emit parity breadcrumbs for draft-vs-committed position source selection'
   );
 }
 
@@ -157,7 +150,7 @@ function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
 function run(): void {
   testTacticalEntryLayerPlanningAndContestedContracts();
   testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule();
-  testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries();
+  testParityDiagnosticsBreadcrumbsCoverPlanningAndSelectionBoundaries();
   testTacticalMapViewLocksZoomPanAndRestoresWorld();
   console.log('rendererMapEntryConsolidation.test.ts passed');
 }

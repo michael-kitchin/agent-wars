@@ -158,7 +158,7 @@ function buildLandBattleFixture(options?: {
  *
  * Purpose: Isolates DB-backed parity checks from the developer's game database.
  * When to use: Wrap tests that call `dbRun`, `getSubscriptions`, or standing-order injection.
- * Expected outcome: Fresh match schema; caller must close and delete the temp dir in `finally`.
+ * Expected outcome: Fresh match schema. `withTempGameDb` closes the database and deletes the temp dir; the callback-subscription stash is reset afterward.
  * Exceptions: None.
  */
 function withTempDb(fn: () => void): void {

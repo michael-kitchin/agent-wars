@@ -938,3 +938,15 @@ The pattern to follow is already in `main.ts`: a `register…IpcHandler` functio
 - **Phase 9:** eight symbols were deleted. Their imports and constant import were removed too.
 - **Phase 10:** `npm test` exited 0 (608 test files). The final `ui:smoke` result is recorded below.
 - **Phase 10 result:** final `ui:smoke` passed with 820 checks, 0 failures, 0 page errors. `git status` shows only `static/renderer.js` (a build artifact, not committed) and this plan. The changed-string-literal diff shows import paths and test fragments only; no user-visible text or prompt text changed.
+
+## Review Follow-Up
+
+- The branch-wide review found no Critical or Important defects. Fixed Minor findings:
+  - The terrain-suppression assertion now checks the guard inside `drawTerrainHexes`.
+  - The `withTempDb` JSDoc in `tacticalPromptSectionParity.test.ts` now matches the helper.
+  - `scripts/run-main-node-tests.cjs` skips compiled tests whose `src` source no longer exists. Three stale ones were in the local `dist`.
+- Deferred Minor: running `tsc -p tsconfig.main.json` alone overwrites the bundled preload with the unbundled file, and the app then has no `window.gameApi`. No script does this; use `npm run build:main`.
+- Defect Inventory resolutions:
+  - `tacticalDraftMarchOverlay.ts` is deleted, along with its contract assertion and the two UX document entries.
+  - `strategicNamingRecords` is deleted from the terrain classification snapshot.
+  - `isOpenRouterSessionCreditsExhausted` was added in `c4222e5` and has never been read. `requestOrdersFlow` has no fast-fail, nothing calls `resetOpenRouterSessionCreditsExhaustedForTests` when a key is saved, and no key preflight sets the flag. The only effect is a debug log line. The owner decides whether to wire the fast-fail or delete the latch.

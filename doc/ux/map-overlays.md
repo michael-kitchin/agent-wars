@@ -98,4 +98,3 @@ None.
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
 - `src/renderer/rendering/sightCueDrawing.ts`
 - `src/renderer/rendering/combatDiceChipDrawing.ts`
-- `src/renderer/tactical/tacticalDraftMarchOverlay.ts`

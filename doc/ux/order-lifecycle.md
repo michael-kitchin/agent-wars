@@ -100,7 +100,6 @@ None.
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapDoubleClickHandler.ts`
 - `src/renderer/tactical/tacticalPendingMarchPath.ts`
-- `src/renderer/tactical/tacticalDraftMarchOverlay.ts`
 - `src/renderer/tactical/tacticalEmbarkSealiftMerge.ts`
 - `src/renderer/map/stackCallout.ts`
 - `src/renderer/map/stackCalloutSealift.ts`
