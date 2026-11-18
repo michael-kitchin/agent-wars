@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **3.0.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **3.1.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **3.1.0** records statistics for every strategic turn and draws them in a charts dialog on the C key, and the P key replays past turns and a battle's beats from recorded snapshots. Commanders now report trust and threat with each stance, a ship needs sea access at its seaport, and the Settings button shows Game Options for the running match.
 
 Release **3.0.0** lets you write to a commander from the chat panel. The message waits until Ready, or until a battle beat is committed, and the history lists every message. Before orders, a commander can send a short message and keep a private stance. A commander is shown which side destroyed its units and told to weigh that record more than what the other side says. When a match ends, the app writes a history file. The P key steps through those turns read-only ([ux/replay-panel.md](ux/replay-panel.md)). Play runs each turn's recorded animations forward, and inside a battle the same controls step and play that battle's beats.
 

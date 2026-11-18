@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v3.0.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v3.0.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v3.1.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v3.1.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -290,7 +290,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ## Status
 
-- **Version:** 3.0.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 3.1.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -300,6 +300,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **3.1.0** adds replay and charts. The P key steps through a match's past turns, or a battle's beats, and Play runs their animations, while the C key opens per-turn charts of every side and of each commander's stance, trust, and threat. Ships now need water or coast beside their seaport, the Settings button opens in-match Game Options, and commanders report trust and threat with each stance.
 - **3.0.0** lets you write to a commander from the panel at the map's bottom-right. The message waits until you press Ready, or until you commit a battle beat, and the history lists every message this match. Before orders, a commander can send a short message and keep a private stance, hostile, wary, neutral, cordial, or friendly. A stance is not an alliance. A commander is shown which side destroyed its units and told to weigh that record more than what the other side says. When a match ends, the app writes a history file on this computer. Playing that history back is not built.
 - **2.26.0** lets a commander launch or cancel a listed sea or air operation, or name a city for one, and turns a land choice into a new target for the campaign. On the turn after a clear sea or air row was offered, the engine launches the first one and never launches a land row on its own. A commander can set a posture, overland, maritime, strangle, or blitz, and it holds for 6 turns. An order on a unit aboard a ship or an air unit is refused, and a standing order does not move a unit that is aboard.
 - **2.25.0** tells a commander to keep one city queued on credits, and names a city for a missile, a ship, or credits when one is worth building. A commander that can build a ship or a missile reads those rules before it owns one. Balanced and cautious commanders are told to strike enemy production their ground units cannot reach. Raise Options shows distance, nearby enemies, and chokepoints, and attention names one affordable raise and a missile that can launch.
