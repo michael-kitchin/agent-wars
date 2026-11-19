@@ -28,6 +28,7 @@ import { rendererSharedState as S } from '../core/state';
 import { replayActive } from '../replay/replayState';
 import { createMessagePartyFlag } from '../chrome/sideNumberFlag';
 import { createSideNumberFlag } from '../chrome/toastInlineMarks';
+import { setSideCodeText } from '../chrome/sideCodeTextHelpers';
 import { appendMapToastSectionHeader, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
 
 /**
@@ -143,7 +144,7 @@ function seatIsOutsideThisBattle(seatId: string, statuses: readonly CommanderSta
  *
  * Purpose: A tab click repaints the panel and restarts the 24 second timer.
  * When to use: `showFilledAiStrategyToast`, and a click on an enabled tab.
- * Expected outcome: A tablist and, when a tab is selected, one tabpanel. Each tab starts with that opponent's number flag. Disabled tabs stay disabled. Each message line starts with the arrow, then that side's flag and name. The first line is `1em` under Messages, and the lines sit against each other. The last line's bottom margin is the gap above Strategy.
+ * Expected outcome: A tablist and, when a tab is selected, one tabpanel. Each tab starts with that opponent's number flag. Disabled tabs stay disabled. Each message line starts with the arrow, then that side's flag and name. The first line is `1em` under Messages, and the lines sit against each other. The last line's bottom margin is the gap above Strategy. Side codes in message lines and in Strategy text show as display names, and a changed text carries its original as a tooltip.
  * Exceptions: None. A missing host is skipped.
  */
 export function renderCommanderMessageTabs(target?: HTMLElement): void {
@@ -192,14 +193,14 @@ export function renderCommanderMessageTabs(target?: HTMLElement): void {
         const flag = createMessagePartyFlag(bullet.toSeatId, seats);
         if (flag) item.appendChild(flag);
         const words = document.createElement('span');
-        words.textContent = `${label}: ${bullet.text}`;
+        setSideCodeText(words, { prefix: `${label}: `, rawText: bullet.text, seats, rawTooltip: true });
         item.appendChild(words);
         panel.appendChild(item);
       }
     } else {
       const span = document.createElement('span');
       span.className = 'commander-message-body';
-      span.textContent = section.body;
+      setSideCodeText(span, { prefix: '', rawText: section.body, seats, rawTooltip: true });
       panel.append(span);
     }
   }

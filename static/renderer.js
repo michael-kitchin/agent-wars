@@ -18689,6 +18689,14 @@
   function hasForbiddenLeadingZero(digits) {
     return digits.startsWith("0");
   }
+  function playerIdCodeFor(player) {
+    if (isHumanSeatId(player)) return "h1";
+    const aiIndex = aiIndexForSeatId(player);
+    if (aiIndex === null) {
+      throw new Error(`Cannot format a player code for ${player}`);
+    }
+    return `a${aiIndex}`;
+  }
   function parseStrategicUnitId(unitId) {
     const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
     if (!match) return null;
@@ -20082,6 +20090,28 @@ ${bonuses}`;
     return [...messages].sort((left, right) => seatOrderOf2(left.toSeatId) - seatOrderOf2(right.toSeatId));
   }
 
+  // src/shared/sideCodeDisplayText.ts
+  var SIDE_CODE_PATTERN = /(?<![A-Za-z0-9_-])([ah][1-4])(?![A-Za-z0-9_-])/g;
+  function namesBySideCode(seats) {
+    const names = /* @__PURE__ */ new Map();
+    for (const seat of seats) {
+      if (isSeatId(seat.seatId)) names.set(playerIdCodeFor(seat.seatId), sideDisplayName(seat));
+    }
+    return names;
+  }
+  function sideCodesToDisplayNames(text, seats) {
+    if (seats.length === 0) return text;
+    const names = namesBySideCode(seats);
+    return text.replace(SIDE_CODE_PATTERN, (match, code) => names.get(code) ?? match);
+  }
+
+  // src/renderer/chrome/sideCodeTextHelpers.ts
+  function setSideCodeText(element, args) {
+    const shown = sideCodesToDisplayNames(args.rawText, args.seats);
+    element.textContent = `${args.prefix}${shown}`;
+    if (args.rawTooltip && shown !== args.rawText) element.title = args.rawText;
+  }
+
   // src/renderer/chrome/frameTooltipText.ts
   var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
   var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
@@ -20140,7 +20170,7 @@ ${bonuses}`;
         if (recipientFlag) item.appendChild(recipientFlag);
       }
       const words = document.createElement("span");
-      words.textContent = `To ${label}: ${text}`;
+      setSideCodeText(words, { prefix: `To ${label}: `, rawText: text, seats, rawTooltip: true });
       item.appendChild(words);
       wrap.append(item);
     }
@@ -20148,7 +20178,7 @@ ${bonuses}`;
     if (strategyText.length > 0) {
       const strategy = document.createElement("p");
       strategy.className = "console-report-strategy";
-      strategy.textContent = `Strategy: ${strategyText}`;
+      setSideCodeText(strategy, { prefix: "Strategy: ", rawText: strategyText, seats, rawTooltip: true });
       wrap.append(strategy);
     }
     return wrap;
@@ -32897,7 +32927,7 @@ ${bonuses}`;
     text.append(document.createTextNode(` ${SIDE_MESSAGE_ARROW} `));
     appendParty(text, row.toSeatId);
     const words = document.createElement("span");
-    words.textContent = `: ${row.text}`;
+    setSideCodeText(words, { prefix: ": ", rawText: row.text, seats: rosterSeats(), rawTooltip: false });
     text.append(words);
     text.title = `${seatName(fromSeatId)} ${SIDE_MESSAGE_ARROW} ${seatName(row.toSeatId)}: ${row.text}`;
     const edit = stagedIconButton("Edit this message", chatStagedEditTooltipText, stagedEditMark());
@@ -32933,7 +32963,7 @@ ${bonuses}`;
       line.append(battle);
     }
     const words = document.createElement("span");
-    words.textContent = `: ${row.text}`;
+    setSideCodeText(words, { prefix: ": ", rawText: row.text, seats: rosterSeats(), rawTooltip: true });
     line.append(words);
     parent.append(line);
   }
@@ -45502,14 +45532,14 @@ ${bonuses}`;
           const flag = createMessagePartyFlag(bullet.toSeatId, seats);
           if (flag) item.appendChild(flag);
           const words = document.createElement("span");
-          words.textContent = `${label}: ${bullet.text}`;
+          setSideCodeText(words, { prefix: `${label}: `, rawText: bullet.text, seats, rawTooltip: true });
           item.appendChild(words);
           panel.appendChild(item);
         }
       } else {
         const span = document.createElement("span");
         span.className = "commander-message-body";
-        span.textContent = section.body;
+        setSideCodeText(span, { prefix: "", rawText: section.body, seats, rawTooltip: true });
         panel.append(span);
       }
     }

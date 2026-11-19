@@ -16,6 +16,7 @@ import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { dispatchMessagesInSideOrder, sideMessagePartyLabel } from '../../shared/sideMessageView';
 import { sideDisplayName } from '../../shared/sideNicknames';
 import { createSideNumberFlag } from './sideNumberFlag';
+import { setSideCodeText } from './sideCodeTextHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
 
@@ -111,7 +112,7 @@ const listeners: Array<() => void> = [];
  *
  * Purpose: The row names the side, then one line per message that commander sent in that consult.
  * When to use: `recordConsoleReport` when `messages` is set.
- * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name. Each message is `To {label}: {text}`, and You has no flag. A strategy line follows when strategy is non-empty.
+ * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name. Each message is `To {label}: {text}`, and You has no flag. A strategy line follows when strategy is non-empty. Side codes in the message and strategy text show as display names, and a changed text carries its original as a tooltip. The entry keeps the names in use when it is filed.
  * Exceptions: None.
  */
 function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
@@ -147,7 +148,7 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
       if (recipientFlag) item.appendChild(recipientFlag);
     }
     const words = document.createElement('span');
-    words.textContent = `To ${label}: ${text}`;
+    setSideCodeText(words, { prefix: `To ${label}: `, rawText: text, seats, rawTooltip: true });
     item.appendChild(words);
     wrap.append(item);
   }
@@ -155,7 +156,7 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
   if (strategyText.length > 0) {
     const strategy = document.createElement('p');
     strategy.className = 'console-report-strategy';
-    strategy.textContent = `Strategy: ${strategyText}`;
+    setSideCodeText(strategy, { prefix: 'Strategy: ', rawText: strategyText, seats, rawTooltip: true });
     wrap.append(strategy);
   }
   return wrap;

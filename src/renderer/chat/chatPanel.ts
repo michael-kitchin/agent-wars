@@ -12,6 +12,7 @@ import { groupSideMessagesByTurn, SIDE_MESSAGE_ARROW, type SideMessageView } fro
 import { sideDisplayName, type SideDisplaySeat } from '../../shared/sideNicknames';
 import { chatStagedCancelTooltipText, chatStagedEditTooltipText } from '../chrome/controlTooltipText';
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
+import { setSideCodeText } from '../chrome/sideCodeTextHelpers';
 import { applyDraggedChatHeight, clearChatPanelHeight, wireChatPanelResize } from './chatPanelResize';
 import { createMessagePartyFlag } from '../chrome/sideNumberFlag';
 import { rendererSharedState as S } from '../core/state';
@@ -364,7 +365,7 @@ function stagedIconButton(label: string, tooltip: string, mark: Node): HTMLButto
  *
  * Purpose: The current-turn list names who each draft will go to.
  * When to use: Once per draft, in recipient order.
- * Expected outcome: The line's text is set with `textContent` and text nodes. Edit points the drop-down at that side and puts the text back in the field. Cancel discards that draft. The title is the full line, without the flags.
+ * Expected outcome: The line's text is set with `textContent` and text nodes. Side codes in the draft show as display names. Edit points the drop-down at that side and puts the text back in the field. Cancel discards that draft. The title is the full line, without the flags.
  * Exceptions: None.
  */
 function stagedRow(row: SideMessageView, viewerSeatId: string | null): HTMLElement {
@@ -377,7 +378,7 @@ function stagedRow(row: SideMessageView, viewerSeatId: string | null): HTMLEleme
   text.append(document.createTextNode(` ${SIDE_MESSAGE_ARROW} `));
   appendParty(text, row.toSeatId);
   const words = document.createElement('span');
-  words.textContent = `: ${row.text}`;
+  setSideCodeText(words, { prefix: ': ', rawText: row.text, seats: rosterSeats(), rawTooltip: false });
   text.append(words);
   text.title = `${seatName(fromSeatId)} ${SIDE_MESSAGE_ARROW} ${seatName(row.toSeatId)}: ${row.text}`;
   const edit = stagedIconButton('Edit this message', chatStagedEditTooltipText, stagedEditMark());
@@ -413,7 +414,7 @@ function appendParty(parent: HTMLElement, seatId: string): void {
  *
  * Purpose: A row reads sender, arrow, recipient, and text, with a battle mark when the message was sent in a battle.
  * When to use: Under each turn heading.
- * Expected outcome: Every piece is set with `textContent`. The viewer's own row is marked `data-own`.
+ * Expected outcome: Every piece is set with `textContent`. Side codes in the message show as display names, and a changed message carries its original text as a tooltip. The viewer's own row is marked `data-own`.
  * Exceptions: None.
  */
 function appendHistoryRow(parent: HTMLElement, row: SideMessageView, viewerSeatId: string | null): void {
@@ -431,7 +432,7 @@ function appendHistoryRow(parent: HTMLElement, row: SideMessageView, viewerSeatI
     line.append(battle);
   }
   const words = document.createElement('span');
-  words.textContent = `: ${row.text}`;
+  setSideCodeText(words, { prefix: ': ', rawText: row.text, seats: rosterSeats(), rawTooltip: true });
   line.append(words);
   parent.append(line);
 }
