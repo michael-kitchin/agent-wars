@@ -8,7 +8,7 @@ This guide covers a match, from the new-game screen to the end. Downloading the 
 
 **Reference:** [Units at a Glance](#units-at-a-glance) · [How a Turn Resolves](#how-a-turn-resolves) · [Winning and Losing](#winning-and-losing) · [Bonuses and Weather](#bonuses-and-weather) · [Battle Terrain and Roads](#battle-terrain-and-roads) · [Controls and Shortcuts](#controls-and-shortcuts) · [Things That May Surprise You](#things-that-may-surprise-you)
 
-<!-- Capture: video, about 60 to 90 seconds, condensed with scripts/condense_match_video.py and uploaded as a GitHub attachment. In order: pan, zoom, and Shift-drag box zoom; select a lone unit and a stack; plan a move and a multi-turn march, then cancel one on the Orders tab; aim ranged fire and an air strike; open a build queue and the Hire tab; load a ship; write a message; press Ready and watch playback; open Reports, Charts (C), and Replay (P); toggle the map modes and hold T. Paste the attachment URL on its own line here, with an italic caption under it. -->
+
 
 ## What This Is
 
@@ -48,7 +48,7 @@ If you're new to Agent Wars, start with a regional game. It's smaller and faster
 
 A match has two to four sides, and each side needs its own home. The first row is you. Each other row is an AI opponent, with a commander button that opens its settings:
 
-<!-- Capture: still, commander-popover.png. The commander popover open on Opponent 1, with a model, reasoning, provider, and doctrine chosen. The README's model-popover.png may be reused if it is current. -->
+
 
 | Setting   | What it does |
 | --------- | ------------ |
@@ -89,7 +89,7 @@ The **Settings** button on the top bar shows the match's options. While you plan
 
 ## The Screen
 
-<!-- Capture: still, screen-overview.png. A strategic turn mid-match with the console open, a unit selected, the chat panel expanded, and the AI strategy toast showing, with numbered callouts matching the table below. -->
+
 
 | # | Area | Where | What it's for |
 | --- | --- | --- | --- |
@@ -107,7 +107,7 @@ The **Settings** button on the top bar shows the match's options. While you plan
 
 You can play all you want with the AI off, and it's a great way to get used to the controls without burning tokens. On the new-game screen, pick **Regional** with two sides. In Game Options, uncheck **Auto-start AI**, then click **Start game**. The opponent won't plan (or spend your money), so you can try everything for free. **Start** on the [Command tab](#managing-commanders) turns its planning on whenever you like.
 
-<!-- Capture: video, about 30 seconds. The first turn of a regional practice match, following the steps below in order. Stills of each step can replace it if a clip is too long. -->
+
 
 1. **Find your units.** Your home is outlined, and your units are the teal tokens in it. Your own home hexes are always visible through fog.
 2. **Select one.** Click a lone unit's token to select it. A stack opens a list where you pick units, or **+ All**.
@@ -144,7 +144,7 @@ Once you've got the hang of it, start a real match with a model on each opponent
 
 Click the **×** at the end of an order's row on the Orders tab. Other orders stay. A new move order for the same unit replaces its old one.
 
-<!-- Capture: still, orders-tab.png. The Orders tab with a move, a march, a ranged attack, and an air strike queued, one row selected. -->
+
 
 ### Sealift
 
@@ -291,7 +291,7 @@ An ignored or abandoned battle can go on for more turns, marked with a magnifyin
 
 ![Beat 8 of a tactical battle in Colombia and Venezuela, during a rainy June.](media/front-page-battle-1-large.png)
 
-<!-- Capture: video, about 20 seconds. One battle beat: plan a move and a ranged attack on the battle map, press Ready, and watch the beat play. -->
+
 
 ### How Battles Are Different
 
@@ -312,7 +312,7 @@ The full battle rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 You can send any AI commander a message, and they send messages to you and to each other. A message is up to 280 characters, from one side to one other side. Nothing in the game enforces it, so a promise, a threat, or an offer is only as good as whoever made it (think: "Diplomacy").
 
-<!-- Capture: still, chat-panel.png. The chat panel expanded, with two turns of history (including a message between two AI sides) and one draft waiting above the field. -->
+
 
 ### Sending a Message
 
@@ -343,7 +343,7 @@ Commanders can also make deals, with each other or with you. When a commander be
 - **You don't keep a record.** To make a deal with a commander, write to it. If it agrees, it records the deal with you on its side, and whether it keeps it is up to it.
 - **Watching them:** you can't open a commander's record, but the [Charts](#charts) show every commander's agreements turn by turn.
 
-<!-- Sources: SIDE_AGREEMENT_* in src/shared/sideAgreements.ts; the Agreements section of doc/commander-messages.md; doc/ux/charts-dialog.md for the agreement strip; doc/ux/chat-panel.md and doc/ux/reports-tab.md for side codes shown as names. -->
+
 
 ### Reading Messages
 
@@ -361,7 +361,7 @@ Commanders can also make deals, with each other or with you. When a commander be
 
 The console's **Command** tab (its header reads Commanders) is where you run the opponents during a match.
 
-<!-- Capture: still, command-tab.png. Already linked from the README; recapture with two commanders, one planning and one ready, and the activity log showing a few lines. -->
+
 
 ![The Command tab, with Start or Stop, the commander cards, the tool groups, and the activity log.](media/command-tab.png)
 
@@ -386,13 +386,13 @@ After Ready, the map toast and the Reports tab give each side a section when it 
 - **Hold T** to hide terrain fill and show hex codes and tech icons.
 - **Map modes:** click the toggle on the minimap's lower-left corner to show the buttons under it. **Weather** shows the weather icons, **Tech** each hex's tech tier, **Control** who holds each hex (on by default), **Production** a production label on every hex, and **Legend** the terrain key. The legend's menu sets the map colors: Standard, Topographic, Nautical, or Night.
 
-<!-- Capture: still, map-modes.png. The minimap with the map-mode buttons showing and the legend open. -->
+
 
 ### Charts
 
 Press **C**, or check **Charts…** in the game menu, to see how the match is going. Press **C** again, press Escape, or click outside to close it. The charts show every side and every turn, whatever fog of war is set to, and no AI commander ever sees them.
 
-<!-- Capture: still, charts.png. The charts dialog in a three-side match, with the relationships row, the stance strip, and the agreement strip in view, and the pointer resting on an agreement cell that shows a breach. -->
+
 
 - **Relationships:** a card for each side the commanders report on, headed "How they see you" for yours. Each line is one commander's view: its color is the stance, its width is trust, and a dashed line is a report more than three turns old. The table under it adds threat, the hexes that commander took from that side in the last five turns, and when it last reported. Use it to see who's turning on whom.
 - **Stance over time:** pick a side to see each commander's stance toward it, turn by turn.
@@ -409,7 +409,7 @@ Hover a chart for each side's value at that turn. Scroll over a chart to zoom th
 
 Press **P**, or check **Playback…** in the game menu, to look back at turns already played. A panel at the map's bottom-left steps back and forward through the turns, and its arrow shows a slider for jumping to one. **Play** runs every turn's movement and combat up to the present. The magnifying glass keeps the map fitted to the units at every step. Press **P** again or Escape to return.
 
-<!-- Capture: video, about 15 seconds. Replay stepping back three turns, then Play running forward to the present. -->
+
 
 Each step shows the map as you saw it then, with that turn's messages. After the match, or while you're watching, replay shows every side. Replay changes nothing, and while it's on, Ready and map clicks do nothing. Inside a battle, **P** replays that battle's beats instead.
 
@@ -417,7 +417,7 @@ Each step shows the map as you saw it then, with that turn's messages. After the
 
 You can also sit back and let the LLMs fight it out among themselves. It's a good way to compare models, to eavesdrop on what they say to each other, and to watch them make (and break) deals.
 
-<!-- Capture: video, about 30 seconds. A watched four-side turn: sight cues, playback, the strategy toast, View as switched to one side, then the charts. -->
+
 
 ### Setting One Up
 
@@ -464,23 +464,23 @@ Save game… and Load game… are in the game menu, under the button at the top 
 
 Each piece, on the global map and across the 23 regional maps.
 
-| Token | Unit | Global game | Regional game |
-| --- | --- | --- | --- |
-| ![Infantry token](media/token-infantry.png) | **Infantry**<br>Attack 3, defense 7<br>Cap 12 | Field armies<br>⚒︎20, 1+ city cells<br>Moves 1 hex<br>Melee only | Divisions<br>⚒︎8–60, 1+ city cells<br>Moves 1 hex<br>Melee only |
-| ![Armor token](media/token-armor.png) | **Armor**<br>Attack 10, defense 7<br>Cap 8 | Field armies<br>⚒︎40, 2+ city cells<br>Moves 2 hexes<br>Fires 1 hex | Divisions<br>⚒︎16–120, 2–7 city cells<br>Moves 2 hexes<br>Fires 1 hex |
-| ![Naval token](media/token-naval.png) | **Naval**<br>Attack 7, defense 7<br>Cap 8 | Fleets<br>⚒︎100, 10+ city cells and a seaport on the water<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry | Task forces<br>⚒︎40–300, 5–31 city cells and a seaport on the water<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry |
-| ![Air token](media/token-air.png) | **Air**<br>Attack 10, defense 3<br>Cap 6 | Air wings<br>⚒︎60, 5+ city cells and an airport<br>Ferries through owned airports, 4 hexes per hop<br>Strikes 3 hexes from base<br>Carries 1 infantry | Air groups<br>⚒︎24–180, 3–17 city cells and an airport<br>Ferries through owned airports, 4 hexes per hop<br>Strikes 3 hexes from base<br>Carries 1 infantry |
-| ![Missile token](media/token-missile.png) | **Missile**<br>Never rolls, hit last<br>Cap 2 | ⚒︎200, 21+ city cells (Advanced)<br>Doesn't move<br>Launches once, 12 hexes | ⚒︎80–600, 6–59 city cells (Advanced)<br>Doesn't move<br>Launches once, 5–14 hexes |
-| ![Mercenary token](media/token-mercenary.png) | **Mercenary**<br>Any type but missile<br>No cap | Raise: ⚒︎ unit price + one turn of upkeep<br>Rehire: two turns of upkeep<br>Fee paid when ordered; returned if removed or unfilled<br>Upkeep: ¤3 infantry, ¤5 armor, ¤8 air, ¤13 naval | Same credits<br>⚒︎ at that map's unit price |
-| ![Fortification token](media/token-fortification.png) | **Fortification**<br>Soaks one hit on the holder's units<br>No cap | ⚒︎20 per city cell<br>Needs an intact city cell | ⚒︎8–60 per city cell |
-| **¤** | **Credits**<br>Pays mercenaries<br>No cap | ⚒︎20 buys ¤20 | ⚒︎8–60 buys ¤20 |
+| Token                                                 | Unit                                                         | Global game                                                                                                                                                                   | Regional game                                                                                                                                    |
+| ----------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![Infantry token](media/token-infantry.png)           | **Infantry** Attack 3, defense 7 Cap 12                      | Field armies ⚒︎20, 1+ city cells Moves 1 hex Melee only                                                                                                                       | Divisions ⚒︎8–60, 1+ city cells Moves 1 hex Melee only                                                                                           |
+| ![Armor token](media/token-armor.png)                 | **Armor** Attack 10, defense 7 Cap 8                         | Field armies ⚒︎40, 2+ city cells Moves 2 hexes Fires 1 hex                                                                                                                    | Divisions ⚒︎16–120, 2–7 city cells Moves 2 hexes Fires 1 hex                                                                                     |
+| ![Naval token](media/token-naval.png)                 | **Naval** Attack 7, defense 7 Cap 8                          | Fleets ⚒︎100, 10+ city cells and a seaport on the water Moves 2 hexes, water and coast Fires 2 hexes Carries 1 armor or 2 infantry                                            | Task forces ⚒︎40–300, 5–31 city cells and a seaport on the water Moves 2 hexes, water and coast Fires 2 hexes Carries 1 armor or 2 infantry      |
+| ![Air token](media/token-air.png)                     | **Air** Attack 10, defense 3 Cap 6                           | Air wings ⚒︎60, 5+ city cells and an airport Ferries through owned airports, 4 hexes per hop Strikes 3 hexes from base Carries 1 infantry                                     | Air groups ⚒︎24–180, 3–17 city cells and an airport Ferries through owned airports, 4 hexes per hop Strikes 3 hexes from base Carries 1 infantry |
+| ![Missile token](media/token-missile.png)             | **Missile** Never rolls, hit last Cap 2                      | ⚒︎200, 21+ city cells (Advanced) Doesn't move Launches once, 12 hexes                                                                                                         | ⚒︎80–600, 6–59 city cells (Advanced) Doesn't move Launches once, 5–14 hexes                                                                      |
+| ![Mercenary token](media/token-mercenary.png)         | **Mercenary** Any type but missile No cap                    | Raise: ⚒︎ unit price + one turn of upkeep Rehire: two turns of upkeep Fee paid when ordered; returned if removed or unfilled Upkeep: ¤3 infantry, ¤5 armor, ¤8 air, ¤13 naval | Same credits ⚒︎ at that map's unit price                                                                                                         |
+| ![Fortification token](media/token-fortification.png) | **Fortification** Soaks one hit on the holder's units No cap | ⚒︎20 per city cell Needs an intact city cell                                                                                                                                  | ⚒︎8–60 per city cell                                                                                                                             |
+| **¤**                                                 | **Credits** Pays mercenaries No cap                          | ⚒︎20 buys ¤20                                                                                                                                                                 | ⚒︎8–60 buys ¤20                                                                                                                                  |
 
 - **Caps:** the caps above are per side in a Small game. Medium doubles them, and Large triples them. Mercenaries, fortifications, and Credits don't count. See [game-size-unit-caps.md](game-size-unit-caps.md).
 - **Hit numbers:** attack and defense are d20 hit numbers. 3 hits 15% of the time, 7 hits 35%, and 10 hits 50%.
 - **Regional maps:** those ranges run from the cheapest map to the dearest. The new-game screen shows the chosen map's own prices and Advanced size.
 - **Advanced mercenaries:** with the tech bonus on, a mercenary born in an Advanced city costs about twice the upkeep: infantry ¤5, armor ¤10, air ¤15, naval ¤25.
 
-<!-- Sources: GLOBAL_GAME_MAP.rules in src/shared/activeGameMap.ts; Table 2 of doc/region-summary-1.md; ATTACK and DEFENSE in src/main/combatConstants.ts; MAX_UNITS_PER_TYPE in src/shared/productionConfig.ts; mercenaryUpkeepFor; doc/combat-rules-v3.md §2.1. -->
+
 
 ### Units in Battles
 
