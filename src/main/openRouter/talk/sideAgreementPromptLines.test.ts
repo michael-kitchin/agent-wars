@@ -35,6 +35,7 @@ function view(overrides: Partial<SideAgreementView> = {}): SideAgreementView {
     startTurn: 3,
     endTurn: 8,
     standing: 'active',
+    closedTurn: null,
     intent: 'opportunistic',
     decision: { turnNumber: 5, decision: 'keep', reason: 'Still useful.' },
     evidence: 'Record, turns 3 to 5: no losses either way.',
@@ -67,6 +68,17 @@ test('each standing prints its text', () => {
   ];
   for (const [standing, text] of expected) {
     assert.ok(formatSideAgreementLines([view({ standing, evidence: null })]).includes(text), standing);
+  }
+});
+
+test('an ended or broken agreement names the turn it closed', () => {
+  const expected: Array<[SideAgreementStanding, string]> = [
+    ['ended', 'turns 3 to 8, ended on turn 4.'],
+    ['broken_by_them', 'turns 3 to 8, broken by a4 on turn 4.'],
+    ['broken_by_me', 'turns 3 to 8, broken by you on turn 4.'],
+  ];
+  for (const [standing, text] of expected) {
+    assert.ok(formatSideAgreementLines([view({ standing, closedTurn: 4, evidence: null })]).includes(text), standing);
   }
 });
 

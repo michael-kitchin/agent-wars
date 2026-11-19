@@ -48,7 +48,7 @@ export function sideAgreementTalkBullets(): readonly string[] {
     `You may hold at most ${SIDE_AGREEMENT_MAX_OPEN_PER_SIDE} proposed or active agreements with any one side.`,
     'intent is your private plan for an agreement: keep, opportunistic (keep it only while it serves you), or plan_to_break.',
     'Keeping an agreement lets you hold that front with fewer units and makes that side predictable. Breaking one can catch a thinly held front by surprise, and pays most when the gain is decisive. It can also bring retaliation, a reinforced front, warnings to other sides, and distrust of your later offers. Whether to keep or break an agreement is your decision.',
-    'The section titled Your agreements shows each open agreement with the losses both ways since it began. That record comes from the game, not from either side.',
+    'The section titled Your agreements shows each open agreement with the losses both ways since it began, and each recently closed one with how and when it ended. That record of losses comes from the game, not from either side.',
     'To change an agreement, send it again with its id and every field, changed or not. Use id 0 for a new agreement. You cannot change who an agreement is with, its kind, or the turn it began.',
   ];
   logTrace('diplomacyRuleText sideAgreementTalkBullets', { bulletCount: bullets.length });

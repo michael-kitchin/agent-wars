@@ -184,6 +184,16 @@ export interface SideAgreementView {
    */
   readonly standing: SideAgreementStanding;
   /**
+   * The turn the commander closed the agreement.
+   *
+   * Contract: The row's `updatedTurn` when the stored status is `ended`, `broken_by_them`, or `broken_by_me`, and null
+   *   for every other standing. A closed agreement can no longer be changed, so its last change is the turn it closed.
+   * When to use: The line's head, so the model sees when a closed agreement stopped applying.
+   * Expected outcome: A turn number or null.
+   * Exceptions: None.
+   */
+  readonly closedTurn: number | null;
+  /**
    * The commander's private plan.
    *
    * Contract: A `SideAgreementIntent`.
@@ -307,6 +317,7 @@ export function buildSideAgreementViews(args: BuildSideAgreementViewsArgs): Side
       startTurn: row.startTurn,
       endTurn: row.endTurn,
       standing,
+      closedTurn: standing === 'ended' || standing === 'broken_by_them' || standing === 'broken_by_me' ? row.updatedTurn : null,
       intent: row.intent,
       decision:
         row.decision !== null && row.decisionReason !== null && row.decisionTurn !== null

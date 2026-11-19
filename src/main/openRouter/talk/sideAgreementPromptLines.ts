@@ -24,11 +24,25 @@ function singleQuoted(text: string): string {
 }
 
 /**
+ * Adds the turn an agreement closed, when it is known.
+ *
+ * Purpose: A closed agreement's span still shows its planned end turn, so the closing turn tells the model when it
+ *   actually stopped applying.
+ * When to use: The text of an ended or broken standing.
+ * Expected outcome: `{text} on turn {closedTurn}`, or the text unchanged when `closedTurn` is null.
+ * Exceptions: None.
+ */
+function withClosedTurn(text: string, closedTurn: number | null): string {
+  return closedTurn === null ? text : `${text} on turn ${closedTurn}`;
+}
+
+/**
  * Words the standing of one agreement.
  *
- * Purpose: Closed and expired agreements say how they ended.
+ * Purpose: Closed and expired agreements say how and when they ended.
  * When to use: The head of a line.
- * Expected outcome: The text from the standing table of the prompt.
+ * Expected outcome: The text from the standing table of the prompt, with the closing turn after an ended or broken
+ *   standing.
  * Exceptions: None.
  */
 function standingText(standing: SideAgreementStanding, view: SideAgreementView): string {
@@ -37,10 +51,12 @@ function standingText(standing: SideAgreementStanding, view: SideAgreementView):
       return `expired after turn ${view.endTurn}`;
     case 'lapsed':
       return `lapsed because ${view.counterpartCode} is out of the match`;
+    case 'ended':
+      return withClosedTurn('ended', view.closedTurn);
     case 'broken_by_them':
-      return `broken by ${view.counterpartCode}`;
+      return withClosedTurn(`broken by ${view.counterpartCode}`, view.closedTurn);
     case 'broken_by_me':
-      return 'broken by you';
+      return withClosedTurn('broken by you', view.closedTurn);
     default:
       return standing;
   }

@@ -123,6 +123,12 @@ test('a closed agreement stays for two turns after its last change', () => {
   assert.equal(viewsOf([recent], rosterWith(), 6).length, 1);
 });
 
+test('a broken agreement carries the turn it closed, and an open or expired one carries none', () => {
+  assert.equal(viewsOf([row({ status: 'broken_by_me', updatedTurn: 5, endTurn: 8 })], rosterWith())[0]?.closedTurn, 5);
+  assert.equal(viewsOf([row()], rosterWith())[0]?.closedTurn, null);
+  assert.equal(viewsOf([row({ status: 'proposed', endTurn: 5, updatedTurn: 5 })], rosterWith())[0]?.closedTurn, null);
+});
+
 test('views follow the other side seat order, then the id', () => {
   const rows = [row({ agreementId: 1, counterpartSeatId: SECOND }), row({ agreementId: 2, counterpartSeatId: THIRD }), row({ agreementId: 3, counterpartSeatId: SECOND })];
   assert.deepEqual(viewsOf(rows, rosterWith(null, true)).map((view) => view.agreementId), [2, 1, 3]);
