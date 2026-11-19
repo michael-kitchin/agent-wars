@@ -19,6 +19,7 @@ import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
 import { normalizeOperationCommands, type OperationCommand } from './operationCommandParsing';
 import { POSTURES, isPosture, type Posture } from '../../shared/postureTypes';
 import { normalizeAgreementDecisions, type ParsedAgreementDecision } from './sideAgreementDecisionParsing';
+import { sideAgreementsEnabled } from './sideAgreementGate';
 import { normalizeAirDropOrders } from './airDropOrderRows';
 import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
 /**
@@ -735,7 +736,7 @@ export function parseOrdersResponse(
         if (context.mode !== 'tactical' && rawPosture !== undefined && postureChoice === undefined) {
           dropReasons.push(`posture dropped: expected one of ${POSTURES.join(', ')}.`);
         }
-        const agreementDecisionResult = context.mode !== 'tactical'
+        const agreementDecisionResult = sideAgreementsEnabled(context.mode)
           ? normalizeAgreementDecisions(obj.agreementDecisions)
           : { decisions: [], dropReasons: [] };
         dropReasons.push(...agreementDecisionResult.dropReasons);

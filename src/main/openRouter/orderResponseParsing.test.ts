@@ -460,6 +460,7 @@ const tests = [
   { name: 'parseOrdersResponse operations yields commands on strategic and nothing on tactical', fn: testOperationsCommandsOnStrategicOnly },
   { name: 'parseOrdersResponse posture keeps a known name and drops an unknown one', fn: testPostureNameOrDropReason },
   { name: 'parseOrdersResponse agreementDecisions are read on strategic and ignored on tactical', fn: testAgreementDecisionsStrategicOnly },
+  { name: 'parseOrdersResponse agreementDecisions are ignored with no drop reason when talk is off', fn: testAgreementDecisionsIgnoredWithTalkOff },
 ];
 
 /**
@@ -552,6 +553,30 @@ function testAgreementDecisionsStrategicOnly(): void {
   assert.ok(tactical);
   assert.strictEqual(tactical!.agreementDecisions, undefined);
   assert.ok(!(tactical!.dropReasons ?? []).some((reason) => reason.includes('agreementDecisions')));
+}
+
+/**
+ * Ignores `agreementDecisions` while the talk stage is off.
+ *
+ * Purpose: A run without talk offers no agreements, so a stray or malformed field is neither read nor reported.
+ * When to use: After the envelope parse of `agreementDecisions`.
+ * Expected outcome: With `AGENT_WARS_DISABLE_TALK` set, a valid list and a non-array value both give no decisions and no drop reason about the field.
+ * Exceptions: None. The variable is restored in a `finally`.
+ */
+function testAgreementDecisionsIgnoredWithTalkOff(): void {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  process.env.AGENT_WARS_DISABLE_TALK = '1';
+  try {
+    for (const field of ['[{"id":7,"decision":"break","reason":"Open front."}]', '"none"']) {
+      const parsed = parseFixture(`{"strategy":"hold","orders":[],"agreementDecisions":${field}}`);
+      assert.ok(parsed);
+      assert.strictEqual(parsed!.agreementDecisions, undefined);
+      assert.ok(!(parsed!.dropReasons ?? []).some((reason) => reason.includes('agreementDecisions')));
+    }
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
 }
 
 function run(): void {

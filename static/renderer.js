@@ -43953,12 +43953,12 @@ ${bonuses}`;
   function agreementAtTurn(entry, turn, lookups) {
     const version = lastAtOrBefore(entry.versions, turn);
     if (!version) return null;
-    const counterpartActive = isSeatInMatchAt(lookups.seats.get(entry.counterpartSeatId), turn) && isSeatInMatchAt(lookups.seats.get(entry.seatId), turn);
+    const bothSidesInMatch = isSeatInMatchAt(lookups.seats.get(entry.counterpartSeatId), turn) && isSeatInMatchAt(lookups.seats.get(entry.seatId), turn);
     const standing = sideAgreementStanding({
       status: version.status,
       endTurn: version.endTurn,
       currentTurn: turn,
-      counterpartActive
+      counterpartActive: bothSidesInMatch
     });
     return standing === "active" || standing === "proposed" ? { entry, version, standing } : null;
   }
@@ -44145,6 +44145,7 @@ ${bonuses}`;
       });
     };
     const render = () => {
+      tooltip.hidden = true;
       const hasRows = strip.rows.length > 0;
       empty.hidden = hasRows;
       canvas.hidden = !hasRows;
@@ -44207,6 +44208,8 @@ ${bonuses}`;
       tooltip.className = args.wrapTooltip === true ? "charts-tooltip charts-tooltip-wrap" : "charts-tooltip";
       tooltip.replaceChildren(heading, ...lines);
       tooltip.hidden = false;
+      tooltip.style.left = "0px";
+      tooltip.style.top = "0px";
       const bounds = args.host.getBoundingClientRect();
       const x = event.clientX - bounds.left;
       const y = event.clientY - bounds.top;
@@ -44421,11 +44424,12 @@ ${bonuses}`;
       );
       return sideCodesToNamesByCode(text, nameByCode);
     };
+    const legendSpace = () => legend.offsetHeight + (Number.parseFloat(getComputedStyle(legend).marginTop) || 0);
     fillWithOptions();
     const strip = createAgreementTimeline({
       host: plotHost,
       width: args.width,
-      height: Math.max(0, args.plotHeightFor(titleRow.offsetHeight) - legend.offsetHeight),
+      height: Math.max(0, args.plotHeightFor(titleRow.offsetHeight) - legendSpace()),
       nameOf,
       flagOf: args.flagOf
     });
@@ -44441,7 +44445,7 @@ ${bonuses}`;
         redraw2();
       },
       resize(width, height) {
-        strip.resize(width, Math.max(0, height - legend.offsetHeight));
+        strip.resize(width, Math.max(0, height - legendSpace()));
       },
       destroy() {
         kindDropdown.select.removeEventListener("change", redraw2);

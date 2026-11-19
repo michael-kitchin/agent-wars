@@ -75,7 +75,7 @@ export function normalizeAgreementDecisions(raw: unknown): {
     const row = entry !== null && typeof entry === 'object' && !Array.isArray(entry)
       ? (entry as { readonly id?: unknown; readonly decision?: unknown; readonly reason?: unknown })
       : null;
-    if (!row || typeof row.id !== 'number' || !Number.isInteger(row.id) || row.id <= 0 || !isSideAgreementDecision(row.decision)) {
+    if (!row || typeof row.id !== 'number' || !Number.isSafeInteger(row.id) || row.id <= 0 || !isSideAgreementDecision(row.decision)) {
       dropReasons.push('agreementDecisions entry dropped: expected a positive integer id and a decision of keep or break.');
       continue;
     }

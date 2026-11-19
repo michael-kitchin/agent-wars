@@ -25,9 +25,9 @@ test('a valid entry is kept with its reason cleaned', () => {
 
 test('a bad id or decision is dropped with the same reason', () => {
   const reason = 'agreementDecisions entry dropped: expected a positive integer id and a decision of keep or break.';
-  const result = normalizeAgreementDecisions([{ id: 0, decision: 'keep' }, { id: '7', decision: 'keep' }, { id: 7, decision: 'betray' }, 'x']);
+  const result = normalizeAgreementDecisions([{ id: 0, decision: 'keep' }, { id: 1e21, decision: 'keep' }, { id: '7', decision: 'keep' }, { id: 7, decision: 'betray' }, 'x']);
   assert.deepEqual(result.decisions, []);
-  assert.deepEqual(result.dropReasons, [reason, reason, reason, reason]);
+  assert.deepEqual(result.dropReasons, [reason, reason, reason, reason, reason]);
 });
 
 test('a repeated id is dropped once, and entries past the limit share one reason', () => {

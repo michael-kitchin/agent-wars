@@ -198,7 +198,7 @@ function parseOneEntry(entry: unknown, args: ParseSideAgreementEntriesArgs, seen
   if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return null;
   const row = entry as RawAgreementEntry;
   const agreementId = row.id === undefined ? 0 : row.id;
-  if (typeof agreementId !== 'number' || !Number.isInteger(agreementId) || agreementId < 0) return null;
+  if (typeof agreementId !== 'number' || !Number.isSafeInteger(agreementId) || agreementId < 0) return null;
   const withSeatId = seatIdForSideCode(row.with, args.addressableSeatIds);
   if (!withSeatId || withSeatId === args.ownSeatId) return null;
   if (!isSideAgreementKind(row.kind) || !isSideAgreementStatus(row.status) || !isSideAgreementIntent(row.intent)) return null;

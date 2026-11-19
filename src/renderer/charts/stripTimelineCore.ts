@@ -248,6 +248,8 @@ export function createStripTimeline<Cell>(args: CreateStripTimelineArgs<Cell>): 
    * Exceptions: None.
    */
   const render = (): void => {
+    // A redraw (new data, zoom, resize) can move the cell under a resting pointer, so the old tooltip is dropped.
+    tooltip.hidden = true;
     const hasRows = strip.rows.length > 0;
     empty.hidden = hasRows;
     canvas.hidden = !hasRows;
@@ -373,6 +375,10 @@ export function createStripTimeline<Cell>(args: CreateStripTimelineArgs<Cell>): 
     tooltip.className = args.wrapTooltip === true ? 'charts-tooltip charts-tooltip-wrap' : 'charts-tooltip';
     tooltip.replaceChildren(heading, ...lines);
     tooltip.hidden = false;
+    // Measure at the origin: an absolutely placed box is as wide as the room right of its `left`, so a stale
+    // `left` near the right edge would wrap the tooltip into a narrow column and hide the need to flip it.
+    tooltip.style.left = '0px';
+    tooltip.style.top = '0px';
     const bounds = args.host.getBoundingClientRect();
     const x = event.clientX - bounds.left;
     const y = event.clientY - bounds.top;

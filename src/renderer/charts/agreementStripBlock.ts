@@ -274,11 +274,21 @@ export function createAgreementStripBlock(args: CreateAgreementStripBlockArgs): 
     return sideCodesToNamesByCode(text, nameByCode);
   };
 
+  /**
+   * Measures the room the legend takes under the plot.
+   *
+   * Purpose: The block counts its legend toward the quarter-height rule, and the legend's top margin is part of that room.
+   * When to use: Sizing or resizing the plot.
+   * Expected outcome: The legend's height plus its top margin, in pixels.
+   * Exceptions: None. A margin that does not parse counts as 0.
+   */
+  const legendSpace = (): number => legend.offsetHeight + (Number.parseFloat(getComputedStyle(legend).marginTop) || 0);
+
   fillWithOptions();
   const strip = createAgreementTimeline({
     host: plotHost,
     width: args.width,
-    height: Math.max(0, args.plotHeightFor(titleRow.offsetHeight) - legend.offsetHeight),
+    height: Math.max(0, args.plotHeightFor(titleRow.offsetHeight) - legendSpace()),
     nameOf,
     flagOf: args.flagOf,
   });
@@ -304,7 +314,7 @@ export function createAgreementStripBlock(args: CreateAgreementStripBlockArgs): 
       redraw();
     },
     resize(width: number, height: number): void {
-      strip.resize(width, Math.max(0, height - legend.offsetHeight));
+      strip.resize(width, Math.max(0, height - legendSpace()));
     },
     destroy(): void {
       kindDropdown.select.removeEventListener('change', redraw);

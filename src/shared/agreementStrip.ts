@@ -483,13 +483,15 @@ function isSeatInMatchAt(seat: MatchChartsSeat | undefined, turn: number): boole
 function agreementAtTurn(entry: AgreementHistoryEntry, turn: number, lookups: StripLookups): AgreementAtTurn | null {
   const version = lastAtOrBefore(entry.versions, turn);
   if (!version) return null;
-  const counterpartActive = isSeatInMatchAt(lookups.seats.get(entry.counterpartSeatId), turn)
+  // `sideAgreementStanding` lapses an agreement when the other side is out. Here both sides count, because the strip
+  // draws a row for the keeper too, and a keeper that is out holds nothing.
+  const bothSidesInMatch = isSeatInMatchAt(lookups.seats.get(entry.counterpartSeatId), turn)
     && isSeatInMatchAt(lookups.seats.get(entry.seatId), turn);
   const standing = sideAgreementStanding({
     status: version.status,
     endTurn: version.endTurn,
     currentTurn: turn,
-    counterpartActive,
+    counterpartActive: bothSidesInMatch,
   });
   return standing === 'active' || standing === 'proposed' ? { entry, version, standing } : null;
 }

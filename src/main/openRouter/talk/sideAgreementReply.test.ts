@@ -67,6 +67,7 @@ test('each failed rule drops its entry and counts it', () => {
     entry({ kind: 'alliance' }),
     entry({ terms: '   ' }),
     entry({ endTurn: 8.5 }),
+    entry({ id: 1e21 }),
     entry({ kind: 'joint_action', against: 'a2' }),
     entry({ kind: 'no_entry_zone', zone: [' ', 4] }),
   ];

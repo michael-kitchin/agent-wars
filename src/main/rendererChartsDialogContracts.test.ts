@@ -47,10 +47,26 @@ test('the window key handler routes the charts key and Escape to the dialog', ()
 });
 
 test('the dialog and its chart modules paint text as text', () => {
-  for (const file of ['chartsDialog.ts', 'lineChart.ts', 'relationshipStack.ts', 'relationshipTimeline.ts']) {
+  const files = [
+    'chartsDialog.ts',
+    'lineChart.ts',
+    'relationshipStack.ts',
+    'relationshipTimeline.ts',
+    'stripTimelineCore.ts',
+    'agreementTimeline.ts',
+    'agreementStripBlock.ts',
+  ];
+  for (const file of files) {
     assert.equal(readRendererSource('charts', file).includes('innerHTML'), false, file);
   }
   assert.equal(readRendererSource('chrome', 'blockingDialogGuards.ts').includes('innerHTML'), false);
+});
+
+test('the dialog draws, resizes, and tears down the agreement strip with the other blocks', () => {
+  const source = readRendererSource('charts', 'chartsDialog.ts');
+  for (const call of ['view.agreements.update(', 'view.agreements.resize(', 'view.agreements.destroy(']) {
+    assert.equal(source.includes(call), true, call);
+  }
 });
 
 test('the blocking-dialog guard names each dialog except the game-over panel', () => {
