@@ -73,6 +73,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Charts close control: Close the charts. You can also press C or Escape.
 - Built units and Mercenary units dropdowns, on the charts dialog: Show the total or one unit type for built units, or for mercenary units.
 - How they see dropdown, on the charts dialog: Choose the side whose standing with each commander the strip shows.
+- Kind dropdown, on the charts dialog: Choose which kind of agreement the agreement strip counts.
+- With dropdown, on the charts dialog: Choose the side whose agreements with each commander the strip counts, or all sides.
 - Chat panel expand, while the history is hidden: Show every message sent this match.
 - Chat panel expand, while the history is showing: Hide the message history.
 - Chat panel recipient: Choose the side this message goes to.

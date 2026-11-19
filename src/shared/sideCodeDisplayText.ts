@@ -39,6 +39,18 @@ function namesBySideCode(seats: readonly SideDisplaySeat[]): ReadonlyMap<string,
 }
 
 /**
+ * Replaces side codes in text with names from a code-to-name lookup.
+ *
+ * Purpose: Lets a screen that already knows each side's name by code convert text without building seat records.
+ * When to use: When drawing commander-written text and the names are known by unit id code, such as `a2`.
+ * Expected outcome: Each whole lowercase code found in `nameByCode` becomes its name. A code missing from the map, and all other text, stay as written.
+ * Exceptions: None.
+ */
+export function sideCodesToNamesByCode(text: string, nameByCode: ReadonlyMap<string, string>): string {
+  return text.replace(SIDE_CODE_PATTERN, (match: string, code: string) => nameByCode.get(code) ?? match);
+}
+
+/**
  * Replaces side codes in text with the sides' display names.
  *
  * Purpose: Commander messages and Strategy text read as names on screen.
@@ -49,6 +61,5 @@ function namesBySideCode(seats: readonly SideDisplaySeat[]): ReadonlyMap<string,
  */
 export function sideCodesToDisplayNames(text: string, seats: readonly SideDisplaySeat[]): string {
   if (seats.length === 0) return text;
-  const names = namesBySideCode(seats);
-  return text.replace(SIDE_CODE_PATTERN, (match: string, code: string) => names.get(code) ?? match);
+  return sideCodesToNamesByCode(text, namesBySideCode(seats));
 }

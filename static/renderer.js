@@ -20099,10 +20099,12 @@ ${bonuses}`;
     }
     return names;
   }
+  function sideCodesToNamesByCode(text, nameByCode) {
+    return text.replace(SIDE_CODE_PATTERN, (match, code) => nameByCode.get(code) ?? match);
+  }
   function sideCodesToDisplayNames(text, seats) {
     if (seats.length === 0) return text;
-    const names = namesBySideCode(seats);
-    return text.replace(SIDE_CODE_PATTERN, (match, code) => names.get(code) ?? match);
+    return sideCodesToNamesByCode(text, namesBySideCode(seats));
   }
 
   // src/renderer/chrome/sideCodeTextHelpers.ts
@@ -43894,19 +43896,174 @@ ${bonuses}`;
     return card;
   }
 
-  // src/renderer/charts/relationshipTimeline.ts
+  // src/shared/sideAgreements.ts
+  var SIDE_AGREEMENT_KINDS = ["non_aggression", "ceasefire_in_place", "no_entry_zone", "joint_action", "information_sharing"];
+  var SIDE_AGREEMENT_KIND_LABELS = {
+    non_aggression: "Non-aggression",
+    ceasefire_in_place: "Ceasefire in place",
+    no_entry_zone: "No-entry zone",
+    joint_action: "Joint action",
+    information_sharing: "Information sharing"
+  };
+  var SIDE_AGREEMENT_INTENT_LABELS = {
+    keep: "keep",
+    opportunistic: "opportunistic",
+    plan_to_break: "plan to break"
+  };
+  function isSideAgreementKind(value) {
+    return typeof value === "string" && SIDE_AGREEMENT_KINDS.includes(value);
+  }
+  function sideAgreementStanding(args) {
+    const { status, endTurn, currentTurn, counterpartActive } = args;
+    if (status !== "proposed" && status !== "active") return status;
+    if (!counterpartActive) return "lapsed";
+    if (endTurn < currentTurn) return "expired";
+    return status;
+  }
+
+  // src/shared/agreementStrip.ts
+  var AGREEMENT_FILTER_ALL = "all";
+  function attackKey(turn, bySeatId, fromSeatId) {
+    return `${turn}|${bySeatId}|${fromSeatId}`;
+  }
+  function lastAtOrBefore(items, turn) {
+    return [...items].reverse().find((item) => item.turnNumber <= turn);
+  }
+  function buildLookups(snapshot3) {
+    const history = snapshot3.agreementHistory;
+    const byKeeper = /* @__PURE__ */ new Map();
+    for (const entry of history?.agreements ?? []) {
+      byKeeper.set(entry.seatId, [...byKeeper.get(entry.seatId) ?? [], entry]);
+    }
+    const attackUnits = /* @__PURE__ */ new Map();
+    (history?.attacks ?? []).forEach((attack) => {
+      const key = attackKey(attack.turnNumber, attack.bySeatId, attack.fromSeatId);
+      attackUnits.set(key, (attackUnits.get(key) ?? 0) + attack.units);
+    });
+    return { byKeeper, attackUnits, seats: new Map(snapshot3.seats.map((seat) => [seat.seatId, seat])) };
+  }
+  function agreementAtTurn(entry, turn, lookups) {
+    const version = lastAtOrBefore(entry.versions, turn);
+    if (!version) return null;
+    const counterpart = lookups.seats.get(entry.counterpartSeatId);
+    const outTurn = counterpart?.outTurn;
+    const counterpartActive = counterpart !== void 0 && (outTurn === null || outTurn === void 0 || turn <= outTurn);
+    const standing = sideAgreementStanding({
+      status: version.status,
+      endTurn: version.endTurn,
+      currentTurn: turn,
+      counterpartActive
+    });
+    return standing === "active" || standing === "proposed" ? { entry, version, standing } : null;
+  }
+  function counterpartRecordAt(item, turn, lookups) {
+    const { entry } = item;
+    const counterpart = lookups.seats.get(entry.counterpartSeatId);
+    if (counterpart?.kind !== "ai") return { kind: "not_applicable" };
+    for (const other of lookups.byKeeper.get(entry.counterpartSeatId) ?? []) {
+      if (other.counterpartSeatId !== entry.seatId || other.kind !== entry.kind) continue;
+      const state = agreementAtTurn(other, turn, lookups);
+      if (state) return { kind: "match", agreementId: other.agreementId, standing: state.standing };
+    }
+    return { kind: "none" };
+  }
+  function cellItem(item, turn, lookups) {
+    const { entry, version, standing } = item;
+    const unitsDestroyedByAttack = standing === "active" ? lookups.attackUnits.get(attackKey(turn, entry.seatId, entry.counterpartSeatId)) ?? 0 : 0;
+    const decidedBreakThisTurn = entry.decisions.some((d) => d.turnNumber === turn && d.decision === "break");
+    return {
+      agreementId: entry.agreementId,
+      counterpartSeatId: entry.counterpartSeatId,
+      againstSeatId: entry.againstSeatId,
+      kind: entry.kind,
+      startTurn: entry.startTurn,
+      endTurn: version.endTurn,
+      standing,
+      intent: version.intent,
+      terms: version.terms,
+      zoneCodes: version.zoneCodes,
+      latestDecision: lastAtOrBefore(entry.decisions, turn) ?? null,
+      unitsDestroyedByAttack,
+      decidedBreakThisTurn,
+      breached: standing === "active" && (unitsDestroyedByAttack > 0 || decidedBreakThisTurn),
+      counterpartRecord: counterpartRecordAt(item, turn, lookups)
+    };
+  }
+  function buildCell(agreements, turn, filter, lookups) {
+    const items = agreements.filter((entry) => filter.kind === AGREEMENT_FILTER_ALL || entry.kind === filter.kind).filter((entry) => filter.withSeatId === AGREEMENT_FILTER_ALL || entry.counterpartSeatId === filter.withSeatId).map((entry) => agreementAtTurn(entry, turn, lookups)).filter((state) => state !== null).map((state) => cellItem(state, turn, lookups)).sort((a, b) => Number(b.standing === "active") - Number(a.standing === "active") || a.agreementId - b.agreementId);
+    return {
+      activeCount: items.filter((item) => item.standing === "active").length,
+      proposedCount: items.filter((item) => item.standing === "proposed").length,
+      breached: items.some((item) => item.breached),
+      mismatched: items.some((item) => item.standing === "active" && item.counterpartRecord.kind === "none"),
+      items
+    };
+  }
+  function agreementStrip(snapshot3, filter) {
+    const turns = snapshot3.turns.map((turn) => turn.turnNumber);
+    const lookups = buildLookups(snapshot3);
+    const rows = [...snapshot3.seats].filter((seat) => seat.kind === "ai" && seat.seatId !== filter.withSeatId).sort((a, b) => a.seatOrder - b.seatOrder).map((seat) => ({
+      seatId: seat.seatId,
+      cells: turns.map((turn) => buildCell(lookups.byKeeper.get(seat.seatId) ?? [], turn, filter, lookups))
+    }));
+    return { turns, rows };
+  }
+
+  // src/shared/agreementStripText.ts
+  function agreementCellLabel(cell) {
+    if (cell.activeCount === 0 && cell.proposedCount === 0) return "";
+    const proposed = cell.proposedCount > 0 ? `+${cell.proposedCount}` : "";
+    return `${cell.activeCount}${proposed}${cell.breached ? "!" : ""}`;
+  }
+  function agreementCellShortLabel(cell) {
+    if (cell.activeCount === 0 && cell.proposedCount === 0) return "";
+    return `${cell.activeCount}${cell.breached ? "!" : ""}`;
+  }
+  function breachText(item, counterpartName) {
+    const parts = [];
+    if (item.unitsDestroyedByAttack > 0) {
+      const noun = item.unitsDestroyedByAttack === 1 ? "unit" : "units";
+      parts.push(`destroyed ${item.unitsDestroyedByAttack} ${noun} of ${counterpartName} by attack`);
+    }
+    if (item.decidedBreakThisTurn) parts.push("decided to break it");
+    return `Breach this turn: ${parts.join(" and ")}`;
+  }
+  function itemLines(item, nameOf, displayText) {
+    const counterpartName = nameOf(item.counterpartSeatId);
+    const against = item.againstSeatId === null ? "" : `, against ${nameOf(item.againstSeatId)}`;
+    const head2 = `#${item.agreementId} ${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
+    const lines = [`Terms: ${displayText(item.terms)}`];
+    if (item.zoneCodes.length > 0) lines.push(`Zone: ${item.zoneCodes.join(", ")}`);
+    if (item.latestDecision) {
+      const { turnNumber, decision, reason } = item.latestDecision;
+      lines.push(`Decision on turn ${turnNumber}: ${decision}${reason === "" ? "" : `: ${displayText(reason)}`}`);
+    }
+    if (item.breached) lines.push(breachText(item, counterpartName));
+    const record = item.counterpartRecord;
+    if (record.kind === "match") lines.push(`${counterpartName} records it as #${record.agreementId} (${record.standing})`);
+    if (record.kind === "none") lines.push(`${counterpartName} records no matching agreement`);
+    return [{ text: head2, emphasis: true }, ...lines.map((text) => ({ text, emphasis: false }))];
+  }
+  function agreementCellTooltip(args) {
+    const { rowSeatId, turn, cell, nameOf, displayText } = args;
+    const heading = `${nameOf(rowSeatId)}, turn ${turn}`;
+    if (cell.items.length === 0) return { heading, lines: [{ text: "No matching agreements.", emphasis: false }] };
+    return { heading, lines: cell.items.flatMap((item) => itemLines(item, nameOf, displayText)) };
+  }
+
+  // src/renderer/charts/stripTimelineCore.ts
   var ROW_HEIGHT_MAX = 22;
   var ROW_HEIGHT_MIN = 10;
   var AXIS_HEIGHT = 18;
   var LABEL_WIDTH = 120;
-  var LETTER_MIN_CELL_WIDTH = 14;
-  function cssColor(name, fallback) {
+  function stripCssColor(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
   }
   function tickStep(cellWidth) {
     return Math.max(1, Math.ceil(40 / Math.max(1, cellWidth)));
   }
-  function createRelationshipTimeline(args) {
+  function createStripTimeline(args) {
+    const { paintCell } = args;
     let size = { width: args.width, height: args.height };
     let strip = { turns: [], rows: [] };
     let view2 = null;
@@ -43917,7 +44074,7 @@ ${bonuses}`;
     canvas.className = "charts-strip-canvas";
     const empty = document.createElement("p");
     empty.className = "charts-empty";
-    empty.textContent = "No AI commander reports on this side.";
+    empty.textContent = args.emptyText;
     empty.hidden = true;
     const tooltip = document.createElement("div");
     tooltip.className = "charts-tooltip";
@@ -43936,9 +44093,9 @@ ${bonuses}`;
           const line = document.createElement("div");
           line.className = "charts-strip-label";
           line.style.height = `${height}px`;
-          const flag = args.flagOf(row.reporterSeatId);
+          const flag = args.flagOf(row.seatId);
           const name = document.createElement("span");
-          name.textContent = args.nameOf(row.reporterSeatId);
+          name.textContent = args.nameOf(row.seatId);
           line.append(...flag === null ? [name] : [flag, name]);
           return line;
         })
@@ -43958,7 +44115,7 @@ ${bonuses}`;
       const turnCount = range.max - range.min + 1;
       const cellWidth = plotWidth() / turnCount;
       const rowPx = rowHeight();
-      const muted = cssColor("--chrome-muted", "#b7c4d4");
+      const muted = stripCssColor("--chrome-muted", "#b7c4d4");
       context.font = "11px system-ui, sans-serif";
       context.textAlign = "center";
       context.textBaseline = "middle";
@@ -43968,20 +44125,9 @@ ${bonuses}`;
           const cell = row.cells[index];
           const x = (turn - range.min) * cellWidth;
           const y = rowIndex * rowPx;
-          if (cell.stance === null) {
-            context.strokeStyle = muted;
-            context.lineWidth = 1;
-            context.strokeRect(x + 0.5, y + 0.5, Math.max(0, cellWidth - 1), rowPx - 1);
-            return;
-          }
-          context.globalAlpha = cell.reportedThisTurn ? 1 : 0.45;
-          context.fillStyle = cssColor(`--stance-${cell.stance}`, "#9AA5A3");
-          context.fillRect(x, y, cellWidth, rowPx - 1);
-          context.globalAlpha = 1;
-          if (cellWidth >= LETTER_MIN_CELL_WIDTH) {
-            context.fillStyle = "#10161d";
-            context.fillText(cell.stance.charAt(0).toUpperCase(), x + cellWidth / 2, y + rowPx / 2);
-          }
+          context.save();
+          paintCell(context, cell, { x, y, width: cellWidth, height: rowPx });
+          context.restore();
         });
       });
       const axisTop = rowPx * strip.rows.length;
@@ -44024,23 +44170,35 @@ ${bonuses}`;
       dragStart4 = { x: event.clientX, range };
       canvas.setPointerCapture(event.pointerId);
     };
+    const rowIndexAt = (clientY) => {
+      const index = Math.floor((clientY - canvas.getBoundingClientRect().top) / rowHeight());
+      return index < 0 || index >= strip.rows.length ? null : index;
+    };
+    const keepTooltipInView = (pointerY) => {
+      const body = args.host.closest(".charts-dialog-body");
+      const visibleBottom = body?.getBoundingClientRect().bottom ?? window.innerHeight;
+      if (tooltip.getBoundingClientRect().bottom <= visibleBottom) return;
+      const hostTop = args.host.getBoundingClientRect().top;
+      const visibleTop = (body?.getBoundingClientRect().top ?? 0) - hostTop;
+      tooltip.style.top = `${Math.max(visibleTop, pointerY - 12 - tooltip.offsetHeight)}px`;
+    };
     const showTooltip = (event) => {
       const index = strip.turns.indexOf(Math.round(turnAt(event.clientX)));
-      if (index < 0) {
+      const content = index < 0 ? null : args.tooltipAt(index, rowIndexAt(event.clientY));
+      if (content === null) {
         tooltip.hidden = true;
         return;
       }
       const heading = document.createElement("div");
       heading.className = "charts-tooltip-heading";
-      heading.textContent = `Turn ${strip.turns[index]}`;
-      const lines = strip.rows.map((row) => {
-        const cell = row.cells[index];
-        const name = args.nameOf(row.reporterSeatId);
+      heading.textContent = content.heading;
+      const lines = content.lines.map((entry) => {
         const line = document.createElement("div");
-        line.className = "charts-tooltip-line";
-        line.textContent = cell.stance === null ? `${name}: no report` : `${name}: ${cell.stance} (${cell.reportedThisTurn ? "reported this turn" : "from an earlier turn"})`;
+        line.className = entry.emphasis ? "charts-tooltip-line charts-tooltip-emphasis" : "charts-tooltip-line";
+        line.textContent = entry.text;
         return line;
       });
+      tooltip.className = args.wrapTooltip === true ? "charts-tooltip charts-tooltip-wrap" : "charts-tooltip";
       tooltip.replaceChildren(heading, ...lines);
       tooltip.hidden = false;
       const bounds = args.host.getBoundingClientRect();
@@ -44049,6 +44207,7 @@ ${bonuses}`;
       const left = x + 12 + tooltip.offsetWidth > args.host.clientWidth ? x - 12 - tooltip.offsetWidth : x + 12;
       tooltip.style.left = `${Math.max(0, left)}px`;
       tooltip.style.top = `${Math.max(0, y + 12)}px`;
+      if (args.wrapTooltip === true) keepTooltipInView(y);
     };
     const onPointerMove = (event) => {
       const full = fullRange();
@@ -44068,6 +44227,13 @@ ${bonuses}`;
     const onDoubleClick = () => {
       showRange(fullRange());
     };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerEnd);
+    canvas.addEventListener("pointercancel", onPointerEnd);
+    canvas.addEventListener("pointerleave", onPointerLeave);
+    canvas.addEventListener("dblclick", onDoubleClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
@@ -44095,6 +44261,245 @@ ${bonuses}`;
         canvas.removeEventListener("dblclick", onDoubleClick);
         args.host.replaceChildren();
       }
+    };
+  }
+
+  // src/renderer/charts/agreementTimeline.ts
+  var LABEL_PADDING = 4;
+  var HATCH_SPACING = 5;
+  var MISMATCH_LEG_MAX = 6;
+  function fillColorFor(activeCount) {
+    const level = Math.min(3, activeCount);
+    return stripCssColor(`--agreement-${level}`, ["#4f6f99", "#7d9cc4", "#b3c9e6"][level - 1]);
+  }
+  function paintHatching(context, x, y, width, height) {
+    context.beginPath();
+    context.rect(x, y, width, height);
+    context.clip();
+    context.strokeStyle = stripCssColor("--chrome-error", "#f0a8a8");
+    context.lineWidth = 1;
+    context.beginPath();
+    for (let offset = -height; offset < width; offset += HATCH_SPACING) {
+      context.moveTo(x + offset, y + height);
+      context.lineTo(x + offset + height, y);
+    }
+    context.stroke();
+  }
+  function paintLabel2(context, cell, rect2) {
+    const { x, y, width, height } = rect2;
+    const fits = (text) => text !== "" && context.measureText(text).width + LABEL_PADDING <= width;
+    const full = agreementCellLabel(cell);
+    const label = fits(full) ? full : agreementCellShortLabel(cell);
+    if (!fits(label)) return;
+    context.fillStyle = cell.activeCount >= 2 ? "#10161d" : stripCssColor("--chrome-text", "#f4f6f8");
+    context.fillText(label, x + width / 2, y + height / 2);
+  }
+  function paintAgreementCell(context, cell, rect2) {
+    const { x, y, width } = rect2;
+    const height = rect2.height - 1;
+    if (cell.activeCount > 0) {
+      context.fillStyle = fillColorFor(cell.activeCount);
+      context.fillRect(x, y, width, height);
+    }
+    context.lineWidth = 1;
+    if (cell.proposedCount > 0) {
+      context.strokeStyle = stripCssColor("--chrome-accent-edge", "#7dcec8");
+      context.setLineDash([3, 2]);
+      context.strokeRect(x + 2.5, y + 2.5, Math.max(0, width - 5), Math.max(0, height - 5));
+      context.setLineDash([]);
+    } else if (cell.activeCount === 0) {
+      context.strokeStyle = stripCssColor("--chrome-muted", "#b7c4d4");
+      context.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), height - 1);
+    }
+    if (cell.breached) {
+      context.save();
+      paintHatching(context, x, y, width, height);
+      context.restore();
+      context.strokeStyle = stripCssColor("--chrome-error", "#f0a8a8");
+      context.lineWidth = 2;
+      context.strokeRect(x + 1, y + 1, Math.max(0, width - 2), Math.max(0, height - 2));
+    }
+    if (cell.mismatched) {
+      const leg = Math.min(MISMATCH_LEG_MAX, width / 3);
+      context.fillStyle = stripCssColor("--stance-wary", "#EF9F27");
+      context.beginPath();
+      context.moveTo(x + width - leg, y);
+      context.lineTo(x + width, y);
+      context.lineTo(x + width, y + leg);
+      context.closePath();
+      context.fill();
+    }
+    paintLabel2(context, cell, { x, y, width, height: rect2.height });
+  }
+  function createAgreementTimeline(args) {
+    let strip = { turns: [], rows: [] };
+    let displayText = (text) => text;
+    const core = createStripTimeline({
+      host: args.host,
+      width: args.width,
+      height: args.height,
+      nameOf: args.nameOf,
+      flagOf: args.flagOf,
+      emptyText: "No AI commander to show.",
+      wrapTooltip: true,
+      paintCell: paintAgreementCell,
+      tooltipAt: (turnIndex, rowIndex) => {
+        if (rowIndex === null) return null;
+        const row = strip.rows[rowIndex];
+        return agreementCellTooltip({
+          rowSeatId: row.seatId,
+          turn: strip.turns[turnIndex],
+          cell: row.cells[turnIndex],
+          nameOf: args.nameOf,
+          displayText
+        });
+      }
+    });
+    return {
+      update(next, nextDisplayText) {
+        strip = next;
+        displayText = nextDisplayText;
+        core.update(next);
+      },
+      resize: (width, height) => core.resize(width, height),
+      destroy: () => core.destroy()
+    };
+  }
+
+  // src/renderer/charts/agreementStripBlock.ts
+  var AGREEMENT_LEGEND_TEXT = "Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record an active agreement.";
+  var KIND_CONTROL_TOOLTIP = "Choose which kind of agreement the agreement strip counts.";
+  var WITH_CONTROL_TOOLTIP = "Choose the side whose agreements with each commander the strip counts, or all sides.";
+  function buildDropdown(caption, ariaLabel, tooltip) {
+    const select = document.createElement("select");
+    select.className = "charts-select";
+    select.setAttribute("aria-label", ariaLabel);
+    select.dataset.controlTooltip = tooltip;
+    const label = document.createElement("label");
+    label.className = "charts-select-label";
+    label.append(caption, select);
+    return { label, select };
+  }
+  function buildOption(value, text) {
+    const option2 = document.createElement("option");
+    option2.value = value;
+    option2.textContent = text;
+    return option2;
+  }
+  function createAgreementStripBlock(args) {
+    const { titleRow, plotHost, nameOf } = args;
+    let snapshot3 = args.snapshot;
+    const kindDropdown = buildDropdown("Kind ", "Kind", KIND_CONTROL_TOOLTIP);
+    kindDropdown.select.append(
+      buildOption(AGREEMENT_FILTER_ALL, "All"),
+      ...SIDE_AGREEMENT_KINDS.map((kind) => buildOption(kind, SIDE_AGREEMENT_KIND_LABELS[kind]))
+    );
+    const withDropdown = buildDropdown("With ", "With", WITH_CONTROL_TOOLTIP);
+    const controls = document.createElement("span");
+    controls.className = "charts-block-controls";
+    controls.append(kindDropdown.label, withDropdown.label);
+    titleRow.appendChild(controls);
+    const legend = document.createElement("p");
+    legend.className = "charts-agreement-legend";
+    legend.textContent = AGREEMENT_LEGEND_TEXT;
+    plotHost.after(legend);
+    const fillWithOptions = () => {
+      const chosen = withDropdown.select.value;
+      const seats = [...snapshot3.seats].sort((a, b) => a.seatOrder - b.seatOrder);
+      withDropdown.select.replaceChildren(
+        buildOption(AGREEMENT_FILTER_ALL, "All sides"),
+        ...seats.map((seat) => buildOption(seat.seatId, nameOf(seat.seatId)))
+      );
+      withDropdown.select.value = seats.some((seat) => seat.seatId === chosen) ? chosen : AGREEMENT_FILTER_ALL;
+    };
+    const currentFilter = () => {
+      const kind = kindDropdown.select.value;
+      return { kind: isSideAgreementKind(kind) ? kind : AGREEMENT_FILTER_ALL, withSeatId: withDropdown.select.value };
+    };
+    const displayText = (text) => {
+      const nameByCode = new Map(
+        snapshot3.seats.flatMap((seat) => isSeatId(seat.seatId) ? [[playerIdCodeFor(seat.seatId), nameOf(seat.seatId)]] : [])
+      );
+      return sideCodesToNamesByCode(text, nameByCode);
+    };
+    fillWithOptions();
+    const strip = createAgreementTimeline({
+      host: plotHost,
+      width: args.width,
+      height: Math.max(0, args.plotHeightFor(titleRow.offsetHeight) - legend.offsetHeight),
+      nameOf,
+      flagOf: args.flagOf
+    });
+    const redraw2 = () => strip.update(agreementStrip(snapshot3, currentFilter()), displayText);
+    redraw2();
+    kindDropdown.select.addEventListener("change", redraw2);
+    withDropdown.select.addEventListener("change", redraw2);
+    return {
+      titleRow,
+      update(next) {
+        snapshot3 = next;
+        fillWithOptions();
+        redraw2();
+      },
+      resize(width, height) {
+        strip.resize(width, Math.max(0, height - legend.offsetHeight));
+      },
+      destroy() {
+        kindDropdown.select.removeEventListener("change", redraw2);
+        withDropdown.select.removeEventListener("change", redraw2);
+        strip.destroy();
+      }
+    };
+  }
+
+  // src/renderer/charts/relationshipTimeline.ts
+  var LETTER_MIN_CELL_WIDTH = 14;
+  function paintStanceCell(context, cell, rect2) {
+    const { x, y, width, height } = rect2;
+    if (cell.stance === null) {
+      context.strokeStyle = stripCssColor("--chrome-muted", "#b7c4d4");
+      context.lineWidth = 1;
+      context.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), height - 1);
+      return;
+    }
+    context.globalAlpha = cell.reportedThisTurn ? 1 : 0.45;
+    context.fillStyle = stripCssColor(`--stance-${cell.stance}`, "#9AA5A3");
+    context.fillRect(x, y, width, height - 1);
+    context.globalAlpha = 1;
+    if (width >= LETTER_MIN_CELL_WIDTH) {
+      context.fillStyle = "#10161d";
+      context.fillText(cell.stance.charAt(0).toUpperCase(), x + width / 2, y + height / 2);
+    }
+  }
+  function createRelationshipTimeline(args) {
+    let strip = { turns: [], rows: [] };
+    const core = createStripTimeline({
+      host: args.host,
+      width: args.width,
+      height: args.height,
+      nameOf: args.nameOf,
+      flagOf: args.flagOf,
+      emptyText: "No AI commander reports on this side.",
+      paintCell: paintStanceCell,
+      tooltipAt: (turnIndex) => ({
+        heading: `Turn ${strip.turns[turnIndex]}`,
+        lines: strip.rows.map((row) => {
+          const cell = row.cells[turnIndex];
+          const name = args.nameOf(row.reporterSeatId);
+          return {
+            text: cell.stance === null ? `${name}: no report` : `${name}: ${cell.stance} (${cell.reportedThisTurn ? "reported this turn" : "from an earlier turn"})`,
+            emphasis: false
+          };
+        })
+      })
+    });
+    return {
+      update(next) {
+        strip = next;
+        core.update({ turns: next.turns, rows: next.rows.map((row) => ({ seatId: row.reporterSeatId, cells: row.cells })) });
+      },
+      resize: (width, height) => core.resize(width, height),
+      destroy: () => core.destroy()
     };
   }
 
@@ -44213,6 +44618,15 @@ ${bonuses}`;
       flagOf: lookups.flagOf
     });
     strip.update(relationshipStrip(snapshot3, subjectSelect.value));
+    const agreementBlock = appendBlock(body, "Agreements over time");
+    const agreements = createAgreementStripBlock({
+      ...agreementBlock,
+      width: innerBodyWidth(body),
+      plotHeightFor: (titleRowHeight) => chartPlotHeight(dialogHeight(), titleRowHeight),
+      nameOf: lookups.nameOf,
+      flagOf: lookups.flagOf,
+      snapshot: snapshot3
+    });
     body.appendChild(buildLegend(snapshot3, lookups));
     const lines = LINE_CHART_DEFINITIONS.map((definition) => buildLineChartBlock(body, definition, snapshot3, lookups));
     latestSnapshot = snapshot3;
@@ -44224,11 +44638,12 @@ ${bonuses}`;
         if (latestSnapshot !== null) updateLineChart(entry, latestSnapshot);
       });
     }
-    view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, lines };
+    view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, agreements, lines };
   }
   function destroyView() {
     if (view === null) return;
     view.strip.destroy();
+    view.agreements.destroy();
     for (const entry of view.lines) entry.handle.destroy();
     view = null;
     latestSnapshot = null;
@@ -44246,6 +44661,7 @@ ${bonuses}`;
     const width = innerBodyWidth(body);
     const height = dialogHeight();
     view.strip.resize(width, chartPlotHeight(height, view.stripTitleRow.offsetHeight));
+    view.agreements.resize(width, chartPlotHeight(height, view.agreements.titleRow.offsetHeight));
     for (const entry of view.lines) {
       entry.handle.resize(width, chartPlotHeight(height, entry.titleRow.offsetHeight));
     }
@@ -44264,6 +44680,7 @@ ${bonuses}`;
     latestSnapshot = snapshot3;
     fillStacks(view.stackHost, snapshot3, lookups);
     view.strip.update(relationshipStrip(snapshot3, view.subjectSelect.value));
+    view.agreements.update(snapshot3);
     for (const entry of view.lines) updateLineChart(entry, snapshot3);
     body.scrollTop = scrollTop;
   }

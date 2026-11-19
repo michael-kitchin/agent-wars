@@ -17,7 +17,9 @@ import {
   isSideAgreementStatus,
   resolveSideAgreementEndTurn,
   SIDE_AGREEMENT_DECISIONS,
+  SIDE_AGREEMENT_INTENT_LABELS,
   SIDE_AGREEMENT_INTENTS,
+  SIDE_AGREEMENT_KIND_LABELS,
   SIDE_AGREEMENT_KINDS,
   SIDE_AGREEMENT_STATUSES,
   sideAgreementStanding,
@@ -70,4 +72,9 @@ test('only proposed and active standings are open', () => {
   const open = (['proposed', 'active', 'ended', 'broken_by_them', 'broken_by_me', 'expired', 'lapsed'] as const)
     .filter((standing) => isOpenSideAgreementStanding(standing));
   assert.deepEqual(open, ['proposed', 'active']);
+});
+
+test('every kind and every intent has a readable label', () => {
+  for (const kind of SIDE_AGREEMENT_KINDS) assert.notEqual(SIDE_AGREEMENT_KIND_LABELS[kind].length, 0);
+  for (const intent of SIDE_AGREEMENT_INTENTS) assert.notEqual(SIDE_AGREEMENT_INTENT_LABELS[intent].length, 0);
 });

@@ -15,6 +15,7 @@ import { getSeatRoster } from '../gameDb';
 import { gameDbOps, hasDbHandle } from '../gameDb/dbConnection';
 import { readTurnNumberOrFirst } from '../gameDb/turnStateReads';
 import { logDebug, logError, logTrace } from '../logger';
+import { readAgreementHistory } from '../matchStatistics/agreementHistoryRead';
 import { readStatisticsHistory } from '../matchStatistics/statisticsHistory';
 
 /**
@@ -32,7 +33,7 @@ const EMPTY_MATCH_CHARTS_SNAPSHOT: MatchChartsSnapshot = { seats: [], turns: [],
  *
  * Purpose: Legends show the same names the rest of the screen shows.
  * When to use: `buildMatchChartsSnapshot`.
- * Expected outcome: One entry per seat in side order, named with `sideDisplayName`.
+ * Expected outcome: One entry per seat in side order, named with `sideDisplayName`, with the turn each seat left the match or null.
  * Exceptions: None.
  */
 function readChartSeats(): MatchChartsSeat[] {
@@ -41,6 +42,7 @@ function readChartSeats(): MatchChartsSeat[] {
     seatOrder: seat.seatOrder,
     kind: seat.kind,
     name: sideDisplayName(seat),
+    outTurn: seat.outTurn,
   }));
 }
 
@@ -49,7 +51,7 @@ function readChartSeats(): MatchChartsSeat[] {
  *
  * Purpose: One read serves the whole chart view. No fog filter is applied: the player sees every value.
  * When to use: `game:readMatchCharts`, and tests.
- * Expected outcome: The seats, the recorded turns, and the current turn. With no database, empty lists and turn 1.
+ * Expected outcome: The seats, the recorded turns, the current turn, and the agreement history rebuilt from recorder events. With no database, empty lists and turn 1. The agreement reader never throws, so a bad agreement record cannot break the charts.
  * Exceptions: Rethrows a read failure after logging it with `logError`, so a failed read is not mistaken for a match with no recorded turns.
  */
 export function buildMatchChartsSnapshot(): MatchChartsSnapshot {
@@ -60,7 +62,12 @@ export function buildMatchChartsSnapshot(): MatchChartsSnapshot {
   try {
     const turns = readStatisticsHistory(gameDbOps);
     logTrace('matchChartsIpcHandler buildMatchChartsSnapshot', { open: true, turnCount: turns.length });
-    return { seats: readChartSeats(), turns, currentTurnNumber: readTurnNumberOrFirst(gameDbOps.getOne) };
+    return {
+      seats: readChartSeats(),
+      turns,
+      currentTurnNumber: readTurnNumberOrFirst(gameDbOps.getOne),
+      agreementHistory: readAgreementHistory(gameDbOps),
+    };
   } catch (err) {
     logError('matchChartsIpcHandler buildMatchChartsSnapshot failed', err);
     throw err;

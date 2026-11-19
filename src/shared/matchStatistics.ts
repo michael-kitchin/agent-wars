@@ -9,6 +9,7 @@
 
 import type { SideStance } from './sideMessages';
 import type { SeatRecord } from './seatRoster';
+import type { AgreementHistory } from './agreementHistoryTypes';
 
 export { RELATIONSHIP_SCALE_MAX } from './sideMessages';
 
@@ -357,6 +358,15 @@ export interface MatchChartsSeat {
    * Exceptions: None.
    */
   readonly name: string;
+  /**
+   * The last strategic turn the seat played, or null while it is still in the match.
+   *
+   * Contract: Optional. A missing value means the side is still in the match, as for a snapshot built before this field existed.
+   * When to use: Deciding whether an agreement with this side had lapsed by a given turn.
+   * Expected outcome: A turn number, or null or missing for a side still in the match.
+   * Exceptions: None.
+   */
+  readonly outTurn?: number | null;
 }
 
 /**
@@ -395,6 +405,15 @@ export interface MatchChartsSnapshot {
    * Exceptions: None.
    */
   readonly currentTurnNumber: number;
+  /**
+   * Every side agreement's recorded history and the attacks between sides.
+   *
+   * Contract: Optional. A missing value means no agreements, as for a match recorded before agreements existed.
+   * When to use: Drawing the agreements strip.
+   * Expected outcome: The history rebuilt from recorder events when the snapshot was read.
+   * Exceptions: None.
+   */
+  readonly agreementHistory?: AgreementHistory;
 }
 
 /**

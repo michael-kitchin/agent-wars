@@ -74,7 +74,7 @@ Each open agreement is shown to its commander with the game's record of losses b
 
 `side_agreements` holds the rows. `ensureSideAgreementTable` creates it on open, it is not in `GAME_DB_REQUIRED_TABLES`, `EXPECTED_USER_VERSION` is unchanged, `resetGameForNewMatch` clears it, and it is a frame table. A save from before agreements loads with none. With talk turned off no agreement is recorded, shown, or decided.
 
-Two recorder events carry the history, both visible only to the owning commander and with no display text: `agreement_recorded` (`recordSideAgreementRecorded`), written when an agreement is created or any stored field changes and carrying `previousStatus`, and `agreement_decision` (`recordSideAgreementDecision`). Their payloads are in [match-recording.md](match-recording.md).
+Two recorder events carry the history, both visible only to the owning commander and with no display text: `agreement_recorded` (`recordSideAgreementRecorded`), written when an agreement is created or any stored field changes and carrying `previousStatus`, and `agreement_decision` (`recordSideAgreementDecision`). Their payloads are in [match-recording.md](match-recording.md). The charts dialog shows every commander's agreements over time, rebuilt from these events and the strategic loss events when the charts snapshot is read (see [ux/charts-dialog.md](ux/charts-dialog.md)).
 
 The two prompts of each diplomacy call are written to `debug-last-talk-system-prompt-N.txt` and `debug-last-talk-user-prompt-N.txt` when `AGENT_WARS_LOG_FULL_PROMPTS` is on. Only the latest talk call per commander is kept. With the flag off, the debug log gets only the lengths.
 

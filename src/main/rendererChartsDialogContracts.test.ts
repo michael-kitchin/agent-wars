@@ -88,8 +88,8 @@ test('the dialog sizes plots by the quarter rule and builds every chart from the
   assert.equal(readRendererSource('charts', 'relationshipStack.ts').includes('createElementNS'), true);
 });
 
-test('the stance strip zooms and pans through the shared rules and listens for the wheel', () => {
-  const strip = readRendererSource('charts', 'relationshipTimeline.ts');
+test('the strips zoom and pan through the shared rules and listen for the wheel', () => {
+  const strip = readRendererSource('charts', 'stripTimelineCore.ts');
   assert.equal(strip.includes('zoomedTurnRange'), true);
   assert.equal(strip.includes('pannedTurnRange'), true);
   assert.equal(strip.includes("'wheel'"), true);
@@ -103,13 +103,13 @@ test('the turn handler refreshes the open dialog and closes it before a dialog t
 });
 
 test('the line charts and the strip share one zoom module, and the strip shows whole turns', () => {
-  for (const file of ['lineChart.ts', 'relationshipTimeline.ts']) {
+  for (const file of ['lineChart.ts', 'stripTimelineCore.ts']) {
     const source = readRendererSource('charts', file);
     assert.equal(source.includes("from './chartZoom'"), true, `${file} imports the shared zoom constants`);
     assert.equal(/const (MIN_ZOOM_SPAN_TURNS|WHEEL_ZOOM_IN_FACTOR) =/.test(source), false, `${file} does not define its own`);
     assert.equal(/\b0\.8\b|\b1\.25\b/.test(source), false, `${file} has no literal wheel factor`);
   }
-  const strip = readRendererSource('charts', 'relationshipTimeline.ts');
+  const strip = readRendererSource('charts', 'stripTimelineCore.ts');
   assert.equal(/const showRange = [^\n]*\n[\s\S]*?wholeTurnRange\(range, fullRange\(\)\)/.test(strip), true, 'showRange rounds to whole turns');
 });
 
@@ -149,7 +149,7 @@ test('the dropdowns use the field colors of the top bar select', () => {
 
 test('every chart with turns on its X axis opens on the 12-turn window and follows it until zoomed', () => {
   const line = readRendererSource('charts', 'lineChart.ts');
-  const strip = readRendererSource('charts', 'relationshipTimeline.ts');
+  const strip = readRendererSource('charts', 'stripTimelineCore.ts');
   for (const source of [line, strip]) {
     assert.equal(source.includes('initialTurnWindow('), true);
     assert.equal(source.includes('zoomExtentTurnRange('), true);

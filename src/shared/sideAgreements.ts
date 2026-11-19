@@ -78,6 +78,36 @@ export const SIDE_AGREEMENT_INTENTS = ['keep', 'opportunistic', 'plan_to_break']
 export type SideAgreementIntent = (typeof SIDE_AGREEMENT_INTENTS)[number];
 
 /**
+ * The readable name of each agreement kind.
+ *
+ * Purpose: Screens that show a kind to the player print these words instead of the stored value.
+ * When to use: Drawing an agreement kind in a tooltip, a list, or a dropdown.
+ * Expected outcome: One non-empty label for each member of `SIDE_AGREEMENT_KINDS`.
+ * Exceptions: None.
+ */
+export const SIDE_AGREEMENT_KIND_LABELS: Readonly<Record<SideAgreementKind, string>> = {
+  non_aggression: 'Non-aggression',
+  ceasefire_in_place: 'Ceasefire in place',
+  no_entry_zone: 'No-entry zone',
+  joint_action: 'Joint action',
+  information_sharing: 'Information sharing',
+};
+
+/**
+ * The readable name of each agreement intent.
+ *
+ * Purpose: Screens that show a commander's private plan print these words instead of the stored value.
+ * When to use: Drawing an agreement intent in a tooltip or a list.
+ * Expected outcome: One non-empty label for each member of `SIDE_AGREEMENT_INTENTS`.
+ * Exceptions: None.
+ */
+export const SIDE_AGREEMENT_INTENT_LABELS: Readonly<Record<SideAgreementIntent, string>> = {
+  keep: 'keep',
+  opportunistic: 'opportunistic',
+  plan_to_break: 'plan to break',
+};
+
+/**
  * The two keep-or-break choices a commander may record for an active agreement.
  *
  * Purpose: The orders reply, its schema, and the table check share one list.

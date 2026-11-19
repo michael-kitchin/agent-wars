@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { sideCodesToDisplayNames } from './sideCodeDisplayText';
+import { sideCodesToDisplayNames, sideCodesToNamesByCode } from './sideCodeDisplayText';
 import { AI_SEAT_KIND, HUMAN_SEAT_KIND } from './seatRoster';
 import { sideDisplayName, type SideDisplaySeat } from './sideNicknames';
 
@@ -51,5 +51,14 @@ describe('sideCodesToDisplayNames', () => {
   it('uses the default name for a seat whose nickname is the empty string', () => {
     const blank: SideDisplaySeat = { ...A1, nickname: '' };
     assert.equal(sideCodesToDisplayNames('a1', [blank]), sideDisplayName(blank));
+  });
+});
+
+describe('sideCodesToNamesByCode', () => {
+  it('replaces codes found in the map and leaves other codes as written', () => {
+    assert.equal(
+      sideCodesToNamesByCode('a2 and a3-t2', new Map([['a2', 'DS 4.1 Flash']])),
+      'DS 4.1 Flash and a3-t2',
+    );
   });
 });

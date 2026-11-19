@@ -29,6 +29,7 @@ import { buildLegend, seatLookups, type SeatLookups } from './chartSeatLookups';
 import type { ChartsView, LineChartEntry } from './chartsDialogTypes';
 import { createLineChart } from './lineChart';
 import { buildRelationshipStack } from './relationshipStack';
+import { createAgreementStripBlock } from './agreementStripBlock';
 import { createRelationshipTimeline } from './relationshipTimeline';
 
 /**
@@ -268,7 +269,7 @@ function updateLineChart(entry: LineChartEntry, snapshot: MatchChartsSnapshot): 
 /**
  * Builds the whole body for a snapshot with turns.
  *
- * Purpose: In order: the relationship stacks, the stance strip, the legend, and the nine line charts.
+ * Purpose: In order: the relationship stacks, the stance strip, the agreements block, the legend, and the nine line charts.
  * When to use: Opening the dialog and the first refresh after an empty snapshot.
  * Expected outcome: `view` is set and the body is filled.
  * Exceptions: None.
@@ -304,6 +305,16 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
   });
   strip.update(relationshipStrip(snapshot, subjectSelect.value));
 
+  const agreementBlock = appendBlock(body, 'Agreements over time');
+  const agreements = createAgreementStripBlock({
+    ...agreementBlock,
+    width: innerBodyWidth(body),
+    plotHeightFor: (titleRowHeight) => chartPlotHeight(dialogHeight(), titleRowHeight),
+    nameOf: lookups.nameOf,
+    flagOf: lookups.flagOf,
+    snapshot,
+  });
+
   body.appendChild(buildLegend(snapshot, lookups));
   const lines = LINE_CHART_DEFINITIONS.map((definition) => buildLineChartBlock(body, definition, snapshot, lookups));
   latestSnapshot = snapshot;
@@ -315,7 +326,7 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
       if (latestSnapshot !== null) updateLineChart(entry, latestSnapshot);
     });
   }
-  view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, lines };
+  view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, agreements, lines };
 }
 
 /**
@@ -329,6 +340,7 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
 function destroyView(): void {
   if (view === null) return;
   view.strip.destroy();
+  view.agreements.destroy();
   for (const entry of view.lines) entry.handle.destroy();
   view = null;
   latestSnapshot = null;
@@ -364,6 +376,7 @@ function resizeCharts(): void {
   const width = innerBodyWidth(body);
   const height = dialogHeight();
   view.strip.resize(width, chartPlotHeight(height, view.stripTitleRow.offsetHeight));
+  view.agreements.resize(width, chartPlotHeight(height, view.agreements.titleRow.offsetHeight));
   for (const entry of view.lines) {
     entry.handle.resize(width, chartPlotHeight(height, entry.titleRow.offsetHeight));
   }
@@ -391,6 +404,7 @@ function applySnapshot(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
   latestSnapshot = snapshot;
   fillStacks(view.stackHost, snapshot, lookups);
   view.strip.update(relationshipStrip(snapshot, view.subjectSelect.value));
+  view.agreements.update(snapshot);
   for (const entry of view.lines) updateLineChart(entry, snapshot);
   body.scrollTop = scrollTop;
 }

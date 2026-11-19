@@ -8,6 +8,7 @@
  */
 
 import type { LineChartDefinition } from '../../shared/chartsDialogState';
+import type { AgreementStripBlockHandle } from './agreementStripBlock';
 import type { LineChartHandle } from './lineChart';
 import type { RelationshipTimelineHandle } from './relationshipTimeline';
 
@@ -63,7 +64,7 @@ export interface LineChartEntry {
  *
  * Contract: Null while closed or while the snapshot has no turns.
  * When to use: Refreshing and resizing.
- * Expected outcome: The stack host, the strip, its selector, and the line chart entries.
+ * Expected outcome: The stack host, the stance strip, its selector, the agreements block, and the line chart entries.
  * Exceptions: None.
  */
 export interface ChartsView {
@@ -103,6 +104,15 @@ export interface ChartsView {
    * Exceptions: None.
    */
   readonly stripTitleRow: HTMLElement;
+  /**
+   * The agreements block under the stance strip.
+   *
+   * Contract: Alive until the dialog closes.
+   * When to use: Update, resize, and destroy.
+   * Expected outcome: A handle that also exposes its title row.
+   * Exceptions: None.
+   */
+  readonly agreements: AgreementStripBlockHandle;
   /**
    * The line charts.
    *
