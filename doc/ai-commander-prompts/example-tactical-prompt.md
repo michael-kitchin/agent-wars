@@ -14,6 +14,13 @@ You command Western Europe in a WEGO (simultaneous movement) hex wargame with 4 
 
 Your goal is to engage and defeat enemy forces in this battle. Review the rules, below, for how to order this.
 
+## Sides
+
+| Side | Code (unit id prefix) | Home region | Status |
+| --- | --- | --- | --- |
+| Western Europe (you) | a1 | Western Europe | Active |
+| Northern Africa | h1 | Northern Africa | Active |
+
 # Coordinates
 
 Tactical battle map: the enclosing strategic hex's tactical cells plus up to three neighboring rings (cells beyond a regional map's edge are not part of the battle). Positions are two-character tactical briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are tactical hex steps where shown.

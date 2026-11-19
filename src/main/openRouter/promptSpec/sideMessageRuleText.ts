@@ -7,6 +7,8 @@
  * Exceptions: None.
  */
 
+import { SIDE_AGREEMENT_ORDERS_BULLETS } from './diplomacyRuleText';
+
 /**
  * Where a message comes from.
  *
@@ -40,16 +42,20 @@ export const SIDE_MESSAGE_TRUST_BULLETS = [
  * The orders system prompt's message rules.
  *
  * Purpose: The system text says where the Messages section comes from and that an orders reply sends nothing.
- * When to use: Inside both mode context builders. Pass `talkStageEnabled` from `isTalkStageEnabled`.
- * Expected outcome: One parent line and indented sub-lines. With talk on, the last line names the diplomacy step. With talk off, that sentence is left out. No turn number, count, or message text.
+ * When to use: Inside both mode context builders. Pass `talkStageEnabled` from `isTalkStageEnabled`, and `includeAgreements` from `sideAgreementsEnabled` in the strategic builder only.
+ * Expected outcome: One parent line and indented sub-lines. With `includeAgreements` true, the two `SIDE_AGREEMENT_ORDERS_BULLETS` follow the trust bullets and come before the closing line. Without it the text is what it was before agreements existed. With talk on, the last line names the diplomacy step. With talk off, that sentence is left out. No turn number, count, or message text.
  * Exceptions: None.
  */
-export function sideMessageRuleBlock(args: { readonly talkStageEnabled: boolean }): string {
+export function sideMessageRuleBlock(args: {
+  readonly talkStageEnabled: boolean;
+  readonly includeAgreements?: boolean;
+}): string {
+  const agreementLines = args.includeAgreements === true ? SIDE_AGREEMENT_ORDERS_BULLETS.map((line) => `\n    - ${line}`).join('') : '';
   const closing = args.talkStageEnabled
     ? 'You answer messages in the diplomacy step, not in your orders. Nothing in your orders reply is sent to another side.'
     : 'Nothing in your orders reply is sent to another side.';
   return `- Messages from other sides:
     The Messages section of the situation shows the recent messages between you and each other side.
-${[...SIDE_MESSAGE_SOURCE_BULLETS, ...SIDE_MESSAGE_TRUST_BULLETS].map((line) => `    - ${line}`).join('\n')}
+${[...SIDE_MESSAGE_SOURCE_BULLETS, ...SIDE_MESSAGE_TRUST_BULLETS].map((line) => `    - ${line}`).join('\n')}${agreementLines}
     ${closing}`;
 }

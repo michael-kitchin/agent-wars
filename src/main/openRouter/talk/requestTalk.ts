@@ -22,8 +22,9 @@ import { BASELINE_ORDERS_REQUEST_PROFILE, type OrdersRequestProfile } from '../o
 import { resolveEffectiveOpenRouterCompletionMaxTokens } from '../openRouterCreditLimits';
 import { isStructuredOutputsRejectedForModel } from '../openRouterModelCapabilities';
 import type { OpenRouterChatTransport } from '../openRouterChatTransport';
+import { logPromptPreview } from '../requestOrdersFlowSupport';
 import type { RequestOrdersUsageTotals } from '../requestOrdersToolLoop';
-import type { AiSeatId } from '../../../shared/seatIds';
+import { aiIndexForSeatId, type AiSeatId } from '../../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { buildTalkSituationText, buildTalkSystemText } from './talkPrompt';
 import { readTalkPromptInput } from './talkPromptInput';
@@ -177,9 +178,14 @@ export async function requestTalk(
     const useSchema = profile.structuredOutputs && !isStructuredOutputsRejectedForModel(args.modelId);
     const settings: OrdersChatRequestSettings = {
       profile,
-      responseFormat: useSchema ? buildTalkReplyResponseFormat(prepared.sideCodes) : null,
+      responseFormat: useSchema ? buildTalkReplyResponseFormat(prepared.sideCodes, { includeAgreements: args.battle === null }) : null,
       telemetry,
     };
+    const systemText = buildTalkSystemText(prepared.input.ownSideLabel, args.battle ? 'tactical' : 'strategic');
+    const situationText = buildTalkSituationText(prepared.input);
+    const aiIndex = aiIndexForSeatId(args.seatId) ?? 1;
+    logPromptPreview('requestTalk: system prompt', systemText, { artifactKind: 'talk-system', aiIndex, previewWhenDisabled: false });
+    logPromptPreview('requestTalk: user message', situationText, { artifactKind: 'talk-user', aiIndex, previewWhenDisabled: false });
     const chatResponse = await postOrdersChatRequest({
       post: deps.postOpenRouterChatWithTimeoutAndRetry,
       key,
@@ -187,8 +193,8 @@ export async function requestTalk(
       baseBody: {
         model: args.modelId,
         messages: [
-          { role: 'system', content: buildTalkSystemText(prepared.input.ownSideLabel) },
-          { role: 'user', content: buildTalkSituationText(prepared.input) },
+          { role: 'system', content: systemText },
+          { role: 'user', content: situationText },
         ],
         max_tokens: resolveEffectiveOpenRouterCompletionMaxTokens(profile.preferredCompletionMaxTokens),
       },
@@ -209,7 +215,12 @@ export async function requestTalk(
     const content = json?.choices?.[0]?.message?.content;
     const replyText = typeof content === 'string' ? content : '';
     const reply = replyText.length > 0
-      ? parseTalkReply({ replyText, ownSeatId: args.seatId, addressableSeatIds: prepared.addressableSeatIds })
+      ? parseTalkReply({
+          replyText,
+          ownSeatId: args.seatId,
+          addressableSeatIds: prepared.addressableSeatIds,
+          allowAgreements: args.battle === null,
+        })
       : null;
     if (!reply) {
       outcome = { kind: 'silent', reason: 'unparsed', costUsd: usage.requestCost };

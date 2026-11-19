@@ -18,6 +18,7 @@ import { processV3OrdersArray } from './envelopeOrderRows';
 import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
 import { normalizeOperationCommands, type OperationCommand } from './operationCommandParsing';
 import { POSTURES, isPosture, type Posture } from '../../shared/postureTypes';
+import { normalizeAgreementDecisions, type ParsedAgreementDecision } from './sideAgreementDecisionParsing';
 import { normalizeAirDropOrders } from './airDropOrderRows';
 import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
 /**
@@ -577,6 +578,15 @@ export function parseOrdersResponse(
    * Exceptions: None.
    */
   postureChoice?: Posture;
+  /**
+   * Keep-or-break decisions the commander recorded for its active agreements.
+   *
+   * Contract: Absent for a tactical reply, an omitted field, and a field with no valid entry.
+   * When to use: `applySideAgreementDecisions` after the orders are applied.
+   * Expected outcome: The accepted entries in reply order. A refused entry adds a drop reason.
+   * Exceptions: None.
+   */
+  agreementDecisions?: readonly ParsedAgreementDecision[];
   productionAppliedCount?: number;
   /**
    * Units whose standing order this response assigned or cancelled.
@@ -725,6 +735,10 @@ export function parseOrdersResponse(
         if (context.mode !== 'tactical' && rawPosture !== undefined && postureChoice === undefined) {
           dropReasons.push(`posture dropped: expected one of ${POSTURES.join(', ')}.`);
         }
+        const agreementDecisionResult = context.mode !== 'tactical'
+          ? normalizeAgreementDecisions(obj.agreementDecisions)
+          : { decisions: [], dropReasons: [] };
+        dropReasons.push(...agreementDecisionResult.dropReasons);
         return {
           movementOrders,
           rangedAttacks,
@@ -740,6 +754,7 @@ export function parseOrdersResponse(
           campaignTargetCode,
           operationCommands: operationCommands.commands.length > 0 ? operationCommands.commands : undefined,
           postureChoice,
+          agreementDecisions: agreementDecisionResult.decisions.length > 0 ? agreementDecisionResult.decisions : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
           standingOrderUnitIds: standingOrderUnitIds.length > 0 ? standingOrderUnitIds : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

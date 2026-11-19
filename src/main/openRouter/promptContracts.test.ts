@@ -12,6 +12,7 @@ import {
   buildAvailableToolsIntro,
   buildProductionSubmitClause,
 } from './promptText';
+import { SIDE_AGREEMENT_DECISIONS_PARAGRAPH } from './promptSpec/diplomacyRuleText';
 import { buildBuildabilityRule } from './promptSpec/gameRuleMercenaryText';
 import { buildStrategicContextCoaching } from './promptSpec/coachingTextStrategic';
 import { buildOrdersGuidanceSection } from './promptSpec/coachingText';
@@ -666,6 +667,10 @@ const tests = [
     name: 'posture paragraph appears only when the posture gate is on',
     fn: testPostureParagraphFollowsTheGate,
   },
+  {
+    name: 'testAgreementDecisionsParagraphFollowsTheGate',
+    fn: testAgreementDecisionsParagraphFollowsTheGate,
+  },
 ];
 
 /**
@@ -760,6 +765,33 @@ function testPostureParagraphFollowsTheGate(): void {
   assert.ok(!disabled.includes('Optional "posture"'));
   const tactical = buildFinalJsonContractInstruction({ ...shared, includePosture: true, coordinateMode: 'tactical' });
   assert.ok(!tactical.includes('Optional "posture"'));
+}
+
+/**
+ * The agreement decisions paragraph is taught only when that gate is on.
+ *
+ * Purpose: A battle prompt and a run with talk off must not teach agreement decisions.
+ * When to use: After edits to `buildFinalJsonContractInstruction`.
+ * Expected outcome: The paragraph appears with the gate on. With it off, or in a battle, it is absent and the text equals the text without the gate.
+ * Exceptions: None.
+ */
+function testAgreementDecisionsParagraphFollowsTheGate(): void {
+  const shared = {
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: 'Move.',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  };
+  const enabled = buildFinalJsonContractInstruction({ ...shared, includeAgreementDecisions: true });
+  assert.ok(enabled.includes(SIDE_AGREEMENT_DECISIONS_PARAGRAPH));
+  assert.ok(enabled.includes('"agreementDecisions": [...]'));
+  const disabled = buildFinalJsonContractInstruction(shared);
+  assert.ok(!disabled.includes(SIDE_AGREEMENT_DECISIONS_PARAGRAPH));
+  assert.equal(buildFinalJsonContractInstruction({ ...shared, includeAgreementDecisions: false }), disabled);
+  const tactical = buildFinalJsonContractInstruction({ ...shared, includeAgreementDecisions: true, coordinateMode: 'tactical' });
+  assert.ok(!tactical.includes(SIDE_AGREEMENT_DECISIONS_PARAGRAPH));
+  assert.equal(tactical, buildFinalJsonContractInstruction({ ...shared, coordinateMode: 'tactical' }));
 }
 
 function run(): void {

@@ -8,6 +8,9 @@
  */
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { test } from 'node:test';
 import { AI_SEAT_IDS, NEUTRAL_OWNER_ID, type AiSeatId } from '../../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
@@ -21,6 +24,7 @@ import { decodeRecordPayload } from '../../recorder/matchRecordCodec';
 import { withSeatedTempGameDbAsync } from '../../testSupport/withSeatedTempGameDb';
 import type { OpenRouterChatTransport, OpenRouterChatTransportPayload } from '../openRouterChatTransport';
 import { beginModelCall } from '../modelCallControl';
+import { BASELINE_ORDERS_REQUEST_PROFILE } from '../ordersRequestProfile';
 import { requestTalk, sentMessagesLogLine, type RequestTalkDeps } from './requestTalk';
 
 test('one sent message is singular', () => {
@@ -271,6 +275,53 @@ test('a match with no other active seat does not call the model', async () => {
     assert.equal(called, false);
     assert.deepEqual(result, { kind: 'silent', reason: 'no_recipients', costUsd: 0 });
     assert.equal(consultationPayloads().length, 0);
+  });
+});
+
+test('the world map sends the agreement text and schema, and a battle sends neither', async () => {
+  await withThreeAi(async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const schemaDeps: RequestTalkDeps = {
+      ...deps(replyingPost('{"messages":[],"stances":[],"agreements":[]}', 0, (payload) => { bodies.push(payload.body); })),
+      resolveOrdersRequestProfile: () => ({ ...BASELINE_ORDERS_REQUEST_PROFILE, structuredOutputs: true }),
+    };
+    await requestTalk({ seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: null }, schemaDeps);
+    await requestTalk(
+      { seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: battleBetween(AI_SEAT_IDS[0], AI_SEAT_IDS[2]) },
+      schemaDeps
+    );
+    const systemOf = (body: Record<string, unknown>): string => ((body.messages as readonly { content: string }[])[0]?.content ?? '');
+    const schemaOf = (body: Record<string, unknown>): string => JSON.stringify(body.response_format ?? null);
+    assert.equal(bodies.length, 2);
+    assert.ok(systemOf(bodies[0]).includes('Agreements:'));
+    assert.ok(schemaOf(bodies[0]).includes('"agreements"'));
+    assert.equal(systemOf(bodies[1]).includes('Agreements:'), false);
+    assert.equal(schemaOf(bodies[1]).includes('"agreements"'), false);
+  });
+});
+
+test('with full prompt logging on, one talk call writes both prompt files', async () => {
+  await withThreeAi(async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-talk-log-'));
+    const previousCwd = process.cwd();
+    const previousFlag = process.env.AGENT_WARS_LOG_FULL_PROMPTS;
+    try {
+      process.chdir(dir);
+      process.env.AGENT_WARS_LOG_FULL_PROMPTS = '1';
+      const bodies: Array<Record<string, unknown>> = [];
+      await requestTalk(
+        { seatId: AI_SEAT_IDS[0], modelId: 'test-model', turnNumber: 1, battle: null },
+        deps(replyingPost('{"messages":[],"stances":[],"agreements":[]}', 0, (payload) => { bodies.push(payload.body); }))
+      );
+      const messages = bodies[0]?.messages as readonly { content: string }[];
+      assert.equal(fs.readFileSync(path.join(dir, 'debug-last-talk-system-prompt-1.txt'), 'utf8'), messages[0]?.content);
+      assert.equal(fs.readFileSync(path.join(dir, 'debug-last-talk-user-prompt-1.txt'), 'utf8'), messages[1]?.content);
+    } finally {
+      process.chdir(previousCwd);
+      if (previousFlag === undefined) delete process.env.AGENT_WARS_LOG_FULL_PROMPTS;
+      else process.env.AGENT_WARS_LOG_FULL_PROMPTS = previousFlag;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -486,6 +486,7 @@ function run(): void {
   testCampaignTargetSchemaFollowsTheGate();
   testOperationsSchemaFollowsTheGate();
   testPostureSchemaFollowsTheGate();
+  testAgreementDecisionsSchemaFollowsTheGate();
   testProductionOrderEnumIncludesFortification();
   console.log('envelopeJsonSchema.test.ts passed');
 }
@@ -623,6 +624,29 @@ function testPostureSchemaFollowsTheGate(): void {
   assert.ok(!('posture' in off));
   const tactical = asRecord(envelopeSchema({ ...TACTICAL, includePosture: true }).properties, 'properties');
   assert.ok(!('posture' in tactical));
+}
+
+/**
+ * Verifies `agreementDecisions` is an optional closed array only when the strategic gate is on.
+ *
+ * Purpose: A bad decision must be a parse drop reason, so the array is not required, while each entry needs an id and a keep-or-break decision.
+ * When to use: After the envelope field list changes.
+ * Expected outcome: The property is an array of closed objects, not required, and absent when the gate is off or the mode is tactical.
+ * Exceptions: None.
+ */
+function testAgreementDecisionsSchemaFollowsTheGate(): void {
+  const onSchema = envelopeSchema({ ...STRATEGIC_ALL_ON, includeAgreementDecisions: true });
+  const on = asRecord(onSchema.properties, 'properties');
+  const decisions = asRecord(on.agreementDecisions, 'agreementDecisions');
+  assert.equal(decisions.type, 'array');
+  const items = asRecord(decisions.items, 'items');
+  assert.equal(items.additionalProperties, false);
+  assert.deepEqual(items.required, ['id', 'decision']);
+  assert.ok(!(onSchema.required as string[]).includes('agreementDecisions'));
+  const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
+  assert.ok(!('agreementDecisions' in off));
+  const tactical = asRecord(envelopeSchema({ ...TACTICAL, includeAgreementDecisions: true }).properties, 'properties');
+  assert.ok(!('agreementDecisions' in tactical));
 }
 
 function testProductionOrderEnumIncludesFortification(): void {

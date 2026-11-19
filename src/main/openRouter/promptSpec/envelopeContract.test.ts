@@ -85,6 +85,7 @@ test('ENVELOPE_FIELD_ORDER is the canonical field sequence', () => {
     'campaignTarget',
     'operations',
     'posture',
+    'agreementDecisions',
   ]);
 });
 
@@ -98,7 +99,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
   });
   assert.deepEqual(
     strategicAll,
-    ENVELOPE_FIELD_ORDER.filter((field) => field !== 'exitBattle' && field !== 'campaignTarget' && field !== 'operations' && field !== 'posture')
+    ENVELOPE_FIELD_ORDER.filter((field) => field !== 'exitBattle' && field !== 'campaignTarget' && field !== 'operations' && field !== 'posture' && field !== 'agreementDecisions')
   );
 
   const noAir = envelopeFieldsForGates({
@@ -462,4 +463,35 @@ test('the repair schema and the final JSON example share the four tail rows', ()
     assert.ok(repair.includes(row), row);
     assert.ok(example.includes(row), row);
   }
+});
+
+test('agreementDecisions comes last on the world map and never in a battle', () => {
+  const strategic = envelopeFieldsForGates({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeOperations: true,
+    includePosture: true,
+    includeAgreementDecisions: true,
+  });
+  assert.deepEqual(strategic.slice(-2), ['posture', 'agreementDecisions']);
+  assert.ok(!envelopeFieldsForGates({
+    coordinateMode: 'tactical',
+    includeAirActions: true,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeAgreementDecisions: true,
+  }).includes('agreementDecisions'));
+});
+
+test('the repair schema example decides nothing', () => {
+  const repair = buildRepairSchemaText({
+    coordinateMode: 'strategic',
+    includeAirActions: false,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeAgreementDecisions: true,
+  });
+  assert.ok(repair.includes('"agreementDecisions":[]'));
 });

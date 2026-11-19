@@ -23,7 +23,7 @@ import { getDbHandle } from './dbConnection';
  * Expected outcome: Four table names.
  * Exceptions: None.
  */
-const MIGRATED_TABLES = ['pending_air_drop_orders', 'match_records', 'side_messages', 'side_stances'] as const;
+const MIGRATED_TABLES = ['pending_air_drop_orders', 'match_records', 'side_messages', 'side_stances', 'side_agreements'] as const;
 
 /**
  * The columns the on-open migrations add to existing tables, keyed by table.

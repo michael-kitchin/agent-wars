@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 import path from 'node:path';
+import { sideHomeNameKey } from '../shared/shortSideName';
 
 
 
@@ -371,6 +372,41 @@ async function testBattleLossesPrint(): Promise<void> {
   }
 }
 
+/**
+ * Verifies a loss line names the responsible side's home region after its code.
+ *
+ * Purpose: The commander can tell who attacked it from the loss line alone.
+ * When to use: After changing the section builder or the loss line formatter.
+ * Expected outcome: On a seated match, `by h1 (<home region of the human seat>)`, and the reading seat stays `you`.
+ * Exceptions: None.
+ */
+async function testLossLineNamesHomeRegion(): Promise<void> {
+  const gameDb = await import('./gameDb');
+  const { withSeatedTempGameDb } = await import('./testSupport/withSeatedTempGameDb');
+  const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const regions = gameDb.listScenarioHomeRegions()
+    .map((name) => ({ name, hexes: gameDb.getScenarioHomeRegionHexes(name).length }))
+    .filter((region) => region.hexes > 0)
+    .sort((a, b) => b.hexes - a.hexes || a.name.localeCompare(b.name))
+    .slice(0, 2)
+    .map((region) => region.name);
+  withSeatedTempGameDb('aw-recent-notes-home-', {
+    gameMapId: 'global',
+    seats: [{ kind: 'human', homeRegion: regions[0] }, { kind: 'ai', homeRegion: regions[1] }],
+  }, () => {
+    gameDb.upsertTurnLossNote(
+      'opponent', 'strategic', '', 1,
+      lossJson('ranged', 'a1-i1', 'opponent', ['human']),
+      lossJson('melee', 'h1-i9', 'human', ['opponent'])
+    );
+    const humanHome = gameDb.getSeatRoster().find((seat) => seat.seatId === 'human')?.homeRegion ?? '';
+    assert.ok(humanHome.length > 0);
+    const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 2, heading: 'Recent Turn Notes' });
+    assert.ok(out.includes(`  - by h1 (${sideHomeNameKey(humanHome)}), Ranged attack: a1-i1`), out);
+    assert.ok(out.includes('- Losses of h1:\n  - by you, Melee attack: h1-i9'), out);
+  });
+}
+
 async function run(): Promise<void> {
 
   await testRecentTurnNotesFormatting();
@@ -380,6 +416,7 @@ async function run(): Promise<void> {
   await testOlderTurnsAreCapped();
   await testBadLossHexDoesNotFailThePrompt();
   await testBattleLossesPrint();
+  await testLossLineNamesHomeRegion();
 
   console.log('recentTurnNotesSection.test.ts passed');
 

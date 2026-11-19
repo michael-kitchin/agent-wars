@@ -141,6 +141,15 @@ interface TurnBlockContext {
    */
   readonly seatOrder: readonly string[];
   /**
+   * Home region of each seat.
+   *
+   * Contract: Seat id to the stored home region, from the same roster as `seatOrder`.
+   * When to use: Passed to `buildRecentTurnLossLines` so a loss line names a side's home region after its code.
+   * Expected outcome: One entry per seat with a home region.
+   * Exceptions: None.
+   */
+  readonly homeRegionBySeatId: ReadonlyMap<string, string>;
+  /**
    * Turns an H3 index into the hex code the map section prints.
    *
    * Contract: Returns undefined when no code exists. Never throws.
@@ -256,6 +265,7 @@ function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext, battleLoss
     ownLosses: parsePlayerLossSummaryJson(row.aiLossJson),
     otherLosses: parsePlayerLossSummaryJson(row.humanLossJson),
     seatOrder: context.seatOrder,
+    homeRegionBySeatId: context.homeRegionBySeatId,
     hexCodeFor: context.hexCodeFor,
     maxGroupLines: context.maxGroupLines,
     battleLosses,
@@ -291,7 +301,9 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
     args.scope === 'strategic' ? readStrategicBattleLossesByTurn(ownSeatId, windowRows) : new Map<number, readonly LostUnit[]>();
   const rows = windowRows.filter((row) => rowHasPromptContent(row) || battleByTurn.has(row.turnNumber));
   if (rows.length === 0) return '';
-  const seatOrder = sortSeatsByOrder(getSeatRoster()).map((seat) => seat.seatId);
+  const sortedRoster = sortSeatsByOrder(getSeatRoster());
+  const seatOrder = sortedRoster.map((seat) => seat.seatId);
+  const homeRegionBySeatId = new Map(sortedRoster.map((seat) => [seat.seatId as string, seat.homeRegion] as const));
   const hexCodeFor = lossHexCodeResolver(args);
   const blocks = rows.map((row, index) =>
     formatTurnBlock(
@@ -299,6 +311,7 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
       {
         ownSeatId,
         seatOrder,
+        homeRegionBySeatId,
         hexCodeFor,
         maxGroupLines: index === rows.length - 1 ? null : RECENT_TURN_LOSS_GROUP_LINES_MAX,
       },

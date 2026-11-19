@@ -225,3 +225,20 @@ test('the messages block stays in the situation, and both system prompts carry t
   assertHeadingsNest(headingOutline(strategic.staticSystemText));
   assertHeadingsNest(headingOutline(withBlock.staticSystemText));
 });
+
+test('a tactical consult lists the Sides table with the code column and keeps its headings nested', () => {
+  const parts = buildConsultPromptParts({
+    state: battleState(1, 'March, Year 1', 'cell-a', 'infantry'),
+    coordMap: {
+      latLngByH3: new Map([['cell-a', [1, 2]]]),
+      resolveToH3: () => 'cell-a',
+      format: (h3: string) => h3,
+    },
+    enabledToolNames: [],
+    coordinateContext: { mode: 'tactical', battleId: 'sides', tacticalTurnNumber: 1 },
+  });
+  assert.ok(parts.staticSystemText.includes('## Sides'));
+  assert.ok(parts.staticSystemText.includes('| Side | Code (unit id prefix) | Home region | Status |'));
+  assert.ok(parts.staticSystemText.includes('| a1 |'));
+  assertHeadingsNest(headingOutline(parts.staticSystemText));
+});

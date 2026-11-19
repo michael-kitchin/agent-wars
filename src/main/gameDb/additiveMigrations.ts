@@ -12,6 +12,7 @@ import { ensureHireOrderReservedCreditsColumn } from './mercenaryState';
 import { ensureMatchRecordsTable } from './matchRecordsTable';
 import { ensurePendingAirDropOrdersTable } from './pendingAirDropOrders';
 import { ensureSeatAddedColumns } from './seatRosterStore';
+import { ensureSideAgreementTable } from './sideAgreementTable';
 import { ensureSideMessageTables, ensureSideStanceScoreColumns } from './sideMessageTables';
 
 /**
@@ -31,4 +32,5 @@ export function applyAdditiveSchemaMigrations(ops: BasicDbOps): void {
   ensureMatchRecordsTable((sql) => ops.run(sql));
   ensureSideMessageTables((sql) => ops.run(sql));
   ensureSideStanceScoreColumns(ops);
+  ensureSideAgreementTable((sql) => ops.run(sql));
 }

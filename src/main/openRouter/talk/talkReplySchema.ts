@@ -8,6 +8,12 @@
  */
 
 import { logTrace } from '../../logger';
+import {
+  SIDE_AGREEMENT_INTENTS,
+  SIDE_AGREEMENT_KINDS,
+  SIDE_AGREEMENT_NO_THIRD_SIDE,
+  SIDE_AGREEMENT_STATUSES,
+} from '../../../shared/sideAgreements';
 import { RELATIONSHIP_SCALE_MAX, SIDE_STANCES } from '../../../shared/sideMessages';
 
 /**
@@ -15,11 +21,14 @@ import { RELATIONSHIP_SCALE_MAX, SIDE_STANCES } from '../../../shared/sideMessag
  *
  * Purpose: The side-code enums are the sides this reply may name, so a side that has left, or in a battle a side outside it, is not offered.
  * When to use: Once per talk call, with the codes `readTalkPromptInput` returns.
- * Expected outcome: `type` `json_schema`, name `talk_reply`, `strict` true, and both lists required. Each `to` and `toward` enum is `sideCodes`. Each `stance` enum is `SIDE_STANCES`. Each stance item also requires `trust` and `threat`, each an integer with the enum 0 through `RELATIONSHIP_SCALE_MAX`. An enum is used because strict structured output does not accept minimum and maximum on every provider.
+ * Expected outcome: `type` `json_schema`, name `talk_reply`, `strict` true, and the lists required. With `options.includeAgreements`, a third required list `agreements` follows the other two. Each of its items requires `id`, `with`, `kind`, `terms`, `zone`, `against`, `endTurn`, `status`, `intent`, and `reason`. `with` is limited to `sideCodes`. `against` is limited to `sideCodes` and `none`. Without the option the format is exactly the two-list format. Each `to` and `toward` enum is `sideCodes`. Each `stance` enum is `SIDE_STANCES`. Each stance item also requires `trust` and `threat`, each an integer with the enum 0 through `RELATIONSHIP_SCALE_MAX`. An enum is used because strict structured output does not accept minimum and maximum on every provider.
  * Exceptions: None.
  */
-export function buildTalkReplyResponseFormat(sideCodes: readonly string[]): Record<string, unknown> {
-  logTrace('talkReplySchema buildTalkReplyResponseFormat', { sideCodeCount: sideCodes.length });
+export function buildTalkReplyResponseFormat(
+  sideCodes: readonly string[],
+  options: { readonly includeAgreements: boolean }
+): Record<string, unknown> {
+  logTrace('talkReplySchema buildTalkReplyResponseFormat', { sideCodeCount: sideCodes.length, includeAgreements: options.includeAgreements });
   const sideEnum = [...sideCodes];
   const scoreEnum = Array.from({ length: RELATIONSHIP_SCALE_MAX + 1 }, (_unused, score) => score);
   const messageItem = {
@@ -43,6 +52,23 @@ export function buildTalkReplyResponseFormat(sideCodes: readonly string[]): Reco
     },
     required: ['toward', 'stance', 'trust', 'threat', 'reason'],
   };
+  const agreementItem = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      id: { type: 'integer' },
+      with: { type: 'string', enum: sideEnum },
+      kind: { type: 'string', enum: [...SIDE_AGREEMENT_KINDS] },
+      terms: { type: 'string' },
+      zone: { type: 'array', items: { type: 'string' } },
+      against: { type: 'string', enum: [...sideCodes, SIDE_AGREEMENT_NO_THIRD_SIDE] },
+      endTurn: { type: 'integer' },
+      status: { type: 'string', enum: [...SIDE_AGREEMENT_STATUSES] },
+      intent: { type: 'string', enum: [...SIDE_AGREEMENT_INTENTS] },
+      reason: { type: 'string' },
+    },
+    required: ['id', 'with', 'kind', 'terms', 'zone', 'against', 'endTurn', 'status', 'intent', 'reason'],
+  };
   return {
     type: 'json_schema',
     json_schema: {
@@ -54,8 +80,9 @@ export function buildTalkReplyResponseFormat(sideCodes: readonly string[]): Reco
         properties: {
           messages: { type: 'array', items: messageItem },
           stances: { type: 'array', items: stanceItem },
+          ...(options.includeAgreements ? { agreements: { type: 'array', items: agreementItem } } : {}),
         },
-        required: ['messages', 'stances'],
+        required: options.includeAgreements ? ['messages', 'stances', 'agreements'] : ['messages', 'stances'],
       },
     },
   };

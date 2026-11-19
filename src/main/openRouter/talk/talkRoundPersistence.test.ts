@@ -17,7 +17,9 @@ import { listSentSideMessages, listSideStances } from '../../gameDb/sideMessageS
 import { advanceMatchGeneration, getMatchGeneration } from '../../matchGeneration';
 import { decodeRecordPayload } from '../../recorder/matchRecordCodec';
 import { withSeatedTempGameDb } from '../../testSupport/withSeatedTempGameDb';
+import { listSideAgreementsForSeat } from '../../gameDb/sideAgreementStore';
 import type { TalkSeatResult } from './requestTalk';
+import type { TalkReplyAgreement } from './sideAgreementReply';
 import { persistTalkRound } from './talkRoundPersistence';
 
 const step = strategicStep(4);
@@ -39,13 +41,14 @@ function largestHomeRegions(count: number): string[] {
     .map((region) => region.name);
 }
 
-function spoke(to: SeatId, text: string, stance: boolean): TalkSeatResult {
+function spoke(to: SeatId, text: string, stance: boolean, agreements: TalkReplyAgreement[] = []): TalkSeatResult {
   return {
     kind: 'spoke',
     costUsd: 0.1,
     reply: {
       messages: [{ toSeatId: to, text }],
       stances: stance ? [{ towardSeatId: to, stance: 'wary', reason: 'massing', trust: 1, threat: 3 }] : [],
+      agreements,
       droppedCount: 0,
     },
   };
@@ -103,5 +106,70 @@ test('a closed round stores messages, stances, and events, and skips a seat that
       `SELECT payload FROM match_records WHERE record_type = 'message_sent' ORDER BY record_id LIMIT 1`
     )?.payload ?? Buffer.alloc(0));
     assert.equal((payload as { text?: string }).text, 'from-a');
+  });
+});
+
+/**
+ * Builds a new active agreement entry with the other AI seat.
+ *
+ * Purpose: The agreement cases need one valid entry in a spoken reply.
+ * When to use: The agreement cases below.
+ * Expected outcome: A non-aggression entry that ends on turn 8.
+ * Exceptions: None.
+ */
+function agreementEntry(): TalkReplyAgreement {
+  return {
+    agreementId: 0,
+    withSeatId: AI_SEAT_IDS[1],
+    kind: 'non_aggression',
+    terms: 'No strikes.',
+    zoneCodes: [],
+    againstSeatId: null,
+    endTurn: 8,
+    status: 'active',
+    intent: 'keep',
+    reason: 'Quiet.',
+  };
+}
+
+/**
+ * Runs a case on a match with one human and two AI seats.
+ *
+ * Purpose: The agreement cases need a second AI seat as the counterpart.
+ * When to use: The agreement cases below.
+ * Expected outcome: `runCase` sees the seats `human`, `opponent`, and `opponent2`.
+ * Exceptions: Propagates a reset or case error.
+ */
+function withAgreementMatch(runCase: () => void): void {
+  const regions = largestHomeRegions(3);
+  withSeatedTempGameDb('aw-talk-persist-agreements-', {
+    gameMapId: 'global',
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+      { kind: 'ai', homeRegion: regions[2] },
+    ],
+  }, runCase);
+}
+
+test('a spoken strategic reply stores its agreement and event beside the message and stance', () => {
+  withAgreementMatch(() => {
+    const results = new Map([[AI_SEAT_IDS[0], spoke(HUMAN_SEAT_ID, 'hello', true, [agreementEntry()])]]);
+    persistTalkRound(step, results, getMatchGeneration());
+    assert.equal(listSentSideMessages(gameDbOps).length, 1);
+    assert.equal(listSideStances(gameDbOps, AI_SEAT_IDS[0]).length, 1);
+    assert.equal(listSideAgreementsForSeat(gameDbOps, AI_SEAT_IDS[0]).length, 1);
+    const events = gameDbOps.getAll<{ record_type: string }>(`SELECT record_type FROM match_records WHERE record_type = 'agreement_recorded'`);
+    assert.equal(events.length, 1);
+  });
+});
+
+test('a failed agreement insert rolls back the messages of the round', () => {
+  withAgreementMatch(() => {
+    gameDbOps.run('DROP TABLE side_agreements');
+    const results = new Map([[AI_SEAT_IDS[0], spoke(HUMAN_SEAT_ID, 'hello', false, [agreementEntry()])]]);
+    const stored = persistTalkRound(step, results, getMatchGeneration());
+    assert.equal(stored.size, 0);
+    assert.equal(listSentSideMessages(gameDbOps).length, 0);
   });
 });

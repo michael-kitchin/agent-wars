@@ -21,6 +21,7 @@ test('a clean reply and a fenced reply become seat ids', () => {
     replyText: '{"messages":[{"to":"h1","text":"Hold the coast."},{"to":"a2","text":"Stay north."}],"stances":[{"toward":"h1","stance":"wary","reason":"Massing."}]}',
     ownSeatId: AI_SEAT_IDS[0],
     addressableSeatIds: active,
+    allowAgreements: false,
   });
   assert.deepEqual(clean?.messages.map((row) => row.toSeatId), [HUMAN_SEAT_ID, AI_SEAT_IDS[1]]);
   assert.equal(clean?.stances[0]?.stance, 'wary');
@@ -30,6 +31,7 @@ test('a clean reply and a fenced reply become seat ids', () => {
     replyText: '```json\n{"messages":[{"to":"h1","text":"Hold."}],"stances":[]}\n```',
     ownSeatId: AI_SEAT_IDS[0],
     addressableSeatIds: active,
+    allowAgreements: false,
   });
   assert.equal(fenced?.messages[0]?.text, 'Hold.');
 });
@@ -51,6 +53,7 @@ test('codes are trimmed and cased, and bad entries are counted', () => {
     }),
     ownSeatId: AI_SEAT_IDS[0],
     addressableSeatIds: active,
+    allowAgreements: false,
   });
   assert.deepEqual(parsed?.messages.map((row) => row.text), ['North.']);
   assert.equal(parsed?.stances.length, 1);
@@ -63,16 +66,17 @@ test('long text is cut, and text that is not an object is null', () => {
     replyText: JSON.stringify({ messages: [{ to: 'h1', text: 'x'.repeat(400) }], stances: [] }),
     ownSeatId: AI_SEAT_IDS[0],
     addressableSeatIds: active,
+    allowAgreements: false,
   });
   assert.equal(long?.messages[0]?.text.length, SIDE_MESSAGE_MAX_CHARS);
-  assert.equal(parseTalkReply({ replyText: 'not json', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active }), null);
-  assert.equal(parseTalkReply({ replyText: '[]', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active }), null);
-  const empty = parseTalkReply({ replyText: '{}', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active });
-  assert.deepEqual(empty, { messages: [], stances: [], droppedCount: 0 });
+  assert.equal(parseTalkReply({ replyText: 'not json', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active, allowAgreements: false }), null);
+  assert.equal(parseTalkReply({ replyText: '[]', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active, allowAgreements: false }), null);
+  const empty = parseTalkReply({ replyText: '{}', ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active, allowAgreements: false });
+  assert.deepEqual(empty, { messages: [], stances: [], agreements: [], droppedCount: 0 });
 });
 
 test('the response format offers the given side codes in both enums', () => {
-  const format = buildTalkReplyResponseFormat(['h1', 'a2']);
+  const format = buildTalkReplyResponseFormat(['h1', 'a2'], { includeAgreements: false });
   const schema = (format.json_schema as { schema: { properties: Record<string, { items: { properties: Record<string, { enum: string[] }> } }> } }).schema;
   assert.deepEqual(schema.properties.messages.items.properties.to.enum, ['h1', 'a2']);
   assert.deepEqual(schema.properties.stances.items.properties.toward.enum, ['h1', 'a2']);
@@ -89,6 +93,7 @@ test('trust and threat are kept when valid and null when missing or out of range
     }),
     ownSeatId: AI_SEAT_IDS[0],
     addressableSeatIds: active,
+    allowAgreements: false,
   });
   assert.deepEqual([parsed?.stances[0]?.trust, parsed?.stances[0]?.threat], [2, 4]);
   assert.deepEqual([parsed?.stances[1]?.trust, parsed?.stances[1]?.threat], [null, null]);
@@ -97,12 +102,13 @@ test('trust and threat are kept when valid and null when missing or out of range
     replyText: JSON.stringify({ messages: [], stances: [{ toward: 'h1', stance: 'wary', reason: '', trust: 9, threat: 1 }] }),
     ownSeatId: AI_SEAT_IDS[0],
     addressableSeatIds: active,
+    allowAgreements: false,
   });
   assert.deepEqual([outOfRange?.stances[0]?.trust, outOfRange?.stances[0]?.threat], [null, 1]);
 });
 
 test('the stance item requires both scores, and each is limited to 0 through 4', () => {
-  const format = buildTalkReplyResponseFormat(['h1', 'a2']);
+  const format = buildTalkReplyResponseFormat(['h1', 'a2'], { includeAgreements: false });
   const schema = (format.json_schema as {
     schema: { properties: { stances: { items: { required: string[]; properties: Record<string, { enum: unknown[] }> } } } };
   }).schema;
@@ -110,4 +116,34 @@ test('the stance item requires both scores, and each is limited to 0 through 4',
   assert.deepEqual(item.required, ['toward', 'stance', 'trust', 'threat', 'reason']);
   assert.deepEqual(item.properties.trust.enum, [0, 1, 2, 3, 4]);
   assert.deepEqual(item.properties.threat.enum, [0, 1, 2, 3, 4]);
+});
+
+test('an agreements key is read only when agreements are allowed', () => {
+  const replyText = JSON.stringify({
+    messages: [],
+    stances: [],
+    agreements: [
+      { id: 0, with: 'a2', kind: 'non_aggression', terms: 'No strikes.', zone: [], against: 'none', endTurn: 8, status: 'active', intent: 'keep', reason: 'Quiet.' },
+      { id: 0, with: 'a9', kind: 'non_aggression', terms: 'Bad side.', zone: [], against: 'none', endTurn: 8, status: 'active', intent: 'keep', reason: '' },
+    ],
+  });
+  const ignored = parseTalkReply({ replyText, ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active, allowAgreements: false });
+  assert.deepEqual([ignored?.agreements.length, ignored?.droppedCount], [0, 0]);
+  const read = parseTalkReply({ replyText, ownSeatId: AI_SEAT_IDS[0], addressableSeatIds: active, allowAgreements: true });
+  assert.deepEqual([read?.agreements.length, read?.droppedCount], [1, 1]);
+});
+
+test('the agreements schema is absent by default and lists ten required properties when included', () => {
+  type FormatSchema = { required: string[]; properties: Record<string, { items: { required: string[]; properties: Record<string, { enum?: string[] }> } }> };
+  const schemaOf = (includeAgreements: boolean): FormatSchema =>
+    (buildTalkReplyResponseFormat(['h1', 'a2'], { includeAgreements }).json_schema as { schema: FormatSchema }).schema;
+  const without = schemaOf(false);
+  assert.equal('agreements' in without.properties, false);
+  assert.deepEqual(without.required, ['messages', 'stances']);
+  const withAgreements = schemaOf(true);
+  assert.deepEqual(withAgreements.required, ['messages', 'stances', 'agreements']);
+  const item = withAgreements.properties.agreements.items;
+  assert.equal(item.required.length, 10);
+  assert.deepEqual(item.properties.against.enum, ['h1', 'a2', 'none']);
+  assert.deepEqual(item.properties.with.enum, ['h1', 'a2']);
 });

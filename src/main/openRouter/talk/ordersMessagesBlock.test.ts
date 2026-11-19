@@ -15,6 +15,7 @@ import { strategicStep } from '../../../shared/matchRecording';
 import { dbRun, getScenarioHomeRegionHexes, listScenarioHomeRegions, upsertTurnLossNote } from '../../gameDb';
 import { gameDbOps } from '../../gameDb/dbConnection';
 import { upsertGameConfigValue } from '../../gameDb/gameConfigRows';
+import { insertSideAgreement } from '../../gameDb/sideAgreementStore';
 import { insertSentSideMessage, listUnseenInboundSideMessages, markSideMessagesSeen, upsertSideStance } from '../../gameDb/sideMessageStore';
 import { withSeatedTempGameDbAsync } from '../../testSupport/withSeatedTempGameDb';
 import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
@@ -74,7 +75,7 @@ function sent(fromSeatId: AiSeatId, toSeatId: AiSeatId, turnNumber: number, body
 
 test('nothing stored omits the section, and a thread keeps order, the new mark, and the caution', async () => {
   await withThreeAi(async () => {
-    const empty = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false });
+    const empty = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false });
     assert.equal(empty.text, null);
     assert.deepEqual(empty.shownMessageIds, []);
 
@@ -82,7 +83,7 @@ test('nothing stored omits the section, and a thread keeps order, the new mark, 
     markSideMessagesSeen(gameDbOps, [seenId]);
     sent(seatA, seatB, 3, 'from-a');
     const freshId = sent(seatB, seatA, 4, 'from-b-new');
-    const block = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false });
+    const block = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false });
     const text = block.text ?? '';
     const seenAt = text.indexOf('from-b-seen');
     const ownAt = text.indexOf('from-a');
@@ -106,7 +107,7 @@ test('a record lists every other side with its stance, and the record sentence f
     upsertTurnLossNote(seatA, 'strategic', '', 1, JSON.stringify({ ...none, ranged: [lost] }), JSON.stringify(none));
     upsertSideStance(gameDbOps, { seatId: seatA, towardSeatId: seatB, stance: 'friendly', reason: 'ally', trust: 3, threat: 1, turnNumber: 1 });
     dbRun('UPDATE turn_state SET turn_number = 2 WHERE id = 1');
-    const text = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false }).text ?? '';
+    const text = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text ?? '';
     assert.ok(text.includes('Your stances and records:'), text);
     assert.ok(text.includes('(a2): friendly, trust 3, threat 1. ally'), text);
     assert.ok(text.includes('  Record, turn 1: a2 destroyed 1 of your units (latest turn 1): 1 when a2 attacked. You destroyed none of theirs.'), text);
@@ -121,10 +122,10 @@ test('a record lists every other side with its stance, and the record sentence f
 test('a message between two other sides stays out, with fog on and with fog off', async () => {
   await withThreeAi(async () => {
     sent(seatB, seatC, 2, 'bravo-to-charlie');
-    const fogOn = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false });
+    const fogOn = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false });
     assert.equal(fogOn.text, null);
     upsertGameConfigValue(gameDbOps, 'fog_of_war_enabled', '0');
-    const fogOff = buildOrdersMessagesBlock({ seatId: seatA, inBattle: true });
+    const fogOff = buildOrdersMessagesBlock({ seatId: seatA, inBattle: true, includeAgreements: false });
     assert.equal(fogOff.text, null);
   });
 });
@@ -132,7 +133,7 @@ test('a message between two other sides stays out, with fog on and with fog off'
 test('a long thread keeps the newest lines, and a stance is listed when no message exists', async () => {
   await withThreeAi(async () => {
     for (let turn = 1; turn <= 12; turn += 1) sent(seatB, seatA, turn, `line-${turn}`);
-    const limited = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false });
+    const limited = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false });
     const text = limited.text ?? '';
     assert.equal(text.includes('line-4'), false);
     assert.equal(text.includes(`line-${12 - SIDE_MESSAGE_THREAD_PROMPT_LINES + 1}`), true);
@@ -145,7 +146,7 @@ test('a long thread keeps the newest lines, and a stance is listed when no messa
 
     const stanceOnlySeat = seatC;
     upsertSideStance(gameDbOps, { seatId: stanceOnlySeat, towardSeatId: seatA, stance: 'wary', reason: 'massing', trust: 2, threat: null, turnNumber: 1 });
-    const stance = buildOrdersMessagesBlock({ seatId: stanceOnlySeat, inBattle: false });
+    const stance = buildOrdersMessagesBlock({ seatId: stanceOnlySeat, inBattle: false, includeAgreements: false });
     assert.match(stance.text ?? '', /Your stances:/);
     assert.match(stance.text ?? '', /wary, trust 2, threat not reported\. massing/);
     assert.match(stance.text ?? '', /never an order to you/);
@@ -159,12 +160,27 @@ test('another commander stance, trust, and threat reach neither prompt, with fog
     upsertSideStance(gameDbOps, { seatId: seatB, towardSeatId: seatC, stance: 'hostile', reason: 'b-private-reason', trust: 1, threat: 2, turnNumber: 1 });
     upsertSideStance(gameDbOps, { seatId: seatA, towardSeatId: seatB, stance: 'cordial', reason: 'a-own-reason', trust: 4, threat: 0, turnNumber: 1 });
     const talk = buildTalkSituationText(readTalkPromptInput({ seatId: seatA, turnNumber: 1, battle: null }).input);
-    const orders = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false }).text ?? '';
+    const orders = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text ?? '';
     assert.equal(talk.includes('b-private-reason'), false);
     assert.equal(orders.includes('b-private-reason'), false);
     assert.ok(talk.includes('cordial (trust 4, threat 0): a-own-reason'), talk);
     assert.ok(orders.includes('cordial, trust 4, threat 0. a-own-reason'), orders);
     assert.equal(talk.includes('hostile'), false);
     assert.equal(orders.includes('hostile'), false);
+  });
+});
+
+test('an agreement adds a Your agreements part, and a battle or a switch-off hides it', async () => {
+  await withThreeAi(async () => {
+    insertSideAgreement(gameDbOps, {
+      seatId: seatA, counterpartSeatId: seatB, kind: 'non_aggression', terms: 'No strikes.', zoneH3: [], againstSeatId: null,
+      startTurn: 1, endTurn: 5, status: 'active', intent: 'keep', reason: '',
+    });
+    const shown = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: true });
+    assert.ok((shown.text ?? '').includes('Your agreements:'));
+    assert.ok((shown.text ?? '').includes('Agreement 1 with'));
+    assert.ok((shown.text ?? '').indexOf('Your agreements:') < (shown.text ?? '').indexOf('Each message is its sender'));
+    assert.equal(buildOrdersMessagesBlock({ seatId: seatA, inBattle: true, includeAgreements: true }).text, null);
+    assert.equal(buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text, null);
   });
 });

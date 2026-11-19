@@ -261,11 +261,12 @@ function writeFullLogArtifact(fileName: string, content: string): string | null 
  *
  * Contract: `'user'` is the initial user message. `'strategic'` and `'tactical'` match
  * `CoordinateContextMode` so a new coordinate mode fails to compile until it has a filename.
+ * `'talk-system'` and `'talk-user'` are the system and situation text of a diplomacy call.
  * When to use: Pass from `logPromptPreview` (and tests) instead of inferring a name from log labels.
  * Expected outcome: Callers can resolve a stable `debug-last-*-prompt.txt` name via `resolveFullPromptLogFileName`.
  * Exceptions: None.
  */
-export type PromptLogArtifactKind = 'user' | CoordinateContextMode;
+export type PromptLogArtifactKind = 'user' | CoordinateContextMode | 'talk-system' | 'talk-user';
 
 /**
  * Maps a prompt-log artifact kind to the cwd filename used when full prompt logging is enabled.
@@ -274,7 +275,8 @@ export type PromptLogArtifactKind = 'user' | CoordinateContextMode;
  * user message on its own file, without inferring names from debug labels.
  * When to use: Before `writeFullLogArtifact` in `logPromptPreview`.
  * Expected outcome: `'user'` and index 1 → `debug-last-user-prompt-1.txt`; `'strategic'` and index 2 →
- * `debug-last-strategic-prompt-2.txt`; `'tactical'` and index 3 → `debug-last-tactical-prompt-3.txt`.
+ * `debug-last-strategic-prompt-2.txt`; `'tactical'` and index 3 → `debug-last-tactical-prompt-3.txt`;
+ * `'talk-system'` and index 2 → `debug-last-talk-system-prompt-2.txt`; `'talk-user'` gives `debug-last-talk-user-prompt-2.txt`.
  * Exceptions: Throws if `kind` is not a supported artifact kind (exhaustive-check fallback).
  */
 export function resolveFullPromptLogFileName(kind: PromptLogArtifactKind, aiIndex: number): string {
@@ -288,6 +290,12 @@ export function resolveFullPromptLogFileName(kind: PromptLogArtifactKind, aiInde
       break;
     case 'tactical':
       stem = 'debug-last-tactical-prompt';
+      break;
+    case 'talk-system':
+      stem = 'debug-last-talk-system-prompt';
+      break;
+    case 'talk-user':
+      stem = 'debug-last-talk-user-prompt';
       break;
     default: {
       const exhaustive: never = kind;
@@ -352,6 +360,15 @@ export interface LogPromptPreviewOptions {
    * Exceptions: None.
    */
   supplementalDiskOnlyBody?: string;
+  /**
+   * Whether to log a preview of the prompt text when full prompt logging is off.
+   *
+   * Contract: Optional. Absent or true keeps the preview. False logs only the length.
+   * When to use: Pass false for diplomacy prompts, so no prompt text reaches the debug log unless full prompt logging is on.
+   * Expected outcome: With false and the flag off, one `logDebug` with `chars` and nothing else.
+   * Exceptions: None.
+   */
+  previewWhenDisabled?: boolean;
 }
 
 /**
@@ -378,6 +395,10 @@ export function logPromptPreview(label: string, content: string, options: LogPro
       diskChars: diskBody.length,
       writtenTo: absPath ?? '(write failed)',
     });
+    return;
+  }
+  if (options.previewWhenDisabled === false) {
+    logDebug(label, { chars: content.length });
     return;
   }
   const preview = content.slice(0, FULL_PROMPT_LOG_PREVIEW_CHARS);

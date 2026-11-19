@@ -63,7 +63,7 @@ function roundFor(seatIds: readonly AiSeatId[]): { round: TalkRound; talked: AiS
     schedule: () => ({ cancel() { /* unused */ } }),
     runner: async (request) => {
       talked.push(request.seatId);
-      return { kind: 'spoke', reply: { messages: [], stances: [], droppedCount: 0 }, costUsd: 0 };
+      return { kind: 'spoke', reply: { messages: [], stances: [], agreements: [], droppedCount: 0 }, costUsd: 0 };
     },
     persist: () => new Map(),
   });

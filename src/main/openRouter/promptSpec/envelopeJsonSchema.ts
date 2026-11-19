@@ -12,6 +12,7 @@ import { logDebug } from '../../logger';
 import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../productionRules';
 import { HIREABLE_UNIT_TYPES } from '../../../shared/mercenaryRules';
 import { AIR_STRIKE_TARGET_TYPES } from '../../../shared/airStrikeTarget';
+import { SIDE_AGREEMENT_DECISIONS } from '../../../shared/sideAgreements';
 import { STANDING_ORDER_TYPES } from '../../tools/standingOrdersShared';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
 import { envelopeFieldsForGates, legalOrderActionsForMode, type EnvelopeGates } from './envelopeContract';
@@ -445,6 +446,13 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
       return { ...STRING_SCHEMA };
     case 'posture':
       return { ...STRING_SCHEMA };
+    case 'agreementDecisions':
+      return arraySchema(
+        closedObjectSchema(
+          { id: { type: 'integer' }, decision: enumSchema([...SIDE_AGREEMENT_DECISIONS]), reason: STRING_SCHEMA },
+          ['id', 'decision']
+        )
+      );
     case 'operations':
       // Optional strings, with nothing required. A method enum or an anyOf of command shapes would reject the consult
       // or be ignored beside this object's type, so a bad entry stays a drop reason.

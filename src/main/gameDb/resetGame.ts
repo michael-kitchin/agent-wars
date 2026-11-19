@@ -517,6 +517,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM match_records');
   run('DELETE FROM side_messages');
   run('DELETE FROM side_stances');
+  run('DELETE FROM side_agreements');
   upsertGameConfigValue({ run }, MATCH_ID_CONFIG_KEY, randomUUID());
   upsertGameConfigValue({ run }, PLAYTHROUGH_ID_CONFIG_KEY, randomUUID());
   run('DELETE FROM unit_transport_assignments');

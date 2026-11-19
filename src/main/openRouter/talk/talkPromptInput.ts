@@ -24,6 +24,7 @@ import { SIDE_MESSAGE_THREAD_PROMPT_LINES } from '../../../shared/aiConsultation
 import { sideMessageVisibleTo } from '../../../shared/sideMessages';
 import { playerIdCodeFor } from '../../../shared/unitIds';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
+import { readSideAgreementViews } from '../../sideAgreements/sideAgreementLedger';
 import type { TalkPromptInput, TalkPromptSide, TalkPromptThread } from './talkPrompt';
 
 /**
@@ -152,7 +153,7 @@ export function readTalkSides(seatId: AiSeatId): TalkPromptSide[] {
  *
  * Purpose: `requestTalk` does not assemble SQL itself. In a battle, only the two sides fighting talk to each other, so a beat does not flood the sides that are not in it.
  * When to use: Once per talk call, before the model is called.
- * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match.
+ * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match. The input carries the commander's agreement views on the world map, and null in a battle.
  * Exceptions: Propagates a SQLite error.
  */
 export function readTalkPromptInput(args: {
@@ -207,6 +208,7 @@ export function readTalkPromptInput(args: {
       lastStrategy,
       recentTurnsSection,
       threads: readSideMessageThreads(args.seatId),
+      agreements: args.battle ? null : readSideAgreementViews(args.seatId, args.turnNumber),
     },
     addressableSeatIds,
     sideCodes,

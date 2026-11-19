@@ -3,11 +3,15 @@
  */
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { test } from 'node:test';
 import {
   resolveFullPromptLogFileName,
   resolveFullResponseLogFileName,
   buildToolBudgetExceededWarning,
+  logPromptPreview,
   REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   dedupeByUnitKeepLast,
   explicitMoveAlreadyArrivedReason,
@@ -19,6 +23,8 @@ const KIND_TO_FILE: ReadonlyArray<{ kind: PromptLogArtifactKind; fileName: strin
   { kind: 'user', fileName: 'debug-last-user-prompt-1.txt' },
   { kind: 'strategic', fileName: 'debug-last-strategic-prompt-1.txt' },
   { kind: 'tactical', fileName: 'debug-last-tactical-prompt-1.txt' },
+  { kind: 'talk-system', fileName: 'debug-last-talk-system-prompt-1.txt' },
+  { kind: 'talk-user', fileName: 'debug-last-talk-user-prompt-1.txt' },
 ];
 
 /**
@@ -39,6 +45,8 @@ test('resolveFullPromptLogFileName maps each artifact kind to a distinct file', 
   assert.equal(resolveFullPromptLogFileName('user', 2), 'debug-last-user-prompt-2.txt');
   assert.equal(resolveFullPromptLogFileName('strategic', 2), 'debug-last-strategic-prompt-2.txt');
   assert.equal(resolveFullPromptLogFileName('tactical', 2), 'debug-last-tactical-prompt-2.txt');
+  assert.equal(resolveFullPromptLogFileName('talk-system', 2), 'debug-last-talk-system-prompt-2.txt');
+  assert.equal(resolveFullPromptLogFileName('talk-user', 2), 'debug-last-talk-user-prompt-2.txt');
   assert.notEqual(resolveFullPromptLogFileName('strategic', 1), resolveFullPromptLogFileName('strategic', 2));
 });
 
@@ -111,4 +119,43 @@ test('keep-last reports earlier duplicate rows and still keeps the last row', ()
 test('explicitMoveAlreadyArrivedReason matches only the unit hex', () => {
   assert.equal(explicitMoveAlreadyArrivedReason('abc', 'abc'), 'already arrived');
   assert.equal(explicitMoveAlreadyArrivedReason('abc', 'def'), null);
+});
+
+/**
+ * Runs a case in a temporary working directory with the full-prompt flag set.
+ *
+ * Purpose: `logPromptPreview` writes to the working directory, so the case must not touch the project.
+ * When to use: The two `logPromptPreview` cases below.
+ * Expected outcome: `runCase` receives the directory. The flag, the directory, and the files are restored or removed afterward.
+ * Exceptions: Propagates the case error after cleanup.
+ */
+function withPromptLogDirectory(flag: string | undefined, runCase: (dir: string) => void): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-prompt-log-'));
+  const previousCwd = process.cwd();
+  const previousFlag = process.env.AGENT_WARS_LOG_FULL_PROMPTS;
+  try {
+    process.chdir(dir);
+    if (flag === undefined) delete process.env.AGENT_WARS_LOG_FULL_PROMPTS;
+    else process.env.AGENT_WARS_LOG_FULL_PROMPTS = flag;
+    runCase(dir);
+  } finally {
+    process.chdir(previousCwd);
+    if (previousFlag === undefined) delete process.env.AGENT_WARS_LOG_FULL_PROMPTS;
+    else process.env.AGENT_WARS_LOG_FULL_PROMPTS = previousFlag;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('logPromptPreview with previewWhenDisabled false writes no file when full logging is off', () => {
+  withPromptLogDirectory(undefined, (dir) => {
+    logPromptPreview('test: talk', 'secret prompt text', { artifactKind: 'talk-system', aiIndex: 1, previewWhenDisabled: false });
+    assert.deepEqual(fs.readdirSync(dir), []);
+  });
+});
+
+test('logPromptPreview writes the full talk prompt when full logging is on', () => {
+  withPromptLogDirectory('1', (dir) => {
+    logPromptPreview('test: talk', 'full prompt body', { artifactKind: 'talk-user', aiIndex: 2, previewWhenDisabled: false });
+    assert.equal(fs.readFileSync(path.join(dir, 'debug-last-talk-user-prompt-2.txt'), 'utf8'), 'full prompt body');
+  });
 });

@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildCoachingBullets, buildContextCoaching, type CoachingGates } from './coachingText';
+import { SIDE_AGREEMENT_ORDERS_BULLETS } from './diplomacyRuleText';
 import { buildOperationRuleBlock } from './operationRuleText';
 import { POSTURE_SETTINGS } from '../../../shared/postureTypes';
 import { buildPostureRuleBlock } from './postureRuleText';
@@ -397,4 +398,10 @@ test('posture rules follow the operation rules only when the gate is on', () => 
   assert.equal(globalPosture.includes('half the usual mass'), false);
   assert.equal(globalPosture.includes('Land options come first'), false);
   assert.ok(globalPosture.includes('twice the air operations'));
+});
+
+test('the strategic context carries the first agreement orders bullet and the tactical context does not', () => {
+  const first = SIDE_AGREEMENT_ORDERS_BULLETS[0];
+  assert.ok(buildContextCoaching(strategicGates()).includes(first));
+  assert.equal(buildContextCoaching(tacticalGates()).includes(first), false);
 });

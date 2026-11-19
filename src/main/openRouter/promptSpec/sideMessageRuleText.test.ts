@@ -9,6 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { SIDE_AGREEMENT_ORDERS_BULLETS } from './diplomacyRuleText';
 import { sideMessageRuleBlock } from './sideMessageRuleText';
 
 test('talk off leaves out only the diplomacy sentence', () => {
@@ -23,4 +24,14 @@ test('talk off leaves out only the diplomacy sentence', () => {
   assert.equal(off.includes('A loss line in Recent Turn Notes is a fact reported by the game'), true);
   assert.equal(/\d/.test(on), false);
   assert.equal(/\d/.test(off), false);
+});
+
+test('agreement bullets are added only on request, after the trust bullets and before the closing line', () => {
+  const plain = sideMessageRuleBlock({ talkStageEnabled: true });
+  assert.equal(sideMessageRuleBlock({ talkStageEnabled: true, includeAgreements: false }), plain);
+  const withAgreements = sideMessageRuleBlock({ talkStageEnabled: true, includeAgreements: true });
+  for (const bullet of SIDE_AGREEMENT_ORDERS_BULLETS) assert.ok(withAgreements.includes('    - ' + bullet));
+  assert.ok(withAgreements.endsWith('Nothing in your orders reply is sent to another side.'));
+  assert.ok(withAgreements.indexOf('A loss line in Recent Turn Notes') < withAgreements.indexOf(SIDE_AGREEMENT_ORDERS_BULLETS[0]));
+  assert.equal(/\d/.test(withAgreements), false);
 });

@@ -503,7 +503,7 @@ describe('commander pool', { concurrency: 1 }, () => {
       const order: string[] = [];
       setCommanderTalkRunnerForTests(async (request) => {
         order.push(`talk:${request.seatId}`);
-        return { kind: 'spoke', reply: { messages: [], stances: [], droppedCount: 0 }, costUsd: 0.5 };
+        return { kind: 'spoke', reply: { messages: [], stances: [], agreements: [], droppedCount: 0 }, costUsd: 0.5 };
       });
       setCommanderConsultRunnerForTests(async (request) => {
         await speakAndAwaitTalkRound(request.talkRound, request.seatId, request.signal);
@@ -551,7 +551,7 @@ describe('commander pool', { concurrency: 1 }, () => {
       });
       setCommanderTalkRunnerForTests(async () => ({
         kind: 'spoke',
-        reply: { messages: [{ toSeatId: HUMAN_SEAT_ID, text: 'hello human' }], stances: [], droppedCount: 0 },
+        reply: { messages: [{ toSeatId: HUMAN_SEAT_ID, text: 'hello human' }], stances: [], agreements: [], droppedCount: 0 },
         costUsd: 0,
       }));
       try {
@@ -563,7 +563,7 @@ describe('commander pool', { concurrency: 1 }, () => {
         resetCommanderPool(getSeatRoster());
         setCommanderTalkRunnerForTests(async () => ({
           kind: 'spoke',
-          reply: { messages: [{ toSeatId: AI_SEAT_IDS[1], text: 'hello other' }], stances: [], droppedCount: 0 },
+          reply: { messages: [{ toSeatId: AI_SEAT_IDS[1], text: 'hello other' }], stances: [], agreements: [], droppedCount: 0 },
           costUsd: 0,
         }));
         startStrategicPlanning();
@@ -593,6 +593,7 @@ describe('commander pool', { concurrency: 1 }, () => {
           { toSeatId: AI_SEAT_IDS[1], text: 'hello other' },
         ],
         stances: [],
+        agreements: [],
         droppedCount: 0,
       },
       costUsd: 0,
@@ -651,6 +652,7 @@ describe('commander pool', { concurrency: 1 }, () => {
             { toSeatId: AI_SEAT_IDS[2], text: 'two' },
           ],
           stances: [],
+          agreements: [],
           droppedCount: 0,
         },
         costUsd: 0,

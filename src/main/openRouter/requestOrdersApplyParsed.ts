@@ -21,6 +21,7 @@ import type { OperationCandidate } from '../../shared/operationTypes';
 import { writeOperationRefusal } from '../gameDb/operationMemory';
 import { applyOperationCommands } from '../operations/operationCommands';
 import { applyPostureChoice } from '../operations/postureChoice';
+import { applySideAgreementDecisions } from '../sideAgreements/sideAgreementDecisionApply';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
 import { applyCampaignTargetOverride } from './campaignTargetOverride';
@@ -313,6 +314,10 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   }
   if (!tacticalBattle && ordersEnabled) {
     writeOperationRefusal({ getOne: dbGetOne, run: dbRun }, seatId, planState.turnNumber, dropReasons);
+  }
+  if (!tacticalBattle && parsed.agreementDecisions) {
+    const agreementResult = applySideAgreementDecisions({ seatId, decisions: parsed.agreementDecisions, turnNumber: planState.turnNumber });
+    dropReasons.push(...agreementResult.dropReasons);
   }
   // Tactical beats omit strategic standing-order expansion: assign_order/cancel_order are blocked for sub-unit ids,
   // so auto-generated pursue/march from parents must not substitute for explicit_move this beat.

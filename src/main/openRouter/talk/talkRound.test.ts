@@ -70,7 +70,7 @@ function open(seatIds: readonly AiSeatId[], runner: TalkRunner | null) {
 }
 
 function spoke(costUsd: number): TalkSeatResult {
-  return { kind: 'spoke', reply: { messages: [], stances: [], droppedCount: 0 }, costUsd };
+  return { kind: 'spoke', reply: { messages: [], stances: [], agreements: [], droppedCount: 0 }, costUsd };
 }
 
 test('two speakers close once, after the second', async () => {

@@ -9,7 +9,13 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { SIDE_AGREEMENT_MAX_OPEN_PER_SIDE, SIDE_AGREEMENT_MAX_TURNS } from '../../../shared/sideAgreements';
 import { SIDE_STANCES } from '../../../shared/sideMessages';
+import {
+  DIPLOMACY_PURPOSE_BULLETS,
+  SIDE_AGREEMENT_REPLY_RULES,
+  sideAgreementTalkBullets,
+} from '../promptSpec/diplomacyRuleText';
 import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
 import { buildTalkSituationText, buildTalkSystemText, type TalkPromptInput, type TalkPromptSide } from './talkPrompt';
 
@@ -67,12 +73,13 @@ function input(extra: Partial<TalkPromptInput> = {}): TalkPromptInput {
       },
       { sideCode: 'a2', lines: [] },
     ],
+    agreements: null,
     ...extra,
   };
 }
 
 test('the system text names the side, the limit, the trust rules, and the stance basis, and has no other digits', () => {
-  const text = buildTalkSystemText('Iberia');
+  const text = buildTalkSystemText('Iberia', 'tactical');
   assert.match(text, /commander of Iberia/);
   assert.match(text, /280/);
   for (const stance of SIDE_STANCES) assert.match(text, new RegExp(stance));
@@ -122,4 +129,37 @@ test('a battle input names the beat and the opponent', () => {
 test('a stance with a missing score prints not reported in its place', () => {
   const text = buildTalkSituationText(input({ sides: [own, { ...other, trust: 3, threat: null }, quiet] }));
   assert.ok(text.includes('| France | h1 | Active | wary (trust 3, threat not reported): Massing |'), text);
+});
+
+test('the strategic system text explains agreements and allows only the fixed limits as digits', () => {
+  const text = buildTalkSystemText('Iberia', 'strategic');
+  const allowed = new Set(['280', '0', '4', String(SIDE_AGREEMENT_MAX_TURNS), String(SIDE_AGREEMENT_MAX_OPEN_PER_SIDE)]);
+  const digitRuns = text.match(/\d+/g) ?? [];
+  assert.ok(digitRuns.every((run) => allowed.has(run)), digitRuns.join(','));
+  assert.match(text, /Why diplomacy matters:/);
+  for (const bullet of DIPLOMACY_PURPOSE_BULLETS) assert.ok(text.includes(bullet));
+  assert.match(text, /\nAgreements:\n/);
+  for (const bullet of sideAgreementTalkBullets()) assert.ok(text.includes(bullet));
+  assert.ok(text.includes('"agreements":['));
+  assert.ok(text.includes(SIDE_AGREEMENT_REPLY_RULES));
+  assert.match(text, /that step will show you the same messages and your agreements\./);
+  assert.doesNotMatch(text, /turn \d/);
+});
+
+test('the battle system text keeps the purpose block and has no agreement text', () => {
+  const text = buildTalkSystemText('Iberia', 'tactical');
+  assert.match(text, /Why diplomacy matters:/);
+  for (const bullet of DIPLOMACY_PURPOSE_BULLETS) assert.ok(text.includes(bullet));
+  for (const absent of ['Agreements:', '"agreements"', 'no_entry_zone', 'your agreements']) assert.equal(text.includes(absent), false, absent);
+  assert.match(text, /that step will show you the same messages\./);
+  assert.match(text, /Use the side codes from the Sides table\. Either list may be empty\.$/);
+  assert.match(text, /"reason":"<one sentence>"}]}\nUse the side codes/);
+});
+
+test('the situation text prints Your agreements after the Sides table only when the ledger is not null', () => {
+  const withLedger = buildTalkSituationText(input({ agreements: [] }));
+  assert.ok(withLedger.includes('## Your agreements\n- None.'));
+  assert.ok(withLedger.indexOf('## Sides') < withLedger.indexOf('## Your agreements'));
+  assert.ok(withLedger.indexOf('## Your agreements') < withLedger.indexOf('## Your last plan'));
+  assert.equal(buildTalkSituationText(input()).includes('## Your agreements'), false);
 });

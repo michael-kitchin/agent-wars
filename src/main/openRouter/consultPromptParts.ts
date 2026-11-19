@@ -79,6 +79,7 @@ import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { RULES_POINTER_LINE } from '../tools/referenceTools';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { buildContextCoaching, buildOrdersGuidanceSection, type CoachingGates } from './promptSpec/coachingText';
+import { sideAgreementsEnabled } from './sideAgreementGate';
 import { buildToolBudgetExceededWarning } from './requestOrdersFlowSupport';
 
 /**
@@ -431,14 +432,12 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     ? ''
     : buildScenarioObjectiveRulesBlock(state, { controlWinMinUrbanShare });
   const scenarioSystem = [scenarioRules, scenarioHomeLines.join('\n')].filter((part) => part.length > 0).join('\n');
-  const sidesBlock = coordinateContext.mode === 'tactical'
-    ? ''
-    : buildSidesPromptBlock({
-        ownSeatId: ownSeat,
-        seats: sidesSeatsForPrompt(state, ownSeat),
-        includeNeutral: state.units.some((unit) => isNeutralOwnerId(unit.player)),
-        includeMercenaryNote: state.units.some((unit) => unit.isMercenary === true),
-      });
+  const sidesBlock = buildSidesPromptBlock({
+    ownSeatId: ownSeat,
+    seats: sidesSeatsForPrompt(state, ownSeat),
+    includeNeutral: state.units.some((unit) => isNeutralOwnerId(unit.player)),
+    includeMercenaryNote: state.units.some((unit) => unit.isMercenary === true),
+  });
   const liveStatus = hasPrecomputedBriefing
     ? `${briefingOverride}\n\n`
     : `${memoryBlock}${campaignBlock}${operationsBlock}${standingOrderBlock}${productionBlock}`;
@@ -456,6 +455,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     includeCampaignTarget: coachingGates.campaignEnabled === true,
     includeOperations: coachingGates.operationsEnabled === true,
     includePosture: coachingGates.operationsEnabled === true,
+    includeAgreementDecisions: sideAgreementsEnabled(coordinateContext.mode),
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),

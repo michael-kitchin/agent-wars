@@ -28,6 +28,12 @@ Same role sentence as strategic, with no clock on that line. The beat clock is t
 
 The battle-local goal from section 1.3, followed by a pointer to the rules below. **Must not** contain win conditions, home regions, or scenario text.
 
+### 2.2a `## Sides`
+
+- **Include:** every battle prompt, in the system message immediately after the goal statement, built by the same `buildSidesPromptBlock` call as the strategic prompt.
+- **Shape:** a Markdown table with the columns `Side`, `Code (unit id prefix)`, `Home region`, `Status`. The commander's row is first and ends with ` (you)`. Other seats follow in seat order, and a knocked-out seat and a Neutral row print as on the strategic prompt.
+- **Model use:** names each side by the code that appears in loss lines, message threads, and unit ids. It is a list of names, not a scenario goal.
+
 ### 2.3 Situational directives
 
 - **Scouting directive:** never. Visibility inside the footprint is complete, so there is nothing to scout.
@@ -137,11 +143,11 @@ Tactical variant, bullets in this order:
 
 1. **Priority**, one line: engage enemy forces and inflict losses when advantageous.
 2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add `buildDoctrineBlock` immediately after the strategy list. A strategic prompt then adds one production-denial line for balanced and one for cautious. A battle prints `buildDoctrineBlock` only, and it does not name the campaign target.
-3. **Message rules**, identical to strategic: `sideMessageRuleBlock`.
+3. **Message rules**, the same as strategic without the two agreement bullets: `sideMessageRuleBlock`, called without `includeAgreements`. A battle prompt has no agreement text.
 
 `# Messages` is the same situation section as on the strategic prompt, immediately before the status sections. A battle has no Scenario Progress block, so the section still precedes Air Operations Status, Missile Forces, Mercenaries, Naval Transport Status, and Unit Roster. The history, the line limit, the visibility rule, the stance list (with this commander's own trust and threat), the record lines, and the caution are the same. The record is the world-map record over the strategic window before the stored turn. It does not count the battle in progress.
 
-**Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing. A combat record is not such a claim: it counts what the game recorded in the past, and the section says so.
+**Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, or any claim about what an enemy is doing. A combat record is not such a claim: it counts what the game recorded in the past, and the section says so.
 
 ### 2.9 `# Air Operations Status`
 

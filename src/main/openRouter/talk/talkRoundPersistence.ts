@@ -1,9 +1,9 @@
 /**
  * Stores one closed talk round and records each message and stance change.
  *
- * Purpose: Messages become visible at the moment the round closes, in one transaction.
+ * Purpose: Messages, stances, and agreements become visible at the moment the round closes, in one transaction.
  * When to use: The `persist` callback of `openTalkRound`, before `whenClosed` resolves.
- * Expected outcome: Sent rows, stance rows, and one recorder event each. An empty map when the match has changed or the database is closed.
+ * Expected outcome: Sent rows, stance rows, agreement rows, and one recorder event each. An empty map when the match has changed or the database is closed.
  * Exceptions: None. A SQLite error rolls the transaction back and returns an empty map.
  */
 
@@ -12,6 +12,7 @@ import { gameDbOps, getDbHandle, hasDbHandle } from '../../gameDb/dbConnection';
 import { readSeatRoster } from '../../gameDb/seatRosterStore';
 import { insertSentSideMessage, upsertSideStance } from '../../gameDb/sideMessageStore';
 import { getMatchGeneration } from '../../matchGeneration';
+import { persistTalkAgreements } from '../../sideAgreements/sideAgreementTalkPersistence';
 import { recordSideMessageSent, recordSideStanceDeclared } from '../../recorder/matchRecordingEvents';
 import { AI_SEAT_IDS, isSeatId, type AiSeatId } from '../../../shared/seatIds';
 import { isSeatActive } from '../../../shared/seatRoster';
@@ -36,7 +37,7 @@ function activeSeatIds(): Set<string> {
  *
  * Purpose: The orders stage reads these rows as soon as the round's promise resolves.
  * When to use: From the round's close, with the generation captured when the round opened.
- * Expected outcome: A map of stored messages per seat. Nothing is written when the generation has moved or the database is not open. A message whose recipient has left is skipped.
+ * Expected outcome: A map of stored messages per seat. A strategic reply's agreements are stored in the same transaction, after its stances. Nothing is written when the generation has moved or the database is not open. A message whose recipient has left is skipped.
  * Exceptions: None. A failure rolls back and returns an empty map.
  */
 export function persistTalkRound(
@@ -90,6 +91,9 @@ export function persistTalkRound(
             previousStance: written.previousStance,
           });
         }
+      }
+      if (step.scope === 'strategic' && result.reply.agreements.length > 0) {
+        persistTalkAgreements({ seatId, step, agreements: result.reply.agreements, activeSeatIds: active });
       }
       if (messages.length > 0) stored.set(seatId, messages);
     }

@@ -64,6 +64,7 @@ export const MATCH_TABLE_RECORDING_POLICY: Readonly<Record<string, TableRecordin
   },
   match_records: { mode: 'excluded', reason: 'The recording itself.' },
   side_stances: { mode: 'frame' },
+  side_agreements: { mode: 'frame' },
   side_messages: { mode: 'excluded', reason: 'A growing log. Each sent message is a message_sent event.' },
 };
 

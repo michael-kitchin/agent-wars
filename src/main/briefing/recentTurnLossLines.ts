@@ -12,6 +12,7 @@ import {
 } from '../../shared/lossSummary';
 import type { LossKillerUnit } from '../../shared/lossAttributionTypes';
 import { isSeatId, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
+import { sideHomeNameKey } from '../../shared/shortSideName';
 import { playerIdCodeFor } from '../../shared/unitIds';
 import { logDebug } from '../logger';
 
@@ -28,13 +29,13 @@ export const RECENT_TURN_LOSS_GROUP_LINES_MAX = 12;
 /**
  * Sentence that explains the loss lines to the model.
  *
- * Purpose: A loss line is a record kept by the game, so the model must not weigh it like a message from another side. Naming where the side codes come from lets the model tell who attacked it before it writes to that side.
+ * Purpose: A loss line is a record kept by the game, so the model must not weigh it like a message from another side. Naming where the side codes come from, and printing each side's home region after its code, lets the model tell who attacked it before it writes to that side.
  * When to use: Printed once under the Recent Turn Notes heading when any block has a loss line.
  * Expected outcome: Names what `by`, `you`, `Neutral`, the side codes, `no side responsible`, `by unknown side`, and the closing counts mean.
  * Exceptions: None.
  */
 export const RECENT_TURN_LOSS_LEGEND =
-  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "you" is your own side, "Neutral" is the Neutral side, and every other side is named by its code from the Sides table and message threads. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
+  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "you" is your own side, "Neutral" is the Neutral side, and every other side is named by its code, which is the Code column of the Sides table and the prefix of its unit ids, followed by its home region in parentheses. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
 
 /**
  * Cause label of a unit a tactical battle destroyed.
@@ -181,6 +182,15 @@ export interface RecentTurnLossLinesInput {
    */
   readonly ownSeatId: string;
   /**
+   * Home region of each seat, for naming a responsible side.
+   *
+   * Contract: Seat id to the full home display name. Optional.
+   * When to use: `responsibleSideName`, so a `by` names the side's code and its home region.
+   * Expected outcome: When absent, or when a seat has no entry, the line prints the bare code as before.
+   * Exceptions: None.
+   */
+  readonly homeRegionBySeatId?: ReadonlyMap<string, string>;
+  /**
    * Parsed losses of the reading seat.
    *
    * Contract: Every unit belongs to `ownSeatId`.
@@ -282,6 +292,23 @@ function sideLabel(ownerId: string, input: RecentTurnLossLinesInput): string {
 }
 
 /**
+ * Names a responsible side in a `by ...` text.
+ *
+ * Purpose: A code alone does not say who a side is, so another side's code is followed by its home region.
+ * When to use: `responsibleText`, once per responsible side.
+ * Expected outcome: What `sideLabel` returns, except that a seat other than the reading seat with a mapped home region reads `a3 (Southern France)`. A trailing abbreviation such as ` (SEGAS)` is dropped so no parentheses nest.
+ * Exceptions: None.
+ */
+function responsibleSideName(ownerId: string, input: RecentTurnLossLinesInput): string {
+  const label = sideLabel(ownerId, input);
+  if (ownerId === input.ownSeatId) return label;
+  const home = input.homeRegionBySeatId?.get(ownerId);
+  if (home === undefined) return label;
+  const homeName = sideHomeNameKey(home);
+  return homeName.length > 0 ? `${label} (${homeName})` : label;
+}
+
+/**
  * Reduces a unit's attribution to its responsibility key.
  *
  * Purpose: Units with the same responsibility share a loss line.
@@ -302,13 +329,14 @@ function responsibleKeyOf(unit: LostUnit, input: RecentTurnLossLinesInput): Resp
  *
  * Purpose: One place decides how one, two, and many sides read.
  * When to use: `lineFor`.
- * Expected outcome: `by unknown side`, `no side responsible`, `by X`, `by X and Y`, or `by X, Y, and Z`.
+ * Expected outcome: `by unknown side`, `no side responsible`, `by X`, `by X and Y`, or `by X, Y, and Z`. When any name includes a home region, every name is joined with ` and `, because home regions contain commas.
  * Exceptions: None.
  */
 function responsibleText(responsible: ResponsibleKey, input: RecentTurnLossLinesInput): string {
   if (responsible.kind === 'unknown') return 'by unknown side';
   if (responsible.kind === 'none') return 'no side responsible';
-  const names = responsible.sides.map((id) => sideLabel(id, input));
+  const names = responsible.sides.map((id) => responsibleSideName(id, input));
+  if (names.some((name) => name.includes(' ('))) return `by ${names.join(' and ')}`;
   if (names.length === 1) return `by ${names[0]}`;
   if (names.length === 2) return `by ${names[0]} and ${names[1]}`;
   return `by ${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;

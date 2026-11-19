@@ -1,4 +1,5 @@
 import { MATCH_RECORDS_TABLE_DDL } from './matchRecordsTable';
+import { SIDE_AGREEMENT_TABLE_DDL } from './sideAgreementTable';
 import { SIDE_MESSAGE_TABLES_DDL } from './sideMessageTables';
 
 /**
@@ -263,5 +264,7 @@ export function getFullDdl(): string {
     ${MATCH_RECORDS_TABLE_DDL};
 
     ${SIDE_MESSAGE_TABLES_DDL}
+
+    ${SIDE_AGREEMENT_TABLE_DDL}
   `;
 }

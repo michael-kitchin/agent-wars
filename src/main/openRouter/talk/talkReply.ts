@@ -8,8 +8,7 @@
  */
 
 import { logTrace } from '../../logger';
-import { isSeatId, type SeatId } from '../../../shared/seatIds';
-import { playerIdCodeFor } from '../../../shared/unitIds';
+import type { SeatId } from '../../../shared/seatIds';
 import {
   cleanRelationshipScore,
   cleanSideMessageText,
@@ -18,6 +17,8 @@ import {
   SIDE_STANCE_REASON_MAX_CHARS,
   type SideStance,
 } from '../../../shared/sideMessages';
+import { parseSideAgreementEntries, type TalkReplyAgreement } from './sideAgreementReply';
+import { seatIdForSideCode } from './talkSideCodes';
 
 /**
  * One message a commander chose to send.
@@ -132,9 +133,18 @@ export interface ParsedTalkReply {
    */
   readonly stances: readonly TalkReplyStance[];
   /**
+   * Agreements that passed the reply rules.
+   *
+   * Contract: Empty in a battle and when the reply has no valid entry. An entry may still be dropped when it is stored, because the limits depend on the match.
+   * When to use: Storing a closed strategic talk round.
+   * Expected outcome: The accepted agreement entries.
+   * Exceptions: None.
+   */
+  readonly agreements: readonly TalkReplyAgreement[];
+  /**
    * How many entries were refused.
    *
-   * Contract: A count of message and stance entries that did not pass.
+   * Contract: A count of message, stance, and agreement entries that did not pass.
    * When to use: A trace log. Do not log the refused text.
    * Expected outcome: Zero when every entry was kept.
    * Exceptions: None.
@@ -157,23 +167,6 @@ function jsonObjectText(replyText: string): string | null {
   return replyText.slice(start, end + 1);
 }
 
-/**
- * Resolves a side code or a seat id to a seat this reply may name.
- *
- * Purpose: The model is shown side codes, and sometimes repeats a seat id.
- * When to use: Each `to` and `toward` value.
- * Expected outcome: The seat, or null when the code does not name one of `addressableSeatIds`.
- * Exceptions: None.
- */
-function seatIdForSideCode(code: unknown, addressableSeatIds: readonly SeatId[]): SeatId | null {
-  if (typeof code !== 'string') return null;
-  const normalized = code.trim().toLowerCase();
-  if (normalized.length === 0) return null;
-  const byCode = addressableSeatIds.find((seatId) => playerIdCodeFor(seatId) === normalized);
-  if (byCode) return byCode;
-  if (isSeatId(normalized) && addressableSeatIds.includes(normalized)) return normalized;
-  return null;
-}
 
 /**
  * Reads one list from a parsed object.
@@ -192,13 +185,14 @@ function entryList(value: unknown): readonly unknown[] {
  *
  * Purpose: The talk stage accepts one object and refuses the rest without a second model call.
  * When to use: After the model returns content.
- * Expected outcome: Null when the text has no JSON object or the value is not an object. Otherwise the accepted messages and stances, and a count of refused entries. An entry is kept only when it names one of `addressableSeatIds` other than `ownSeatId`.
+ * Expected outcome: Null when the text has no JSON object or the value is not an object. Otherwise the accepted messages, stances, and agreements, and a count of refused entries. An entry is kept only when it names one of `addressableSeatIds` other than `ownSeatId`. The `agreements` list is read only when `allowAgreements` is true. Otherwise the key is ignored and nothing is counted.
  * Exceptions: None.
  */
 export function parseTalkReply(args: {
   readonly replyText: string;
   readonly ownSeatId: SeatId;
   readonly addressableSeatIds: readonly SeatId[];
+  readonly allowAgreements: boolean;
 }): ParsedTalkReply | null {
   const slice = jsonObjectText(args.replyText);
   if (slice === null) {
@@ -216,7 +210,7 @@ export function parseTalkReply(args: {
     logTrace('talkReply parseTalkReply', { parsed: false });
     return null;
   }
-  const record = parsed as { readonly messages?: unknown; readonly stances?: unknown };
+  const record = parsed as { readonly messages?: unknown; readonly stances?: unknown; readonly agreements?: unknown };
   const messages: TalkReplyMessage[] = [];
   const stances: TalkReplyStance[] = [];
   const seenRecipients = new Set<SeatId>();
@@ -260,6 +254,17 @@ export function parseTalkReply(args: {
     });
   }
 
-  logTrace('talkReply parseTalkReply', { parsed: true, messageCount: messages.length, stanceCount: stances.length, droppedCount });
-  return { messages, stances, droppedCount };
+  const agreementResult = args.allowAgreements
+    ? parseSideAgreementEntries({ raw: record.agreements, ownSeatId: args.ownSeatId, addressableSeatIds: args.addressableSeatIds })
+    : { agreements: [], droppedCount: 0 };
+  droppedCount += agreementResult.droppedCount;
+
+  logTrace('talkReply parseTalkReply', {
+    parsed: true,
+    messageCount: messages.length,
+    stanceCount: stances.length,
+    agreementCount: agreementResult.agreements.length,
+    droppedCount,
+  });
+  return { messages, stances, agreements: agreementResult.agreements, droppedCount };
 }

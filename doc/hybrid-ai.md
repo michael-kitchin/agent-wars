@@ -52,7 +52,7 @@ Each consult **replaces** the full callback list. Tactical subscriptions use sub
 
 ## Talk before orders
 
-A wave that is about to ask for orders can open with a talk call. Every talk call in the wave finishes, fails, or times out before any orders call starts. A commander still waiting on its talk round starts no orders call after Stop, New, or Load. A commander talks only when the policy above is about to consult it. An unread message the next prompt would show (`countUnreadPromptMessages`) still asks for orders and does not start a talk call. An older unread message, past `SIDE_MESSAGE_THREAD_PROMPT_LINES`, stays unseen and does not by itself request a consult. The limits, the tables, and `AGENT_WARS_DISABLE_TALK` are in [commander-messages.md](commander-messages.md).
+A wave that is about to ask for orders can open with a talk call. Every talk call in the wave finishes, fails, or times out before any orders call starts. A commander still waiting on its talk round starts no orders call after Stop, New, or Load. A commander talks only when the policy above is about to consult it. An unread message the next prompt would show (`countUnreadPromptMessages`) still asks for orders and does not start a talk call. An older unread message, past `SIDE_MESSAGE_THREAD_PROMPT_LINES`, stays unseen and does not by itself request a consult. Commanders may keep private agreements with other sides, which the game never enforces. The limits, the tables, the agreements, and `AGENT_WARS_DISABLE_TALK` are in [commander-messages.md](commander-messages.md).
 
 ## Campaign
 

@@ -186,3 +186,25 @@ test('a cap counts a battle group like any other group', () => {
   assert.equal(lines[lines.length - 1], '- 1 more loss group on this turn is not listed.');
   assert.equal(lines.some((line) => line.includes('Battle')), false);
 });
+
+test('a home region map names each other responsible side after its code', () => {
+  const homes = new Map<string, string>([
+    ['human', 'North America'],
+    ['opponent', 'Own Home'],
+    ['opponent2', 'Southern France'],
+    ['opponent3', 'Southern Europe (SEGAS)'],
+  ]);
+  const base = input(
+    { ranged: [unit('a1-i3', 'infantry', 'opponent', 'hA', ['human'], [armor('h1-a4')])] },
+    {
+      melee: [unit('a2-i1', 'infantry', 'opponent2', 'hB', ['opponent'])],
+      airStrike: [unit('h1-n1', 'naval', 'human', 'hC', ['opponent2', 'opponent3'])],
+    }
+  );
+  const lines = buildRecentTurnLossLines({ ...base, homeRegionBySeatId: homes });
+  assert.ok(lines.includes('  - by h1 (North America), Ranged attack at QX: a1-i3 (by 1 Armored)'));
+  assert.ok(lines.includes('  - by you, Melee attack at RB: a2-i1'));
+  assert.ok(lines.includes('  - by a2 (Southern France) and a3 (Southern Europe), Air strike at TT: h1-n1'));
+  assert.ok(lines.includes('- Losses of a2:'));
+  assert.deepEqual(buildRecentTurnLossLines(base), buildRecentTurnLossLines({ ...base, homeRegionBySeatId: undefined }));
+});

@@ -9,7 +9,15 @@
 
 import { logTrace } from '../../logger';
 import { RELATIONSHIP_SCALE_MAX, SIDE_MESSAGE_MAX_CHARS, SIDE_STANCES, type SideStance } from '../../../shared/sideMessages';
+import type { SideAgreementView } from '../../sideAgreements/sideAgreementLedger';
+import {
+  DIPLOMACY_PURPOSE_BULLETS,
+  SIDE_AGREEMENT_REPLY_RULES,
+  sideAgreementReplyShape,
+  sideAgreementTalkBullets,
+} from '../promptSpec/diplomacyRuleText';
 import { SIDE_MESSAGE_SOURCE_BULLETS, SIDE_MESSAGE_TRUST_BULLETS } from '../promptSpec/sideMessageRuleText';
+import { formatSideAgreementLines } from './sideAgreementPromptLines';
 
 /**
  * One side in the talk prompt's table.
@@ -260,6 +268,15 @@ export interface TalkPromptInput {
    * Exceptions: None.
    */
   readonly threads: readonly TalkPromptThread[];
+  /**
+   * The commander's own agreements.
+   *
+   * Contract: Null in a battle. Otherwise the ledger, which may be empty.
+   * When to use: The Your agreements section of the world-map situation text.
+   * Expected outcome: The views `readSideAgreementViews` returns, or null.
+   * Exceptions: None.
+   */
+  readonly agreements: readonly SideAgreementView[] | null;
 }
 
 /**
@@ -319,17 +336,28 @@ export function formatStanceScores(trust: number | null, threat: number | null):
  *
  * Purpose: The cached system text tells the commander what this step is for, where messages come from, and how far to trust them.
  * When to use: The system message of a talk call. Do not put a turn number, a count, or a message in it.
- * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants.
+ * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line. The text depends only on the two arguments.
  * Exceptions: None.
  */
-export function buildTalkSystemText(ownSideLabel: string): string {
-  logTrace('talkPrompt buildTalkSystemText', { labelLength: ownSideLabel.length });
+export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | 'tactical'): string {
+  logTrace('talkPrompt buildTalkSystemText', { labelLength: ownSideLabel.length, scope });
+  const strategic = scope === 'strategic';
+  const purpose = DIPLOMACY_PURPOSE_BULLETS.map((line) => `- ${line}`).join('\n');
+  const agreementBullets = sideAgreementTalkBullets().map((line) => `- ${line}`).join('\n');
+  const agreementsBlock = strategic ? `\nAgreements:\n${agreementBullets}\n` : '';
+  const sameMessages = strategic ? 'the same messages and your agreements' : 'the same messages';
+  const replyRules = strategic ? SIDE_AGREEMENT_REPLY_RULES : 'Use the side codes from the Sides table. Either list may be empty.';
   const source = SIDE_MESSAGE_SOURCE_BULLETS.map((line) => `- ${line}`).join('\n');
   const trust = SIDE_MESSAGE_TRUST_BULLETS.map((line) => `- ${line}`).join('\n');
   const stances = SIDE_STANCES.join(', ');
   const stanceEnum = SIDE_STANCES.join('|');
   const max = RELATIONSHIP_SCALE_MAX;
-  return `You are the commander of ${ownSideLabel} in a turn-based war game. This step is for diplomacy only. You give no orders here. Your orders come in a separate step, right after this one, and that step will show you the same messages.
+  const baseShape = `"messages":[{"to":"<side code>","text":"<message>"}],"stances":[{"toward":"<side code>","stance":"<${stanceEnum}>","trust":<0-${max}>,"threat":<0-${max}>,"reason":"<one sentence>"}]`;
+  const replyShape = strategic ? `{${baseShape},${sideAgreementReplyShape()}}` : `{${baseShape}}`;
+  return `You are the commander of ${ownSideLabel} in a turn-based war game. This step is for diplomacy only. You give no orders here. Your orders come in a separate step, right after this one, and that step will show you ${sameMessages}.
+
+Why diplomacy matters:
+${purpose}
 
 Where messages come from:
 ${source}
@@ -342,10 +370,10 @@ What you may do in this step:
 - You may threaten, bargain, propose, bluff, or lie. Nothing you say binds you, and nothing another commander says binds them.
 - Send nothing when you have nothing worth saying. Silence costs nothing.
 - Set how you regard each side. A stance is your private view of one side: ${stances}. With each stance give trust, from 0 to ${max}, for how far you believe what that side tells you, and threat, from 0 to ${max}, for how dangerous that side is to you now. No other commander is told your stance, trust, or threat. Base all three on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
-
+${agreementsBlock}
 Reply with one JSON object and nothing else:
-{"messages":[{"to":"<side code>","text":"<message>"}],"stances":[{"toward":"<side code>","stance":"<${stanceEnum}>","trust":<0-${max}>,"threat":<0-${max}>,"reason":"<one sentence>"}]}
-Use the side codes from the Sides table. Either list may be empty.`;
+${replyShape}
+${replyRules}`;
 }
 
 /**
@@ -353,7 +381,7 @@ Use the side codes from the Sides table. Either list may be empty.`;
  *
  * Purpose: The user message carries the turn, the sides, the last plan, and the messages this commander may see.
  * When to use: The user message of a talk call.
- * Expected outcome: The diplomacy heading, the sides table, the last plan, the recent-turns section when it is not empty, and the message threads.
+ * Expected outcome: The diplomacy heading, the sides table, the Your agreements section when `input.agreements` is not null, the last plan, the recent-turns section when it is not empty, and the message threads.
  * Exceptions: None.
  */
 export function buildTalkSituationText(input: TalkPromptInput): string {
@@ -375,6 +403,7 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
     blocks.push(`# Diplomacy: turn ${input.turnNumber}`);
   }
   blocks.push(`## Sides\n${sidesTable(input.sides)}`);
+  if (input.agreements !== null) blocks.push(`## Your agreements\n${formatSideAgreementLines(input.agreements)}`);
   blocks.push(`## Your last plan\n${input.lastStrategy ?? '(none yet)'}`);
   if (input.recentTurnsSection.trim().length > 0) blocks.push(input.recentTurnsSection.trim());
   blocks.push(`## Messages\n${formatSideMessageThreads(input.threads, input.sides, 3)}`);

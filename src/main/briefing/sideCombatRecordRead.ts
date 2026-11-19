@@ -9,7 +9,7 @@ import { playerIdCodeFor } from '../../shared/unitIds';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { readSeatRoster } from '../gameDb/seatRosterStore';
 import { getRecentTurnNotes } from '../gameDb/turnNotesHistory';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import { buildSideCombatRecords, type CombatRecordTurn } from './sideCombatRecord';
 import { formatSideCombatRecord } from './sideCombatRecordText';
 import { readStrategicBattleLossesByTurn } from './strategicLossWindow';
@@ -44,6 +44,27 @@ export interface SideCombatRecordView {
 }
 
 /**
+ * Reads the stored strategic loss notes of one commander as combat record turns.
+ *
+ * Purpose: The side records and the agreement evidence count losses from the same stored notes, so both read them through this one function.
+ * When to use: `readSideCombatRecords` and `readSideAgreementViews`, with the turn now being played.
+ * Expected outcome: One entry per stored note row before `currentTurnNumber`, with the commander's own losses, every other owner's losses, and the losses of battles in that window. Empty when no note row exists.
+ * Exceptions: Propagates a database error. Callers catch it.
+ */
+export function readCombatRecordTurns(seatId: AiSeatId, currentTurnNumber: number): CombatRecordTurn[] {
+  const rows = getRecentTurnNotes(gameDbOps, seatId, 'strategic', '', currentTurnNumber);
+  const battleByTurn = readStrategicBattleLossesByTurn(seatId, rows);
+  logTrace('sideCombatRecordRead readCombatRecordTurns', { seatId, currentTurnNumber, rowCount: rows.length });
+  // The stored columns are named from the human's point of view: the "human" column holds every other owner's losses.
+  return rows.map((row) => ({
+    turnNumber: row.turnNumber,
+    ownLosses: parsePlayerLossSummaryJson(row.aiLossJson),
+    otherLosses: parsePlayerLossSummaryJson(row.humanLossJson),
+    battleLosses: battleByTurn.get(row.turnNumber) ?? [],
+  }));
+}
+
+/**
  * Reads the record of one commander against each other active side.
  *
  * Purpose: The talk prompt and the orders prompt show the evidence next to each stance. The window is the one Recent Turn Notes prints, so both agree.
@@ -53,15 +74,7 @@ export interface SideCombatRecordView {
  */
 export function readSideCombatRecords(seatId: AiSeatId, currentTurnNumber: number): ReadonlyMap<string, SideCombatRecordView> {
   try {
-    const rows = getRecentTurnNotes(gameDbOps, seatId, 'strategic', '', currentTurnNumber);
-    const battleByTurn = readStrategicBattleLossesByTurn(seatId, rows);
-    // The stored columns are named from the human's point of view: the "human" column holds every other owner's losses.
-    const turns: CombatRecordTurn[] = rows.map((row) => ({
-      turnNumber: row.turnNumber,
-      ownLosses: parsePlayerLossSummaryJson(row.aiLossJson),
-      otherLosses: parsePlayerLossSummaryJson(row.humanLossJson),
-      battleLosses: battleByTurn.get(row.turnNumber) ?? [],
-    }));
+    const turns = readCombatRecordTurns(seatId, currentTurnNumber);
     const sideIds = activeSeats(readSeatRoster(gameDbOps))
       .filter((seat) => isSeatId(seat.seatId) && seat.seatId !== seatId)
       .map((seat) => seat.seatId);
@@ -69,7 +82,7 @@ export function readSideCombatRecords(seatId: AiSeatId, currentTurnNumber: numbe
     logDebug('sideCombatRecordRead readSideCombatRecords', {
       seatId,
       currentTurnNumber,
-      rowCount: rows.length,
+      rowCount: turns.length,
       sideCount: set?.records.length ?? 0,
     });
     const views = new Map<string, SideCombatRecordView>();

@@ -132,6 +132,15 @@ export interface EnvelopeGates {
    * Exceptions: None.
    */
   readonly includePosture?: boolean;
+  /**
+   * Whether this consult may record keep-or-break decisions on agreements.
+   *
+   * Contract: Strategic consults while `sideAgreementsEnabled('strategic')` is true. Omitted means false.
+   * When to use: Set from `sideAgreementsEnabled`, beside `includePosture`.
+   * Expected outcome: `agreementDecisions` is last in the field list. A tactical consult never includes it.
+   * Exceptions: None.
+   */
+  readonly includeAgreementDecisions?: boolean;
 }
 
 /**
@@ -156,6 +165,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'campaignTarget',
   'operations',
   'posture',
+  'agreementDecisions',
 ] as const;
 
 /**
@@ -230,6 +240,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
     if (field === 'campaignTarget') return gates.coordinateMode !== 'tactical' && gates.includeCampaignTarget === true;
     if (field === 'operations') return gates.coordinateMode !== 'tactical' && gates.includeOperations === true;
     if (field === 'posture') return gates.coordinateMode !== 'tactical' && gates.includePosture === true;
+    if (field === 'agreementDecisions') return gates.coordinateMode !== 'tactical' && gates.includeAgreementDecisions === true;
     return false;
   });
 }
@@ -402,7 +413,7 @@ const TACTICAL_REPAIR_ORDERS: readonly Record<string, unknown>[] = [
  * When to use: The parse-repair user message.
  * Expected outcome: Tactical text contains no assign_order, cancel_order, memoryUpdates, or
  * productionOrders; every gate combination mentions fields in canonical relative order. The
- * operations example is an empty array, so copying it launches nothing.
+ * operations example is an empty array, so copying it launches nothing, and the agreementDecisions example is an empty array, so copying it decides nothing.
  * Exceptions: None.
  */
 export function buildRepairSchemaText(gates: EnvelopeGates): string {
@@ -437,6 +448,8 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
       example.productionOrders = EXAMPLE_PRODUCTION_ORDERS;
     } else if (field === 'operations') {
       example.operations = [];
+    } else if (field === 'agreementDecisions') {
+      example.agreementDecisions = [];
     }
   }
   const json = JSON.stringify(example);

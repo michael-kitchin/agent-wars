@@ -38,6 +38,7 @@ import {
   subHeading,
 } from './promptSpec/sectionHeadings';
 import { buildConsultPromptParts } from './consultPromptParts';
+import { sideAgreementsEnabled } from './sideAgreementGate';
 import { buildOrdersMessagesBlock } from './talk/ordersMessagesBlock';
 import { buildConsultMessages } from './consultPromptMessages';
 import { resolveEffectiveOpenRouterCompletionMaxTokens } from './openRouterCreditLimits';
@@ -363,7 +364,11 @@ export async function requestOrdersFlow(
     return failRequest('Operational map is required for AI prompting and was not generated.', toolInvocationCounts);
   }
   const includeExitBattle = tacticalBattle?.leadPartyId != null;
-  const messagesBlock = buildOrdersMessagesBlock({ seatId, inBattle: Boolean(tacticalBattle) });
+  const messagesBlock = buildOrdersMessagesBlock({
+    seatId,
+    inBattle: Boolean(tacticalBattle),
+    includeAgreements: sideAgreementsEnabled(tacticalBattle ? 'tactical' : 'strategic'),
+  });
   const promptParts = buildConsultPromptParts({
     state: planState,
     coordMap,
@@ -449,6 +454,7 @@ export async function requestOrdersFlow(
     includeCampaignTarget: !tacticalBattle && flags.ordersEnabled && planState.scenarioId === 'region_vs_region',
     includeOperations: !tacticalBattle && flags.ordersEnabled,
     includePosture: !tacticalBattle && flags.ordersEnabled,
+    includeAgreementDecisions: sideAgreementsEnabled(coordinateContext.mode),
     includeExitBattle,
   };
   const wallClockStart = Date.now();

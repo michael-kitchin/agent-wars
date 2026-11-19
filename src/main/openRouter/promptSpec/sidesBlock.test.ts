@@ -27,6 +27,7 @@ test('two seats give two rows and the commander is marked you', () => {
     seats: [seat(HUMAN_SEAT_ID, 1, 'Northern America'), seat('opponent', 2, 'Eastern Europe')],
     includeNeutral: false,
   });
+  assert.ok(text.includes('| Side | Code (unit id prefix) | Home region | Status |'));
   assert.match(text, /\| Eastern Europe \(you\) \| a1 \| Eastern Europe \| Active \|/);
   assert.match(text, /\| Northern America \| h1 \| Northern America \| Active \|/);
   assert.equal(text.includes('Out since turn'), false);

@@ -1,5 +1,6 @@
 import { logDebug } from '../logger';
 import { POSTURE_MIN_HOLD_TURNS, POSTURES } from '../../shared/postureTypes';
+import { SIDE_AGREEMENT_DECISIONS_PARAGRAPH } from './promptSpec/diplomacyRuleText';
 import {
   EXAMPLE_CALLBACKS,
   EXAMPLE_MEMORY_UPDATES,
@@ -146,6 +147,15 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   includePosture?: boolean;
+  /**
+   * When true, the contract names optional `agreementDecisions` after `posture`.
+   *
+   * Contract: Omitted means false. True on a strategic consult while `sideAgreementsEnabled('strategic')` is true. Never true in a battle.
+   * When to use: Pass `sideAgreementsEnabled(coordinateContext.mode)` from `buildConsultPromptParts`.
+   * Expected outcome: The header and one paragraph name the field. The example omits it.
+   * Exceptions: None.
+   */
+  includeAgreementDecisions?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -179,6 +189,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeCampaignTarget = false,
     includeOperations = false,
     includePosture = false,
+    includeAgreementDecisions = false,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -196,6 +207,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeCampaignTarget,
     includeOperations,
     includePosture,
+    includeAgreementDecisions,
     coordinateMode,
     structuredOutputs,
   });
@@ -211,6 +223,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeCampaignTarget: coordinateMode !== 'tactical' && includeCampaignTarget,
     includeOperations: coordinateMode !== 'tactical' && includeOperations,
     includePosture: coordinateMode !== 'tactical' && includePosture,
+    includeAgreementDecisions: coordinateMode !== 'tactical' && includeAgreementDecisions,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
@@ -227,6 +240,7 @@ export function buildFinalJsonContractInstruction(args: {
     campaignTarget: '"campaignTarget": "<optional hex code>"',
     operations: '"operations": [...]',
     posture: '"posture": "<optional posture>"',
+    agreementDecisions: '"agreementDecisions": [...]',
   };
   const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
     .map((field) => headerSlots[field])
@@ -273,6 +287,7 @@ export function buildFinalJsonContractInstruction(args: {
     gates.includePosture === true
       ? `Optional "posture": one of ${POSTURES.join(', ')}. Omit it to keep your posture. A posture holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change; the Posture section of the briefing says when.`
       : '';
+  const agreementDecisionsParagraph = gates.includeAgreementDecisions === true ? SIDE_AGREEMENT_DECISIONS_PARAGRAPH : '';
   const paragraphs = [
     ...(structuredOutputs ? [] : [submitHeader]),
     ...(structuredOutputs ? strictSchemaParagraphs.slice(1) : strictSchemaParagraphs),
@@ -285,6 +300,7 @@ export function buildFinalJsonContractInstruction(args: {
     campaignParagraph,
     operationsParagraph,
     postureParagraph,
+    agreementDecisionsParagraph,
     memoryParagraph,
     ...productionClause.split('\n\n'),
   ].map((part) => part.trim()).filter((part) => part.length > 0);

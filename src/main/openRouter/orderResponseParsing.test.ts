@@ -459,6 +459,7 @@ const tests = [
   { name: 'parseOrdersResponse campaignTarget keeps a code and drops a non-code', fn: testCampaignTargetCodeOrDropReason },
   { name: 'parseOrdersResponse operations yields commands on strategic and nothing on tactical', fn: testOperationsCommandsOnStrategicOnly },
   { name: 'parseOrdersResponse posture keeps a known name and drops an unknown one', fn: testPostureNameOrDropReason },
+  { name: 'parseOrdersResponse agreementDecisions are read on strategic and ignored on tactical', fn: testAgreementDecisionsStrategicOnly },
 ];
 
 /**
@@ -529,6 +530,28 @@ function testPostureNameOrDropReason(): void {
   assert.ok(tactical);
   assert.strictEqual(tactical!.postureChoice, undefined);
   assert.ok(!(tactical!.dropReasons ?? []).some((reason) => reason.includes('posture')));
+}
+
+/**
+ * Reads `agreementDecisions` on the world map only.
+ *
+ * Purpose: A strategic reply may decide on agreements, and a battle reply never does.
+ * When to use: After the envelope parse of `agreementDecisions`.
+ * Expected outcome: A strategic reply with one valid decision has one entry. A tactical reply with the same key has none and no drop reason from it.
+ * Exceptions: None.
+ */
+function testAgreementDecisionsStrategicOnly(): void {
+  const text = '{"strategy":"hold","orders":[],"agreementDecisions":[{"id":7,"decision":"break","reason":"Open front."}]}';
+  const strategic = parseFixture(text);
+  assert.ok(strategic);
+  assert.deepStrictEqual(strategic!.agreementDecisions, [{ agreementId: 7, decision: 'break', reason: 'Open front.' }]);
+  ensureStrategicCoordinateRegistryInitialized();
+  const hexList = minimalState.hexes.map((hex) => hex.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const tactical = parseOrdersResponse(text, resolveToH3, minimalState, latLngByH3, false, { mode: 'tactical', battleId: 'agreements' });
+  assert.ok(tactical);
+  assert.strictEqual(tactical!.agreementDecisions, undefined);
+  assert.ok(!(tactical!.dropReasons ?? []).some((reason) => reason.includes('agreementDecisions')));
 }
 
 function run(): void {
