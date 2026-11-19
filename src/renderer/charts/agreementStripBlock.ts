@@ -24,7 +24,7 @@ import { createAgreementTimeline } from './agreementTimeline';
  * Exceptions: None.
  */
 const AGREEMENT_LEGEND_TEXT =
-  'Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record an active agreement.';
+  'Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record a matching proposed or active agreement.';
 
 /**
  * The tooltip of the Kind dropdown.

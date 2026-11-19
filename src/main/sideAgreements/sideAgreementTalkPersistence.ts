@@ -14,6 +14,7 @@ import {
   insertSideAgreement,
   listSideAgreementsForSeat,
   updateSideAgreement,
+  type SideAgreementRow,
 } from '../gameDb/sideAgreementStore';
 import { recordSideAgreementRecorded } from '../recorder/sideAgreementRecordingEvents';
 import type { TalkReplyAgreement } from '../openRouter/talk/sideAgreementReply';
@@ -89,7 +90,7 @@ export interface PersistTalkAgreementsArgs {
  *
  * Purpose: Applies the limits that depend on the match: who is still in it, how many agreements are open with one side, and how long an agreement may run.
  * When to use: Inside the talk round's transaction. This function opens none.
- * Expected outcome: Nothing happens, and zeros are returned, unless the step is strategic. A new entry (id 0) is dropped when its side or third side is out, its status is not `proposed` or `active`, the commander already holds `SIDE_AGREEMENT_MAX_OPEN_PER_SIDE` open agreements with that side, its end turn cannot be fixed, or a no-entry zone translates to no hex. A change (positive id) is dropped when the agreement is missing, belongs to another seat, differs in side or kind, is not open, or has an end turn or zone that cannot be fixed. A change that alters a stored field is recorded with the previous status. An unchanged entry counts as stored.
+ * Expected outcome: Nothing happens, and zeros are returned, unless the step is strategic. A new entry (id 0) is dropped when its side or third side is out, its status is not `proposed` or `active`, the commander already holds `SIDE_AGREEMENT_MAX_OPEN_PER_SIDE` open agreements with that side, its end turn cannot be fixed, or a no-entry zone translates to no hex. A new entry that repeats an open agreement of the same side, kind, third side, terms, and zone is applied to that agreement as a change, so it adds no copy. A change (positive id) is dropped when the agreement is missing, belongs to another seat, differs in side or kind, is not open, or has an end turn or zone that cannot be fixed. A change that alters a stored field is recorded with the previous status. An unchanged entry counts as stored.
  * Exceptions: Propagates a SQLite error.
  */
 export function persistTalkAgreements(args: PersistTalkAgreementsArgs): { readonly storedCount: number; readonly droppedCount: number } {
@@ -118,6 +119,68 @@ export function persistTalkAgreements(args: PersistTalkAgreementsArgs): { readon
         )
     ).length;
 
+  /**
+   * Finds an open agreement that a new entry only repeats.
+   *
+   * Purpose: A model that proposes the same deal again with id 0 (it forgot or ignored the id) must not stack copies that each count toward the limit and show in the ledger and the chart.
+   * When to use: Before a new entry (id 0) is stored.
+   * Expected outcome: The lowest-id open agreement of this commander with the same other side, kind, third side, and terms (compared without regard to case), and for a no-entry zone the same hexes in the same order. Null when there is none.
+   * Exceptions: Propagates a SQLite error.
+   */
+  const findOpenDuplicate = (entry: TalkReplyAgreement, zoneH3: readonly string[]): SideAgreementRow | null => {
+    const terms = entry.terms.toLowerCase();
+    return (
+      listSideAgreementsForSeat(gameDbOps, seatId).find(
+        (row) =>
+          row.counterpartSeatId === entry.withSeatId &&
+          row.kind === entry.kind &&
+          row.againstSeatId === entry.againstSeatId &&
+          row.terms.toLowerCase() === terms &&
+          row.zoneH3.length === zoneH3.length &&
+          row.zoneH3.every((hex, index) => hex === zoneH3[index]) &&
+          isOpenSideAgreementStanding(
+            sideAgreementStanding({ status: row.status, endTurn: row.endTurn, currentTurn, counterpartActive: activeSeatIds.has(row.counterpartSeatId) })
+          )
+      ) ?? null
+    );
+  };
+
+  /**
+   * Applies one entry to an agreement that already exists.
+   *
+   * Purpose: One path serves a change by id and a repeated proposal, so both are checked and recorded the same way.
+   * When to use: When the entry names, or repeats, an existing agreement.
+   * Expected outcome: True when the entry is stored, including an unchanged resend. False when the agreement is not this commander's, differs in side or kind, is no longer open, or its end turn cannot be fixed. A change that alters a stored field is recorded with the previous status. An active agreement sent as `proposed` stays active.
+   * Exceptions: Propagates a SQLite error.
+   */
+  const applyToExisting = (existing: SideAgreementRow | null, entry: TalkReplyAgreement, zoneH3: readonly string[]): boolean => {
+    if (!existing || existing.seatId !== seatId || existing.counterpartSeatId !== entry.withSeatId || existing.kind !== entry.kind) return false;
+    const standing = sideAgreementStanding({
+      status: existing.status,
+      endTurn: existing.endTurn,
+      currentTurn,
+      counterpartActive: activeSeatIds.has(existing.counterpartSeatId),
+    });
+    const endTurn = resolveSideAgreementEndTurn({ startTurn: existing.startTurn, currentTurn, requestedEndTurn: entry.endTurn });
+    if (!isOpenSideAgreementStanding(standing) || endTurn === null) return false;
+    // Sending an active agreement again as `proposed` never takes back an acceptance that was already recorded. To end
+    // one, the commander sets a closing status.
+    const status = existing.status === 'active' && entry.status === 'proposed' ? existing.status : entry.status;
+    const written = updateSideAgreement(gameDbOps, {
+      agreementId: existing.agreementId,
+      terms: entry.terms,
+      zoneH3,
+      endTurn,
+      status,
+      intent: entry.intent,
+      reason: entry.reason,
+      turnNumber: currentTurn,
+    });
+    if (written === null) return false;
+    if (written.changed) recordSideAgreementRecorded({ step, row: written.row, previousStatus: written.previousStatus });
+    return true;
+  };
+
   for (const entry of agreements) {
     const zoneH3 = entry.kind === 'no_entry_zone' ? zoneCodesToH3(entry.zoneCodes, translator).h3 : [];
     if (entry.kind === 'no_entry_zone' && zoneH3.length === 0) {
@@ -128,7 +191,17 @@ export function persistTalkAgreements(args: PersistTalkAgreementsArgs): { readon
       const endTurn = resolveSideAgreementEndTurn({ startTurn: currentTurn, currentTurn, requestedEndTurn: entry.endTurn });
       const sideOut = !activeSeatIds.has(entry.withSeatId) || (entry.againstSeatId !== null && !activeSeatIds.has(entry.againstSeatId));
       const statusAllowed = (SIDE_AGREEMENT_NEW_STATUSES as readonly string[]).includes(entry.status);
-      if (endTurn === null || sideOut || !statusAllowed || openCountWith(entry.withSeatId) >= SIDE_AGREEMENT_MAX_OPEN_PER_SIDE) {
+      if (sideOut || !statusAllowed) {
+        droppedCount += 1;
+        continue;
+      }
+      const duplicate = findOpenDuplicate(entry, zoneH3);
+      if (duplicate) {
+        if (applyToExisting(duplicate, entry, zoneH3)) storedCount += 1;
+        else droppedCount += 1;
+        continue;
+      }
+      if (endTurn === null || openCountWith(entry.withSeatId) >= SIDE_AGREEMENT_MAX_OPEN_PER_SIDE) {
         droppedCount += 1;
         continue;
       }
@@ -149,38 +222,8 @@ export function persistTalkAgreements(args: PersistTalkAgreementsArgs): { readon
       storedCount += 1;
       continue;
     }
-    const existing = getSideAgreement(gameDbOps, entry.agreementId);
-    if (!existing || existing.seatId !== seatId || existing.counterpartSeatId !== entry.withSeatId || existing.kind !== entry.kind) {
-      droppedCount += 1;
-      continue;
-    }
-    const standing = sideAgreementStanding({
-      status: existing.status,
-      endTurn: existing.endTurn,
-      currentTurn,
-      counterpartActive: activeSeatIds.has(existing.counterpartSeatId),
-    });
-    const endTurn = resolveSideAgreementEndTurn({ startTurn: existing.startTurn, currentTurn, requestedEndTurn: entry.endTurn });
-    if (!isOpenSideAgreementStanding(standing) || endTurn === null) {
-      droppedCount += 1;
-      continue;
-    }
-    const written = updateSideAgreement(gameDbOps, {
-      agreementId: existing.agreementId,
-      terms: entry.terms,
-      zoneH3,
-      endTurn,
-      status: entry.status,
-      intent: entry.intent,
-      reason: entry.reason,
-      turnNumber: currentTurn,
-    });
-    if (written === null) {
-      droppedCount += 1;
-      continue;
-    }
-    if (written.changed) recordSideAgreementRecorded({ step, row: written.row, previousStatus: written.previousStatus });
-    storedCount += 1;
+    if (applyToExisting(getSideAgreement(gameDbOps, entry.agreementId), entry, zoneH3)) storedCount += 1;
+    else droppedCount += 1;
   }
   logDebug('sideAgreementTalkPersistence persistTalkAgreements done', { seatId, turnNumber: currentTurn, storedCount, droppedCount });
   return { storedCount, droppedCount };

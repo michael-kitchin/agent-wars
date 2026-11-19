@@ -147,16 +147,26 @@ export function cleanRelationshipScore(raw: unknown): number | null {
 }
 
 /**
+ * Invisible formatting characters that change how text reads without showing.
+ *
+ * Purpose: A model could use a right-to-left override or an isolate to make text read in a different order on screen than it is stored and shown to other commanders. The zero-width space and the word joiner hide text in the same way.
+ * When to use: `cleanSideMessageText` only.
+ * Expected outcome: Matches U+061C, U+200B, U+200E, U+200F, U+202A to U+202E, U+2060, and U+2066 to U+2069. It leaves U+200C and U+200D alone, because emoji sequences and some scripts need them.
+ * Exceptions: None.
+ */
+const INVISIBLE_FORMATTING_PATTERN = /[\u061C\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069]/gu;
+
+/**
  * Turns raw text into one stored line.
  *
- * Purpose: A message and a stance reason share the same cleaning.
+ * Purpose: A message and a stance reason share the same cleaning. Agreement terms and reasons share it too.
  * When to use: Before storing either one.
- * Expected outcome: Empty for a non-string. Otherwise whitespace runs become one space, other control characters are removed, and the result is cut to `maxChars` characters, counting each code point once, without an ellipsis.
+ * Expected outcome: Empty for a non-string. Otherwise the invisible direction and zero-width characters of `INVISIBLE_FORMATTING_PATTERN` are removed first, so one between two spaces cannot leave a double space. Then whitespace runs become one space, other control characters are removed, and the result is cut to `maxChars` characters, counting each code point once, without an ellipsis.
  * Exceptions: None.
  */
 export function cleanSideMessageText(raw: unknown, maxChars: number): string {
   if (typeof raw !== 'string') return '';
-  const collapsed = raw.replace(/\s+/g, ' ');
+  const collapsed = raw.replace(INVISIBLE_FORMATTING_PATTERN, '').replace(/\s+/g, ' ');
   const stripped = Array.from(collapsed).filter((ch) => {
     const code = ch.codePointAt(0) ?? 0;
     return code >= 32 && code !== 127;

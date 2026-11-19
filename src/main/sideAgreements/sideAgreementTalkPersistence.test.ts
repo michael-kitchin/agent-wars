@@ -150,6 +150,69 @@ test('a fourth open agreement with one side is dropped, counting those stored ea
   });
 });
 
+test('a new entry that repeats an open agreement updates it and adds no copy', () => {
+  withMatch(() => {
+    persist([entry()]);
+    assert.deepEqual(persist([entry({ terms: 'NO STRIKES.', endTurn: 9, reason: 'Again.' })]), { storedCount: 1, droppedCount: 0 });
+    const rows = listSideAgreementsForSeat(gameDbOps, OWN);
+    assert.equal(rows.length, 1);
+    assert.deepEqual([rows[0]?.startTurn, rows[0]?.endTurn, rows[0]?.reason], [5, 9, 'Again.']);
+    assert.equal(recordedPayloads().length, 2);
+  });
+});
+
+test('repeating an active deal as proposed keeps it active, and a repeat in the same reply adds no copy', () => {
+  withMatch(() => {
+    persist([entry()]);
+    persist([entry({ status: 'proposed' })]);
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN)[0]?.status, 'active');
+    assert.deepEqual(persist([entry({ terms: 'Fresh.' }), entry({ terms: 'Fresh.' })]), { storedCount: 2, droppedCount: 0 });
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN).length, 2);
+  });
+});
+
+test('a proposal repeated as active is upgraded once, and an active deal sent by id as proposed stays active', () => {
+  withMatch(() => {
+    persist([entry({ status: 'proposed' })]);
+    assert.deepEqual(persist([entry({ status: 'active' })]), { storedCount: 1, droppedCount: 0 });
+    const [row] = listSideAgreementsForSeat(gameDbOps, OWN);
+    assert.equal(row?.status, 'active');
+    assert.equal(recordedPayloads().at(-1)?.previousStatus, 'proposed');
+    persist([entry({ agreementId: row!.agreementId, status: 'proposed' })]);
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN)[0]?.status, 'active');
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN).length, 1);
+  });
+});
+
+test('a repeat is still applied at the open limit, and not when its other side has left', () => {
+  withMatch(() => {
+    persist([entry(), entry({ terms: 'Two.' }), entry({ terms: 'Three.' })]);
+    assert.deepEqual(persist([entry({ terms: 'Two.', reason: 'Still.' })]), { storedCount: 1, droppedCount: 0 });
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN).length, 3);
+    const without = new Set<string>([HUMAN_SEAT_ID, OWN]);
+    const result = persistTalkAgreements({ seatId: OWN, step: strategicStep(5), agreements: [entry()], activeSeatIds: without, zoneTranslator: FAKE_ZONES });
+    assert.deepEqual(result, { storedCount: 0, droppedCount: 1 });
+  });
+});
+
+test('a no-entry zone repeated with the same hexes is one agreement', () => {
+  withMatch(() => {
+    const zone = (zoneCodes: string[]): TalkReplyAgreement => entry({ kind: 'no_entry_zone', zoneCodes });
+    persist([zone(['D4'])]);
+    persist([zone(['D4'])]);
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN).length, 1);
+  });
+});
+
+test('a different kind, third side, or terms is a separate agreement, and a closing status on a new entry is still dropped', () => {
+  withMatch(() => {
+    persist([entry()]);
+    assert.deepEqual(persist([entry({ kind: 'ceasefire_in_place' }), entry({ terms: 'Other terms.' })]), { storedCount: 2, droppedCount: 0 });
+    assert.deepEqual(persist([entry({ status: 'broken_by_me' })]), { storedCount: 0, droppedCount: 1 });
+    assert.equal(listSideAgreementsForSeat(gameDbOps, OWN).length, 3);
+  });
+});
+
 test('an end turn far away is cut to the start plus nine', () => {
   withMatch(() => {
     persist([entry({ endTurn: 35 })]);

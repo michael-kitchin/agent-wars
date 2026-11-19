@@ -39,6 +39,9 @@ test('cleaning collapses whitespace, strips controls, and cuts at the limit', ()
   assert.equal(cleanSideMessageText('a\u0001b', 20), 'ab');
   assert.equal(cleanSideMessageText('x'.repeat(SIDE_MESSAGE_MAX_CHARS + 5), SIDE_MESSAGE_MAX_CHARS).length, SIDE_MESSAGE_MAX_CHARS);
   assert.equal(cleanSideMessageText(42, 20), '');
+  assert.equal(cleanSideMessageText('no \u200B \u2060strikes', 40), 'no strikes');
+  assert.equal(cleanSideMessageText('read \u202Eevil\u202C \u2066x\u2069 a\u200Bb\u200Fc', 40), 'read evil x abc');
+  assert.equal(cleanSideMessageText('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 20), '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}');
   assert.equal(cleanSideMessageText(`${'a'.repeat(279)}😀`, 280), `${'a'.repeat(279)}😀`);
   const cut = cleanSideMessageText(`${'a'.repeat(280)}😀`, 280);
   assert.equal(cut, 'a'.repeat(280));

@@ -44369,7 +44369,7 @@ ${bonuses}`;
   }
 
   // src/renderer/charts/agreementStripBlock.ts
-  var AGREEMENT_LEGEND_TEXT = "Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record an active agreement.";
+  var AGREEMENT_LEGEND_TEXT = "Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record a matching proposed or active agreement.";
   var KIND_CONTROL_TOOLTIP = "Choose which kind of agreement the agreement strip counts.";
   var WITH_CONTROL_TOOLTIP = "Choose the side whose agreements with each commander the strip counts, or all sides.";
   function buildDropdown(caption, ariaLabel, tooltip) {
