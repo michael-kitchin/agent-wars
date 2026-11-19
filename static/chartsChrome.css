@@ -97,7 +97,11 @@
 .charts-tooltip-line { display: flex; align-items: center; gap: 0.35rem; }
 .charts-tooltip-total { margin-top: 0.15rem; border-top: 1px solid var(--chrome-border); padding-top: 0.15rem; }
 .charts-tooltip-wrap { white-space: normal; max-width: 32rem; }
-.charts-tooltip-emphasis { font-weight: 600; margin-top: 0.3rem; }
+.charts-tooltip-emphasis { margin-top: 0.3rem; }
+.charts-tooltip-lead { font-weight: 600; }
+/* A line that opens with a bold lead-in reads as one run of text that wraps under itself, not as two flex columns. */
+.charts-tooltip-line:has(> .charts-tooltip-lead) { display: block; }
+.charts-tooltip-list { margin: 0; padding-left: 1.1rem; list-style: disc; }
 .charts-agreement-legend { margin: 0.25rem 0 0; color: var(--chrome-muted); font-size: 11px; }
 .charts-block-controls { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 /* One content-width column per stack, spread across the row and centered. A narrow dialog wraps them. */

@@ -44037,7 +44037,7 @@ ${bonuses}`;
   function itemLines(item, nameOf, displayText) {
     const counterpartName = nameOf(item.counterpartSeatId);
     const against = item.againstSeatId === null ? "" : `, against ${nameOf(item.againstSeatId)}`;
-    const head2 = `#${item.agreementId} ${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
+    const head2 = `${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
     const lines = [`Terms: ${displayText(item.terms)}`];
     if (item.zoneCodes.length > 0) lines.push(`Zone: ${item.zoneCodes.join(", ")}`);
     if (item.latestDecision) {
@@ -44048,11 +44048,14 @@ ${bonuses}`;
     const record = item.counterpartRecord;
     if (record.kind === "match") lines.push(`${counterpartName} records it as #${record.agreementId} (${record.standing})`);
     if (record.kind === "none") lines.push(`${counterpartName} records no matching agreement`);
-    return [{ text: head2, emphasis: true }, ...lines.map((text) => ({ text, emphasis: false }))];
+    return [
+      { lead: `Agreement #${item.agreementId}:`, text: head2, emphasis: true },
+      ...lines.map((text) => ({ text, bullet: true, emphasis: false }))
+    ];
   }
   function agreementCellTooltip(args) {
     const { rowSeatId, turn, cell, nameOf, displayText } = args;
-    const heading = `${nameOf(rowSeatId)}, turn ${turn}`;
+    const heading = `${nameOf(rowSeatId)} (turn ${turn})`;
     if (cell.items.length === 0) return { heading, lines: [{ text: "No matching agreements.", emphasis: false }] };
     return { heading, lines: cell.items.flatMap((item) => itemLines(item, nameOf, displayText)) };
   }
@@ -44067,6 +44070,36 @@ ${bonuses}`;
   }
   function tickStep(cellWidth) {
     return Math.max(1, Math.ceil(40 / Math.max(1, cellWidth)));
+  }
+  function tooltipLineElements(lines) {
+    const elements = [];
+    let list = null;
+    for (const entry of lines) {
+      if (entry.bullet === true) {
+        if (list === null) {
+          list = document.createElement("ul");
+          list.className = "charts-tooltip-list";
+          elements.push(list);
+        }
+        const item = document.createElement("li");
+        item.textContent = entry.text;
+        list.append(item);
+        continue;
+      }
+      list = null;
+      const line = document.createElement("div");
+      line.className = entry.emphasis ? "charts-tooltip-line charts-tooltip-emphasis" : "charts-tooltip-line";
+      if (entry.lead !== void 0) {
+        const lead = document.createElement("span");
+        lead.className = "charts-tooltip-lead";
+        lead.textContent = entry.lead;
+        line.append(lead, document.createTextNode(` ${entry.text}`));
+      } else {
+        line.textContent = entry.text;
+      }
+      elements.push(line);
+    }
+    return elements;
   }
   function createStripTimeline(args) {
     const { paintCell } = args;
@@ -44199,12 +44232,7 @@ ${bonuses}`;
       const heading = document.createElement("div");
       heading.className = "charts-tooltip-heading";
       heading.textContent = content.heading;
-      const lines = content.lines.map((entry) => {
-        const line = document.createElement("div");
-        line.className = entry.emphasis ? "charts-tooltip-line charts-tooltip-emphasis" : "charts-tooltip-line";
-        line.textContent = entry.text;
-        return line;
-      });
+      const lines = tooltipLineElements(content.lines);
       tooltip.className = args.wrapTooltip === true ? "charts-tooltip charts-tooltip-wrap" : "charts-tooltip";
       tooltip.replaceChildren(heading, ...lines);
       tooltip.hidden = false;

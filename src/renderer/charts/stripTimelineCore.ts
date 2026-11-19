@@ -14,6 +14,7 @@ import type {
   CreateStripTimelineArgs,
   StripTimelineData,
   StripTimelineHandle,
+  StripTooltipLine,
 } from './stripTimelineTypes';
 
 export type {
@@ -88,6 +89,45 @@ export function stripCssColor(name: string, fallback: string): string {
  */
 function tickStep(cellWidth: number): number {
   return Math.max(1, Math.ceil(40 / Math.max(1, cellWidth)));
+}
+
+/**
+ * Builds the elements of a tooltip's lines.
+ *
+ * Purpose: A line can open with a bold lead-in, and consecutive bullet lines read as one list under the line above them.
+ * When to use: `showTooltip`, with the lines the caller returned.
+ * Expected outcome: A `div` for each plain line, with its lead in a `charts-tooltip-lead` span, and one `ul.charts-tooltip-list` of `li` items for each run of bullet lines. Every text is set with `textContent`.
+ * Exceptions: None.
+ */
+function tooltipLineElements(lines: readonly StripTooltipLine[]): HTMLElement[] {
+  const elements: HTMLElement[] = [];
+  let list: HTMLUListElement | null = null;
+  for (const entry of lines) {
+    if (entry.bullet === true) {
+      if (list === null) {
+        list = document.createElement('ul');
+        list.className = 'charts-tooltip-list';
+        elements.push(list);
+      }
+      const item = document.createElement('li');
+      item.textContent = entry.text;
+      list.append(item);
+      continue;
+    }
+    list = null;
+    const line = document.createElement('div');
+    line.className = entry.emphasis ? 'charts-tooltip-line charts-tooltip-emphasis' : 'charts-tooltip-line';
+    if (entry.lead !== undefined) {
+      const lead = document.createElement('span');
+      lead.className = 'charts-tooltip-lead';
+      lead.textContent = entry.lead;
+      line.append(lead, document.createTextNode(` ${entry.text}`));
+    } else {
+      line.textContent = entry.text;
+    }
+    elements.push(line);
+  }
+  return elements;
 }
 
 /**
@@ -366,12 +406,7 @@ export function createStripTimeline<Cell>(args: CreateStripTimelineArgs<Cell>): 
     const heading = document.createElement('div');
     heading.className = 'charts-tooltip-heading';
     heading.textContent = content.heading;
-    const lines = content.lines.map((entry) => {
-      const line = document.createElement('div');
-      line.className = entry.emphasis ? 'charts-tooltip-line charts-tooltip-emphasis' : 'charts-tooltip-line';
-      line.textContent = entry.text;
-      return line;
-    });
+    const lines = tooltipLineElements(content.lines);
     tooltip.className = args.wrapTooltip === true ? 'charts-tooltip charts-tooltip-wrap' : 'charts-tooltip';
     tooltip.replaceChildren(heading, ...lines);
     tooltip.hidden = false;

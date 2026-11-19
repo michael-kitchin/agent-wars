@@ -175,3 +175,14 @@ test('every chart with turns on its X axis opens on the 12-turn window and follo
   assert.equal(line.includes('overBlankSpace'), true, 'no tooltip over the blank space');
   assert.equal(line.includes('plot.setData(toUplotData(next), false);'), true, 'a refresh does not rescale to every turn');
 });
+
+test('a strip tooltip draws a bold lead-in and bullet runs as one list, with text set as text', () => {
+  const builder = getFunctionSource(readRendererSource('charts', 'stripTimelineCore.ts'), 'tooltipLineElements');
+  assert.equal(builder.includes("'charts-tooltip-lead'"), true, 'the lead-in is its own span');
+  assert.equal(builder.includes("'charts-tooltip-list'"), true, 'bullets share one list');
+  assert.equal(builder.includes('innerHTML'), false, 'no tooltip text is parsed as markup');
+  const css = readRepoFile('static', 'chartsChrome.css');
+  assert.match(css, /\.charts-tooltip-lead \{[^}]*font-weight: 600/);
+  assert.match(css, /\.charts-tooltip-list \{[^}]*list-style: disc/);
+  assert.match(css, /\.charts-tooltip-line:has\(> \.charts-tooltip-lead\) \{ display: block/);
+});

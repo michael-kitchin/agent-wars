@@ -65,16 +65,30 @@ test('labels show active, proposed, and breach, and the short label drops the pr
 
 test('an empty cell has the heading and the no-match line', () => {
   assert.deepEqual(tooltipOf(cellOf([])), {
-    heading: 'Sonnet 5.5, turn 7',
+    heading: 'Sonnet 5.5 (turn 7)',
     lines: [{ text: 'No matching agreements.', emphasis: false }],
   });
 });
 
-test('an item head names kind, side, turns, standing, and intent, and only it is emphasized', () => {
+test('an item head has a bold lead-in and then names kind, side, turns, standing, and intent', () => {
   const { lines } = tooltipOf(cellOf([item()]));
-  assert.equal(lines[0].text, '#7 Non-aggression with GPT 6.2 Sol, turns 3 to 8, active, intent opportunistic');
+  assert.equal(lines[0].lead, 'Agreement #7:');
+  assert.equal(lines[0].text, 'Non-aggression with GPT 6.2 Sol, turns 3 to 8, active, intent opportunistic');
   assert.deepEqual(lines.map((line) => line.emphasis), [true, false]);
   assert.equal(lines[1].text, 'Terms: no fire between GPT 6.2 Sol and us');
+});
+
+test('every line under an agreement head is a bullet, and the head and the no-match line are not', () => {
+  const { lines } = tooltipOf(cellOf([
+    item({ zoneCodes: ['CI'], latestDecision: { turnNumber: 5, decision: 'keep', reason: '' }, counterpartRecord: { kind: 'none' } }),
+    item({ agreementId: 8 }),
+  ]));
+  assert.deepEqual(
+    lines.map((line) => (line.lead !== undefined ? 'head' : line.bullet === true ? 'bullet' : 'plain')),
+    ['head', 'bullet', 'bullet', 'bullet', 'bullet', 'head', 'bullet'],
+  );
+  assert.equal(tooltipOf(cellOf([])).lines[0].bullet, undefined);
+  assert.equal(tooltipOf(cellOf([])).lines[0].lead, undefined);
 });
 
 test('a joint action names its target and a zone lists its codes', () => {

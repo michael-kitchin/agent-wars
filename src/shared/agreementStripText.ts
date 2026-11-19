@@ -15,7 +15,7 @@ import { SIDE_AGREEMENT_INTENT_LABELS, SIDE_AGREEMENT_KIND_LABELS } from './side
  *
  * Contract: Plain text, never markup.
  * When to use: Inside `AgreementTooltip`.
- * Expected outcome: The text and whether it is drawn with emphasis.
+ * Expected outcome: The text, an optional bold lead-in, whether it is a list item, and whether it starts a spaced group.
  * Exceptions: None.
  */
 export interface AgreementTooltipLine {
@@ -29,11 +29,29 @@ export interface AgreementTooltipLine {
    */
   readonly text: string;
   /**
-   * Whether the line is drawn with emphasis.
+   * Bold text drawn before `text`.
+   *
+   * Contract: Plain text. Omitted for a line with no lead-in.
+   * When to use: An agreement's head line, which reads `Agreement #7:` in bold and then the rest in regular weight.
+   * Expected outcome: The renderer draws the lead, one space, and `text`.
+   * Exceptions: None.
+   */
+  readonly lead?: string;
+  /**
+   * Whether the line is a bullet in a list.
+   *
+   * Contract: True for the detail lines under an agreement's head line.
+   * When to use: Drawing the line as a list item. Consecutive bullet lines form one list.
+   * Expected outcome: A flag. Omitted means false.
+   * Exceptions: None.
+   */
+  readonly bullet?: boolean;
+  /**
+   * Whether the line starts a spaced group.
    *
    * Contract: True only for an agreement's head line.
-   * When to use: Choosing the line's style.
-   * Expected outcome: A flag.
+   * When to use: Choosing the line's spacing.
+   * Expected outcome: A flag. The renderer adds space above the line.
    * Exceptions: None.
    */
   readonly emphasis: boolean;
@@ -53,7 +71,7 @@ export interface AgreementTooltip {
    *
    * Contract: Plain text.
    * When to use: The first line of the tooltip.
-   * Expected outcome: Text such as `Sonnet 5.5, turn 7`.
+   * Expected outcome: Text such as `Sonnet 5.5 (turn 7)`.
    * Exceptions: None.
    */
   readonly heading: string;
@@ -174,7 +192,7 @@ function breachText(item: AgreementCellItem, counterpartName: string): string {
  *
  * Purpose: One agreement reads as a head line and its detail lines.
  * When to use: For each item of a cell.
- * Expected outcome: The emphasized head line, then terms, zone, decision, breach, and counterpart lines as they apply.
+ * Expected outcome: The head line, with `Agreement #N:` as its bold lead-in, then terms, zone, decision, breach, and counterpart lines as they apply, each as a bullet.
  * Exceptions: None.
  */
 function itemLines(
@@ -184,7 +202,7 @@ function itemLines(
 ): AgreementTooltipLine[] {
   const counterpartName = nameOf(item.counterpartSeatId);
   const against = item.againstSeatId === null ? '' : `, against ${nameOf(item.againstSeatId)}`;
-  const head = `#${item.agreementId} ${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, `
+  const head = `${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, `
     + `turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
   const lines: string[] = [`Terms: ${displayText(item.terms)}`];
   if (item.zoneCodes.length > 0) lines.push(`Zone: ${item.zoneCodes.join(', ')}`);
@@ -196,7 +214,10 @@ function itemLines(
   const record = item.counterpartRecord;
   if (record.kind === 'match') lines.push(`${counterpartName} records it as #${record.agreementId} (${record.standing})`);
   if (record.kind === 'none') lines.push(`${counterpartName} records no matching agreement`);
-  return [{ text: head, emphasis: true }, ...lines.map((text) => ({ text, emphasis: false }))];
+  return [
+    { lead: `Agreement #${item.agreementId}:`, text: head, emphasis: true },
+    ...lines.map((text) => ({ text, bullet: true, emphasis: false })),
+  ];
 }
 
 /**
@@ -209,7 +230,7 @@ function itemLines(
  */
 export function agreementCellTooltip(args: AgreementTooltipArgs): AgreementTooltip {
   const { rowSeatId, turn, cell, nameOf, displayText } = args;
-  const heading = `${nameOf(rowSeatId)}, turn ${turn}`;
+  const heading = `${nameOf(rowSeatId)} (turn ${turn})`;
   if (cell.items.length === 0) return { heading, lines: [{ text: 'No matching agreements.', emphasis: false }] };
   return { heading, lines: cell.items.flatMap((item) => itemLines(item, nameOf, displayText)) };
 }

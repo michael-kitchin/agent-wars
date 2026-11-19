@@ -117,7 +117,7 @@ export interface StripCellRect {
  *
  * Contract: Plain text.
  * When to use: `StripTooltipContent.lines`.
- * Expected outcome: The text and whether it is emphasized.
+ * Expected outcome: The text, an optional bold lead-in, whether it is a list item, and whether it starts a spaced group.
  * Exceptions: None.
  */
 export interface StripTooltipLine {
@@ -131,9 +131,27 @@ export interface StripTooltipLine {
    */
   readonly text: string;
   /**
-   * Whether the line is drawn with emphasis.
+   * Bold text drawn before `text`.
    *
-   * Contract: Adds the class `charts-tooltip-emphasis`.
+   * Contract: Plain text, set with `textContent` in a span with the class `charts-tooltip-lead`. Omitted for a line with no lead-in.
+   * When to use: Drawing the tooltip.
+   * Expected outcome: The lead, one space, then `text`.
+   * Exceptions: None.
+   */
+  readonly lead?: string;
+  /**
+   * Whether the line is a bullet in a list.
+   *
+   * Contract: Consecutive bullet lines are drawn as the items of one `ul` with the class `charts-tooltip-list`.
+   * When to use: Drawing the tooltip.
+   * Expected outcome: A flag. Omitted means false.
+   * Exceptions: None.
+   */
+  readonly bullet?: boolean;
+  /**
+   * Whether the line starts a spaced group.
+   *
+   * Contract: Adds the class `charts-tooltip-emphasis`, which puts space above the line.
    * When to use: Drawing the tooltip.
    * Expected outcome: A flag.
    * Exceptions: None.
