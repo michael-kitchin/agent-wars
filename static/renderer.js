@@ -20292,6 +20292,98 @@ ${bonuses}`;
     return input.matchLoaded && !input.playbackRunning && !input.mapToastShowing && !input.autoAdvance && !input.replayActive;
   }
 
+  // src/shared/chatPanelSize.ts
+  var CHAT_PANEL_MIN_WIDTH = 280;
+  var CHAT_PANEL_MAX_WIDTH = 640;
+  var CHAT_PANEL_MIN_HEIGHT = 140;
+  var CHAT_PANEL_MAP_MARGIN = 24;
+  function clampChatPanelSize(size, mapHeight) {
+    const maxHeight = Math.max(CHAT_PANEL_MIN_HEIGHT, mapHeight - CHAT_PANEL_MAP_MARGIN);
+    return {
+      width: Math.min(CHAT_PANEL_MAX_WIDTH, Math.max(CHAT_PANEL_MIN_WIDTH, Math.round(size.width))),
+      height: Math.min(maxHeight, Math.max(CHAT_PANEL_MIN_HEIGHT, Math.round(size.height)))
+    };
+  }
+
+  // src/renderer/map/mapContainerResize.ts
+  var MAP_CONTAINER_ID = "canvas-container";
+  function observeMapContainerResize(onResize) {
+    let frameId = 0;
+    const schedule = () => {
+      if (frameId !== 0) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        onResize();
+      });
+    };
+    window.addEventListener("resize", schedule);
+    const container = document.getElementById(MAP_CONTAINER_ID);
+    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    if (container) observer?.observe(container);
+    return () => {
+      window.removeEventListener("resize", schedule);
+      observer?.disconnect();
+      if (frameId !== 0) window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    };
+  }
+
+  // src/renderer/chat/chatPanelResize.ts
+  var dragStart = null;
+  var draggedWidth = null;
+  var draggedHeight = null;
+  function chatPanelDraggedWidth() {
+    return draggedWidth;
+  }
+  function applyDraggedChatHeight(panel) {
+    if (draggedHeight === null) return;
+    panel.style.height = `${draggedHeight}px`;
+    panel.style.maxHeight = "calc(100% - 24px)";
+    panel.dataset.draggedHeight = "true";
+  }
+  function clearChatPanelHeight(panel) {
+    panel.style.height = "";
+    panel.style.maxHeight = "";
+    delete panel.dataset.draggedHeight;
+  }
+  function applyPanelSize(panel, width, height) {
+    draggedWidth = width;
+    panel.style.width = `${width}px`;
+    if (height === null) return;
+    draggedHeight = height;
+    applyDraggedChatHeight(panel);
+  }
+  function wireChatPanelResize() {
+    const panel = document.getElementById("chat-panel");
+    const grip = document.getElementById("chat-panel-grip");
+    if (!panel || !grip) return;
+    grip.addEventListener("pointerdown", (event) => {
+      const state = panel.dataset.state;
+      if (event.button !== 0 || state !== "expanded" && state !== "compact") return;
+      event.preventDefault();
+      const box = panel.getBoundingClientRect();
+      dragStart = { x: event.clientX, y: event.clientY, width: box.width, height: box.height, compact: state === "compact" };
+      grip.setPointerCapture(event.pointerId);
+    });
+    grip.addEventListener("pointermove", (event) => {
+      if (!dragStart) return;
+      const mapHeight = document.getElementById(MAP_CONTAINER_ID)?.clientHeight ?? 0;
+      const size = clampChatPanelSize(
+        { width: dragStart.width - (event.clientX - dragStart.x), height: dragStart.height - (event.clientY - dragStart.y) },
+        mapHeight
+      );
+      applyPanelSize(panel, size.width, dragStart.compact ? null : size.height);
+    });
+    const endDrag2 = (event) => {
+      if (!dragStart) return;
+      dragStart = null;
+      if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+    };
+    grip.addEventListener("pointerup", endDrag2);
+    grip.addEventListener("pointercancel", endDrag2);
+    grip.addEventListener("lostpointercapture", endDrag2);
+  }
+
   // src/shared/mapChromePlacement.ts
   var MAP_CHROME_INSET = 12;
   var MAP_CHROME_GAP = 8;
@@ -20388,7 +20480,7 @@ ${bonuses}`;
       mapHeight: mapBox.height,
       bandWidth
     });
-    panel.style.width = `${place.width}px`;
+    panel.style.width = `${chatPanelDraggedWidth() ?? place.width}px`;
     panel.style.right = `${place.right}px`;
     panel.style.bottom = `${place.bottom}px`;
     const history = document.getElementById("chat-panel-history");
@@ -26551,7 +26643,7 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/newGameDialogMove.ts
-  var dragStart = null;
+  var dragStart2 = null;
   function dialogAndArea() {
     const panel = document.getElementById("game-over-overlay");
     const area = document.getElementById("app-body");
@@ -26571,7 +26663,7 @@ ${bonuses}`;
     panel.style.top = `${place.top}px`;
   }
   function placeNewGameDialogAtInset() {
-    dragStart = null;
+    dragStart2 = null;
     const parts = dialogAndArea();
     if (!parts) return;
     parts.panel.style.removeProperty("left");
@@ -26584,8 +26676,8 @@ ${bonuses}`;
     applyOffset(parts.panel, parts.area, parts.panel.offsetLeft, parts.panel.offsetTop, panelHeight ?? parts.panel.offsetHeight);
   }
   function endDrag() {
-    if (!dragStart) return;
-    dragStart = null;
+    if (!dragStart2) return;
+    dragStart2 = null;
     layoutMapChrome();
   }
   function wireNewGameDialogMove() {
@@ -26596,13 +26688,13 @@ ${bonuses}`;
       const parts = dialogAndArea();
       if (!parts) return;
       event.preventDefault();
-      dragStart = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
+      dragStart2 = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
       grip.setPointerCapture(event.pointerId);
     });
     grip.addEventListener("pointermove", (event) => {
       const parts = dialogAndArea();
-      if (!dragStart || !parts) return;
-      applyOffset(parts.panel, parts.area, dragStart.left + event.clientX - dragStart.x, dragStart.top + event.clientY - dragStart.y);
+      if (!dragStart2 || !parts) return;
+      applyOffset(parts.panel, parts.area, dragStart2.left + event.clientX - dragStart2.x, dragStart2.top + event.clientY - dragStart2.y);
     });
     grip.addEventListener("pointerup", endDrag);
     grip.addEventListener("pointercancel", endDrag);
@@ -32694,7 +32786,7 @@ ${bonuses}`;
     slide2?.cancel();
     slide2 = null;
     panel.dataset.state = expanded2 ? "expanded" : "compact";
-    panel.style.height = "";
+    if (!expanded2) clearChatPanelHeight(panel);
   }
   function slideChat(panel, from, to) {
     slide2 = startPanelHeightSlide(panel, from, to, (finished) => {
@@ -32711,12 +32803,13 @@ ${bonuses}`;
     if (expanded2) {
       scrollHistoryToEnd = true;
       panel.dataset.state = "expanding";
+      applyDraggedChatHeight(panel);
       renderChatPanel();
       slideChat(panel, from, panel.getBoundingClientRect().height);
       return;
     }
     panel.dataset.state = "collapsing";
-    panel.style.height = "";
+    clearChatPanelHeight(panel);
     const borders = panel.offsetHeight - panel.clientHeight;
     slideChat(panel, from, bar.offsetHeight + borders);
   }
@@ -32739,7 +32832,7 @@ ${bonuses}`;
       })
     );
     probe.remove();
-    const paddingBordersAndArrow = 28;
+    const paddingBordersAndArrow = 34;
     select.style.width = `${widest + paddingBordersAndArrow}px`;
   }
   function syncSendEnabled() {
@@ -32934,6 +33027,7 @@ ${bonuses}`;
       syncExpandControl(button);
       button.addEventListener("click", () => toggleChatPanel(panel, bar, button));
     }
+    wireChatPanelResize();
     const input = chatMessageField();
     if (input) {
       input.addEventListener("input", () => syncSendEnabled());
@@ -32972,44 +33066,21 @@ ${bonuses}`;
     };
   }
 
-  // src/renderer/map/mapContainerResize.ts
-  var MAP_CONTAINER_ID = "canvas-container";
-  function observeMapContainerResize(onResize) {
-    let frameId = 0;
-    const schedule = () => {
-      if (frameId !== 0) return;
-      frameId = window.requestAnimationFrame(() => {
-        frameId = 0;
-        onResize();
-      });
-    };
-    window.addEventListener("resize", schedule);
-    const container = document.getElementById(MAP_CONTAINER_ID);
-    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    if (container) observer?.observe(container);
-    return () => {
-      window.removeEventListener("resize", schedule);
-      observer?.disconnect();
-      if (frameId !== 0) window.cancelAnimationFrame(frameId);
-      frameId = 0;
-    };
-  }
-
   // src/renderer/gameplay/selectionPanelResize.ts
-  var dragStart2 = null;
-  var draggedHeight = null;
+  var dragStart3 = null;
+  var draggedHeight2 = null;
   function applyDraggedPanelHeight(panel) {
-    if (draggedHeight === null) return;
-    panel.style.height = `${draggedHeight}px`;
+    if (draggedHeight2 === null) return;
+    panel.style.height = `${draggedHeight2}px`;
     panel.style.maxHeight = "calc(100% - 24px)";
   }
   function clearPanelHeight(panel) {
     panel.style.height = "";
     panel.style.maxHeight = "";
   }
-  function applyPanelSize(panel, width, height) {
+  function applyPanelSize2(panel, width, height) {
     panel.style.width = `${width}px`;
-    draggedHeight = height;
+    draggedHeight2 = height;
     applyDraggedPanelHeight(panel);
   }
   function wireSelectionPanelResize() {
@@ -33020,21 +33091,21 @@ ${bonuses}`;
       if (event.button !== 0 || panel.dataset.state !== "expanded") return;
       event.preventDefault();
       const box = panel.getBoundingClientRect();
-      dragStart2 = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
+      dragStart3 = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
       grip.setPointerCapture(event.pointerId);
     });
     grip.addEventListener("pointermove", (event) => {
-      if (!dragStart2) return;
+      if (!dragStart3) return;
       const mapHeight = document.getElementById(MAP_CONTAINER_ID)?.clientHeight ?? 0;
       const size = clampSelectionPanelSize(
-        { width: dragStart2.width + (event.clientX - dragStart2.x), height: dragStart2.height - (event.clientY - dragStart2.y) },
+        { width: dragStart3.width + (event.clientX - dragStart3.x), height: dragStart3.height - (event.clientY - dragStart3.y) },
         mapHeight
       );
-      applyPanelSize(panel, size.width, size.height);
+      applyPanelSize2(panel, size.width, size.height);
     });
     const endDrag2 = (event) => {
-      if (!dragStart2) return;
-      dragStart2 = null;
+      if (!dragStart3) return;
+      dragStart3 = null;
       if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
     };
     grip.addEventListener("pointerup", endDrag2);
@@ -43578,22 +43649,22 @@ ${bonuses}`;
       const factor = event.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
       showRange(zoomedTurnRange({ range, full, anchor: anchor3, factor, minSpan: MIN_ZOOM_SPAN_TURNS }));
     };
-    let dragStart3 = null;
+    let dragStart4 = null;
     const onPointerDown = (event) => {
       const range = currentRange();
       if (event.button !== 0) return;
-      dragStart3 = { x: event.clientX, range };
+      dragStart4 = { x: event.clientX, range };
       plot.over.setPointerCapture(event.pointerId);
     };
     const onPointerMove = (event) => {
       const full = fullTurnRange(data);
-      if (dragStart3 === null) return;
-      const turnsPerPixel = (dragStart3.range.max - dragStart3.range.min) / Math.max(1, plot.over.clientWidth);
-      const deltaTurns = -(event.clientX - dragStart3.x) * turnsPerPixel;
-      showRange(pannedTurnRange({ range: dragStart3.range, full, deltaTurns }));
+      if (dragStart4 === null) return;
+      const turnsPerPixel = (dragStart4.range.max - dragStart4.range.min) / Math.max(1, plot.over.clientWidth);
+      const deltaTurns = -(event.clientX - dragStart4.x) * turnsPerPixel;
+      showRange(pannedTurnRange({ range: dragStart4.range, full, deltaTurns }));
     };
     const onPointerEnd = () => {
-      dragStart3 = null;
+      dragStart4 = null;
     };
     const onDoubleClick = () => {
       showRange(fullTurnRange(data));
@@ -43809,7 +43880,7 @@ ${bonuses}`;
     let size = { width: args.width, height: args.height };
     let strip = { turns: [], rows: [] };
     let view2 = null;
-    let dragStart3 = null;
+    let dragStart4 = null;
     const labels = document.createElement("div");
     labels.className = "charts-strip-labels";
     const canvas = document.createElement("canvas");
@@ -43920,7 +43991,7 @@ ${bonuses}`;
     const onPointerDown = (event) => {
       const range = visibleRange();
       if (event.button !== 0) return;
-      dragStart3 = { x: event.clientX, range };
+      dragStart4 = { x: event.clientX, range };
       canvas.setPointerCapture(event.pointerId);
     };
     const showTooltip = (event) => {
@@ -43951,15 +44022,15 @@ ${bonuses}`;
     };
     const onPointerMove = (event) => {
       const full = fullRange();
-      if (dragStart3 !== null) {
-        const turnsPerPixel = (dragStart3.range.max - dragStart3.range.min + 1) / plotWidth();
-        showRange(pannedTurnRange({ range: dragStart3.range, full, deltaTurns: -(event.clientX - dragStart3.x) * turnsPerPixel }));
+      if (dragStart4 !== null) {
+        const turnsPerPixel = (dragStart4.range.max - dragStart4.range.min + 1) / plotWidth();
+        showRange(pannedTurnRange({ range: dragStart4.range, full, deltaTurns: -(event.clientX - dragStart4.x) * turnsPerPixel }));
         return;
       }
       showTooltip(event);
     };
     const onPointerEnd = () => {
-      dragStart3 = null;
+      dragStart4 = null;
     };
     const onPointerLeave = () => {
       tooltip.hidden = true;
