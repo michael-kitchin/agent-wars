@@ -49,6 +49,8 @@ test('end turn is capped at ten turns from the start and never in the past', () 
   assert.equal(at(5, 5, '8'), null);
   assert.equal(at(5, 5, 8.5), null);
   assert.equal(at(5, 15, 15), null);
+  assert.equal(at(Number.NaN, 5, 8), null);
+  assert.equal(at(5, Number.NaN, 8), null);
 });
 
 test('standing follows the stored status, the other side, and the end turn', () => {

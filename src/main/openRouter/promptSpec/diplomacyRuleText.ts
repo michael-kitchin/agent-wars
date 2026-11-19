@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { logTrace } from '../../logger';
 import {
   SIDE_AGREEMENT_KINDS,
   SIDE_AGREEMENT_INTENTS,
@@ -35,11 +36,11 @@ export const DIPLOMACY_PURPOSE_BULLETS = [
  *
  * Purpose: Explains what an agreement is, its kinds, statuses, limits, and how to change one.
  * When to use: The "Agreements:" block of the strategic talk system text only.
- * Expected outcome: Eight bullets, without the leading hyphen. They hold only fixed limits, never a turn number or a count that changes during a match.
+ * Expected outcome: Nine bullets, without the leading hyphen. They hold only fixed limits, never a turn number or a count that changes during a match.
  * Exceptions: None.
  */
 export function sideAgreementTalkBullets(): readonly string[] {
-  return [
+  const bullets = [
     'An agreement is your private record of what you believe you and one other side have agreed to. That side keeps its own record, which may differ from yours. No other commander sees your record, and the game does not enforce any agreement.',
     "The kinds are: non_aggression (neither side strikes the other or moves into the other's hexes), ceasefire_in_place (neither side strikes the other, and both hold their current lines), no_entry_zone (neither side moves into the hexes listed in zone), joint_action (both sides act against the side named in against), and information_sharing (both sides tell each other what they see).",
     'Record an agreement when you propose one, or when you believe one has been made. Use status proposed until you believe the other side has accepted, then active. When an agreement ends early, set its status to ended, broken_by_them, or broken_by_me.',
@@ -50,6 +51,8 @@ export function sideAgreementTalkBullets(): readonly string[] {
     'The section titled Your agreements shows each open agreement with the losses both ways since it began. That record comes from the game, not from either side.',
     'To change an agreement, send it again with its id and every field, changed or not. Use id 0 for a new agreement. You cannot change who an agreement is with, its kind, or the turn it began.',
   ];
+  logTrace('diplomacyRuleText sideAgreementTalkBullets', { bulletCount: bullets.length });
+  return bullets;
 }
 
 /**
@@ -74,7 +77,9 @@ export const SIDE_AGREEMENT_ORDERS_BULLETS = [
  * Exceptions: None.
  */
 export function sideAgreementReplyShape(): string {
-  return `"agreements":[{"id":<agreement id, or 0 for a new one>,"with":"<side code>","kind":"<${SIDE_AGREEMENT_KINDS.join('|')}>","terms":"<one sentence>","zone":["<hex code>"],"against":"<side code, or ${SIDE_AGREEMENT_NO_THIRD_SIDE}>","endTurn":<turn number>,"status":"<${SIDE_AGREEMENT_STATUSES.join('|')}>","intent":"<${SIDE_AGREEMENT_INTENTS.join('|')}>","reason":"<one sentence>"}]`;
+  const shape = `"agreements":[{"id":<agreement id, or 0 for a new one>,"with":"<side code>","kind":"<${SIDE_AGREEMENT_KINDS.join('|')}>","terms":"<one sentence>","zone":["<hex code>"],"against":"<side code, or ${SIDE_AGREEMENT_NO_THIRD_SIDE}>","endTurn":<turn number>,"status":"<${SIDE_AGREEMENT_STATUSES.join('|')}>","intent":"<${SIDE_AGREEMENT_INTENTS.join('|')}>","reason":"<one sentence>"}]`;
+  logTrace('diplomacyRuleText sideAgreementReplyShape', { length: shape.length });
+  return shape;
 }
 
 /**

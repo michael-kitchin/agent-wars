@@ -1,8 +1,8 @@
 /**
- * The Sides table for a strategic system prompt.
+ * The Sides table for every orders system prompt.
  *
  * Purpose: Each commander is told who is still playing, who is out, and that Neutral garrisons are hostile.
- * When to use: Immediately before the Scenario Objective block in a strategic prompt, and in the system text of a battle prompt.
+ * When to use: In every orders system prompt, after the scenario block in a strategic prompt and after the goal statement in a battle prompt.
  * Expected outcome: A Markdown table. The commander's row is first and marked "(you)". Other seats follow in seat order.
  * Exceptions: None.
  */
@@ -68,7 +68,7 @@ const NEUTRAL_STATUS =
  * Builds the Sides table.
  *
  * Purpose: The commander sees every seat, including seats already knocked out, and Neutral only when a neutral unit exists.
- * When to use: Strategic `buildSystemPromptForTools`, immediately before the scenario objective.
+ * When to use: `buildSystemPromptForTools` in both theaters, after the scenario block (strategic) or the goal statement (battle).
  * Expected outcome: A heading, a four-column table (Side, Code (unit id prefix), Home region, Status), and a Neutral row when `includeNeutral` is true. An empty seat list returns an empty string.
  * Exceptions: `playerIdCodeFor` throws when a seat id is not a seat. Callers pass roster ids only.
  */

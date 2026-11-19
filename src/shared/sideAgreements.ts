@@ -190,7 +190,9 @@ export const SIDE_AGREEMENT_MAX_DECISIONS = 12;
 /**
  * How many turns a closed agreement stays in the ledger.
  *
- * Purpose: A commander sees how an agreement ended for a short while, then the ledger forgets it.
+ * Purpose: A commander sees how an agreement ended for a while, then the ledger forgets it. A closed agreement stays
+ *   until this many turns after the later of its last change and its end turn, so one broken early stays in view
+ *   until shortly after the turn it would have ended.
  * When to use: Choosing which agreements to show.
  * Expected outcome: 2.
  * Exceptions: None.
@@ -298,11 +300,12 @@ export interface ResolveSideAgreementEndTurnArgs {
  *
  * Purpose: Every agreement ends within `SIDE_AGREEMENT_MAX_TURNS` of its start, and never in the past.
  * When to use: Storing a new agreement or a change to one.
- * Expected outcome: The requested end turn, cut to the span cap, or null when it is not an integer or the result is before the current turn.
+ * Expected outcome: The requested end turn, cut to the span cap, or null when any of the three turns is not an integer or the result is before the current turn.
  * Exceptions: None.
  */
 export function resolveSideAgreementEndTurn(args: ResolveSideAgreementEndTurnArgs): number | null {
   const { startTurn, currentTurn, requestedEndTurn } = args;
+  if (!Number.isInteger(startTurn) || !Number.isInteger(currentTurn)) return null;
   if (typeof requestedEndTurn !== 'number' || !Number.isInteger(requestedEndTurn)) return null;
   if (requestedEndTurn < currentTurn) return null;
   const capped = Math.min(requestedEndTurn, startTurn + SIDE_AGREEMENT_MAX_TURNS - 1);

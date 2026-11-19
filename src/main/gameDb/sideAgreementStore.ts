@@ -8,7 +8,7 @@
  */
 
 import type { BasicDbOps } from './dbOps';
-import { logDebug, logTrace } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import type {
   SideAgreementDecision,
   SideAgreementIntent,
@@ -347,15 +347,16 @@ const AGREEMENT_COLUMNS = `agreement_id, seat_id, counterpart_seat_id, kind, ter
  *
  * Purpose: A damaged value must not break a prompt, so anything that is not an array of strings reads as empty.
  * When to use: Converting a stored row.
- * Expected outcome: The parsed strings, or an empty array. The value is not logged.
- * Exceptions: None. A parse error is caught.
+ * Expected outcome: The parsed strings, or an empty array. Only the value's length is logged, never the value.
+ * Exceptions: None. A parse error is caught and logged.
  */
 function parseZoneJson(text: string): string[] {
   try {
     const parsed: unknown = JSON.parse(text);
     if (Array.isArray(parsed) && parsed.every((entry) => typeof entry === 'string')) return parsed as string[];
-  } catch {
+  } catch (err) {
     // A value that does not parse reads as an empty zone.
+    logError('sideAgreementStore parseZoneJson failed', { length: text.length, err });
   }
   return [];
 }

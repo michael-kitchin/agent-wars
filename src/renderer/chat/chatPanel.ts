@@ -449,7 +449,11 @@ function renderHistory(): void {
   const history = document.getElementById('chat-panel-history');
   if (!(history instanceof HTMLElement)) return;
   const snapshot = chatSnapshot();
-  const appearing = [...new Set(snapshot.messages.flatMap((row) => [row.fromSeatId, row.toSeatId]))];
+  // Message text can name any side by code, so every roster name is part of the key, not only the senders and recipients.
+  const appearing = [...new Set([
+    ...snapshot.messages.flatMap((row) => [row.fromSeatId, row.toSeatId]),
+    ...rosterSeats().map((seat) => seat.seatId),
+  ])];
   const key = `${snapshot.viewerSeatId ?? ''}|${snapshot.messages.map((row) => row.messageId).join(',')}|${chatNamedSeatKey(appearing, seatName)}`;
   const followLatest = scrollHistoryToEnd;
   scrollHistoryToEnd = false;

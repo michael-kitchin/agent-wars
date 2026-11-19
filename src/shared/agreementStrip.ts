@@ -458,9 +458,24 @@ function buildLookups(snapshot: MatchChartsSnapshot): StripLookups {
 }
 
 /**
+ * Tells whether a seat was still in the match at a turn.
+ *
+ * Purpose: Applies the `outTurn` rule: a side still plays the turn it is knocked out on, and is out after it.
+ * When to use: Deciding whether an agreement had lapsed because one of its two sides had left the match.
+ * Expected outcome: False for a seat missing from the snapshot or past its out turn, true otherwise.
+ * Exceptions: None.
+ */
+function isSeatInMatchAt(seat: MatchChartsSeat | undefined, turn: number): boolean {
+  if (seat === undefined) return false;
+  const outTurn = seat.outTurn;
+  return outTurn === null || outTurn === undefined || turn <= outTurn;
+}
+
+/**
  * Works out an agreement's state and shown standing at one turn.
  *
- * Purpose: Applies the shared standing rule with the counterpart's out turn.
+ * Purpose: Applies the shared standing rule with the counterpart's out turn. An agreement whose keeper is out of
+ *   the match lapses the same way, so a knocked-out side shows no agreements after its out turn.
  * When to use: For each agreement and turn.
  * Expected outcome: The state, or null when the agreement does not exist yet, is closed, expired, or lapsed.
  * Exceptions: None.
@@ -468,9 +483,8 @@ function buildLookups(snapshot: MatchChartsSnapshot): StripLookups {
 function agreementAtTurn(entry: AgreementHistoryEntry, turn: number, lookups: StripLookups): AgreementAtTurn | null {
   const version = lastAtOrBefore(entry.versions, turn);
   if (!version) return null;
-  const counterpart = lookups.seats.get(entry.counterpartSeatId);
-  const outTurn = counterpart?.outTurn;
-  const counterpartActive = counterpart !== undefined && (outTurn === null || outTurn === undefined || turn <= outTurn);
+  const counterpartActive = isSeatInMatchAt(lookups.seats.get(entry.counterpartSeatId), turn)
+    && isSeatInMatchAt(lookups.seats.get(entry.seatId), turn);
   const standing = sideAgreementStanding({
     status: version.status,
     endTurn: version.endTurn,

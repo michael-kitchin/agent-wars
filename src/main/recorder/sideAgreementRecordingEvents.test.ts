@@ -68,6 +68,8 @@ test('an agreement change is one event visible to its owner with the previous st
     recordSideAgreementDecision({ step, agreementId: row.agreementId, seatId: 'opponent', counterpartSeatId: 'human', decision: 'break', reason: 'Empty front.' });
     const decision = readOnlyEvent('agreement_decision');
     assert.equal(decision.visibility, 'seats:opponent');
+    assert.equal(decision.formatVersion, 1);
+    assert.ok(!decision.displayText);
     assert.equal(decision.payload.decision, 'break');
     assert.equal(decision.payload.reason, 'Empty front.');
   });

@@ -60,7 +60,7 @@ Each row is an AI commander, in side order, and the commander is the side that k
 
 **What a cell counts.** The number of that commander's agreements that are active at that turn and match both dropdowns. Proposed agreements are counted apart and never in the main number. Expired, lapsed, ended, and broken agreements are not shown. `Kind` limits the cell to one kind. `With` matches the agreement's other side only, not the third side of a joint action.
 
-**Turn timing.** Each turn's state is rebuilt from the agreements recorded up to and including that turn, with `sideAgreementStanding`. An agreement made in a turn's talk appears in that turn. An agreement lapses after the last turn its other side played (the seat's `outTurn`).
+**Turn timing.** Each turn's state is rebuilt from the agreements recorded up to and including that turn, with `sideAgreementStanding`. An agreement made in a turn's talk appears in that turn. An agreement lapses after the last turn its other side played (the seat's `outTurn`). It lapses the same way after the last turn its own commander played, so a knocked-out commander's row is empty from then on.
 
 **Breach.** An active agreement is breached in a turn when that turn its keeper's ranged, air, or missile attacks destroyed units of the other side on the world map, or its keeper recorded a `break` decision for it. Melee and battle losses do not count, because the game cannot tell who started them.
 
@@ -113,6 +113,7 @@ A text legend under the strip says: "Number: active agreements. +N: proposed agr
 - Closed: the start state. The overlay is hidden and the body is empty.
 - Open, empty: the one-sentence message.
 - Open: the stacks, the stance strip, the agreement strip, the legend, and the nine charts.
+- Open, no agreement rows: the agreement strip shows `No AI commander to show.` in place of its cells. This happens when the match has no AI commander, or when **With** names the only one.
 
 ## Invariants
 

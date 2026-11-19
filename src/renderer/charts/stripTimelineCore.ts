@@ -444,14 +444,6 @@ export function createStripTimeline<Cell>(args: CreateStripTimelineArgs<Cell>): 
   canvas.addEventListener('pointerleave', onPointerLeave);
   canvas.addEventListener('dblclick', onDoubleClick);
 
-  canvas.addEventListener('wheel', onWheel, { passive: false });
-  canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('pointermove', onPointerMove);
-  canvas.addEventListener('pointerup', onPointerEnd);
-  canvas.addEventListener('pointercancel', onPointerEnd);
-  canvas.addEventListener('pointerleave', onPointerLeave);
-  canvas.addEventListener('dblclick', onDoubleClick);
-
   return {
     update(next: StripTimelineData<Cell>): void {
       const kept = refreshedTurnView({ view, previousTurns: strip.turns, nextTurns: next.turns, minSpan: MIN_ZOOM_SPAN_TURNS });

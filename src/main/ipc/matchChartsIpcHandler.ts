@@ -33,7 +33,7 @@ const EMPTY_MATCH_CHARTS_SNAPSHOT: MatchChartsSnapshot = { seats: [], turns: [],
  *
  * Purpose: Legends show the same names the rest of the screen shows.
  * When to use: `buildMatchChartsSnapshot`.
- * Expected outcome: One entry per seat in side order, named with `sideDisplayName`, with the turn each seat left the match or null.
+ * Expected outcome: One entry per seat in side order, named with `sideDisplayName`, with the last strategic turn each seat played before it left the match, or null.
  * Exceptions: None.
  */
 function readChartSeats(): MatchChartsSeat[] {

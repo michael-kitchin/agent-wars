@@ -8,6 +8,7 @@
  */
 
 import { isSeatId, type SeatId } from '../../../shared/seatIds';
+import { logTrace } from '../../logger';
 import { playerIdCodeFor } from '../../../shared/unitIds';
 
 /**
@@ -19,6 +20,20 @@ import { playerIdCodeFor } from '../../../shared/unitIds';
  * Exceptions: None.
  */
 export function seatIdForSideCode(code: unknown, addressableSeatIds: readonly SeatId[]): SeatId | null {
+  const resolved = resolveSideCode(code, addressableSeatIds);
+  logTrace('talkSideCodes seatIdForSideCode', { resolved: resolved !== null, addressableCount: addressableSeatIds.length });
+  return resolved;
+}
+
+/**
+ * Does the lookup for `seatIdForSideCode`.
+ *
+ * Purpose: Keeps the one log line in the exported function while the lookup returns early.
+ * When to use: Only from `seatIdForSideCode`.
+ * Expected outcome: The seat, or null when the code does not name one of `addressableSeatIds`.
+ * Exceptions: None.
+ */
+function resolveSideCode(code: unknown, addressableSeatIds: readonly SeatId[]): SeatId | null {
   if (typeof code !== 'string') return null;
   const normalized = code.trim().toLowerCase();
   if (normalized.length === 0) return null;

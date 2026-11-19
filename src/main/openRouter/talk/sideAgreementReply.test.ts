@@ -75,6 +75,16 @@ test('each failed rule drops its entry and counts it', () => {
   assert.equal(result.droppedCount, bad.length);
 });
 
+test('an entry with or against the own seat is dropped even when the own seat is addressable', () => {
+  const result = parseSideAgreementEntries({
+    raw: [entry({ with: 'a1' }), entry({ kind: 'joint_action', against: 'a1' })],
+    ownSeatId: OWN,
+    addressableSeatIds: [OWN, ...addressable],
+  });
+  assert.equal(result.agreements.length, 0);
+  assert.equal(result.droppedCount, 2);
+});
+
 test('a repeated positive id is dropped, and a repeated zero id is not', () => {
   assert.equal(parse([entry({ id: 5 }), entry({ id: 5, terms: 'Again.' })]).droppedCount, 1);
   assert.equal(parse([entry(), entry({ terms: 'Second.' })]).droppedCount, 0);

@@ -32973,7 +32973,10 @@ ${bonuses}`;
     const history = document.getElementById("chat-panel-history");
     if (!(history instanceof HTMLElement)) return;
     const snapshot3 = chatSnapshot();
-    const appearing = [...new Set(snapshot3.messages.flatMap((row) => [row.fromSeatId, row.toSeatId]))];
+    const appearing = [.../* @__PURE__ */ new Set([
+      ...snapshot3.messages.flatMap((row) => [row.fromSeatId, row.toSeatId]),
+      ...rosterSeats().map((seat) => seat.seatId)
+    ])];
     const key = `${snapshot3.viewerSeatId ?? ""}|${snapshot3.messages.map((row) => row.messageId).join(",")}|${chatNamedSeatKey(appearing, seatName)}`;
     const followLatest = scrollHistoryToEnd;
     scrollHistoryToEnd = false;
@@ -43942,12 +43945,15 @@ ${bonuses}`;
     });
     return { byKeeper, attackUnits, seats: new Map(snapshot3.seats.map((seat) => [seat.seatId, seat])) };
   }
+  function isSeatInMatchAt(seat, turn) {
+    if (seat === void 0) return false;
+    const outTurn = seat.outTurn;
+    return outTurn === null || outTurn === void 0 || turn <= outTurn;
+  }
   function agreementAtTurn(entry, turn, lookups) {
     const version = lastAtOrBefore(entry.versions, turn);
     if (!version) return null;
-    const counterpart = lookups.seats.get(entry.counterpartSeatId);
-    const outTurn = counterpart?.outTurn;
-    const counterpartActive = counterpart !== void 0 && (outTurn === null || outTurn === void 0 || turn <= outTurn);
+    const counterpartActive = isSeatInMatchAt(lookups.seats.get(entry.counterpartSeatId), turn) && isSeatInMatchAt(lookups.seats.get(entry.seatId), turn);
     const standing = sideAgreementStanding({
       status: version.status,
       endTurn: version.endTurn,
@@ -44227,13 +44233,6 @@ ${bonuses}`;
     const onDoubleClick = () => {
       showRange(fullRange());
     };
-    canvas.addEventListener("wheel", onWheel, { passive: false });
-    canvas.addEventListener("pointerdown", onPointerDown);
-    canvas.addEventListener("pointermove", onPointerMove);
-    canvas.addEventListener("pointerup", onPointerEnd);
-    canvas.addEventListener("pointercancel", onPointerEnd);
-    canvas.addEventListener("pointerleave", onPointerLeave);
-    canvas.addEventListener("dblclick", onDoubleClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);

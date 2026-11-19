@@ -69,7 +69,7 @@ export const STRATEGIC_ZONE_CODE_TRANSLATOR: ZoneCodeTranslator = {
       ensureStrategicCoordinateRegistryInitialized();
       return getH3IndexForCode(code.trim().toUpperCase(), STRATEGIC_CONTEXT) ?? null;
     } catch (err) {
-      logError('sideAgreementZoneCodes codeToH3 failed', { code, err });
+      logError('sideAgreementZoneCodes codeToH3 failed', { codeLength: code.length, err });
       return null;
     }
   },

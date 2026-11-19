@@ -226,6 +226,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 
 - `static/index.html` (`#charts-dialog-close`)
 - `src/renderer/charts/chartsDialog.ts` (`buildLineChartBlock`, `buildBody`)
+- `src/renderer/charts/agreementStripBlock.ts` (`KIND_CONTROL_TOOLTIP`, `WITH_CONTROL_TOOLTIP`)
 - `static/index.html` (`#replay-panel-expand`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`, `#replay-follow-units`)
 - `src/renderer/replay/replayPanel.ts` (`SHOW_SEEK_TIP`, `HIDE_SEEK_TIP`, `PLAY_TIP`, `PAUSE_TIP`)
 - `static/index.html` (`#control-tooltip`, `#chat-panel-grip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)

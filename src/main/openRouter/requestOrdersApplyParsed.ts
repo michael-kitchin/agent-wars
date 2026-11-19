@@ -44,6 +44,7 @@ import { tacticalComputeMovementOrderOutcomeForPlayer } from '../tacticalBattle/
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
 import { parseOrdersResponse } from './orderResponseParsing';
+import { sideAgreementsEnabled } from './sideAgreementGate';
 import { applyParsedMissileLaunches } from './missileLaunchOrderParsing';
 import { convertOverBudgetExplicitMoveToMarch } from './explicitMoveMarch';
 import {
@@ -315,7 +316,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   if (!tacticalBattle && ordersEnabled) {
     writeOperationRefusal({ getOne: dbGetOne, run: dbRun }, seatId, planState.turnNumber, dropReasons);
   }
-  if (!tacticalBattle && parsed.agreementDecisions) {
+  // Decisions are stored only when this consult offered agreements; a stray field with talk off records nothing.
+  if (!tacticalBattle && parsed.agreementDecisions && sideAgreementsEnabled('strategic')) {
     const agreementResult = applySideAgreementDecisions({ seatId, decisions: parsed.agreementDecisions, turnNumber: planState.turnNumber });
     dropReasons.push(...agreementResult.dropReasons);
   }

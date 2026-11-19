@@ -99,6 +99,20 @@ test('an agreement lapses after the turn its counterpart is knocked out', () => 
   assert.deepEqual(activeCounts(snapshot), [1, 1, 1, 1, 0, 0]);
 });
 
+test('a knocked-out keeper shows no agreements after its out turn, and its partner is not marked as unmatched', () => {
+  const snapshot = snapshotOf(
+    [
+      entry(1, 'opponent2', 'opponent3', [version(1, 'active', 6)]),
+      entry(2, 'opponent3', 'opponent2', [version(1, 'active', 6)]),
+    ],
+    [],
+    4,
+  );
+  assert.deepEqual(activeCounts(snapshot, ALL, 'opponent2'), [1, 1, 1, 1, 0, 0]);
+  const keeperCells = agreementStrip(snapshot, ALL).rows.find((row) => row.seatId === 'opponent2')!.cells;
+  assert.deepEqual(keeperCells.map((cell) => cell.mismatched), [false, false, false, false, false, false]);
+});
+
 test('an attack on the counterpart breaches that turn only, and an attack on another side does not', () => {
   const snapshot = snapshotOf(
     [entry(1, 'opponent', 'opponent2', [version(1, 'active', 6)])],
