@@ -57,7 +57,7 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 
 1. When you first run Agent Wars, you'll see the **New game** screen. Explore the options and add AI opponents (up to 3).
 
-![New game screen.](doc/media/first-start-game.png)
+![New game screen.](doc/media/global-preview.png)
 
 2. For each AI opponent, click on **Select Model** to enter your [OpenRouter](https://openrouter.ai) API key, reasoning, doctrine, and a model from Anthropic, Google, OpenAI, SpaceX/xAI, etc.
 
