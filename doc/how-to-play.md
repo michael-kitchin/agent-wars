@@ -24,13 +24,13 @@ The new-game screen opens when you start Agent Wars. It has three sections, Map,
 
 ### Map
 
-*New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: Eastern Asia vs Southern Africa). The buttons to the right of the lists pick random choices.*
+*New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: South America vs Eastern Asia). The buttons to the right of the lists pick random choices.*
 
-![New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: Eastern Asia vs Southern Africa). The buttons to the right of the lists pick random choices.](media/global-preview.png)
+![New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: South America vs Eastern Asia). The buttons to the right of the lists pick random choices.](media/global-preview.png)
 
-*New regional game: Click the Regional tab, then pick the region and each side's home (in this case: Eastern Asia, with Japan vs South & east China, Taiwan (SECT)).*
+*New regional game: Click the Regional tab, then pick the region and each side's home (in this case: Western Europe, with Southern France vs Northern Germany).*
 
-![New regional game: Click the Regional tab, then pick the region and each side's home (in this case: Eastern Asia, with Japan vs South & east China, Taiwan (SECT)).](media/regional-preview.png)
+![New regional game: Click the Regional tab, then pick the region and each side's home (in this case: Western Europe, with Southern France vs Northern Germany).](media/regional-preview.png)
 
 |                 | Global game                                              | Regional game                                                                    |
 | --------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------- |
