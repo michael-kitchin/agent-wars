@@ -312,15 +312,30 @@ The full battle rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 You can send any AI commander a message, and they send messages to you and to each other. A message is up to 280 characters, from one side to one other side. Nothing in the game enforces it, so a promise, a threat, or an offer is only as good as whoever made it (think: "Diplomacy").
 
+*Write to a commander from the chat panel at the map's bottom right. Each commander's messages and strategy for this turn appear at the top right.*
 
+![Write to a commander from the chat panel at the map's bottom right. Each commander's messages and strategy for this turn appear at the top right.](media/messages-whole-screen.png)
 
 ### Sending a Message
 
 1. In the chat panel at the map's bottom-right, pick a side from the list.
-2. Type, and press Enter. Shift+Enter starts a new line.
-3. The draft waits above the field until you press **Ready**, or commit a battle beat, and then it's sent. **Edit** brings it back into the field, and **×** discards it.
+2. Type, and press Enter or click the arrow. Shift+Enter starts a new line.
+3. The draft waits above the field until you press **Ready**, or commit a battle beat, and then it's sent. **Edit** (the pencil) brings it back into the field, and **×** discards it.
+4. Replies come on a later turn. Click the chevron at the panel's left to show the history.
 
 Each side holds one draft at a time, so writing to that side again replaces it.
+
+*Step 1: Pick a side, and type the message.*
+
+![Step 1: Pick a side, and type the message.](media/messages-typing.png)
+
+*Step 2: After Enter or the arrow, the draft waits above the field until you press Ready. The pencil edits it, and × discards it.*
+
+![Step 2: After Enter or the arrow, the draft waits above the field until you press Ready. The pencil edits it, and × discards it.](media/messages-sent.png)
+
+*Step 3: The chevron expands the history, by turn. Here N. France replied on the next turn, and the next message is under way.*
+
+![Step 3: The chevron expands the history, by turn. Here N. France replied on the next turn, and the next message is under way.](media/messages-history.png)
 
 ### What a Commander Does With It
 
@@ -392,24 +407,51 @@ After Ready, the map toast and the Reports tab give each side a section when it 
 
 Press **C**, or check **Charts…** in the game menu, to see how the match is going. Press **C** again, press Escape, or click outside to close it. The charts show every side and every turn, whatever fog of war is set to, and no AI commander ever sees them.
 
+*The Charts in a four-side agent-only game: relationships at the top, then stance and agreements over time, then the line charts.*
 
+![The Charts in a four-side agent-only game: relationships at the top, then stance and agreements over time, then the line charts.](media/charts-whole-screen.png)
 
 - **Relationships:** a card for each side the commanders report on, headed "How they see you" for yours. Each line is one commander's view: its color is the stance, its width is trust, and a dashed line is a report more than three turns old. The table under it adds threat, the hexes that commander took from that side in the last five turns, and when it last reported. Use it to see who's turning on whom.
-- **Stance over time:** pick a side to see each commander's stance toward it, turn by turn.
+
+  *How the other three commanders see the Netherlands. All three are neutral, and every report is old.*
+
+  ![How the other three commanders see the Netherlands. All three are neutral, and every report is old.](media/charts-relationship.png)
+
+- **Stance over time:** pick a side from **How they see** to see each commander's stance toward it, turn by turn. A solid cell was reported that turn, and a faded one carries an earlier report forward.
+
+  *Hovering a turn lists each commander's stance, and whether it was reported that turn.*
+
+  ![Hovering a turn lists each commander's stance, and whether it was reported that turn.](media/charts-stance-strip-w-popup.png)
+
 - **Agreements over time:** a row for each AI commander, and a cell for each turn with the number of active [agreements](#agreements) it held. **Kind** narrows it to one kind of deal, and **With** to deals with one side. The legend under the strip explains the marks:
   - **+N** counts proposals, and a dashed edge means there's at least one.
   - **Red hatching and !** mean a breach that turn: the commander destroyed the other side's units on the world map with ranged fire, air strikes, or missiles, or decided to break the deal. Melee and battle losses don't count, because the game can't tell who started them.
   - **An amber corner** means another AI commander doesn't record a matching deal, proposed or active, of the same kind. Only an active deal is marked. Deals with you never get one, since you don't keep a record.
   - **Hovering a cell** lists each deal's terms, zone, decisions, and intent (including whether its keeper planned to break it all along), and whether the other side records it too.
+
+  *Hovering S. France's turn 18: an active non-aggression deal with SEGAS, which SEGAS records too, and a proposed one with N. France, which N. France doesn't.*
+
+  ![Hovering S. France's turn 18: an active non-aggression deal with SEGAS, which SEGAS records too, and a proposed one with N. France, which N. France doesn't.](media/charts-agreements-strip-w-popup.png)
+
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep, units lost per turn, and model cost so far. Built and mercenary units can show one unit type.
+
+  *Line charts showing every turn. The list beside Built units is open, to show one unit type.*
+
+  ![Line charts showing every turn. The list beside Built units is open, to show one unit type.](media/charts-line-graphs-zoomed-out.png)
 
 Hover a chart for each side's value at that turn. Scroll over a chart to zoom the turns, drag to move along it, and double-click to show every turn again. Charts begin at the first turn the game recorded, so a save from an earlier version shows "No turns have been recorded yet." until you play a turn.
 
 ### Replay
 
-Press **P**, or check **Playback…** in the game menu, to look back at turns already played. A panel at the map's bottom-left steps back and forward through the turns, jumps to the first or last turn with the double arrows, and its arrow shows a slider for jumping to any turn. **Play** runs every turn's movement and combat up to the present. The magnifying glass keeps the map fitted to the units at every step. Drag the dotted grip in the panel's upper-right corner to move the panel out of the way. Press **P** again or Escape to return.
+Press **P**, or check **Playback…** in the game menu, to look back at turns already played. A panel at the map's bottom-left steps back and forward through the turns, jumps to the first or last turn with the double arrows, and its chevron shows a slider for jumping to any turn. **Play** runs every turn's movement and combat up to the present. The magnifying glass keeps the map fitted to the units at every step. Drag the dotted grip in the panel's upper-right corner to move the panel out of the way. Press **P** again or Escape to return.
 
+*Replaying turn 5 of an agent-only game. The panel is at the bottom left, with that turn's messages at the top right and its report at the bottom right.*
 
+![Replaying turn 5 of an agent-only game. The panel is at the bottom left, with that turn's messages at the top right and its report at the bottom right.](media/playback-whole-screen.png)
+
+| *Expanded: type a turn, or drag the slider, to jump to it. The magnifying glass follows the units, and the buttons rewind, step back, step forward, play, and fast forward.* | *Collapsed, on the last turn: there's nothing ahead, so Step forward, Play, and Fast forward are off.* |
+| --- | --- |
+| ![Expanded: type a turn, or drag the slider, to jump to it. The magnifying glass follows the units, and the buttons rewind, step back, step forward, play, and fast forward.](media/playback-expanded.png) | ![Collapsed, on the last turn: there's nothing ahead, so Step forward, Play, and Fast forward are off.](media/playback-last-turn.png) |
 
 Each step shows the map as you saw it then, with that turn's messages. After the match, or while you're watching, replay shows every side. Replay changes nothing, and while it's on, Ready and map clicks do nothing. Inside a battle, **P** replays that battle's beats instead. The [Charts](#charts) can stay open over replay. They show the match as it stood on the turn you are viewing, and follow the slider.
 
