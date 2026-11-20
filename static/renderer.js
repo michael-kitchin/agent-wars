@@ -14465,10 +14465,10 @@
     return outStr;
   }
   var UPPER_BIT_DIVISOR = Math.pow(2, 32);
-  function readH3IndexFromPointer(cAddress, offset) {
-    if (offset === void 0) offset = 0;
-    var lower = libh3.getValue(cAddress + SZ_H3INDEX * offset, "i32");
-    var upper = libh3.getValue(cAddress + SZ_H3INDEX * offset + SZ_INT, "i32");
+  function readH3IndexFromPointer(cAddress, offset2) {
+    if (offset2 === void 0) offset2 = 0;
+    var lower = libh3.getValue(cAddress + SZ_H3INDEX * offset2, "i32");
+    var upper = libh3.getValue(cAddress + SZ_H3INDEX * offset2 + SZ_INT, "i32");
     return upper ? splitLongToH3Index(lower, upper) : null;
   }
   function readInt64AsDoubleFromPointer(cAddress) {
@@ -16365,20 +16365,20 @@
     return matches[0] ?? null;
   }
   function sideNameMarksForLine(line, seats, sectionOwnerId = null) {
-    let offset = 0;
+    let offset2 = 0;
     let body = line;
     if (body.startsWith("\u2022 ")) {
-      offset += 2;
+      offset2 += 2;
       body = body.slice(2);
     }
     if (body.startsWith("## ")) {
-      offset += 3;
+      offset2 += 3;
       body = body.slice(3);
     }
     return markInBody(body, seats, sectionOwnerId).map((mark) => ({
       seatId: mark.seatId,
-      start: mark.start + offset,
-      end: mark.end + offset
+      start: mark.start + offset2,
+      end: mark.end + offset2
     }));
   }
 
@@ -34303,7 +34303,7 @@ ${bonuses}`;
   function labelNudgeOffsetsWithin(maxPx) {
     const steps = maxPx / LABEL_NUDGE_STEP_PX;
     const values = Array.from({ length: steps * 2 + 1 }, (_value, index) => (index - steps) * LABEL_NUDGE_STEP_PX);
-    return values.flatMap((dx) => values.map((dy) => ({ dx, dy }))).filter((offset) => Math.hypot(offset.dx, offset.dy) <= maxPx).sort(compareNudgeOffsets);
+    return values.flatMap((dx) => values.map((dy) => ({ dx, dy }))).filter((offset2) => Math.hypot(offset2.dx, offset2.dy) <= maxPx).sort(compareNudgeOffsets);
   }
   function compareNudgeOffsets(left, right) {
     const length = Math.hypot(left.dx, left.dy) - Math.hypot(right.dx, right.dy);
@@ -34334,12 +34334,12 @@ ${bonuses}`;
     if (previous != null && isClear(choice, previous)) return previous;
     let best = null;
     let bestCount = Number.POSITIVE_INFINITY;
-    for (const offset of LABEL_NUDGE_OFFSETS) {
-      if (!isAllowed(choice, offset)) continue;
-      const count = overlapCount(choice, offset);
-      if (count === 0) return offset;
+    for (const offset2 of LABEL_NUDGE_OFFSETS) {
+      if (!isAllowed(choice, offset2)) continue;
+      const count = overlapCount(choice, offset2);
+      if (count === 0) return offset2;
       if (count < bestCount) {
-        best = offset;
+        best = offset2;
         bestCount = count;
       }
     }
@@ -38976,6 +38976,3581 @@ ${bonuses}`;
     return scope === "tactical" ? step.beatNumber : step.turnNumber;
   }
 
+  // src/renderer/chrome/blockingDialogGuards.ts
+  function tacticalBattlesDialogIsOpen() {
+    return document.querySelector('[role="dialog"][aria-label="Tactical battles"]') !== null;
+  }
+  var CLASS_HIDDEN_DIALOG_IDS = [
+    "knockout-dialog",
+    "start-confirm-dialog",
+    "load-confirm-dialog",
+    "tactical-annihilation-overlay"
+  ];
+  function blockingDialogIsOpen() {
+    if (tacticalBattlesDialogIsOpen()) return true;
+    if (document.querySelector(".melee-intercept-frame") !== null) return true;
+    if (CLASS_HIDDEN_DIALOG_IDS.some((id) => document.getElementById(id)?.classList.contains("hidden") === false)) return true;
+    const optionsPopover = document.getElementById("new-game-options-popover");
+    if (optionsPopover !== null && !optionsPopover.hidden) return true;
+    return isGameMenuOpen() || commanderPopoverIsOpen();
+  }
+
+  // src/renderer/replay/replayBattleCopy.ts
+  function copyBattleState() {
+    return {
+      snapshot: rendererSharedState.tacticalBattleSnapshot,
+      marches: rendererSharedState.tacticalPendingMarches.map((row) => ({ ...row })),
+      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      airStrikes: [...rendererSharedState.pendingAirStrikes],
+      airDrops: [...rendererSharedState.pendingAirDrops],
+      missileLaunches: [...rendererSharedState.pendingMissileLaunches],
+      ferryOrders: [...rendererSharedState.pendingFerryOrders],
+      embarkOrders: [...rendererSharedState.pendingEmbarkOrders]
+    };
+  }
+
+  // src/renderer/replay/replayCamera.ts
+  function frameReplayStepIfFollowing() {
+    if (!rendererSharedState.replayFollowUnits || !replayActive()) return;
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const limit = tacticalBattleAreaFrameBox(battle.tacticalChildH3Indexes);
+      if (!limit) return;
+      fitBattleUnitsNow(battle.subUnits.map((unit) => unit.h3Index).filter((index) => index.length > 0), limit);
+      return;
+    }
+    const units = rendererSharedState.gameState?.units ?? [];
+    fitStrategicUnitsNow(units.map((unit) => unit.h3Index).filter((index) => index.length > 0));
+  }
+  function setReplayFollowUnits(on2) {
+    rendererSharedState.replayFollowUnits = on2;
+    if (on2) frameReplayStepIfFollowing();
+  }
+
+  // src/shared/consolidatedTurnUpdateToast.ts
+  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
+  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
+  var DEPLOYED_LINE_TYPE_ORDER = ["armor", "infantry", "naval", "air", "missile"];
+  function joinWithSerialComma(parts) {
+    if (parts.length <= 1) return parts[0] ?? "";
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+    return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+  }
+  function formatDeployedUnitsLine(deployed) {
+    if (!deployed) return null;
+    const parts = [];
+    for (const unitType of DEPLOYED_LINE_TYPE_ORDER) {
+      const count = deployed[unitType] ?? 0;
+      if (count > 0) parts.push(`${count.toLocaleString()} ${unitType}`);
+    }
+    if (parts.length === 0) return null;
+    const total = DEPLOYED_LINE_TYPE_ORDER.reduce((sum, unitType) => sum + (deployed[unitType] ?? 0), 0);
+    const noun = total === 1 ? "unit" : "units";
+    return `${joinWithSerialComma(parts)} ${noun} deployed`;
+  }
+  function formatDeploymentCapReachedLine(cappedTypes, player) {
+    if (player !== HUMAN_SEAT_ID) return null;
+    if (!cappedTypes || cappedTypes.length === 0) return null;
+    const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
+    if (ordered.length === 0) return null;
+    return `Maximum human ${joinWithSerialComma([...ordered])} units deployed.`;
+  }
+  function buildOtherTurnUpdatePrimaryLines(readyResult) {
+    const lines = [];
+    const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
+    if (deployedLine) lines.push(deployedLine);
+    const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
+    if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
+    const creditsAdded = readyResult.humanCreditsAdded ?? 0;
+    if (creditsAdded > 0) lines.push(formatCreditsAddedLine(creditsAdded));
+    const mercenariesHired = readyResult.humanMercenariesHired ?? 0;
+    if (mercenariesHired > 0) lines.push(formatMercenariesHiredLine(mercenariesHired));
+    const unitsDeserted = readyResult.humanUnitsDeserted ?? 0;
+    if (unitsDeserted > 0) lines.push(formatUnitsDesertedLine(unitsDeserted));
+    const hireOrdersUnfilled = readyResult.humanHireOrdersUnfilled ?? 0;
+    if (hireOrdersUnfilled > 0) lines.push(formatHireOrdersUnfilledLine(hireOrdersUnfilled));
+    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
+    if (deploymentCapLine) lines.push(deploymentCapLine);
+    return lines;
+  }
+  function stripLeadingBullet(line) {
+    return line.replace(/^\u2022\s*/, "");
+  }
+  function splitToastLinesByOwner(lines, ownerIdOf, ownsSection) {
+    const byOwner = /* @__PURE__ */ new Map();
+    const updates = [];
+    for (const entry of lines ?? []) {
+      const line = entry.line.trim();
+      if (line.length === 0) continue;
+      const ownerId = ownerIdOf(entry);
+      if (ownerId !== null && ownsSection(ownerId)) {
+        const existing = byOwner.get(ownerId);
+        if (existing) existing.push(line);
+        else byOwner.set(ownerId, [line]);
+      } else {
+        updates.push(line);
+      }
+    }
+    return { byOwner, updates };
+  }
+  function splitMissileStrikeLines(lines) {
+    return splitToastLinesByOwner(lines, (entry) => entry.controllerId, (ownerId) => isSeatId(ownerId));
+  }
+  function splitFortificationReportLines(lines) {
+    return splitToastLinesByOwner(
+      lines,
+      (entry) => entry.ownerId,
+      (ownerId) => isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID
+    );
+  }
+  function mergeStrikeLines(missileLines, fortificationLines) {
+    const merged = /* @__PURE__ */ new Map();
+    for (const [ownerId, lines] of missileLines) merged.set(ownerId, [...lines]);
+    for (const [ownerId, lines] of fortificationLines) {
+      const existing = merged.get(ownerId);
+      if (existing) existing.push(...lines);
+      else merged.set(ownerId, [...lines]);
+    }
+    return merged;
+  }
+  function buildConsolidatedTurnUpdateToastMessage(args) {
+    const { readyResult, combatFallbackBullets, turnReport } = args;
+    const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
+    const fortificationReports = splitFortificationReportLines(args.fortificationReportLines);
+    const sections = [];
+    const lossSections = buildTurnLossSections(
+      args.turnLossSummary,
+      turnReport?.viewerSeatId ?? null,
+      turnReport?.seats ?? [],
+      turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
+      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner),
+      args.battleLinesByOwner
+    );
+    sections.push(...lossSections);
+    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
+    if (lossSections.length === 0 && otherLines.length === 0) {
+      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
+    }
+    const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
+    if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
+    if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
+    const queuePauseLines = (args.queuePauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+    if (queuePauseLines.length > 0) otherLines = [...otherLines, ...queuePauseLines];
+    if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
+    if (otherLines.length > 0) {
+      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
+      sections.push(...otherLines);
+    }
+    if (sections.length === 0) return null;
+    return sections.join("\n");
+  }
+
+  // src/shared/turnReportHexCodes.ts
+  var TURN_REPORT_UNKNOWN_HEX = "an unidentified hex";
+  function formatTurnReportHexList(codes) {
+    const known = /* @__PURE__ */ new Set();
+    let unknown = false;
+    for (const code of codes) {
+      const trimmed = code?.trim() ?? "";
+      if (trimmed.length === 0) unknown = true;
+      else known.add(trimmed);
+    }
+    const sorted = [...known].sort(compareCodeUnits);
+    if (unknown) sorted.push(TURN_REPORT_UNKNOWN_HEX);
+    return joinWithSerialComma(sorted);
+  }
+
+  // src/shared/missileStrikeReport.ts
+  function missileLaunchVisibleToViewer(record, viewerSeatId2, visibleHexes) {
+    if (viewerSeatId2 === null) return true;
+    if (record.player === viewerSeatId2) return true;
+    if (record.targetControllerId === viewerSeatId2) return true;
+    return visibleHexes.has(record.targetH3Index);
+  }
+  function countPhrase(count, singular, plural) {
+    if (count <= 0) return null;
+    return `${count} ${count === 1 ? singular : plural}`;
+  }
+  function formatMissileStrikeSummaryLine(entries) {
+    if (entries.length === 0) return null;
+    let urban = 0;
+    let airports = 0;
+    let seaports = 0;
+    let fortifications = 0;
+    let squadrons = 0;
+    const codes = [];
+    for (const entry of entries) {
+      urban += entry.record.urbanDestroyed;
+      airports += entry.record.airportsDestroyed;
+      seaports += entry.record.seaportsDestroyed;
+      fortifications += entry.record.fortificationsDestroyed;
+      squadrons += entry.record.destroyedAirUnitIds.length;
+      codes.push(entry.hexCode);
+    }
+    const phrases = [
+      countPhrase(urban, "city cell", "city cells"),
+      countPhrase(airports, "airport", "airports"),
+      countPhrase(seaports, "seaport", "seaports"),
+      countPhrase(fortifications, "fortification", "fortifications")
+    ].filter((part2) => part2 !== null);
+    const destroyed = phrases.length === 0 ? "destroyed nothing" : `destroyed ${joinWithSerialComma(phrases)}`;
+    const squadronClause = squadrons === 0 ? "" : `; ${squadrons} ${squadrons === 1 ? "squadron" : "squadrons"} lost`;
+    const strike = entries.length === 1 ? "strike" : "strikes";
+    return `Missile ${strike} in ${formatTurnReportHexList(codes)} ${destroyed}${squadronClause}.`;
+  }
+  function buildMissileStrikeToastLines(entries) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const controller = entry.record.targetControllerId;
+      const key = controller !== null && isSeatId(controller) ? controller : null;
+      const group = groups.get(key);
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    }
+    const lines = [];
+    for (const [controllerId, group] of groups) {
+      const line = formatMissileStrikeSummaryLine(group);
+      if (line !== null) lines.push({ controllerId, line });
+    }
+    return lines;
+  }
+  function buildMissilePlaybackMoves(records) {
+    return records.map((record) => ({
+      unitId: record.unitId,
+      player: record.player,
+      unitType: "missile",
+      fromH3Index: record.fromH3Index,
+      targetH3Index: record.targetH3Index,
+      returnsToBase: false
+    }));
+  }
+
+  // src/shared/lossSummaryFromResolution.ts
+  function normalizeUnitType(raw) {
+    return isBuildUnitType(raw) ? raw : null;
+  }
+  function snapshotById(snapshots) {
+    const map = /* @__PURE__ */ new Map();
+    for (const s of snapshots) map.set(s.id, s);
+    return map;
+  }
+  function allRemovedSnapshots(args) {
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const s of args.removedUnits ?? []) byId2.set(s.id, s);
+    for (const s of args.missileStrikeRemovedUnits ?? []) byId2.set(s.id, s);
+    for (const s of args.airStrikeRemovedUnits ?? []) byId2.set(s.id, s);
+    return [...byId2.values()];
+  }
+  function resolveLostUnit(victimId, snapshots, args) {
+    const snap = snapshots.get(victimId);
+    const meta = args.resolveUnitMeta(victimId) ?? (snap ? { player: snap.player, unitType: snap.unitType } : void 0);
+    if (!meta) return null;
+    const unitType = normalizeUnitType(meta.unitType);
+    if (!unitType) return null;
+    const player = meta.player;
+    const alwaysVisiblePlayer = args.perspectivePlayerId ?? HUMAN_SEAT_ID;
+    const visible = player === alwaysVisiblePlayer || !args.isVictimVisible || args.isVictimVisible(victimId, player);
+    if (!visible) return null;
+    const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
+    return { unitType, displayName, unitId: victimId };
+  }
+  function bucketForPlayer(summary, player) {
+    const existing = summary.byOwner[player];
+    if (existing) return existing;
+    const created = emptyPlayerLossSummary();
+    summary.byOwner[player] = created;
+    return created;
+  }
+  function pushToBucket(summary, player, bucket, unit) {
+    bucketForPlayer(summary, player)[bucket].push(unit);
+  }
+  function airStrikeAttackerLossUnitIdsFromMoves(moves) {
+    if (!moves || moves.length === 0) return [];
+    return moves.filter((m) => m.returnsToBase === false).map((m) => m.unitId);
+  }
+  function classifyAirStrikeKillCause(edge, args) {
+    const victimMeta = args.resolveUnitMeta(edge.victimId);
+    if (victimMeta?.unitType !== "air") return "airStrike";
+    const killerId = edge.killerIds?.[0];
+    if (!killerId) return "returnFire";
+    const killerMeta = args.resolveUnitMeta(killerId);
+    if (killerMeta && killerMeta.player !== victimMeta.player) return "returnFire";
+    return "airStrike";
+  }
+  function causeForAirStrikeRemovedUnit(snap, args) {
+    const edge = (args.killsByAirStrike ?? []).find((e) => e.victimId === snap.id);
+    if (edge) return classifyAirStrikeKillCause(edge, args);
+    if (args.airStrikeAttackerLossUnitIds?.includes(snap.id)) return "returnFire";
+    return "airStrike";
+  }
+  function buildTurnLossSummary(args) {
+    const summary = emptyTurnLossSummary();
+    const snapshots = snapshotById(allRemovedSnapshots(args));
+    const victimToCause = /* @__PURE__ */ new Map();
+    const assignFromEdges = (edges, cause) => {
+      for (const edge of edges ?? []) {
+        if (!victimToCause.has(edge.victimId)) victimToCause.set(edge.victimId, cause);
+      }
+    };
+    for (const edge of args.killsByAirStrike ?? []) {
+      if (!victimToCause.has(edge.victimId)) {
+        victimToCause.set(edge.victimId, classifyAirStrikeKillCause(edge, args));
+      }
+    }
+    assignFromEdges(args.killsByDirectFire, "ranged");
+    assignFromEdges(args.killsByReturnFire, "returnFire");
+    if (args.killsByMelee && args.killsByMelee.length > 0) {
+      assignFromEdges(args.killsByMelee, "melee");
+    } else {
+      assignFromEdges(args.kills, "melee");
+    }
+    for (const snap of args.missileStrikeRemovedUnits ?? []) {
+      if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, "missileStrike");
+    }
+    for (const snap of args.airStrikeRemovedUnits ?? []) {
+      if (!victimToCause.has(snap.id)) {
+        victimToCause.set(snap.id, causeForAirStrikeRemovedUnit(snap, args));
+      }
+    }
+    const claimed = /* @__PURE__ */ new Set();
+    const addVictim = (victimId, cause) => {
+      if (claimed.has(victimId)) return;
+      const unit = resolveLostUnit(victimId, snapshots, args);
+      if (!unit) return;
+      const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
+      const player = meta?.player ?? AI_SEAT_IDS[0];
+      pushToBucket(summary, player, cause, unit);
+      claimed.add(victimId);
+    };
+    for (const [victimId, cause] of victimToCause) {
+      addVictim(victimId, cause);
+    }
+    for (const snap of allRemovedSnapshots(args)) {
+      if (claimed.has(snap.id)) continue;
+      addVictim(snap.id, "other");
+    }
+    return summary;
+  }
+  function buildTurnLossSummaryFromReadyShape(args) {
+    return buildTurnLossSummary(args);
+  }
+
+  // src/shared/tacticalToastKillSlice.ts
+  function tacticalKillEdgesForStrategicStyleTurnUpdate(playback) {
+    return [
+      ...playback.killsByDirectFire ?? [],
+      ...playback.killsByReturnFire ?? [],
+      ...playback.killsByMelee ?? []
+    ];
+  }
+
+  // src/shared/unknownBattleContinentNames.ts
+  async function collectUnknownBattleContinentNames(unknownCombatHexes, unknownCasualtyHexes, fetchContinentNames) {
+    const unknownContinentNames = [];
+    if (!fetchContinentNames) return unknownContinentNames;
+    const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter(
+      (h3, idx, arr) => arr.indexOf(h3) === idx
+    );
+    for (const h3 of unknownHexes) {
+      const names = await fetchContinentNames(h3);
+      for (const n of names) {
+        if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
+      }
+    }
+    return unknownContinentNames;
+  }
+
+  // src/shared/destroyedInBattleLine.ts
+  var GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
+  function visibleDestroyedParents(units, viewerSeatId2, visibleHexes) {
+    if (viewerSeatId2 == null) return [...units];
+    return units.filter((unit) => unit.ownerId === viewerSeatId2 || visibleHexes.has(unit.h3Index));
+  }
+  function formatDestroyedInBattleLine(units) {
+    if (units.length === 0) return "";
+    const counts = /* @__PURE__ */ new Map();
+    for (const unit of units) counts.set(unit.unitType, (counts.get(unit.unitType) ?? 0) + 1);
+    const named = [];
+    const grouped = /* @__PURE__ */ new Set();
+    for (const unit of units) {
+      const count = counts.get(unit.unitType) ?? 0;
+      if (count > LOSS_TYPE_NAME_LIST_MAX && isBuildUnitType(unit.unitType)) {
+        grouped.add(unit.unitType);
+      } else {
+        named.push(unit.displayName);
+      }
+    }
+    const groups = GROUP_ORDER.flatMap((unitType) => {
+      if (!grouped.has(unitType)) return [];
+      const count = counts.get(unitType);
+      return count == null ? [] : [formatCollapsedTypeCount(count, unitType)];
+    });
+    return `${[...named, ...groups].join(", ")} destroyed in battle.`;
+  }
+  function destroyedInBattleLinesByOwner(units) {
+    const byOwner = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const list = byOwner.get(unit.ownerId);
+      if (list) list.push(unit);
+      else byOwner.set(unit.ownerId, [unit]);
+    }
+    const lines = /* @__PURE__ */ new Map();
+    for (const [ownerId, list] of byOwner) {
+      const line = formatDestroyedInBattleLine(list);
+      if (line.length > 0) lines.set(ownerId, line);
+    }
+    return lines;
+  }
+
+  // src/shared/fortificationReport.ts
+  function fortificationReportVisibleToViewer(report, viewerSeatId2, exploredHexes) {
+    if (viewerSeatId2 === null) return true;
+    if (viewerSeatId2 === report.ownerId) return true;
+    return exploredHexes.has(report.h3Index);
+  }
+  function formatFortificationSummaryLine(entries) {
+    let total = 0;
+    const codes = [];
+    for (const entry of entries) {
+      if (entry.report.lost <= 0) continue;
+      total += entry.report.lost;
+      codes.push(entry.hexCode);
+    }
+    if (total === 0) return null;
+    const hit = total === 1 ? "hit" : "hits";
+    return `Fortifications in ${formatTurnReportHexList(codes)} absorbed ${total} ${hit}.`;
+  }
+  function buildFortificationToastLines(entries) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const key = entry.report.ownerId;
+      const group = groups.get(key);
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    }
+    const lines = [];
+    for (const [ownerId, group] of groups) {
+      const line = formatFortificationSummaryLine(group);
+      if (line !== null) lines.push({ ownerId, line });
+    }
+    return lines;
+  }
+
+  // src/renderer/gameplay/fortificationUpdateLines.ts
+  function fortificationReportLinesFor(readySlice, viewer, hexCodeBattle) {
+    const entries = [];
+    for (const report of readySlice.fortificationReports ?? []) {
+      if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
+      entries.push({ report, hexCode: orderTargetHexCode(report.h3Index, hexCodeBattle) });
+    }
+    return buildFortificationToastLines(entries);
+  }
+
+  // src/shared/queuePauseReasons.ts
+  var QUEUE_PAUSE_REASON_ORDER = ["occupation", "allCellsFortified", "unitCap"];
+  var QUEUE_PAUSE_REASON_TEXT = {
+    occupation: "occupying units or fortifications required",
+    allCellsFortified: "every city cell fortified",
+    unitCap: "unit cap reached"
+  };
+  function sortQueuePauseReasons(reasons) {
+    return QUEUE_PAUSE_REASON_ORDER.filter((reason) => reasons.includes(reason));
+  }
+  function formatQueuePausedNote(reasons) {
+    const sorted = sortQueuePauseReasons(reasons);
+    if (sorted.length === 0) return null;
+    return `Queue paused: ${joinWithSerialComma(sorted.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]))}.`;
+  }
+  function formatQueuePausedLines(entries) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const reasons = sortQueuePauseReasons(entry.reasons);
+      if (reasons.length === 0) continue;
+      const key = reasons.map((reason) => QUEUE_PAUSE_REASON_ORDER.indexOf(reason)).join(",");
+      const group = groups.get(key) ?? { reasons, codes: [] };
+      group.codes.push(entry.hexCode);
+      groups.set(key, group);
+    }
+    return [...groups.entries()].sort(([left], [right]) => compareCodeUnits(left, right)).map(([, group]) => {
+      const noun = group.codes.length === 1 ? "Queue" : "Queues";
+      const reasons = joinWithSerialComma(group.reasons.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]));
+      return `${noun} paused at ${formatTurnReportHexList(group.codes)}: ${reasons}.`;
+    });
+  }
+
+  // src/renderer/gameplay/queuePauseUpdateLines.ts
+  function queuePauseUpdateLinesFor(readySlice) {
+    const pauses = readySlice.humanNewlyPausedQueues ?? [];
+    return formatQueuePausedLines(
+      pauses.map((pause) => ({ hexCode: orderTargetHexCode(pause.h3Index, null), reasons: pause.reasons }))
+    );
+  }
+
+  // src/renderer/gameplay/readyResolutionAnnouncements.ts
+  function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
+    const allKills = readyResult.kills ?? [];
+    const viewerInvolved = (ownerId) => viewerSeatId2 !== null && ownerId === viewerSeatId2;
+    const viewerIsHuman = viewerSeatId2 !== null && isHumanSeatId(viewerSeatId2);
+    const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
+    const killerOwner = (id) => {
+      const removedPlayer = removedById.get(id)?.player;
+      if (removedPlayer) return removedPlayer;
+      return rendererSharedState.gameState?.units.find((unit) => unit.id === id)?.player ?? unitIdOwnerFromId(id);
+    };
+    const friendlyInvolvedKillVictimIds = new Set(
+      allKills.filter((k) => {
+        const victim = removedById.get(k.victimId);
+        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(killerOwner(id)));
+        const victimIsFriendly = viewerInvolved(victim?.player);
+        return killerIsFriendly || victimIsFriendly;
+      }).map((k) => k.victimId)
+    );
+    const friendlyInvolvedCombatHexes = new Set(
+      [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
+    );
+    const friendlyPlannedCombatHexes = new Set(
+      viewerIsHuman ? [
+        ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
+        ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
+        ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
+        ...(readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).flatMap((move) => [move.fromH3Index, move.targetH3Index]),
+        ...(readyResult.removedUnits ?? []).filter((unit) => viewerInvolved(unit.player)).map((unit) => unit.h3Index)
+      ] : []
+    );
+    for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
+    const knownHumanAirStrikeTargetHexes = new Set(
+      (readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).map((move) => move.targetH3Index)
+    );
+    const unknownCombatHexes = [
+      ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+      ...readyResult.rangedCombatHexes ?? [],
+      ...readyResult.meleeCombatHexes ?? [],
+      ...readyResult.combatHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+    const unknownCasualtyHexes = [
+      ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+      ...readyResult.rangedCasualtyHexes ?? [],
+      ...readyResult.meleeCasualtyHexes ?? [],
+      ...readyResult.casualtyHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+    const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
+    for (const removed of readyResult.removedUnits ?? []) {
+      if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
+    }
+    for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
+    for (const launch of readyResult.missileLaunches ?? []) {
+      if (launch.player !== viewerSeatId2) continue;
+      for (const victimId of launch.destroyedAirUnitIds) knownVictimIds.add(victimId);
+    }
+    const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => {
+      const removed = removedById.get(id);
+      if (viewerInvolved(removed?.player)) return false;
+      return !friendlyInvolvedKillVictimIds.has(id);
+    }).filter((id) => {
+      const removed = removedById.get(id);
+      return removed ? !visibleHexes.has(removed.h3Index) : false;
+    });
+    return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
+  }
+  function buildTacticalCommitReadyResultForToast(playback) {
+    const killsByDirectFire = playback.killsByDirectFire ?? [];
+    const killsByAirStrike = playback.killsByAirStrike ?? [];
+    const killsByReturnFire = playback.killsByReturnFire ?? [];
+    const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
+    const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : void 0;
+    const removedAll = [...playback.rangedRemovedUnits ?? [], ...playback.meleeRemovedUnits ?? []];
+    const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
+    const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
+    const airStrikeRemovedUnits = removedAll.filter((u) => {
+      if (airStrikeVictimIds.has(u.id)) return true;
+      if (u.player === HUMAN_SEAT_ID && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
+      return false;
+    });
+    return {
+      success: true,
+      kills,
+      killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : void 0,
+      killsByAirStrike: killsByAirStrike.length > 0 ? killsByAirStrike : void 0,
+      killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : void 0,
+      removedUnits: removedAll.length > 0 ? removedAll : void 0,
+      humanMoves: playback.humanMoves,
+      rangedCombatHexes: playback.rangedCombatHexes,
+      rangedCasualtyHexes: playback.rangedCasualtyHexes,
+      rangedRemovedUnits: playback.rangedRemovedUnits,
+      airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
+      infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
+      fortificationReports: playback.fortificationReports?.length ? playback.fortificationReports : void 0,
+      airStrikeAttemptCount: playback.airStrikeAttemptCount,
+      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
+    };
+  }
+  function buildPopupTurnLossSummary(args) {
+    const { readySlice, knownVictimIds, formatBaseUnitName, killsByMelee, killsByAirStrike } = args;
+    const removed = readySlice.removedUnits ?? [];
+    const metaMap = /* @__PURE__ */ new Map();
+    for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    for (const u of readySlice.missileStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    const readyWithAir = readySlice;
+    return buildTurnLossSummaryFromReadyShape({
+      kills: readySlice.kills,
+      killsByDirectFire: readySlice.killsByDirectFire,
+      killsByReturnFire: readySlice.killsByReturnFire,
+      killsByMelee,
+      killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
+      removedUnits: removed,
+      airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
+      missileStrikeRemovedUnits: readySlice.missileStrikeRemovedUnits,
+      airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(readySlice.airStrikeMoves),
+      resolveDisplayName: (id) => {
+        const snap = removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id) ?? readySlice.missileStrikeRemovedUnits?.find((u) => u.id === id);
+        if (snap?.displayName) return snap.displayName;
+        return formatBaseUnitName(id);
+      },
+      resolveUnitMeta: (id) => metaMap.get(id),
+      isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id)
+    });
+  }
+  function formatHexCount(label, count) {
+    return `\u2022 ${label} at ${count.toLocaleString()} ${count === 1 ? "hex" : "hexes"}.`;
+  }
+  function buildCombatActivityFallbackBullets(readyResult) {
+    const bullets = [];
+    const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
+    if (rangedHexCount > 0) bullets.push(formatHexCount("Ranged engagements", rangedHexCount));
+    const meleeHexCount = readyResult.meleeCombatHexes?.length ?? 0;
+    if (meleeHexCount > 0) bullets.push(formatHexCount("Melee engagements", meleeHexCount));
+    const casualtyHexCount = (readyResult.rangedCasualtyHexes?.length ?? 0) + (readyResult.meleeCasualtyHexes?.length ?? 0) + (readyResult.airStrikeCasualtyHexes?.length ?? 0);
+    if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
+    return bullets;
+  }
+  function reportViewerSeatId() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const viewer = readoutViewerSeatId(seats, rendererSharedState.viewAs);
+    return viewer ?? null;
+  }
+  function launchTurnSeats() {
+    return (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
+      seatId: seat.seatId,
+      seatOrder: seat.seatOrder,
+      homeRegion: seat.homeRegion,
+      kind: seat.kind,
+      nickname: seat.nickname
+    }));
+  }
+  async function announceResolutionTurnUpdate(args, deps) {
+    const parents = args.destroyedParents ?? (args.usePendingBattleParents ? takePendingDestroyedBattleParents() : []);
+    if (args.holdForBattle) {
+      console.debug("[agent-wars] announceResolutionTurnUpdate holding for battle", {
+        parentCount: parents.length,
+        reportTag: args.reportTag
+      });
+      stashHeldBattleTurnUpdate(
+        {
+          ...args,
+          holdForBattle: false,
+          usePendingBattleParents: false,
+          viewerSeatId: reportViewerSeatId(),
+          seats: launchTurnSeats(),
+          exploredHexes: getExploredHexSet(rendererSharedState.gameState)
+        },
+        deps,
+        parents
+      );
+      return;
+    }
+    const { readySlice, visibility, killToastFormatter, extraKills, reportTag, missileLaunches } = args;
+    const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
+    const turnLossSummary = buildPopupTurnLossSummary({
+      readySlice,
+      knownVictimIds,
+      formatBaseUnitName: killToastFormatter.formatBaseUnitName,
+      ...extraKills !== void 0 ? extraKills : {}
+    });
+    const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
+    const seats = args.seats ? [...args.seats] : launchTurnSeats();
+    const viewerSeatId2 = args.viewerSeatId !== void 0 ? args.viewerSeatId : reportViewerSeatId();
+    const visibleParents = visibleDestroyedParents(parents, viewerSeatId2, args.visibleHexes ?? /* @__PURE__ */ new Set());
+    const battleLinesByOwner = destroyedInBattleLinesByOwner(visibleParents);
+    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+    let unknownBattleLine;
+    if (hasUnknownBattle) {
+      try {
+        const getContinentNames = window.gameApi?.getHexContinentNames;
+        const unknownContinentNames = await collectUnknownBattleContinentNames(
+          unknownCombatHexes,
+          unknownCasualtyHexes,
+          getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
+        );
+        unknownBattleLine = deps.formatUnknownBattleAnnouncement(unknownContinentNames);
+      } catch (err) {
+        console.error("unknown battle continent names failed", err);
+        unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
+      }
+    }
+    const missileStrikeLines = missileStrikeLinesFor(missileLaunches);
+    const queuePauseLines = queuePauseUpdateLinesFor(readySlice);
+    const fortificationReportLines = fortificationReportLinesFor(
+      readySlice,
+      {
+        viewerSeatId: viewerSeatId2,
+        exploredHexes: args.exploredHexes ?? getExploredHexSet(rendererSharedState.gameState)
+      },
+      args.hexCodeBattle ?? null
+    );
+    const updateText = buildConsolidatedTurnUpdateToastMessage({
+      readyResult: readySlice,
+      turnLossSummary,
+      combatFallbackBullets,
+      turnReport: {
+        viewerSeatId: viewerSeatId2,
+        seats,
+        transitions: readySlice.controlTransitions ?? []
+      },
+      unknownBattleLine,
+      missileStrikeLines,
+      queuePauseLines,
+      fortificationReportLines,
+      battleLinesByOwner
+    });
+    if (updateText) {
+      rememberUnitOrigins([
+        ...readySlice.removedUnits ?? [],
+        ...readySlice.airStrikeRemovedUnits ?? [],
+        ...readySlice.missileStrikeRemovedUnits ?? [],
+        ...readySlice.rangedRemovedUnits ?? [],
+        ...readySlice.meleeRemovedUnits ?? [],
+        ...visibleParents
+      ]);
+      const unitOriginByDisplayName = mergeDestroyedBattleParentFlags(
+        buildUnitOriginByLossDisplayName(turnLossSummary),
+        visibleParents
+      );
+      deps.showMapToast(updateText, {
+        isError: false,
+        unitOriginByDisplayName,
+        seats,
+        viewerSeatId: viewerSeatId2,
+        report: { kind: "turn", tag: reportTag }
+      });
+      deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
+    }
+  }
+  async function showHeldBattleTurnUpdate(includeBattleLines = true) {
+    const held2 = takeHeldBattleTurnUpdate();
+    console.debug("[agent-wars] showHeldBattleTurnUpdate", {
+      found: held2 != null,
+      includeBattleLines,
+      parentCount: held2?.destroyedParents.length ?? 0
+    });
+    if (!held2) return;
+    await announceResolutionTurnUpdate(
+      {
+        ...held2.inputs,
+        destroyedParents: includeBattleLines ? held2.destroyedParents : [],
+        holdForBattle: false,
+        usePendingBattleParents: false
+      },
+      held2.deps
+    );
+  }
+  function missileStrikeLinesFor(launches) {
+    const entries = (launches ?? []).map((record) => ({
+      record,
+      hexCode: orderTargetHexCode(record.targetH3Index, null)
+    }));
+    return buildMissileStrikeToastLines(entries);
+  }
+  function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
+    if (needsPlayback) {
+      enqueueResolutionPlaybackCompleteNotify(send);
+    } else {
+      dropQueuedResolutionPlaybackCompleteNotifies();
+      send();
+      notifyResolutionPlaybackFinished();
+    }
+  }
+
+  // src/renderer/gameplay/resolutionPlaybackPlan.ts
+  function planResolutionPlayback(input) {
+    const { readyResult, state, humanMoves, visibleHexesBeforeTurn, deps } = input;
+    const aiMoves = readyResult.aiMoves ?? [];
+    const resolutionMoves = [...humanMoves, ...aiMoves];
+    const visibleHexes = deps.getVisibleHexSet(state);
+    const visibleMissileLaunches = (readyResult.missileLaunches ?? []).filter(
+      (record) => missileLaunchVisibleToViewer(
+        record,
+        reportViewerSeatId(),
+        /* @__PURE__ */ new Set([...visibleHexesBeforeTurn, ...visibleHexes])
+      )
+    );
+    const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
+    const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
+    const airStrikeOutboundMoves = [
+      ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
+      ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves)
+    ];
+    const airStrikeReturnMoves = [
+      ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
+      ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves)
+    ];
+    const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
+    const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
+    const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
+    const hasAirStrikeResolution = visibleMissileLaunches.length > 0 || (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
+    const hasDiceRolls = (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 || (readyResult.rangedDiceRolls?.length ?? 0) > 0 || (readyResult.meleeDiceRolls?.length ?? 0) > 0;
+    const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
+    const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
+    const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
+    const visibleMissileVictims = (readyResult.missileStrikeRemovedUnits ?? []).filter(
+      (unit) => visibleMissileVictimIds.has(unit.id)
+    );
+    const airStrikeRemovedForPlayback = [...readyResult.airStrikeRemovedUnits ?? [], ...visibleMissileVictims];
+    const airStrikeCasualtyHexesForPlayback = [
+      ...readyResult.airStrikeCasualtyHexes ?? [],
+      ...visibleMissileVictims.map((unit) => unit.h3Index).filter((hex) => !(readyResult.airStrikeCasualtyHexes ?? []).includes(hex))
+    ];
+    const airStrikeCombatHexesForPlayback = [
+      ...readyResult.airStrikeHexes ?? [],
+      ...visibleMissileLaunches.map((record) => record.targetH3Index).filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex))
+    ];
+    const needsCombatOrMovementAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+    const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
+    return {
+      resolutionMoves,
+      visibleHexes,
+      visibleMissileLaunches,
+      sightCuesForPlayback,
+      airStrikeOutboundMoves,
+      airStrikeReturnMoves,
+      visibility,
+      unknownCombatHexes,
+      unknownCasualtyHexes,
+      airStrikeRemovedForPlayback,
+      airStrikeCasualtyHexesForPlayback,
+      airStrikeCombatHexesForPlayback,
+      needsCombatOrMovementAnimation,
+      needsAnimation
+    };
+  }
+
+  // src/shared/pendingMovementSidebarLabels.ts
+  function formatPendingMovementSidebarTargetLabel(destinationH3Index, distanceHexSteps) {
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(destinationH3Index, null),
+      distanceHexes: distanceHexSteps,
+      note: null
+    });
+  }
+  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
+    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
+    let steps = null;
+    if (origin) {
+      try {
+        steps = gridDistance(origin, destinationH3Index);
+      } catch {
+        steps = null;
+      }
+    }
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(destinationH3Index, battle),
+      distanceHexes: steps,
+      note: null
+    });
+  }
+
+  // src/renderer/gameplay/sidebarSupport.ts
+  function estimateHexesLeftForOrder(order) {
+    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
+    let total = 0;
+    for (const segment of order.routeSegments) {
+      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
+      total += Math.max(0, segment.hexes.length - 1);
+    }
+    return total;
+  }
+  function isPendingMovementOrderForDisplay(order) {
+    return estimateHexesLeftForOrder(order) > 0;
+  }
+  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
+    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
+    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
+    if (useMultiSelect) {
+      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
+      deps.toggleUnitSelection(unitId);
+    } else {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
+      deps.replaceSelection([unitId]);
+    }
+    deps.syncUiAfterSelectionChange();
+  }
+  function formatPendingOrderSidebarLabel(order) {
+    return formatPendingMovementSidebarTargetLabel(order.destinationH3Index, estimateHexesLeftForOrder(order));
+  }
+  function formatKillToastLine(kill, formatDisplayUnitName) {
+    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
+    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
+  }
+  function buildTacticalSubUnitKillLabelOverlay(args) {
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const row of args.subUnitsBeforeCommit ?? []) {
+      byId2.set(row.id, row.displayName);
+    }
+    for (const row of args.subUnitsAfterCommit ?? []) {
+      byId2.set(row.id, row.displayName);
+    }
+    for (const u of args.removedUnits ?? []) {
+      if (u.displayName) byId2.set(u.id, u.displayName);
+    }
+    return [...byId2.entries()].map(([id, displayName]) => ({ id, displayName }));
+  }
+  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
+    const removedUnitsForDisplay = removedUnits ?? [];
+    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      displayOrder: u.displayOrder
+    }));
+    const rosterById = /* @__PURE__ */ new Map();
+    for (const unit of state.units ?? []) {
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder,
+        player: unit.player
+      });
+    }
+    for (const unit of rosterFromRemoved) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder,
+        player: unit.player
+      });
+    }
+    for (const unit of killLabelUnits ?? []) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, unit);
+    }
+    const rosterForDisplay = [...rosterById.values()];
+    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+    for (const u of removedUnitsForDisplay) {
+      if (u.displayName) displayNameById.set(u.id, u.displayName);
+    }
+    for (const row of tacticalSubUnitsForKillLabels ?? []) {
+      displayNameById.set(row.id, row.displayName);
+    }
+    const formatBaseUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const formatDisplayUnitName = (unitId) => {
+      const baseName = formatBaseUnitName(unitId);
+      const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+      if (!ownerId) return baseName;
+      return formatUnitNameForViewer({
+        baseName,
+        ownerId,
+        viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState?.seats ?? []),
+        seats: rendererSharedState.gameState?.seats ?? []
+      });
+    };
+    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
+    return { formatUnitName: formatDisplayUnitName, formatBaseUnitName, formatKillLine };
+  }
+  function syncUiAfterSelectionChange2(deps, options = {}) {
+    if (options.refreshHoverPreview !== false) {
+      void deps.refreshHoverRoutePreview();
+    }
+    deps.updateSidebar();
+    deps.updatePendingOrdersSidebar();
+    deps.updateRangedSidebar();
+    if (options.refreshStackCallout !== false) {
+      deps.refreshStackCalloutIfOpen();
+    }
+    deps.redraw();
+  }
+  function updatePendingOrdersSidebar2(deps) {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const rows = [];
+    const rowFor = (unitId, detail, onCancel) => sidebarOrderRowArgs(unitId, detail, onCancel, deps);
+    if (battle) {
+      for (const row of rendererSharedState.tacticalPendingMarches) {
+        const detail = formatTacticalDraftMarchPendingOrderTargetLabel(battle, row.subUnitId, row.destinationH3Index);
+        rows.push(rowFor(row.subUnitId, detail, () => {
+          rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+          deps.updatePendingOrdersSidebar?.();
+          deps.redraw?.();
+        }));
+      }
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
+        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, battle), () => {
+          deps.cancelFerryForUnit(ferry.unitId);
+          deps.refreshStackCalloutIfOpen?.();
+        }));
+      }
+    } else {
+      for (const order of rendererSharedState.humanStandingOrders.filter((o) => deps.isPendingMovementOrderForDisplay(o))) {
+        rows.push(rowFor(order.unitId, deps.formatPendingOrderSidebarLabel(order), () => {
+          void deps.cancelOrderForUnit(order.unitId);
+        }));
+      }
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
+        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry), () => deps.cancelFerryForUnit(ferry.unitId)));
+      }
+    }
+    renderSidebarOrderGroup("movement", rows);
+  }
+  function showSidebarError(message, showMapToast2, clearSidebarError2) {
+    showMapToast2(message, { isError: true });
+    clearSidebarError2();
+  }
+  function clearSidebarError() {
+    const el = document.getElementById("sidebar-error");
+    if (el) el.style.display = "none";
+  }
+
+  // src/renderer/gameplay/tacticalAnimationStart.ts
+  function tacticalPlaybackNeeded(playback) {
+    const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
+    const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
+    const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+    const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+    const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
+    const hasDicePlayback = (playback?.airStrikeDiceRolls?.length ?? 0) > 0 || (playback?.rangedDiceRolls?.length ?? 0) > 0 || (playback?.meleeDiceRolls?.length ?? 0) > 0;
+    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
+    return needsResolutionPlayback;
+  }
+  function buildTacticalResolutionAnimation(input) {
+    const { playback, subUnitsBefore, deps } = input;
+    const tacticalMarchPlaybackUnits = subUnitsBefore?.length ? subUnitsBefore.map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      h3Index: u.h3Index
+    })) : void 0;
+    const airStrikeOutboundMoves = [
+      ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
+      ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves)
+    ];
+    const airStrikeReturnMoves = [
+      ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
+      ...buildAirDropReturnPlaybackMoves(playback.airDropMoves)
+    ];
+    return {
+      moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
+      startTime: Date.now(),
+      tacticalDeferResolutionClock: true,
+      ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
+      ...airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {},
+      ...airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {},
+      ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
+      ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
+      ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
+      rangedCombatHexes: playback.rangedCombatHexes,
+      rangedCasualtyHexes: playback.rangedCasualtyHexes,
+      rangedRemovedUnits: playback.rangedRemovedUnits,
+      ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
+      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
+      ...pickPlaybackDiceRolls(playback)
+    };
+  }
+
+  // src/shared/aiStrategyToastContent.ts
+  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
+  function trimToastField(raw) {
+    const trimmed = raw?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function buildAiStrategyToastSections(fields) {
+    const sections = [];
+    const bullets = (fields.messages ?? []).filter((row) => row.text.trim().length > 0);
+    const strategy = trimToastField(fields.strategy);
+    if (bullets.length > 0) sections.push({ title: SIDE_MESSAGES_TITLE, body: "", bullets });
+    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
+    return sections;
+  }
+
+  // src/renderer/openRouter/commanderMessageTabsUi.ts
+  var tabState = null;
+  function bindCommanderMessageTabs() {
+    setAiStrategyToastHiddenListener(() => {
+      tabState = null;
+    });
+  }
+  function showCommanderMessageTabs(dispatches, statuses = [], options) {
+    if (replayActive() && options?.fromReplay !== true) return;
+    const opening = strategyToastHidden() || tabState === null;
+    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
+    if (opening) {
+      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
+      tabState = initialCommanderMessageTabs(seats);
+    } else if (tabState) {
+      tabState = resetCommanderConsultMarks(tabState);
+    }
+    if (!tabState) return;
+    for (const dispatch of dispatches) {
+      tabState = commanderDispatchHasProse(dispatch) ? applyCommanderMessage(tabState, {
+        seatId: dispatch.seatId,
+        strategy: dispatch.strategy,
+        messages: dispatch.messages
+      }) : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
+    }
+    tabState = applyOpenTabAbsences(tabState, statuses);
+    if (!tabState.tabs.some((tab) => tab.enabled)) return;
+    showFilledAiStrategyToast(renderCommanderMessageTabs, false);
+  }
+  function applyOpenTabAbsences(state, statuses) {
+    let next = state;
+    for (const tab of state.tabs) {
+      const seat = (rendererSharedState.gameState?.seats ?? []).find((row) => row.seatId === tab.seatId);
+      const status = statuses.find((row) => row.seatId === tab.seatId);
+      const reason = resolveCommanderTabAbsence({
+        outTurn: seat?.outTurn ?? null,
+        status: status?.status ?? null,
+        storedReason: status?.absenceReason ?? null,
+        tacticalOtherSeat: seatIsOutsideThisBattle(tab.seatId, statuses),
+        consultedWithoutProse: tab.consultedWithoutProse
+      });
+      if (!reason) continue;
+      const turnNumber = reason === "knocked_out" ? seat?.outTurn ?? null : reason === "timed_out" ? status?.timedOutTurn ?? null : null;
+      next = applyCommanderAbsence(next, tab.seatId, formatCommanderAbsenceMessage(reason, turnNumber));
+    }
+    return next;
+  }
+  function seatIsOutsideThisBattle(seatId, statuses) {
+    const opposingPartyId = rendererSharedState.tacticalBattleSnapshot?.opposingPartyId;
+    const opponent = opposingPartyId ? statuses.find((row) => row.seatId === opposingPartyId) : void 0;
+    return seatOutsideTacticalConsult(seatId, opposingPartyId, opponent?.theater ?? null);
+  }
+  function renderCommanderMessageTabs(target) {
+    const host = target ?? document.getElementById("ai-strategy-toast-text");
+    if (!(host instanceof HTMLElement) || !tabState) return;
+    const state = tabState;
+    host.replaceChildren();
+    const list = document.createElement("div");
+    list.className = "ai-strategy-tab-bar";
+    list.setAttribute("role", "tablist");
+    for (const tab of state.tabs) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "tab");
+      const flag = createSideNumberFlag(tab.seatId, rendererSharedState.gameState?.seats ?? []);
+      if (flag) button.appendChild(flag);
+      button.appendChild(document.createTextNode(tab.label));
+      button.title = tab.label;
+      button.disabled = !tab.enabled;
+      button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
+      button.addEventListener("click", () => {
+        if (!tab.enabled || !tabState) return;
+        tabState = { ...tabState, selectedSeatId: tab.seatId };
+        restartAiStrategyToastTimer();
+        renderCommanderMessageTabs();
+      });
+      list.append(button);
+    }
+    host.append(list);
+    const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
+    if (!selected?.enabled) return;
+    const sections = buildAiStrategyToastSections({ messages: selected.messages, strategy: selected.strategy });
+    const absence = selected.fromAbsence ? selected.message : null;
+    if (sections.length === 0 && !absence) return;
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "tabpanel");
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    for (const section of sections) {
+      appendMapToastSectionHeader(panel, section.title);
+      if (section.bullets && section.bullets.length > 0) {
+        for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
+          const item = document.createElement("div");
+          item.className = "commander-message-line";
+          const label = seatName2(seats, bullet.toSeatId);
+          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_ARROW} `));
+          const flag = createMessagePartyFlag(bullet.toSeatId, seats);
+          if (flag) item.appendChild(flag);
+          const words = document.createElement("span");
+          setSideCodeText(words, { prefix: `${label}: `, rawText: bullet.text, seats, rawTooltip: true });
+          item.appendChild(words);
+          panel.appendChild(item);
+        }
+      } else {
+        const span = document.createElement("span");
+        span.className = "commander-message-body";
+        setSideCodeText(span, { prefix: "", rawText: section.body, seats, rawTooltip: true });
+        panel.append(span);
+      }
+    }
+    if (absence) {
+      const span = document.createElement("span");
+      span.style.display = "block";
+      span.textContent = absence;
+      panel.append(span);
+    }
+    host.append(panel);
+  }
+  function seatOrder(seats, seatId) {
+    return seats.find((seat) => seat.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
+  }
+  function seatName2(seats, seatId) {
+    const seat = seats.find((row) => row.seatId === seatId);
+    return seat ? sideDisplayName(seat) : seatId;
+  }
+  function strategyToastHidden() {
+    const toast = document.getElementById("ai-strategy-toast");
+    return !(toast instanceof HTMLElement) || toast.classList.contains("hidden");
+  }
+
+  // src/renderer/replay/replayDialogs.ts
+  async function showReplayUpdateDialog(view2, replayView, deps) {
+    const result = view2.resolution;
+    const plan = planResolutionPlayback({
+      readyResult: result,
+      state: view2.snapshot,
+      humanMoves: result.humanMoves ?? [],
+      visibleHexesBeforeTurn: new Set(view2.visibleHexesBefore ?? []),
+      deps
+    });
+    if (!(plan.needsCombatOrMovementAnimation || Boolean(result.tacticalAutoStartH3Index))) return;
+    const killToastFormatter = deps.buildKillToastFormatterBundle(
+      view2.snapshot,
+      result.removedUnits,
+      void 0,
+      result.killLabelUnits
+    );
+    await announceResolutionTurnUpdate(
+      {
+        readySlice: result,
+        visibility: plan.visibility,
+        missileLaunches: plan.visibleMissileLaunches,
+        visibleHexes: plan.visibleHexes,
+        killToastFormatter,
+        reportTag: currentConsoleReportTag(),
+        holdForBattle: false,
+        destroyedParents: [],
+        viewerSeatId: replayView === "player" ? HUMAN_SEAT_ID : null,
+        seats: view2.snapshot.seats ?? [],
+        exploredHexes: new Set(view2.snapshot.exploredHexes ?? [])
+      },
+      {
+        showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }),
+        appendOpenRouterLog: () => {
+        },
+        formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement
+      }
+    );
+  }
+  async function showReplayBeatDialog(view2, replayView, deps) {
+    const result = view2.resolution;
+    const playback = result.tacticalResolutionPlayback;
+    if (!playback || !tacticalPlaybackNeeded(playback)) return;
+    const slice = buildTacticalCommitReadyResultForToast(playback);
+    const battle = result.tacticalBattle ?? view2.snapshot.tacticalBattleSession ?? null;
+    const battleCells = battle?.tacticalChildH3Indexes ?? [];
+    const visibleHexes = /* @__PURE__ */ new Set([...deps.getVisibleHexSet(view2.snapshot), ...battleCells]);
+    const visibility = deriveCombatVisibilityClassification(slice, visibleHexes, reportViewerSeatId());
+    const killToastFormatter = deps.buildKillToastFormatterBundle(
+      view2.snapshot,
+      slice.removedUnits,
+      buildTacticalSubUnitKillLabelOverlay({
+        subUnitsBeforeCommit: view2.subUnitsBefore ?? void 0,
+        subUnitsAfterCommit: view2.snapshot.tacticalBattleSession?.subUnits,
+        removedUnits: slice.removedUnits
+      })
+    );
+    await announceResolutionTurnUpdate(
+      {
+        readySlice: slice,
+        visibility,
+        killToastFormatter,
+        reportTag: currentConsoleReportTag(),
+        extraKills: { killsByMelee: playback.killsByMelee, killsByAirStrike: playback.killsByAirStrike },
+        hexCodeBattle: battle,
+        destroyedParents: [],
+        viewerSeatId: replayView === "player" ? HUMAN_SEAT_ID : null,
+        seats: view2.snapshot.seats ?? [],
+        exploredHexes: /* @__PURE__ */ new Set([...view2.snapshot.exploredHexes ?? [], ...battleCells])
+      },
+      {
+        showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }),
+        appendOpenRouterLog: () => {
+        },
+        formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement
+      }
+    );
+  }
+  async function showReplayStepDialogs(view2, replayView, deps) {
+    hideMapToast();
+    deps.hideAiStrategyToast();
+    if (!replayActive()) return;
+    if (view2.resolution !== null) {
+      if (view2.ref.scope === "tactical") await showReplayBeatDialog(view2, replayView, deps);
+      else await showReplayUpdateDialog(view2, replayView, deps);
+    }
+    if (view2.dispatches.length > 0) showCommanderMessageTabs(view2.dispatches, [], { fromReplay: true });
+  }
+
+  // src/renderer/replay/replayMode.ts
+  var REPLAY_NO_TURNS_REASON = "This match has no recorded turns to replay yet.";
+  var REPLAY_STEP_FAILED_REASON = "That turn could not be loaded.";
+  var boundDeps = null;
+  var savedMarkers = null;
+  var savedBattle = null;
+  var savedSelection = [];
+  function bindReplayDeps(deps) {
+    boundDeps = deps;
+    registerReplayLeaver(leaveReplay);
+  }
+  function requireDeps() {
+    if (boundDeps === null) throw new Error("replay dependencies are not bound");
+    return boundDeps;
+  }
+  function entryDecision() {
+    return replayMayEnter({
+      matchLoaded: (rendererSharedState.gameState?.seats?.length ?? 0) > 0,
+      readyInFlight: rendererSharedState.readyRequestInFlight,
+      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
+      otherModalOpen: blockingDialogIsOpen(),
+      newGameOpenMidMatch: newGameOverlayIsOpen() && rendererSharedState.gameState?.gameOver !== true
+    });
+  }
+  async function toggleReplay() {
+    if (replayLeaving !== null) {
+      await replayLeaving;
+      return;
+    }
+    if (replayActive()) {
+      await leaveReplay();
+      return;
+    }
+    await enterReplay();
+  }
+  async function enterReplay() {
+    const decision = entryDecision();
+    if (!decision.ok) {
+      if (decision.reason !== null) showMapToast(decision.reason, { isError: false, skipReport: true });
+      return;
+    }
+    const epoch = currentRendererMatchEpoch();
+    let timeline;
+    try {
+      timeline = await window.gameApi.readReplayTimeline();
+    } catch (error) {
+      console.error("readReplayTimeline failed", error);
+      showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
+      return;
+    }
+    if (!rendererMatchEpochCurrent(epoch) || replayActive() || replayLeaving !== null || !entryDecision().ok) return;
+    if (timeline.scope === "tactical" !== (rendererSharedState.tacticalBattleSnapshot != null)) return;
+    if (timeline.steps.length === 0) {
+      showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
+      return;
+    }
+    const deps = requireDeps();
+    deps.hideBuildPopup();
+    deps.hideStackCallout();
+    savedSelection = [...rendererSharedState.selectedUnitIds];
+    clearSelectionLikeRightClick(deps.selectionDeps);
+    setAsideLastSeenMarkers();
+    savedBattle = timeline.scope === "tactical" ? copyBattleState() : null;
+    ordersTabWasSelected = selectedConsoleTabId() === ORDERS_TAB_ID2;
+    const last = timeline.steps.length - 1;
+    setReplay({ timeline, index: last, busy: false, matchEpoch: epoch, playing: false, stopRequested: false, session: nextReplaySession() });
+    document.body.dataset.replay = "on";
+    refreshConsoleHeader();
+    syncTacticalExitButtonElementVisibility();
+    try {
+      await showReplayStep(last);
+    } catch (error) {
+      console.error("entering replay could not show the last recorded step", error);
+      showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+      await leaveReplay();
+    }
+  }
+  async function openReplay() {
+    if (replayLeaving !== null) await replayLeaving;
+    if (replayActive()) return;
+    await enterReplay();
+  }
+  function setAsideLastSeenMarkers() {
+    savedMarkers = {
+      observed: new Map(rendererSharedState.lastObservedEnemyByUnitId),
+      stale: new Map(rendererSharedState.clientStaleEnemyIntelByUnitId),
+      rendered: new Map(rendererSharedState.lastRenderedVisibleEnemyByUnitId)
+    };
+    rendererSharedState.lastObservedEnemyByUnitId.clear();
+    rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+  }
+  function restoreBattleState() {
+    if (savedBattle === null) return;
+    rendererSharedState.tacticalBattleSnapshot = savedBattle.snapshot;
+    rendererSharedState.tacticalPendingMarches = savedBattle.marches;
+    rendererSharedState.pendingRangedAttacks = savedBattle.rangedAttacks;
+    rendererSharedState.pendingAirStrikes = savedBattle.airStrikes;
+    rendererSharedState.pendingAirDrops = savedBattle.airDrops;
+    rendererSharedState.pendingMissileLaunches = savedBattle.missileLaunches;
+    rendererSharedState.pendingFerryOrders = savedBattle.ferryOrders;
+    rendererSharedState.pendingEmbarkOrders = savedBattle.embarkOrders;
+    savedBattle = null;
+  }
+  function restoreLastSeenMarkers() {
+    if (savedMarkers === null) return;
+    rendererSharedState.lastObservedEnemyByUnitId.clear();
+    rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+    for (const [key, value] of savedMarkers.observed) rendererSharedState.lastObservedEnemyByUnitId.set(key, value);
+    for (const [key, value] of savedMarkers.stale) rendererSharedState.clientStaleEnemyIntelByUnitId.set(key, value);
+    for (const [key, value] of savedMarkers.rendered) rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(key, value);
+    savedMarkers = null;
+  }
+  function restoreSelection(unitIds) {
+    if (unitIds.length === 0) return;
+    replaceSelection([...unitIds]);
+    const { updateSidebar: updateSidebar3, updateRangedSidebar: updateRangedSidebar4, redraw: redraw2 } = requireDeps().selectionDeps;
+    updateSidebar3();
+    updateRangedSidebar4();
+    redraw2();
+  }
+  function replayReadyDeps() {
+    return requireDeps().readyDeps();
+  }
+  async function loadReplayStep(index) {
+    const state = currentReplay();
+    const ref = state?.timeline.steps[index];
+    if (!state || state.busy || !ref) return null;
+    setReplay({ ...state, busy: true });
+    let view2 = null;
+    try {
+      view2 = await window.gameApi.readReplayStep({ recordId: ref.recordId });
+    } catch (error) {
+      console.error("readReplayStep failed", error);
+    }
+    const waiting = currentReplay();
+    if (!waiting || waiting.session !== state.session) return null;
+    setReplay({ ...waiting, busy: false });
+    if (!rendererMatchEpochCurrent(state.matchEpoch)) return null;
+    if (!view2) showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
+    return view2;
+  }
+  async function presentReplayStep(index, view2, options) {
+    const state = currentReplay();
+    if (!state) return;
+    setReplay({ ...state, busy: true });
+    let shown = false;
+    try {
+      await requireDeps().readyDeps().applyGameStateSnapshot(view2.snapshot, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: false,
+        updateGameOverUi: false,
+        updateReadyButton: true,
+        refreshBuildPopup: false,
+        redraw: !options.forPlayback,
+        replay: "step"
+      });
+      if (options.showDialogs) await showReplayStepDialogs(view2, state.timeline.view, requireDeps().readyDeps());
+      shown = true;
+    } finally {
+      const applied = currentReplay();
+      if (applied && applied.session === state.session) setReplay({ ...applied, ...shown ? { index } : {}, busy: false });
+    }
+  }
+  async function showReplayStep(index) {
+    if (currentReplay()?.playing) return;
+    const view2 = await loadReplayStep(index);
+    if (!view2) return;
+    await presentReplayStep(index, view2, { forPlayback: false, showDialogs: true });
+    if (replayLeaving === null) frameReplayStepIfFollowing();
+  }
+  var ORDERS_TAB_ID2 = "console-tab-orders";
+  var ordersTabWasSelected = false;
+  var replayLeaving = null;
+  function replayIsLeaving() {
+    return replayLeaving !== null;
+  }
+  function leaveReplay() {
+    if (replayLeaving !== null) return replayLeaving;
+    const leaving = runLeaveReplay().finally(() => {
+      replayLeaving = null;
+      setReplayLeaveRunning(false);
+    });
+    replayLeaving = leaving;
+    setReplayLeaveRunning(true);
+    return leaving;
+  }
+  function abandonReplayForNewMatch() {
+    if (!replayActive()) return;
+    clearResolutionPlaybackAnimationState();
+    abandonReplay();
+    savedSelection = [];
+    ordersTabWasSelected = false;
+    refreshConsoleHeader();
+    syncTacticalExitButtonElementVisibility();
+  }
+  async function runLeaveReplay() {
+    let state = currentReplay();
+    if (state?.playing) {
+      setReplay({ ...state, playing: false, stopRequested: true });
+      clearResolutionPlaybackAnimationState();
+    }
+    if (state?.busy || state?.playing) {
+      await waitForStepToSettle();
+      state = currentReplay();
+    }
+    if (!state) return;
+    if (rendererMatchEpochCurrent(state.matchEpoch)) {
+      try {
+        await showReplayStep(state.timeline.steps.length - 1);
+      } catch (error) {
+        console.error("leaving replay could not show the last recorded step", error);
+      }
+    }
+    if (!replayActive()) return;
+    setReplay(null);
+    delete document.body.dataset.replay;
+    restoreLastSeenMarkers();
+    restoreBattleState();
+    const selection = savedSelection;
+    savedSelection = [];
+    try {
+      const live = await fetchMatchSnapshot();
+      await requireDeps().readyDeps().applyGameStateSnapshot(live, {
+        refreshStandingOrders: true,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: true,
+        updateGameOverUi: false,
+        updateReadyButton: true,
+        refreshBuildPopup: false,
+        redraw: true,
+        replay: "leave"
+      });
+    } catch (error) {
+      console.error("leaving replay could not read the live match", error);
+    }
+    restoreSelection(selection);
+    refreshConsoleHeader();
+    syncTacticalExitButtonElementVisibility();
+    if (ordersTabWasSelected) selectConsoleTabKeepingCollapse(ORDERS_TAB_ID2);
+    ordersTabWasSelected = false;
+    syncChatPanelVisibility();
+    void maybeObserveAutoAdvance();
+  }
+
+  // src/renderer/gameplay/newGame.ts
+  function registerRegionRandomizeButtons() {
+    document.getElementById("new-game-start-month-randomize")?.addEventListener("click", () => {
+      randomizeNewGameStartMonth();
+      repaintNewGameMapPreview();
+    });
+    document.getElementById("new-game-start-month")?.addEventListener("change", () => {
+      repaintNewGameMapPreview();
+    });
+    document.getElementById("new-game-weather-bonus-select")?.addEventListener("change", () => {
+      repaintNewGameMapPreview();
+    });
+    document.getElementById("new-game-tech-bonus-select")?.addEventListener("change", () => {
+      repaintNewGameMapPreview();
+    });
+  }
+  function stopMatchWaitingUnderNewGame() {
+    if (!isMatchWaitingUnderNewGame()) return;
+    forgetMatchUnderNewGame();
+    void stopOpponentPlanning("new_game");
+    clearResolutionPlaybackAnimationState();
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
+      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
+    }
+    rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+    rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+    rendererSharedState.readyRequestInFlight = false;
+  }
+  function registerNewGameButton(deps) {
+    document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
+      toggleNewGameDialogCollapsed();
+    });
+    wireNewGameDialogMove();
+    document.getElementById("new-game-dialog-close")?.addEventListener("click", () => {
+      closeNewGameOverlayToMatch(deps);
+    });
+    registerRegionRandomizeButtons();
+    registerNewGameMapControls();
+    bindNewGameSides();
+    registerGameSizeSelect();
+    wireNewGameOptionsPopover();
+    wireHumanNicknameField();
+    document.getElementById("new-game-btn")?.addEventListener("click", async () => {
+      const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
+      if (!window.gameApi?.newGame) return;
+      const seatsStart = readNewGameSeatsStart();
+      if (seatsStart.blocked) {
+        showMapToast(seatsStart.blocked);
+        return;
+      }
+      if (!newGameHasAnyModel()) {
+        closeCommanderPopover();
+        closeNewGameOptionsPopover();
+        const startAnyway = await confirmStartWithNoModels();
+        if (!startAnyway) return;
+      }
+      const matchEpoch = advanceRendererMatchEpoch();
+      abandonReplayForNewMatch();
+      stopMatchWaitingUnderNewGame();
+      const cameraHold = holdNewGameMapPreviewCamera();
+      try {
+        const humanNickname = readHumanNicknameForStart();
+        const state = await window.gameApi.newGame({
+          ...readNewGameOptionChoices(),
+          startMonth: readNewGameStartMonth(),
+          ...readNewGameMapChoice(),
+          seats: seatsStart.seats,
+          turnLimit: seatsStart.turnLimit,
+          victoryRule: seatsStart.victoryRule,
+          aiOnlyBattles: seatsStart.aiOnlyBattles,
+          aiOnlyBeatLimit: seatsStart.aiOnlyBeatLimit,
+          sightCues: seatsStart.sightCues,
+          gameSize: readSelectedGameSizeFromDocument(),
+          ...humanNickname === void 0 ? {} : { humanNickname }
+        });
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
+        abandonReplayForNewMatch();
+        installRendererGameMap(state);
+        await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
+        rendererSharedState.gameState = state;
+        void refreshChatThread();
+        rendererSharedState.strategicScenarioInitialLeafletView = null;
+        tacticalReleaseRendererSessionForNewStrategicMatch(state);
+        clearObserveAfterKnockout();
+        clearRememberedUnitOrigins();
+        deps.rebuildUnitDisplayNameLookup(state);
+        deps.reconcileSelectionToCurrentState();
+        rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+        rendererSharedState.lastObservedEnemyByUnitId.clear();
+        rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+        deps.updateClientStaleEnemyIntel(null, state);
+        rendererSharedState.initialCameraApplied = false;
+        deps.updateGameOverUI(state);
+        syncMapExtentToSnapshot(state, { refit: true });
+        if (state.hexes.length > 0) {
+          deps.applyInitialCameraForState(state);
+        }
+        deps.clearStrategicTooltipSummaryCaches();
+        rendererSharedState.humanStandingOrders = [];
+        rendererSharedState.hoverRoutePreview = null;
+        deps.clearPendingTacticalOrders();
+        discardStrategicOrderUiStash();
+        rendererSharedState.selectedUnitIds = [];
+        rendererSharedState.selectedUnitIdsAtMouseDown = [];
+        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+        rendererSharedState.selectedHexIndex = null;
+        deps.hideStackCallout();
+        rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+        rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+        clearOpenRouterLog();
+        await readCommanderPoolAndApply(false);
+        hideAiStrategyToast();
+        clearConsoleReports();
+        deps.updateOpenRouterCostLabel();
+        deps.updateGameStateSidebar(state);
+        await deps.refreshHumanStandingOrders();
+        deps.updatePendingOrdersSidebar();
+        deps.updateRangedSidebar();
+        deps.updateSidebar();
+        await applyStartMatchAiChoice(startMatchAi, {
+          startPlanning: () => deps.startBackgroundRequestIfAllowed(),
+          updateReadyButtonState: () => deps.updateReadyButtonState()
+        });
+        await syncOpenRouterRunToggle();
+        deps.resizeAndRedraw();
+      } catch (err) {
+        console.error("newGame failed:", err);
+        showMapToast("The new game did not start. This screen stays open.");
+        if (releaseNewGameMapPreviewCamera(cameraHold)) void refreshNewGameMapPreview();
+      }
+    });
+  }
+  function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return false;
+    if (rendererSharedState.readyRequestInFlight) return false;
+    const overlay = document.getElementById("game-over-overlay");
+    const newGameBtn = document.getElementById("new-game-btn");
+    const opened = overlay?.classList.contains("hidden") === true;
+    if (opened && rendererSharedState.gameState && rendererSharedState.gameState.hexes.length > 0 && !rendererSharedState.gameState.gameOver) {
+      holdMatchUnderNewGame();
+      advanceRendererMatchEpoch();
+    }
+    hideGameOverStandings();
+    showNewGameBanner("newGame", selectedNewGameTab());
+    if (newGameBtn) {
+      newGameBtn.textContent = "Start game";
+      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
+    }
+    closeMatchOptionsDialogIfOpen();
+    resetNewGameOptionControls();
+    void (async () => {
+      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
+      refreshNewGameSides({ reset: true });
+      await refreshNewGameMapPreview();
+    })();
+    syncGameSizeCapPreview();
+    overlay?.classList.remove("hidden");
+    expandNewGameDialog();
+    if (opened) scrollNewGameDialogToTop();
+    placeNewGameDialogAtInset();
+    blurMapChromeIfFocused();
+    resetNewGameMapPreviewFrame();
+    repaintNewGameMapPreview();
+    setMainUIControlsEnabled2(false);
+    updateReadyButtonState2();
+    return opened;
+  }
+  async function refreshHumanStandingOrders2() {
+    if (!window.gameApi?.listHumanStandingOrders) {
+      rendererSharedState.humanStandingOrders = [];
+      return;
+    }
+    try {
+      rendererSharedState.humanStandingOrders = await window.gameApi.listHumanStandingOrders();
+    } catch {
+      rendererSharedState.humanStandingOrders = [];
+    }
+  }
+
+  // src/shared/tacticalStateAssertions.ts
+  function tacticalBoundaryPlanningExitAllowed(tacticalSnapshot, tacticalPhasePlanning) {
+    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_exit" };
+    return { ok: true };
+  }
+
+  // src/shared/tacticalAnnihilation.ts
+  function getTacticalAnnihilationOutcome(subUnits) {
+    let human = 0;
+    let opponent = 0;
+    for (const u of subUnits) {
+      if (u.player === HUMAN_SEAT_ID) human += 1;
+      else opponent += 1;
+    }
+    if (human > 0 && opponent > 0) return null;
+    if (human > 0 && opponent === 0) return "human_win";
+    if (human === 0 && opponent > 0) return "human_loss";
+    return "mutual";
+  }
+  function getTwoPartyAnnihilationOutcome(subUnits, partyA, partyB) {
+    let countA = 0;
+    let countB = 0;
+    for (const unit of subUnits) {
+      if (unit.player === partyA) countA += 1;
+      else if (unit.player === partyB) countB += 1;
+    }
+    if (countA > 0 && countB > 0) return null;
+    if (countA > 0) return partyA;
+    if (countB > 0) return partyB;
+    return "mutual";
+  }
+
+  // src/renderer/tactical/tacticalExitFlow.ts
+  var aiOnlyExitStarted = false;
+  function tacticalMaybeScheduleAnnihilationExit(session, io) {
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
+    const snap = session.getBattleSnapshot();
+    if (!snap || !session.getPhasePlanning()) return;
+    if (snap.leadPartyId != null) {
+      if (snap.aiOnlyEndReason == null) {
+        aiOnlyExitStarted = false;
+        return;
+      }
+      if (rendererSharedState.resolutionMoveAnimation) return;
+      const sentence = aiOnlyResultSentence(snap);
+      if (sentence == null) return;
+      const presentation = aiOnlyBattleEndPresentation(snap.aiOnlyEndReason, rendererSharedState.autoAdvance);
+      if (presentation === "leave_now") {
+        if (aiOnlyExitStarted) return;
+        aiOnlyExitStarted = true;
+        void leaveAiOnlyBattle(session, io, true);
+        return;
+      }
+      if (presentation === "timed_dialog") {
+        openAiOnlyBattleResultDialog(sentence, aiOnlyTimedResultOkTooltipText);
+        if (io.finishTimedAiOnlyResult) scheduleAiOnlyResultAutoClose(io.finishTimedAiOnlyResult);
+        io.redraw();
+        return;
+      }
+      openAiOnlyBattleResultDialog(sentence);
+      io.redraw();
+      return;
+    }
+    const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
+    if (outcome === null) return;
+    openTacticalAnnihilationOutcomeDialog(outcome);
+    io.redraw();
+  }
+  function aiOnlyResultSentence(snap) {
+    if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
+    if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
+    if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
+    if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
+    if (snap.aiOnlyEndReason === "beat_limit") return formatAiOnlyBeatLimitSentence(snap.tacticalTurnNumber - 1);
+    const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
+    if (winner == null || winner === "mutual") return "All units destroyed.";
+    const winnerSeat = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner);
+    return `${winnerSeat ? sideDisplayName(winnerSeat) : winner} wins the battle.`;
+  }
+  async function leaveAiOnlyBattle(session, io, autoAdvance) {
+    await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {
+    } });
+    if (session.getBattleSnapshot() != null) return;
+    rendererSharedState.aiOnlyBattleResultSentence = null;
+    const waitingHoldId = waitingHeldBattleTurnUpdateId();
+    if (autoAdvance) await maybeObserveAutoAdvance();
+    if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
+      await showHeldBattleTurnUpdate(true);
+    }
+  }
+  async function tacticalPerformBattleExit(session, io) {
+    const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
+    if (!boundary.ok) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    invalidateBackgroundAiRequest();
+    try {
+      if (io.endTacticalBattle) {
+        const ended = await io.endTacticalBattle();
+        attachDestroyedBattleParents(destroyedParentsFromEnd(ended));
+      }
+    } catch (err) {
+      console.error("endTacticalBattle failed:", err);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      io.showMapToast("Could not exit tactical battle.", { isError: true });
+      return;
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    tacticalBattleExitTeardownTransientRendererState();
+    session.setBattleSnapshot(null);
+    clearAutomaticBattleFrameMemory();
+    closeTacticalAnnihilationOutcomeDialog();
+    session.setPhasePlanning(true);
+    exitTacticalMapView();
+    tacticalApplyStrategicSidebarForTacticalMode(false);
+    const tel = document.getElementById("tactical-entry-layer");
+    if (tel) hideTacticalEntryLayer(tel, false);
+    tacticalUpdateExitButtonVisibility();
+    try {
+      await io.refreshStrategicSnapshotAfterExit?.();
+    } catch (err) {
+      console.error("refreshStrategicSnapshotAfterExit failed:", err);
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    updateGameStateSidebar(rendererSharedState.gameState);
+    restoreStrategicOrderDraftsAfterTacticalSession();
+    io.refreshSidebarAfterTacticalDraftTeardown?.();
+    io.redraw();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    frameAutomaticStrategicUnits();
+    await io.runReadyAfterExit();
+  }
+  function destroyedParentsFromEnd(ended) {
+    if (!ended || typeof ended !== "object" || !("destroyedParents" in ended)) return [];
+    const parents = ended.destroyedParents;
+    return Array.isArray(parents) ? parents : [];
+  }
+
+  // src/renderer/tactical/tacticalIpcHandlers.ts
+  function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned() {
+    const interruptedStrategicPlayback = rendererSharedState.resolutionMoveAnimation !== null || rendererSharedState.resolutionMoveAnimationFrameId !== null;
+    if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
+      cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
+    }
+    rendererSharedState.resolutionMoveAnimationFrameId = null;
+    rendererSharedState.resolutionMoveAnimation = null;
+    syncChatPanelVisibility();
+    if (interruptedStrategicPlayback) {
+      flushResolutionPlaybackCompleteNotifyCallbacks();
+    }
+    reconcileSelectionToCurrentState();
+    rendererSharedState.hoverRoutePreview = null;
+    rendererSharedState.hoverPreviewRequestSeq++;
+    rendererSharedState.hoveredHexH3 = null;
+    rendererSharedState.hoveredDetailHexH3 = null;
+    rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+    rendererSharedState.hideCommittedOrderLinesAfterReady = false;
+  }
+  function tacticalRendererApplyStartBattleIpcResult(result, fx) {
+    if (!result.success || !result.battle) {
+      fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
+      return;
+    }
+    stashStrategicOrderDraftsForTacticalSession();
+    fx.assignBattleSnapshot(result.battle);
+    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
+    fx.setPhasePlanning(true);
+    const skipped = result.skippedParentDisplayNames;
+    if (skipped && skipped.length > 0) {
+      fx.showMapToast(`Some units could not be placed tactically: ${skipped.join(", ")}.`, { isError: true });
+    }
+    fx.enterTacticalView(result.battle.tacticalChildH3Indexes);
+    fx.setStrategicSidebarTactical(true);
+    fx.refreshTacticalExitButton();
+    fx.scheduleAnnihilationExit();
+    fx.refreshReadyButton();
+    fx.syncTacticalEntryOverlay();
+    fx.redraw();
+    updateGameStateSidebar(rendererSharedState.gameState);
+    fx.refreshOrderSidebars?.();
+  }
+  function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
+    stashStrategicOrderDraftsForTacticalSession();
+    fx.assignBattleSnapshot(battle);
+    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
+    fx.setPhasePlanning(true);
+    fx.enterTacticalView(battle.tacticalChildH3Indexes);
+    fx.setStrategicSidebarTactical(true);
+    fx.refreshTacticalExitButton();
+    fx.scheduleAnnihilationExit();
+    fx.refreshReadyButton();
+    fx.syncTacticalEntryOverlay();
+    fx.redraw();
+    updateGameStateSidebar(rendererSharedState.gameState);
+    fx.refreshOrderSidebars?.();
+  }
+
+  // src/renderer/tactical/tacticalEntryFlow.ts
+  function buildDefaultTacticalBattleActivationSideEffects(bindings) {
+    return {
+      showMapToast: bindings.showMapToast,
+      assignBattleSnapshot: (battle) => {
+        rendererSharedState.tacticalBattleSnapshot = battle;
+        bindings.rebuildUnitDisplayNameLookup?.();
+      },
+      setPhasePlanning: (planning) => {
+        rendererSharedState.tacticalPhasePlanning = planning;
+      },
+      enterTacticalView: enterTacticalMapView,
+      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+      refreshTacticalExitButton: tacticalUpdateExitButtonVisibility,
+      scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
+      refreshReadyButton: bindings.refreshReadyButton,
+      syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
+      redraw: bindings.redraw,
+      refreshOrderSidebars: bindings.refreshOrderSidebars
+    };
+  }
+  async function startTacticalBattleFromEntryHex(enclosingStrategicH3Index, deps) {
+    const matchEpoch = currentRendererMatchEpoch();
+    if (deps.prepareStrategicUiBeforeTacticalStart) {
+      await deps.prepareStrategicUiBeforeTacticalStart();
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) {
+      dropHeldBattleTurnUpdate();
+      return;
+    }
+    const resumedSession = rendererSharedState.gameState?.tacticalBattleSession && rendererSharedState.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index && !rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.gameState.tacticalBattleSession : null;
+    if (resumedSession) {
+      deps.hideBuildPopup();
+      activateRestoredTacticalBattleFromMainSnapshot(resumedSession, deps.getActivationSideEffects());
+      return;
+    }
+    const ipc = deps.invokeStartTacticalBattle;
+    if (!ipc) {
+      deps.onMissingStartTacticalBattleIpc();
+      await showHeldBattleTurnUpdate(true);
+      return;
+    }
+    deps.hideBuildPopup();
+    let result;
+    try {
+      result = await ipc({ enclosingStrategicH3Index });
+    } catch (err) {
+      console.error("startTacticalBattle failed", err);
+      await showHeldBattleTurnUpdate(true);
+      return;
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) {
+      dropHeldBattleTurnUpdate();
+      return;
+    }
+    tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
+    if (!result.success || !result.battle) await showHeldBattleTurnUpdate(true);
+  }
+  function activateRestoredTacticalBattleFromMainSnapshot(battle, getActivationSideEffects) {
+    tacticalRendererActivateRestoredBattleSnapshot(battle, getActivationSideEffects());
+  }
+  async function performTacticalBattleExitWithGameApi(session, io) {
+    const waitingHoldId = waitingHeldBattleTurnUpdateId();
+    await tacticalPerformBattleExit(session, {
+      ...io,
+      endTacticalBattle: window.gameApi?.endTacticalBattle
+    });
+    if (session.getBattleSnapshot() != null) return;
+    if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
+      await showHeldBattleTurnUpdate(true);
+    }
+  }
+
+  // src/shared/buildQueueItemLabels.ts
+  function formatBuildQueueItemLabel(item) {
+    if (item === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_QUEUE_ITEM_LABEL;
+    if (item === CREDITS_QUEUE_ITEM) return CREDITS_QUEUE_ITEM_LABEL;
+    return item.charAt(0).toUpperCase() + item.slice(1);
+  }
+
+  // src/renderer/gameplay/buildQueuePopupFormatting.ts
+  function sanitizeBuildCountInputText(raw) {
+    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
+    if (digitsOnly.length === 0) return "1";
+    const parsed = parseInt(digitsOnly, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
+    if (parsed > 99) return "99";
+    return String(parsed);
+  }
+  function escapeBuildPopupHtml(text) {
+    return escapeHtmlText(text);
+  }
+  function createBuildPopupCloseRow(onClose) {
+    const closeRow = document.createElement("div");
+    closeRow.className = "build-popup-close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "unit-select build-close-btn";
+    closeBtn.textContent = "\xD7";
+    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
+    closeBtn.addEventListener("click", () => onClose());
+    closeRow.appendChild(closeBtn);
+    return closeRow;
+  }
+  function createBuildCountInput(tooltipText, initialValue) {
+    const countInput = document.createElement("input");
+    countInput.setAttribute("data-control-tooltip", tooltipText);
+    countInput.type = "text";
+    countInput.className = "build-count-input";
+    countInput.maxLength = 2;
+    countInput.inputMode = "numeric";
+    countInput.value = initialValue;
+    countInput.addEventListener("keydown", (event) => {
+      const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
+      if (allowed.includes(event.key)) return;
+      if (/^\d$/.test(event.key)) return;
+      event.preventDefault();
+    });
+    return countInput;
+  }
+  function readSanitizedBuildCount(input) {
+    const raw = sanitizeBuildCountInputText(input.value);
+    if (input.value !== raw) input.value = raw;
+    return parseInt(raw, 10);
+  }
+  function createQueuePausedNote(text) {
+    const note2 = document.createElement("div");
+    note2.className = "build-no-urban";
+    note2.textContent = text;
+    return note2;
+  }
+
+  // src/renderer/gameplay/buildQueueMultiSelect.ts
+  var nextBuildQueueTemplateRowKey = 1;
+  function createBuildQueueTemplateRow(unitType, count) {
+    return { rowKey: nextBuildQueueTemplateRowKey++, unitType, count };
+  }
+  function toBuildQueueTemplateEntries(template) {
+    return template.map(({ unitType, count }) => ({ unitType, count }));
+  }
+  function formatSelectedBuildHexCodesHtml(h3Indexes) {
+    const labels = h3Indexes.map(
+      (h3Index) => `<strong>${escapeBuildPopupHtml(`(${getStrategicHexCode(h3Index) ?? h3Index})`)}</strong>`
+    );
+    const suffix = ` (${h3Indexes.length} ${h3Indexes.length === 1 ? "hex" : "hexes"})`;
+    if (labels.length <= 1) return `${labels[0] ?? ""}${suffix}`;
+    if (labels.length === 2) return `${labels[0]} and ${labels[1]}${suffix}`;
+    return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}${suffix}`;
+  }
+  function buildQueueTemplateFromSnapshot(snapshot3) {
+    return snapshot3.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
+  }
+  function unionAvailableBuildUnitTypes(snapshots) {
+    const available = new Set(snapshots.flatMap((snapshot3) => snapshot3.availableUnitTypes));
+    return ALL_BUILD_QUEUE_ITEM_TYPES.filter((unitType) => available.has(unitType));
+  }
+  function countEligibleBuildHexes(snapshots, unitType) {
+    return snapshots.filter((snapshot3) => snapshot3.availableUnitTypes.includes(unitType)).length;
+  }
+  function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
+    const typeLabel = formatBuildQueueItemLabel(unitType);
+    if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
+      return `${typeLabel} (all hexes)`;
+    }
+    if (eligibleCount === 1) return `${typeLabel} (1 hex)`;
+    return `${typeLabel} (${Math.max(0, eligibleCount)} hexes)`;
+  }
+  function filterTemplateForBuildHex(template, snapshot3) {
+    const available = new Set(snapshot3.availableUnitTypes);
+    return template.filter((entry) => available.has(entry.unitType));
+  }
+  function templateEntriesForTurnEstimate(template) {
+    return template.map((entry, queueIndex) => ({
+      id: queueIndex + 1,
+      queueIndex,
+      unitType: entry.unitType,
+      count: entry.count
+    }));
+  }
+
+  // src/renderer/gameplay/buildQueueKeepBuilding.ts
+  function canArmKeepBuilding(snapshot3) {
+    return snapshot3.entries.length > 0 || snapshot3.keepBuilding && snapshot3.keepBuildingUnitType !== null;
+  }
+  function areAllKeepBuildingArmed(snapshots) {
+    return snapshots.length > 0 && snapshots.every((snapshot3) => snapshot3.keepBuilding);
+  }
+  function canArmKeepBuildingForAll(snapshots) {
+    return snapshots.length > 0 && snapshots.every((snapshot3) => canArmKeepBuilding(snapshot3));
+  }
+  function appendKeepBuildingCheckbox(args) {
+    const row = document.createElement("div");
+    row.className = "build-keep-building-row";
+    const label = document.createElement("label");
+    label.className = "build-keep-building-label";
+    label.setAttribute("data-control-tooltip", args.tooltipText);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "build-keep-building-checkbox";
+    checkbox.checked = args.checked;
+    checkbox.disabled = args.disabled;
+    checkbox.addEventListener("change", () => {
+      void args.onChange(checkbox.checked);
+    });
+    const text = document.createElement("span");
+    text.textContent = "Keep building";
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    row.appendChild(label);
+    args.section.appendChild(row);
+  }
+
+  // src/shared/queueItemTooltipText.ts
+  var QUEUE_ITEM_TOOLTIP_TEXT = {
+    infantry: "The cheapest unit. It cannot shoot on the world map, and it can shoot in a battle.",
+    armor: "Costs more than infantry, shoots one hex on the world map, and cannot enter mountains, wetlands, or arctic.",
+    naval: "Needs a seaport, shoots two hexes on the world map, and can carry land units.",
+    air: "Strikes from an airport and does not march. A hex needs an airport to build it.",
+    missile: "Launches once on the world map and is then gone. It cannot fire in a battle.",
+    fortification: "Protects one city cell. It is not a unit, and a hit removes it before a unit.",
+    credits: "Adds 20 credits to the treasury. It is not a unit and does not count toward a unit cap."
+  };
+  function queueItemTooltipText(value) {
+    if (!isBuildQueueItemType(value)) return null;
+    return QUEUE_ITEM_TOOLTIP_TEXT[value];
+  }
+
+  // src/renderer/chrome/syncQueueItemSelectTooltip.ts
+  function syncQueueItemSelectTooltip(select, emptyText) {
+    select.setAttribute("data-control-tooltip", queueItemTooltipText(select.value) ?? emptyText);
+  }
+
+  // src/renderer/gameplay/buildQueueMultiPopup.ts
+  async function loadSelectedBuildSnapshots(h3Indexes) {
+    if (!window.gameApi?.getHexBuildQueue) return [];
+    const snapshots = await Promise.all(
+      h3Indexes.map(async (h3Index) => {
+        try {
+          return await window.gameApi.getHexBuildQueue({ h3Index });
+        } catch (err) {
+          console.error("getHexBuildQueue failed:", { h3Index, err });
+          return null;
+        }
+      })
+    );
+    return snapshots.filter((snapshot3) => snapshot3 !== null);
+  }
+  function copyBuildQueueTemplate(template) {
+    return template.map((row) => ({ ...row }));
+  }
+  async function restoreTemplateAfterFailedApply(applyResult, previousTemplate, liveTemplate) {
+    if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
+    if (applyResult.ok) return true;
+    if (!applyResult.anyHexWritten) {
+      rendererSharedState.buildQueueTemplate = previousTemplate;
+      return true;
+    }
+    const seedHex = rendererSharedState.selectedBuildHexH3s[0];
+    const snapshots = seedHex ? await loadSelectedBuildSnapshots([seedHex]) : [];
+    if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
+    const snapshot3 = snapshots[0];
+    rendererSharedState.buildQueueTemplate = snapshot3 ? buildQueueTemplateFromSnapshot(snapshot3) : previousTemplate;
+    return true;
+  }
+  async function commitEditedTemplate(deps, nextTemplate) {
+    const previousTemplate = copyBuildQueueTemplate(rendererSharedState.buildQueueTemplate);
+    rendererSharedState.buildQueueTemplate = nextTemplate;
+    const applyResult = await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
+    const stillCurrent = await restoreTemplateAfterFailedApply(
+      applyResult,
+      previousTemplate,
+      nextTemplate
+    );
+    if (!stillCurrent) return;
+    void renderMultiBuildQueueIntoMount(deps);
+  }
+  function formatMultiQueueSummary(snapshots) {
+    if (rendererSharedState.buildQueueTemplate.length === 0) return "<strong>Queue:</strong> (none)";
+    const queueTotalCost = sumQueuedProductionCost(rendererSharedState.buildQueueTemplate);
+    const turns = snapshots.map(
+      (snapshot3) => estimateTurnsToCompleteQueuedProduction(
+        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot3)),
+        snapshot3.storedPoints,
+        snapshot3.urbanHexCount
+      )
+    );
+    const numericTurns = turns.filter((turn) => turn !== null);
+    if (numericTurns.length !== turns.length) {
+      return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ? turns`;
+    }
+    const minimum = Math.min(...numericTurns);
+    const maximum = Math.max(...numericTurns);
+    const turnsDisplay = minimum === maximum ? String(minimum) : `${minimum}\u2013${maximum}`;
+    const turnLabel = minimum === 1 && maximum === 1 ? "turn" : "turns";
+    return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${turnsDisplay} ${turnLabel}`;
+  }
+  function buildQueueEditBlockedByPlayback() {
+    return resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation);
+  }
+  async function renderMultiBuildQueueIntoMount(deps) {
+    const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
+    const selectedH3Indexes = [...rendererSharedState.selectedBuildHexH3s];
+    const selectionSignature = selectedH3Indexes.join("|");
+    const snapshots = await loadSelectedBuildSnapshots(selectedH3Indexes);
+    if (requestSeq !== rendererSharedState.buildPopupRequestSeq || rendererSharedState.buildPopupHexH3 !== deps.h3Index || rendererSharedState.selectedBuildHexH3s.join("|") !== selectionSignature) {
+      return;
+    }
+    if (snapshots.length !== selectedH3Indexes.length) {
+      console.error("renderMultiBuildQueueIntoMount: incomplete snapshot load", {
+        selectedCount: selectedH3Indexes.length,
+        loadedCount: snapshots.length
+      });
+      deps.mount.innerHTML = "";
+      deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
+      const errorLine = document.createElement("div");
+      errorLine.className = "build-no-urban";
+      errorLine.textContent = "Failed to load build queues for the selected hexes.";
+      deps.mount.appendChild(errorLine);
+      placeOpenBuildPopup();
+      return;
+    }
+    deps.mount.innerHTML = "";
+    deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    const descriptionLine = document.createElement("div");
+    descriptionLine.innerHTML = formatSelectedBuildHexCodesHtml(selectedH3Indexes);
+    section.appendChild(descriptionLine);
+    const descriptionSpacer = document.createElement("div");
+    descriptionSpacer.style.height = "0.5em";
+    section.appendChild(descriptionSpacer);
+    const techLineHtml = formatSelectedHexTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCounts: selectedH3Indexes.map((h3Index) => baselineUrbanHexCountForStrategicHex(h3Index))
+    });
+    if (techLineHtml) {
+      const techLine = document.createElement("div");
+      techLine.innerHTML = techLineHtml;
+      section.appendChild(techLine);
+      const techSpacer = document.createElement("div");
+      techSpacer.style.height = "0.5em";
+      section.appendChild(techSpacer);
+    }
+    const totalProduction = snapshots.reduce((sum, snapshot3) => sum + snapshot3.urbanHexCount, 0);
+    const pointsLine = document.createElement("div");
+    pointsLine.innerHTML = `<strong>Production:</strong> ${formatProductionCapacityAmount(totalProduction.toLocaleString())} / turn`;
+    section.appendChild(pointsLine);
+    const productionQueueSpacer = document.createElement("div");
+    productionQueueSpacer.style.height = "0.5em";
+    section.appendChild(productionQueueSpacer);
+    const queueSummaryLine = document.createElement("div");
+    queueSummaryLine.innerHTML = formatMultiQueueSummary(snapshots);
+    section.appendChild(queueSummaryLine);
+    const productionSpacer = document.createElement("div");
+    productionSpacer.style.height = "0.5em";
+    section.appendChild(productionSpacer);
+    const unionTypes = unionAvailableBuildUnitTypes(snapshots);
+    const head2 = document.createElement("div");
+    head2.className = "build-queue-head";
+    const title = document.createElement("span");
+    title.className = "build-queue-title";
+    title.textContent = "Build Queue";
+    const buildBtn = document.createElement("button");
+    buildBtn.type = "button";
+    buildBtn.className = "unit-select stack-unit-toggle";
+    buildBtn.textContent = UNIT_SELECT_GLYPH;
+    buildBtn.setAttribute("data-control-tooltip", multiBuildAddTooltipText);
+    buildBtn.addEventListener("click", async () => {
+      if (buildQueueEditBlockedByPlayback()) return;
+      const defaultUnitType = unionTypes[0];
+      if (!defaultUnitType) return;
+      await commitEditedTemplate(deps, [
+        ...rendererSharedState.buildQueueTemplate,
+        createBuildQueueTemplateRow(defaultUnitType, 1)
+      ]);
+    });
+    head2.appendChild(title);
+    head2.appendChild(buildBtn);
+    section.appendChild(head2);
+    const list = document.createElement("div");
+    list.className = "build-queue-list";
+    rendererSharedState.buildQueueTemplate.forEach((entry) => {
+      const rowKey = entry.rowKey;
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const typeSelect = document.createElement("select");
+      const rowTypes = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
+        (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
+      );
+      for (const unitType of rowTypes) {
+        const eligibleCount = countEligibleBuildHexes(snapshots, unitType);
+        const opt = document.createElement("option");
+        opt.value = unitType;
+        opt.textContent = formatBuildUnitTypeOptionLabel(unitType, eligibleCount, snapshots.length);
+        typeSelect.appendChild(opt);
+      }
+      typeSelect.value = entry.unitType;
+      syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
+      row.appendChild(typeSelect);
+      const countInput = createBuildCountInput(multiBuildCountTooltipText, String(entry.count));
+      row.appendChild(countInput);
+      typeSelect.addEventListener("change", async () => {
+        syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
+        if (buildQueueEditBlockedByPlayback()) {
+          void renderMultiBuildQueueIntoMount(deps);
+          return;
+        }
+        const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
+        if (entryIndex < 0) return;
+        const updated = [...rendererSharedState.buildQueueTemplate];
+        updated[entryIndex] = {
+          rowKey,
+          unitType: typeSelect.value,
+          count: readSanitizedBuildCount(countInput)
+        };
+        await commitEditedTemplate(deps, updated);
+      });
+      countInput.addEventListener("input", async () => {
+        if (buildQueueEditBlockedByPlayback()) {
+          void renderMultiBuildQueueIntoMount(deps);
+          return;
+        }
+        const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
+        if (entryIndex < 0) return;
+        const updated = [...rendererSharedState.buildQueueTemplate];
+        updated[entryIndex] = {
+          rowKey,
+          unitType: typeSelect.value,
+          count: readSanitizedBuildCount(countInput)
+        };
+        await commitEditedTemplate(deps, updated);
+      });
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "unit-select";
+      removeBtn.textContent = "x";
+      removeBtn.setAttribute("data-control-tooltip", multiHexQueueRemoveTooltipText);
+      removeBtn.addEventListener("click", async () => {
+        if (buildQueueEditBlockedByPlayback()) return;
+        await commitEditedTemplate(
+          deps,
+          rendererSharedState.buildQueueTemplate.filter((row2) => row2.rowKey !== rowKey)
+        );
+      });
+      row.appendChild(removeBtn);
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+    appendKeepBuildingCheckbox({
+      section,
+      checked: areAllKeepBuildingArmed(snapshots),
+      disabled: !canArmKeepBuildingForAll(snapshots),
+      tooltipText: multiKeepBuildingTooltipText,
+      onChange: async (keepBuilding) => {
+        if (buildQueueEditBlockedByPlayback()) {
+          void renderMultiBuildQueueIntoMount(deps);
+          return;
+        }
+        await deps.setKeepBuilding(keepBuilding);
+        void renderMultiBuildQueueIntoMount(deps);
+      }
+    });
+    deps.mount.appendChild(section);
+    placeOpenBuildPopup();
+  }
+
+  // src/renderer/gameplay/hirePanel.ts
+  async function fetchHirePanelData(h3Index) {
+    let view2 = null;
+    let caption = null;
+    try {
+      view2 = await window.gameApi?.getHexHireView({ h3Index }) ?? null;
+    } catch (err) {
+      console.error("getHexHireView failed:", err);
+    }
+    try {
+      if (window.gameApi?.getHexNamingTooltipLine) {
+        caption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+      }
+    } catch (err) {
+      console.error("getHexNamingTooltipLine failed:", err);
+    }
+    return { view: view2, caption };
+  }
+  function renderHirePanel(panel, h3Index, data, deps) {
+    panel.innerHTML = "";
+    panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
+    appendCaption(panel, h3Index, data.caption);
+    appendTechLine(panel, h3Index);
+    const view2 = data.view;
+    if (!view2) {
+      panel.appendChild(note(HIRE_VIEW_FAILED));
+      if (!panel.hidden) placeOpenBuildPopup();
+      return;
+    }
+    appendFunds(panel, view2);
+    if (view2.raiseShortage) appendShortage(panel, view2.raiseShortage);
+    const unavailable = view2.hireAvailable ? null : visibleBlockedReason(view2.unavailableReason);
+    if (unavailable) panel.appendChild(note(unavailable));
+    if (view2.raise) appendRaise(panel, h3Index, view2, deps);
+    else if (!view2.raiseShortage) {
+      const raiseBlocked = visibleBlockedReason(view2.raiseBlockedReason);
+      if (raiseBlocked && raiseBlocked !== unavailable) panel.appendChild(note(raiseBlocked));
+    }
+    if (view2.rehireUnits.length > 0) appendRehires(panel, h3Index, view2, deps);
+    if (view2.pendingOrders.length > 0) appendOrders(panel, h3Index, view2, deps);
+    if (!panel.hidden) placeOpenBuildPopup();
+  }
+  function appendCaption(panel, h3Index, caption) {
+    const strategicCode = getStrategicHexCode(h3Index);
+    const prefix = strategicCode ? `<strong>(${escapeBuildPopupHtml(strategicCode)})</strong> ` : "";
+    const text = caption && caption.text.trim().length > 0 ? `${prefix}${formatHexNamingCaptionHtml(caption)}` : prefix;
+    if (!text) return;
+    const line = document.createElement("div");
+    line.innerHTML = text;
+    panel.append(line, spacer());
+  }
+  function appendTechLine(panel, h3Index) {
+    const techLineHtml = formatProducedUnitTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index)
+    });
+    if (!techLineHtml) return;
+    const techLine = document.createElement("div");
+    techLine.innerHTML = techLineHtml;
+    panel.append(techLine, spacer());
+  }
+  function appendFunds(panel, view2) {
+    const raise = view2.raise;
+    if (!raise) return;
+    appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft));
+  }
+  function appendLabeledAmount(panel, label, value) {
+    panel.append(fundLine(label, value), spacer());
+  }
+  function spacer() {
+    const gap = document.createElement("div");
+    gap.style.height = "0.5em";
+    return gap;
+  }
+  function endsWithSpacer(panel) {
+    const last = panel.lastElementChild;
+    return last instanceof HTMLElement && last.style.height === "0.5em" && last.childNodes.length === 0;
+  }
+  function fundLine(label, value) {
+    const line = document.createElement("div");
+    line.innerHTML = `<strong>${label}:</strong> ${escapeBuildPopupHtml(value)}`;
+    return line;
+  }
+  function visibleBlockedReason(text) {
+    if (!text || text === RAISE_REASON_CAPACITY_USED || text === RAISE_REASON_OCCUPIED) return null;
+    return text;
+  }
+  function note(text, className = "build-no-urban") {
+    const line = document.createElement("div");
+    line.className = className;
+    line.textContent = text;
+    return line;
+  }
+  function appendShortage(panel, sentence) {
+    if (!sentence) return;
+    panel.append(note(sentence, "hire-funds-warning"), spacer());
+  }
+  function selectedHireCount(countText) {
+    const raw = sanitizeBuildCountInputText(countText);
+    const count = parseInt(raw, 10);
+    if (!Number.isInteger(count) || count < HIRE_COUNT_MIN || count > HIRE_COUNT_MAX) return null;
+    return count;
+  }
+  function appendRaise(panel, h3Index, view2, deps) {
+    const raise = view2.raise;
+    if (!raise) return;
+    const shortage = document.createElement("div");
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    const row = document.createElement("div");
+    row.className = "build-queue-row";
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "unit-select";
+    for (const option2 of raise.options) {
+      const choice = document.createElement("option");
+      choice.value = option2.unitType;
+      choice.textContent = formatHireOptionLabel(option2);
+      typeSelect.appendChild(choice);
+    }
+    const countInput = createBuildCountInput(hireCountTooltipText, "1");
+    syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
+    typeSelect.addEventListener("change", () => {
+      syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
+      shortage.replaceChildren();
+    });
+    countInput.addEventListener("input", () => {
+      const raw = sanitizeBuildCountInputText(countInput.value);
+      if (countInput.value !== raw) countInput.value = raw;
+      shortage.replaceChildren();
+    });
+    const button = hireButton();
+    button.addEventListener("click", () => {
+      const count = selectedHireCount(countInput.value);
+      const option2 = raise.options.find((row2) => row2.unitType === typeSelect.value);
+      if (count == null || !option2) return;
+      const label = hireShortageLabel(view2.funds.credits, option2.fee * count, option2.unitCost * count, raise.capacityLeft);
+      if (label) {
+        shortage.replaceChildren();
+        appendShortage(shortage, label);
+        return;
+      }
+      void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({
+        kind: "raise",
+        h3Index,
+        unitType: typeSelect.value,
+        count
+      }));
+    });
+    row.append(typeSelect, countInput, button);
+    section.appendChild(row);
+    panel.append(shortage, section);
+  }
+  function appendRehires(panel, h3Index, view2, deps) {
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    section.appendChild(head(REHIRE_SECTION_TITLE));
+    for (const unit of view2.rehireUnits) {
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const label = document.createElement("span");
+      label.className = "unit-label";
+      setUnitNameContent(label, unit.unitId, formatHireOrderLabel({
+        kind: "rehire",
+        unitType: unit.unitType,
+        count: 1,
+        displayName: unit.displayName,
+        fee: unit.fee
+      }));
+      const button = hireButton();
+      button.addEventListener("click", () => {
+        void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({ kind: "rehire", unitId: unit.unitId }));
+      });
+      row.append(label, button);
+      section.appendChild(row);
+    }
+    panel.appendChild(section);
+  }
+  function appendOrders(panel, h3Index, view2, deps) {
+    if (!endsWithSpacer(panel)) panel.appendChild(spacer());
+    const section = document.createElement("div");
+    section.className = "build-queue-section hire-orders";
+    section.appendChild(head(PENDING_HIRE_SECTION_TITLE));
+    for (const order of view2.pendingOrders) {
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const label = document.createElement("span");
+      const text = formatHireOrderLabel(order);
+      if (order.kind === "rehire" && order.unitId) {
+        label.className = "unit-label";
+        setUnitNameContent(label, order.unitId, text);
+      } else {
+        label.textContent = text;
+      }
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "unit-select";
+      button.textContent = "x";
+      button.setAttribute("data-control-tooltip", hireRemoveTooltipText);
+      button.addEventListener("click", () => {
+        void submitHire(panel, h3Index, deps, () => window.gameApi.removeHireOrder({ orderId: order.orderId }));
+      });
+      row.append(label, button);
+      section.append(row, spacer());
+    }
+    panel.appendChild(section);
+  }
+  function head(title) {
+    const row = document.createElement("div");
+    row.className = "build-queue-head";
+    const text = document.createElement("span");
+    text.className = "build-queue-title";
+    text.textContent = title;
+    row.appendChild(text);
+    return row;
+  }
+  function hireButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "unit-select";
+    button.textContent = HIRE_BUTTON_LABEL;
+    button.setAttribute("data-control-tooltip", hireSubmitTooltipText);
+    return button;
+  }
+  async function submitHire(panel, h3Index, deps, mutate) {
+    if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
+    if (!window.gameApi?.placeHireOrder || !window.gameApi.removeHireOrder) return;
+    let result;
+    try {
+      result = await mutate();
+    } catch (err) {
+      console.error("hire order failed:", err);
+      if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+      deps.showMapToast(HIRE_ORDER_UPDATE_FAILED, { isError: true });
+      return;
+    }
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+    if (!result.success) {
+      deps.showMapToast(result.reason ?? HIRE_ORDER_UPDATE_FAILED, { isError: true });
+      return;
+    }
+    await deps.refreshGameStateAfterBuildQueueChange();
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+    const data = await fetchHirePanelData(h3Index);
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+    renderHirePanel(panel, h3Index, data, deps);
+  }
+
+  // src/renderer/gameplay/buildHirePopup.ts
+  var tabHex = null;
+  var tabChoice = "build";
+  var hireRequestSeq = 0;
+  async function renderBuildOrHirePopupIntoMount(mount, h3Index, deps) {
+    const popup = document.getElementById("build-popup");
+    if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
+      popup?.classList.remove("build-popup-wide");
+      await deps.renderBuildPanel(mount, h3Index);
+      return;
+    }
+    const requestSeq = ++hireRequestSeq;
+    const data = await fetchHirePanelData(h3Index);
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || requestSeq !== hireRequestSeq) return;
+    if (isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index) && (data.view == null || data.view.hireAvailable === false)) {
+      popup?.classList.remove("build-popup-wide");
+      await deps.renderBuildPanel(mount, h3Index);
+      return;
+    }
+    if (!isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index)) {
+      mount.innerHTML = "";
+      popup?.classList.add("build-popup-wide");
+      const panel = document.createElement("div");
+      panel.className = "hire-panel";
+      mount.appendChild(panel);
+      if (data.view == null) {
+        renderHireFailure(panel, deps);
+        placeOpenBuildPopup();
+        return;
+      }
+      renderHirePanel(panel, h3Index, data, deps);
+      return;
+    }
+    if (tabHex !== h3Index) {
+      tabHex = h3Index;
+      tabChoice = "build";
+    }
+    mount.innerHTML = "";
+    popup?.classList.add("build-popup-wide");
+    const tabBar = document.createElement("div");
+    tabBar.className = "build-popup-tab-bar";
+    tabBar.setAttribute("role", "tablist");
+    const buildTab = tabButton(BUILD_TAB_LABEL);
+    const hireTab = tabButton(HIRE_TAB_LABEL);
+    tabBar.append(buildTab, hireTab);
+    const buildPanel = document.createElement("div");
+    buildPanel.setAttribute("role", "tabpanel");
+    const hirePanel = document.createElement("div");
+    hirePanel.className = "hire-panel";
+    hirePanel.setAttribute("role", "tabpanel");
+    mount.append(tabBar, buildPanel, hirePanel);
+    const show = (choice) => {
+      tabChoice = choice;
+      tabHex = h3Index;
+      buildTab.setAttribute("aria-selected", choice === "build" ? "true" : "false");
+      hireTab.setAttribute("aria-selected", choice === "hire" ? "true" : "false");
+      buildPanel.hidden = choice !== "build";
+      hirePanel.hidden = choice !== "hire";
+    };
+    buildTab.addEventListener("click", () => {
+      show("build");
+      placeOpenBuildPopup();
+    });
+    hireTab.addEventListener("click", () => {
+      show("hire");
+      placeOpenBuildPopup();
+    });
+    show(tabChoice);
+    renderHirePanel(hirePanel, h3Index, data, deps);
+    await deps.renderBuildPanel(buildPanel, h3Index);
+  }
+  function tabButton(label) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "tab");
+    button.textContent = label;
+    if (label === BUILD_TAB_LABEL) button.setAttribute("data-control-tooltip", buildTabTooltipText);
+    else if (label === HIRE_TAB_LABEL) button.setAttribute("data-control-tooltip", hireTabTooltipText);
+    return button;
+  }
+  function renderHireFailure(panel, deps) {
+    const note2 = document.createElement("div");
+    note2.className = "build-no-urban";
+    note2.textContent = HIRE_VIEW_FAILED;
+    panel.append(createBuildPopupCloseRow(deps.hideBuildPopup), note2);
+  }
+
+  // src/renderer/gameplay/buildQueuePopup.ts
+  function rowTypeOptions(available, current) {
+    return available.includes(current) ? [...available] : [current, ...available];
+  }
+  function isBuildQueueSelectInPopupFocused() {
+    const popup = document.getElementById("build-popup");
+    const active2 = document.activeElement;
+    return !!popup && active2 instanceof HTMLSelectElement && popup.contains(active2);
+  }
+  function isBuildPopupOrEntryTarget(target) {
+    if (!(target instanceof Node)) return false;
+    const popup = document.getElementById("build-popup");
+    const layer = document.getElementById("build-entry-layer");
+    const tacticalLayer = document.getElementById("tactical-entry-layer");
+    return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target));
+  }
+  function createBuildQueuePopupHandler(deps) {
+    let buildEntryInteractionChain = Promise.resolve();
+    let popupLifecycleRevision = 0;
+    async function runBuildQueueMutation(args) {
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
+      try {
+        const result = await args.mutate();
+        if (!result.success) {
+          deps.showMapToast(result.reason ?? args.failureMessage, { isError: true });
+          return false;
+        }
+        if (args.refreshState) await deps.refreshGameStateAfterBuildQueueChange();
+        return true;
+      } catch (err) {
+        console.error("runBuildQueueMutation failed:", err);
+        deps.showMapToast(args.failureMessage, { isError: true });
+        return false;
+      }
+    }
+    async function applyCurrentTemplateToHexes(h3Indexes) {
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
+        return { ok: false, anyHexWritten: false };
+      }
+      if (!window.gameApi?.applyBuildQueueTemplateToHexes) {
+        return { ok: false, anyHexWritten: false };
+      }
+      try {
+        const result = await window.gameApi.applyBuildQueueTemplateToHexes({
+          h3Indexes,
+          entries: toBuildQueueTemplateEntries(rendererSharedState.buildQueueTemplate)
+        });
+        const anyHexWritten = result.applied.length > 0;
+        if (anyHexWritten) await deps.refreshGameStateAfterBuildQueueChange();
+        if (!result.success) {
+          const failureReason = result.reason ?? result.failed[0]?.reason ?? "Failed to synchronize build queues.";
+          deps.showMapToast(failureReason, { isError: true });
+          return { ok: false, anyHexWritten };
+        }
+        return { ok: true };
+      } catch (err) {
+        console.error("applyCurrentTemplateToHexes failed:", err);
+        deps.showMapToast("Failed to synchronize build queues.", { isError: true });
+        return { ok: false, anyHexWritten: false };
+      }
+    }
+    function restoreRejectedBuildQueueControls(typeSelect, countInput, entry) {
+      typeSelect.value = entry.unitType;
+      syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
+      countInput.value = String(entry.count);
+    }
+    function rejectedBuildQueueEditStillShown(typeSelect, countInput, submittedUnitType, submittedCountText) {
+      return typeSelect.value === submittedUnitType && countInput.value === submittedCountText;
+    }
+    function restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index) {
+      if (!resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
+      void renderBuildQueueIntoMount(mount, h3Index);
+      return true;
+    }
+    async function renderBuildQueueIntoMount(mount, h3Index) {
+      if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
+        await renderMultiBuildQueueIntoMount({
+          mount,
+          h3Index,
+          hideBuildPopup: hideBuildPopup3,
+          applyTemplate: applyCurrentTemplateToHexes,
+          setKeepBuilding: async (keepBuilding) => {
+            if (!window.gameApi?.setHexesKeepBuilding) return false;
+            return runBuildQueueMutation({
+              mutate: () => window.gameApi.setHexesKeepBuilding({
+                h3Indexes: [...rendererSharedState.selectedBuildHexH3s],
+                keepBuilding
+              }),
+              failureMessage: "Failed to update Keep building.",
+              refreshState: true
+            });
+          }
+        });
+        return;
+      }
+      if (!window.gameApi?.getHexBuildQueue) return;
+      const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
+      let snapshot3 = null;
+      let namingCaption = null;
+      try {
+        snapshot3 = await window.gameApi.getHexBuildQueue({ h3Index });
+        if (window.gameApi.getHexNamingTooltipLine) {
+          namingCaption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+        }
+      } catch (err) {
+        console.error("getHexBuildQueue failed:", err);
+      }
+      if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot3 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
+      mount.innerHTML = "";
+      mount.appendChild(createBuildPopupCloseRow(hideBuildPopup3));
+      const section = document.createElement("div");
+      section.className = "build-queue-section";
+      const strategicCode = getStrategicHexCode(h3Index);
+      const llmPrefixHtml = strategicCode ? `<strong>(${escapeBuildPopupHtml(strategicCode)})</strong> ` : "";
+      if (namingCaption && namingCaption.text.trim().length > 0) {
+        const descriptionLine = document.createElement("div");
+        descriptionLine.innerHTML = `${llmPrefixHtml}${formatHexNamingCaptionHtml(namingCaption)}`;
+        section.appendChild(descriptionLine);
+        const descriptionSpacer = document.createElement("div");
+        descriptionSpacer.style.height = "0.5em";
+        section.appendChild(descriptionSpacer);
+      } else if (llmPrefixHtml) {
+        const codeLine = document.createElement("div");
+        codeLine.innerHTML = llmPrefixHtml;
+        section.appendChild(codeLine);
+        const codeSpacer = document.createElement("div");
+        codeSpacer.style.height = "0.5em";
+        section.appendChild(codeSpacer);
+      }
+      const techLineHtml = formatProducedUnitTechLineHtml({
+        techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+        baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index)
+      });
+      if (techLineHtml) {
+        const techLine = document.createElement("div");
+        techLine.innerHTML = techLineHtml;
+        section.appendChild(techLine);
+        const techSpacer = document.createElement("div");
+        techSpacer.style.height = "0.5em";
+        section.appendChild(techSpacer);
+      }
+      const pointsLine = document.createElement("div");
+      const productionCapacity = snapshot3.urbanHexCount;
+      const productionDetail = productionCapacity > 0 ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn` : "(none)";
+      pointsLine.innerHTML = `<strong>Production (Build):</strong> ${productionDetail}`;
+      section.appendChild(pointsLine);
+      const productionQueueSpacer = document.createElement("div");
+      productionQueueSpacer.style.height = "0.5em";
+      section.appendChild(productionQueueSpacer);
+      const queueSummaryLine = document.createElement("div");
+      const queueTotalCost = sumQueuedProductionCost(snapshot3.entries);
+      if (snapshot3.entries.length === 0) {
+        queueSummaryLine.innerHTML = `<strong>Queue:</strong> (none)`;
+      } else {
+        const queueTurns = estimateTurnsToCompleteQueuedProduction(
+          snapshot3.entries,
+          snapshot3.storedPoints,
+          productionCapacity
+        );
+        const queueTurnsDisplay = queueTurns === null ? "?" : queueTurns.toLocaleString();
+        const turnLabel = queueTurns === 1 ? "turn" : "turns";
+        queueSummaryLine.innerHTML = `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${queueTurnsDisplay} ${turnLabel}`;
+      }
+      section.appendChild(queueSummaryLine);
+      const productionSpacer = document.createElement("div");
+      productionSpacer.style.height = "0.5em";
+      section.appendChild(productionSpacer);
+      const pausedNote = snapshot3.controlledByRequester ? formatQueuePausedNote(snapshot3.pausedReasons ?? []) : null;
+      if (pausedNote) section.appendChild(createQueuePausedNote(pausedNote));
+      if (!snapshot3.controlledByRequester) {
+        mount.appendChild(section);
+        placeOpenBuildPopup();
+        return;
+      }
+      if (!snapshot3.buildSectionVisible) {
+        const noUrban = document.createElement("div");
+        noUrban.className = "build-no-urban";
+        noUrban.textContent = snapshot3.noBuildReason ?? "This hex cannot build units.";
+        section.appendChild(noUrban);
+        mount.appendChild(section);
+        placeOpenBuildPopup();
+        return;
+      }
+      const head2 = document.createElement("div");
+      head2.className = "build-queue-head";
+      const title = document.createElement("span");
+      title.className = "build-queue-title";
+      title.textContent = "Build Queue";
+      const buildBtn = document.createElement("button");
+      buildBtn.type = "button";
+      buildBtn.className = "unit-select stack-unit-toggle";
+      buildBtn.textContent = UNIT_SELECT_GLYPH;
+      buildBtn.setAttribute("data-control-tooltip", buildAddTooltipText);
+      buildBtn.addEventListener("click", async () => {
+        if (!window.gameApi?.addHexBuildQueueEntry) return;
+        const success = await runBuildQueueMutation({
+          mutate: () => window.gameApi.addHexBuildQueueEntry({ h3Index }),
+          failureMessage: "Failed to add build queue entry.",
+          refreshState: true
+        });
+        if (!success) return;
+        void renderBuildQueueIntoMount(mount, h3Index);
+      });
+      head2.appendChild(title);
+      head2.appendChild(buildBtn);
+      section.appendChild(head2);
+      const list = document.createElement("div");
+      list.className = "build-queue-list";
+      const options = snapshot3.availableUnitTypes;
+      for (const entry of snapshot3.entries) {
+        const row = document.createElement("div");
+        row.className = "build-queue-row";
+        const typeSelect = document.createElement("select");
+        for (const unitType of rowTypeOptions(options, entry.unitType)) {
+          const opt = document.createElement("option");
+          opt.value = unitType;
+          opt.textContent = formatBuildQueueItemLabel(unitType);
+          typeSelect.appendChild(opt);
+        }
+        typeSelect.value = entry.unitType;
+        syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
+        const countInput = createBuildCountInput(buildCountTooltipText, String(entry.count));
+        async function submitBuildQueueEntryEdit(failureMessage) {
+          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
+          if (!window.gameApi?.updateHexBuildQueueEntry) return;
+          const submittedUnitType = typeSelect.value;
+          const submittedCount = readSanitizedBuildCount(countInput);
+          const submittedCountText = countInput.value;
+          const success = await runBuildQueueMutation({
+            mutate: () => window.gameApi.updateHexBuildQueueEntry({
+              h3Index,
+              entryId: entry.id,
+              unitType: submittedUnitType,
+              count: submittedCount
+            }),
+            failureMessage,
+            refreshState: true
+          });
+          if (!success) {
+            if (rejectedBuildQueueEditStillShown(
+              typeSelect,
+              countInput,
+              submittedUnitType,
+              submittedCountText
+            )) {
+              restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
+              await renderBuildQueueIntoMount(mount, h3Index);
+            }
+            return;
+          }
+          void renderBuildQueueIntoMount(mount, h3Index);
+        }
+        typeSelect.addEventListener("change", async () => {
+          syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
+          await submitBuildQueueEntryEdit("Failed to update build queue entry.");
+        });
+        row.appendChild(typeSelect);
+        countInput.addEventListener("input", async () => {
+          await submitBuildQueueEntryEdit("Failed to update build count.");
+        });
+        row.appendChild(countInput);
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "unit-select";
+        removeBtn.textContent = "x";
+        removeBtn.setAttribute("data-control-tooltip", singleHexQueueRemoveTooltipText);
+        removeBtn.addEventListener("click", async () => {
+          if (!window.gameApi?.removeHexBuildQueueEntry) return;
+          const success = await runBuildQueueMutation({
+            mutate: () => window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id }),
+            failureMessage: "Failed to remove build queue entry.",
+            refreshState: true
+          });
+          if (!success) return;
+          void renderBuildQueueIntoMount(mount, h3Index);
+        });
+        row.appendChild(removeBtn);
+        list.appendChild(row);
+      }
+      section.appendChild(list);
+      appendKeepBuildingCheckbox({
+        section,
+        checked: snapshot3.keepBuilding,
+        disabled: !canArmKeepBuilding(snapshot3),
+        tooltipText: keepBuildingTooltipText,
+        onChange: async (keepBuilding) => {
+          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
+          if (!window.gameApi?.setHexesKeepBuilding) return;
+          const success = await runBuildQueueMutation({
+            mutate: () => window.gameApi.setHexesKeepBuilding({
+              h3Indexes: [h3Index],
+              keepBuilding
+            }),
+            failureMessage: "Failed to update Keep building.",
+            refreshState: true
+          });
+          void renderBuildQueueIntoMount(mount, h3Index);
+          if (!success) return;
+        }
+      });
+      mount.appendChild(section);
+      placeOpenBuildPopup();
+    }
+    function clientPointForBuildEntryHex(h3Index, fallbackClientX, fallbackClientY) {
+      const layer = document.getElementById("build-entry-layer");
+      const button = layer?.querySelector(
+        `.build-entry-btn[data-h3-index="${CSS.escape(h3Index)}"]`
+      );
+      if (!button) return { clientX: fallbackClientX, clientY: fallbackClientY };
+      const rect2 = button.getBoundingClientRect();
+      return {
+        clientX: rect2.left + rect2.width / 2,
+        clientY: rect2.top + rect2.height / 2
+      };
+    }
+    async function processBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
+      const multiSelect = shiftKey && isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index) && rendererSharedState.selectedBuildHexH3s.every((hex) => isHumanBuildEntryHexIndex(rendererSharedState.gameState, hex));
+      const lifecycleRevision = popupLifecycleRevision;
+      if (isHoverOrderPlanningActive() || deps.shouldRenderTacticalHexes()) return;
+      rendererSharedState.selectedHexIndex = h3Index;
+      const popup = document.getElementById("build-popup");
+      const popupOpen = !!popup && !popup.classList.contains("hidden");
+      if (!multiSelect) {
+        const togglesSinglePopup = rendererSharedState.selectedBuildHexH3s.length === 1 && rendererSharedState.selectedBuildHexH3s[0] === h3Index && popupOpen && rendererSharedState.buildPopupHexH3 === h3Index;
+        if (togglesSinglePopup) {
+          hideBuildPopup3();
+          return;
+        }
+        rendererSharedState.selectedBuildHexH3s = [h3Index];
+        rendererSharedState.buildQueueTemplate = [];
+        showBuildPopup2(h3Index, clientX, clientY);
+        return;
+      }
+      const existingIndex = rendererSharedState.selectedBuildHexH3s.indexOf(h3Index);
+      if (existingIndex >= 0) {
+        rendererSharedState.selectedBuildHexH3s = rendererSharedState.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
+        if (rendererSharedState.selectedBuildHexH3s.length === 0) {
+          hideBuildPopup3();
+          return;
+        }
+        if (rendererSharedState.selectedBuildHexH3s.length === 1) rendererSharedState.buildQueueTemplate = [];
+        const remainingAnchor = rendererSharedState.selectedBuildHexH3s.at(-1);
+        rendererSharedState.selectedHexIndex = remainingAnchor;
+        const anchorPoint = clientPointForBuildEntryHex(remainingAnchor, clientX, clientY);
+        showBuildPopup2(remainingAnchor, anchorPoint.clientX, anchorPoint.clientY);
+        return;
+      }
+      const priorCount = rendererSharedState.selectedBuildHexH3s.length;
+      const seedHex = priorCount === 1 ? rendererSharedState.selectedBuildHexH3s[0] : void 0;
+      rendererSharedState.selectedBuildHexH3s = [...rendererSharedState.selectedBuildHexH3s, h3Index];
+      if (priorCount === 0) {
+        rendererSharedState.buildQueueTemplate = [];
+        showBuildPopup2(h3Index, clientX, clientY);
+        return;
+      }
+      if (priorCount === 1) {
+        const seedSnapshot = seedHex ? await window.gameApi?.getHexBuildQueue({ h3Index: seedHex }) : null;
+        if (lifecycleRevision !== popupLifecycleRevision) return;
+        if (!seedSnapshot) {
+          deps.showMapToast("Failed to load the build queue template.", { isError: true });
+          rendererSharedState.selectedBuildHexH3s = rendererSharedState.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
+          deps.requestRedraw();
+          return;
+        }
+        rendererSharedState.buildQueueTemplate = buildQueueTemplateFromSnapshot(seedSnapshot);
+        await applyCurrentTemplateToHexes([...rendererSharedState.selectedBuildHexH3s]);
+      } else {
+        await applyCurrentTemplateToHexes([h3Index]);
+      }
+      if (lifecycleRevision !== popupLifecycleRevision) return;
+      showBuildPopup2(h3Index, clientX, clientY);
+    }
+    function handleBuildEntryClick2(h3Index, clientX, clientY, shiftKey) {
+      buildEntryInteractionChain = buildEntryInteractionChain.then(() => processBuildEntryClick(h3Index, clientX, clientY, shiftKey)).catch((err) => {
+        console.error("handleBuildEntryClick failed:", err);
+        deps.showMapToast("Failed to update build selection.", { isError: true });
+      });
+      return buildEntryInteractionChain;
+    }
+    function hideBuildPopup3() {
+      const el = document.getElementById("build-popup");
+      const wasOpen = !!el && !el.classList.contains("hidden");
+      const hadBuildState = rendererSharedState.buildPopupHexH3 !== null || rendererSharedState.selectedBuildHexH3s.length > 0 || rendererSharedState.buildQueueTemplate.length > 0;
+      if (!wasOpen && !hadBuildState) return;
+      popupLifecycleRevision++;
+      rendererSharedState.buildPopupHexH3 = null;
+      rendererSharedState.buildPopupRequestSeq++;
+      rendererSharedState.selectedBuildHexH3s = [];
+      rendererSharedState.buildQueueTemplate = [];
+      if (el) {
+        el.classList.add("hidden");
+        el.removeAttribute("data-open");
+        el.removeAttribute("data-x");
+        el.removeAttribute("data-y");
+        el.setAttribute("aria-hidden", "true");
+      }
+      const body = document.getElementById("build-popup-body");
+      if (body) body.innerHTML = "";
+      deps.requestRedraw();
+      if (wasOpen) deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
+    }
+    const popupDeps = {
+      renderBuildPanel: renderBuildQueueIntoMount,
+      hideBuildPopup: hideBuildPopup3,
+      refreshGameStateAfterBuildQueueChange: deps.refreshGameStateAfterBuildQueueChange,
+      showMapToast: deps.showMapToast
+    };
+    function showBuildPopup2(h3Index, clientX, clientY) {
+      if (isHoverOrderPlanningActive()) return;
+      if (deps.shouldRenderTacticalHexes()) return;
+      deps.hideStackCallout();
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
+      const el = document.getElementById("build-popup");
+      const body = document.getElementById("build-popup-body");
+      if (!el || !body) return;
+      hidePlanningChromeToasts();
+      rendererSharedState.buildPopupHexH3 = h3Index;
+      el.setAttribute("data-open", "true");
+      el.setAttribute("data-x", String(clientX));
+      el.setAttribute("data-y", String(clientY));
+      el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+      el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+      el.classList.remove("hidden");
+      el.setAttribute("aria-hidden", "false");
+      void renderBuildOrHirePopupIntoMount(body, h3Index, popupDeps);
+      deps.requestRedraw();
+    }
+    function refreshBuildPopupIfOpen2() {
+      if (deps.shouldRenderTacticalHexes()) {
+        hideBuildPopup3();
+        return;
+      }
+      const el = document.getElementById("build-popup");
+      const body = document.getElementById("build-popup-body");
+      if (!el || el.classList.contains("hidden") || !rendererSharedState.buildPopupHexH3 || !body) return;
+      void renderBuildOrHirePopupIntoMount(body, rendererSharedState.buildPopupHexH3, popupDeps);
+    }
+    return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup3, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
+  }
+
+  // src/renderer/gameplay/tacticalBattlePromptPreference.ts
+  var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
+  function readTacticalBattlesInterceptPromptEnabled() {
+    try {
+      const v = localStorage.getItem(STORAGE_KEY);
+      if (v === null) return true;
+      return v !== "0" && v !== "false";
+    } catch {
+      return true;
+    }
+  }
+  function writeTacticalBattlesInterceptPromptEnabled(enabled) {
+    try {
+      localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
+    } catch {
+    }
+  }
+
+  // src/shared/ordersHeldForPlayback.ts
+  function ordersHeldUntilMovementEnds(orders, units, moves) {
+    const originH3ByUnitId = {};
+    const held2 = [];
+    for (const order of orders) {
+      if (!order.destinationH3Index) continue;
+      const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === HUMAN_SEAT_ID);
+      if (!unit || unit.h3Index !== order.destinationH3Index) continue;
+      const move = moves.find(
+        (candidate) => candidate.unitId === order.unitId && candidate.fromH3Index !== order.destinationH3Index
+      );
+      if (!move) continue;
+      originH3ByUnitId[order.unitId] = move.fromH3Index;
+      held2.push({
+        ...order,
+        routeSegments: order.routeSegments?.map((segment) => ({
+          turn: segment.turn,
+          hexes: segment.hexes.map((hex) => [hex[0], hex[1]])
+        }))
+      });
+    }
+    return { orders: held2, originH3ByUnitId };
+  }
+  function ferriesHeldUntilMovementEnds(ferryOrders, moves) {
+    const held2 = [];
+    for (const order of ferryOrders) {
+      const move = moves.find((candidate) => candidate.unitId === order.unitId);
+      if (!move || move.fromH3Index === move.toH3Index || move.toH3Index !== order.destinationH3Index) continue;
+      const flown = move.pathH3Indexes && move.pathH3Indexes.length >= 2 ? move.pathH3Indexes : void 0;
+      const ordered = order.pathH3Indexes && order.pathH3Indexes.length >= 2 ? order.pathH3Indexes : void 0;
+      const path = flown ?? ordered ?? [move.fromH3Index, move.toH3Index];
+      held2.push({ unitId: order.unitId, pathH3Indexes: [...path] });
+    }
+    return held2;
+  }
+
+  // src/shared/ipc/tacticalOpponentPlanMerge.ts
+  function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
+    if (plan == null) return false;
+    return plan.movementOrders.length + plan.rangedAttacks.length + plan.airStrikes.length + (plan.airDropOrders?.length ?? 0) + plan.ferryOrders.length + plan.embarkOrders.length > 0;
+  }
+  function tacticalDraftAlreadyDecided(plan) {
+    return tacticalOpponentPlanPayloadHasAnyOrders(plan) || plan?.exitBattle === true;
+  }
+  function nextTacticalOpponentDraftAfterPostBeatPlan(tacticalOpponentPlan) {
+    if (tacticalOpponentPlan != null && tacticalDraftAlreadyDecided(tacticalOpponentPlan)) {
+      return { draft: tacticalOpponentPlan, startBackgroundPrefetch: false };
+    }
+    return { draft: null, startBackgroundPrefetch: true };
+  }
+
+  // src/renderer/tactical/applyTacticalPostBeatConsultSideEffects.ts
+  function isTacticalPostBeatConsultOnCommit(obj) {
+    if (typeof obj !== "object" || obj === null) return false;
+    const r = obj;
+    return r.kind === "tactical" && typeof r.battleId === "string" && typeof r.attachTacticalOpponentPlanToIpc === "boolean";
+  }
+  function applyTacticalPostBeatConsultSideEffects(payload2, deps) {
+    if (payload2.kind !== "tactical") return;
+    if (payload2.battleId !== rendererSharedState.tacticalBattleSnapshot?.battleId) return;
+    if (payload2.attachTacticalOpponentPlanToIpc) {
+      const { startBackgroundPrefetch } = nextTacticalOpponentDraftAfterPostBeatPlan(payload2.tacticalOpponentPlan);
+      if (startBackgroundPrefetch && tacticalBattleHasAiSide()) deps.startBackgroundRequestIfAllowed();
+    } else if (rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
+      deps.startBackgroundRequestIfAllowed();
+    }
+    void readCommanderPoolAndApply(true);
+    if (typeof payload2.cost === "number" && Number.isFinite(payload2.cost)) {
+      void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
+    }
+    deps.appendOpenRouterLog("Tactical post-beat consultation applied.", false);
+    deps.redraw();
+    deps.updateReadyButtonState();
+  }
+  function tacticalBattleHasAiSide() {
+    const units = rendererSharedState.tacticalBattleSnapshot?.subUnits;
+    if (!units) return false;
+    return units.some((unit) => isAiSeatId(unit.player));
+  }
+
+  // src/shared/marchPathHelpers.ts
+  function findPathTailFromCurrentPosition(storedPathH3Indexes, currentH3) {
+    if (storedPathH3Indexes.length === 0) return null;
+    if (storedPathH3Indexes[0] === currentH3) return storedPathH3Indexes;
+    for (let i = 1; i < storedPathH3Indexes.length; i++) {
+      if (storedPathH3Indexes[i] === currentH3) return storedPathH3Indexes.slice(i);
+    }
+    return null;
+  }
+
+  // src/shared/tacticalMarchContinuations.ts
+  function filterTacticalMarchContinuationsToPresentSubUnits(continuations, presentSubUnitIds) {
+    return continuations.filter((row) => presentSubUnitIds.has(row.subUnitId));
+  }
+
+  // src/renderer/tactical/tacticalPendingMarchPath.ts
+  function buildTacticalPendingMarchRowsFromContinuations(args) {
+    const livingIds = new Set(args.battle.subUnits.map((u) => u.id));
+    const livingContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
+      args.continuations,
+      livingIds
+    );
+    return livingContinuations.map((cont) => {
+      const prev = args.previousBySubUnitId.get(cont.subUnitId);
+      const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
+      const newUnitH3 = sub?.h3Index;
+      if (prev?.pathH3Indexes && newUnitH3) {
+        const tail = findPathTailFromCurrentPosition(prev.pathH3Indexes, newUnitH3);
+        if (tail) {
+          const result2 = buildTacticalMarchDraftDestinationPreview(
+            args.battle,
+            cont.subUnitId,
+            cont.destinationH3Index,
+            { overridePathH3Indexes: tail }
+          );
+          if (result2.preview.valid && result2.preview.segments.length > 0) {
+            return {
+              subUnitId: cont.subUnitId,
+              destinationH3Index: cont.destinationH3Index,
+              pathH3Indexes: [...tail],
+              cachedSegments: result2.preview.segments
+            };
+          }
+        }
+      }
+      const result = buildTacticalMarchDraftDestinationPreview(
+        args.battle,
+        cont.subUnitId,
+        cont.destinationH3Index
+      );
+      return {
+        subUnitId: cont.subUnitId,
+        destinationH3Index: cont.destinationH3Index,
+        ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
+        ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
+      };
+    });
+  }
+  function buildTacticalPendingMarchRowFromDraft(args) {
+    const result = buildTacticalMarchDraftDestinationPreview(
+      args.battle,
+      args.subUnitId,
+      args.destinationH3Index
+    );
+    return {
+      subUnitId: args.subUnitId,
+      destinationH3Index: args.destinationH3Index,
+      ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
+      ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
+    };
+  }
+
+  // src/renderer/gameplay/readyTacticalCommit.ts
+  async function runTacticalReadyCommit(context) {
+    const { deps, matchEpoch } = context;
+    if (!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning)) return false;
+    if (!window.gameApi) return true;
+    const beatReportTag = currentConsoleReportTag();
+    const commit = window.gameApi.commitHumanTacticalDraftOrders;
+    if (!commit) {
+      deps.showSidebarError("Tactical commit is not available in this build.");
+      deps.updateReadyButtonState();
+      return true;
+    }
+    const livingSubUnitIds = new Set(rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => u.id));
+    rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter(
+      (row) => livingSubUnitIds.has(row.subUnitId)
+    );
+    const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({
+      unitId: r.subUnitId,
+      toH3Index: r.destinationH3Index
+    }));
+    const commitResult = await commit({
+      movementOrders,
+      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      airStrikes: [...rendererSharedState.pendingAirStrikes],
+      airDropOrders: [...rendererSharedState.pendingAirDrops],
+      ferryOrders: [...rendererSharedState.pendingFerryOrders],
+      embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
+      useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
+      aiPlanningRunEnabled: rendererSharedState.runButtonOn
+    });
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    if (!commitResult.success) {
+      deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
+      deps.updateReadyButtonState();
+      return true;
+    }
+    void refreshChatThread();
+    const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
+    const playback = commitResult.tacticalResolutionPlayback;
+    const needsResolutionPlayback = tacticalPlaybackNeeded(playback);
+    if (playback && needsResolutionPlayback) {
+      if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
+      rendererSharedState.resolutionMoveAnimationFrameId = null;
+      rendererSharedState.resolutionMoveAnimation = buildTacticalResolutionAnimation({
+        playback,
+        subUnitsBefore: tacticalSubUnitsBeforeCommit,
+        deps
+      });
+      syncChatPanelVisibility();
+    }
+    if (commitResult.tacticalBattle) {
+      rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
+    }
+    if (rendererSharedState.resolutionMoveAnimation != null && rendererSharedState.tacticalBattleSnapshot != null) {
+      deps.updateGameStateSidebar(rendererSharedState.gameState);
+      deps.syncTacticalExitButton?.();
+    }
+    reconcileSelectionToCurrentState();
+    if (commitResult.tacticalPostBeatConsultDeferred) {
+      rendererSharedState.pendingDeferredTacticalPostBeatConsult = true;
+      rendererSharedState.deferredResolutionConsultNotifySent = false;
+    }
+    if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
+      applyTacticalPostBeatConsultSideEffects(commitResult, deps);
+    } else if (!commitResult.tacticalPostBeatConsultDeferred) {
+      const plan = "tacticalOpponentPlan" in commitResult ? commitResult.tacticalOpponentPlan : null;
+      if (!tacticalOpponentPlanPayloadHasAnyOrders(plan) && rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
+        deps.startBackgroundRequestIfAllowed();
+      }
+      void readCommanderPoolAndApply(true);
+    }
+    const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
+    rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
+      battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
+      continuations: commitResult.tacticalMarchContinuations,
+      previousBySubUnitId: previousPendingMarches
+    }) : [];
+    rendererSharedState.pendingRangedAttacks = [];
+    rendererSharedState.pendingAirStrikes = [];
+    rendererSharedState.pendingAirDrops = [];
+    rendererSharedState.pendingMissileLaunches = [];
+    rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.pendingEmbarkOrders = [];
+    rendererSharedState.rangedModeActive = false;
+    rendererSharedState.airStrikeModeActive = false;
+    rendererSharedState.airDropModeActive = false;
+    rendererSharedState.missileLaunchModeActive = false;
+    try {
+      const refreshedStrategic = await fetchMatchSnapshot();
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+      await deps.applyGameStateSnapshot(refreshedStrategic, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: false,
+        updateSelectionUi: false,
+        updateGameOverUi: false,
+        updateReadyButton: false,
+        refreshBuildPopup: true,
+        redraw: false
+      });
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    } catch (err) {
+      console.error("tactical commit: failed to refresh strategic game state snapshot", err);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    }
+    if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
+      const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
+      const visibleHexes = /* @__PURE__ */ new Set([
+        ...deps.getVisibleHexSet(rendererSharedState.gameState),
+        ...rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes ?? []
+      ]);
+      const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes, reportViewerSeatId());
+      const killToastFormatter = deps.buildKillToastFormatterBundle(
+        rendererSharedState.gameState,
+        tacticalReadySlice.removedUnits,
+        buildTacticalSubUnitKillLabelOverlay({
+          subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
+          subUnitsAfterCommit: rendererSharedState.tacticalBattleSnapshot?.subUnits,
+          removedUnits: tacticalReadySlice.removedUnits
+        })
+      );
+      const battleForReport = commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot;
+      await announceResolutionTurnUpdate(
+        {
+          readySlice: tacticalReadySlice,
+          visibility,
+          killToastFormatter,
+          reportTag: beatReportTag,
+          extraKills: {
+            killsByMelee: playback.killsByMelee,
+            killsByAirStrike: playback.killsByAirStrike
+          },
+          hexCodeBattle: battleForReport ?? null,
+          // A battle has no fog, so an opponent's absorbed hits are visible. visibleHexes does not feed this filter.
+          exploredHexes: /* @__PURE__ */ new Set([
+            ...getExploredHexSet(rendererSharedState.gameState),
+            ...battleForReport?.tacticalChildH3Indexes ?? []
+          ])
+        },
+        deps
+      );
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    }
+    await deps.refreshTacticalTerrainOverridesForRenderer();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    deps.updatePendingOrdersSidebar();
+    deps.updateRangedSidebar();
+    deps.updateSidebar();
+    deps.updateGameStateSidebar(rendererSharedState.gameState);
+    if (rendererSharedState.resolutionMoveAnimation?.tacticalDeferResolutionClock) {
+      rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
+      rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
+    }
+    if (rendererSharedState.resolutionMoveAnimation && needsResolutionPlayback && rendererSharedState.resolutionMoveAnimationFrameId === null) {
+      rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+    }
+    deps.redraw();
+    deps.scheduleTacticalAnnihilationExit?.();
+    if (commitResult.tacticalPostBeatConsultDeferred) {
+      const bid = commitResult.tacticalBattle?.battleId;
+      if (bid) {
+        const sendTacticalNotify = () => {
+          void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: "tactical", battleId: bid });
+          rendererSharedState.deferredResolutionConsultNotifySent = true;
+          deps.updateReadyButtonState();
+        };
+        scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
+      }
+    }
+    deps.updateReadyButtonState();
+    return true;
+  }
+
+  // src/shared/knockoutNotice.ts
+  var REASON_ORDER = ["home_control", "no_city_hexes", "home_cities_destroyed"];
+  function formatKnockoutNotice(input) {
+    const sentences = [input.victimIsHuman ? "You are out of the match." : `${input.victimName} is out of the match.`];
+    const held2 = new Set(input.reasons);
+    for (const reason of REASON_ORDER) {
+      if (!held2.has(reason)) continue;
+      if (reason === "home_control") {
+        const outBy = input.outByName ?? "A side";
+        sentences.push(
+          input.globalHome ? `${outBy} holds all of its home.` : `${outBy} holds ${input.controlShareLabel} of its home's cities.`
+        );
+      } else if (reason === "no_city_hexes") sentences.push("It holds no city hexes.");
+      else sentences.push("Its home has no cities left.");
+    }
+    sentences.push("Its land is now neutral and its cities stop building.");
+    if (input.remainingUnits > 0) {
+      sentences.push(`Its last ${input.remainingUnits} units hold their hexes as neutral garrisons and fire on any unit in range.`);
+    }
+    return sentences.join(" ");
+  }
+
+  // src/renderer/gameplay/knockoutNotices.ts
+  function announceKnockouts(knockouts, before, afterSeats, removedUnitIdsBySeat) {
+    if (knockouts.length === 0) return;
+    const notices = knockouts.map((row) => noticeText(row, before, afterSeats, removedUnitIdsBySeat));
+    const tag = currentConsoleReportTag();
+    for (const notice of notices) {
+      const body = document.createElement("p");
+      body.textContent = notice;
+      recordConsoleReport("notice", tag, body);
+    }
+    showMapToast(notices.join("\n\n"), { isError: false, report: { kind: "notice", tag }, skipReport: true });
+  }
+  function noticeText(row, before, afterSeats, removedUnitIdsBySeat) {
+    const seats = afterSeats ?? before?.seats ?? [];
+    const victim = seats.find((seat) => seat.seatId === row.seatId);
+    const outBy = row.outBy === null ? null : seats.find((seat) => seat.seatId === row.outBy);
+    const removed = new Set(removedUnitIdsBySeat?.[row.seatId] ?? []);
+    const remaining = (before?.units ?? []).filter((unit) => unit.player === row.seatId && !removed.has(unit.id)).length;
+    const share = activeGameMap().controlWinMinUrbanShare;
+    return formatKnockoutNotice({
+      victimName: victim ? sideDisplayName(victim) : row.seatId,
+      victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
+      outByName: outBy ? sideDisplayName(outBy) : null,
+      reasons: row.reasons,
+      globalHome: share === null,
+      controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`,
+      remainingUnits: remaining
+    });
+  }
+
   // src/shared/sideMessages.ts
   var RELATIONSHIP_SCALE_MAX = 4;
 
@@ -39143,23 +42718,26 @@ ${bonuses}`;
     { id: "model-cost", title: "Model cost so far (USD)", options: [], decimals: 2 }
   ];
 
-  // src/renderer/chrome/blockingDialogGuards.ts
-  function tacticalBattlesDialogIsOpen() {
-    return document.querySelector('[role="dialog"][aria-label="Tactical battles"]') !== null;
+  // src/shared/chartsTurnCap.ts
+  function capAgreementHistory(history, turn) {
+    const agreements = history.agreements.map((entry) => ({
+      ...entry,
+      versions: entry.versions.filter((version) => version.turnNumber <= turn),
+      decisions: entry.decisions.filter((decision) => decision.turnNumber <= turn)
+    })).filter((entry) => entry.versions.length > 0);
+    return { agreements, attacks: history.attacks.filter((attack) => attack.turnNumber <= turn) };
   }
-  var CLASS_HIDDEN_DIALOG_IDS = [
-    "knockout-dialog",
-    "start-confirm-dialog",
-    "load-confirm-dialog",
-    "tactical-annihilation-overlay"
-  ];
-  function blockingDialogIsOpen() {
-    if (tacticalBattlesDialogIsOpen()) return true;
-    if (document.querySelector(".melee-intercept-frame") !== null) return true;
-    if (CLASS_HIDDEN_DIALOG_IDS.some((id) => document.getElementById(id)?.classList.contains("hidden") === false)) return true;
-    const optionsPopover = document.getElementById("new-game-options-popover");
-    if (optionsPopover !== null && !optionsPopover.hidden) return true;
-    return isGameMenuOpen() || commanderPopoverIsOpen();
+  function capSeat(seat, turn) {
+    return seat.outTurn != null && seat.outTurn > turn ? { ...seat, outTurn: null } : seat;
+  }
+  function capChartsSnapshot(snapshot3, turn) {
+    return {
+      ...snapshot3,
+      seats: snapshot3.seats.map((seat) => capSeat(seat, turn)),
+      turns: snapshot3.turns.filter((entry) => entry.turnNumber <= turn),
+      currentTurnNumber: Math.min(snapshot3.currentTurnNumber, turn),
+      ...snapshot3.agreementHistory ? { agreementHistory: capAgreementHistory(snapshot3.agreementHistory, turn) } : {}
+    };
   }
 
   // src/renderer/chrome/modalDialogKit.ts
@@ -42233,11 +45811,11 @@ ${bonuses}`;
       } = s._paths;
       width = roundDec(width * pxRatio, 3);
       let boundsClip = null;
-      let offset = width % 2 / 2;
+      let offset2 = width % 2 / 2;
       if (_points && fillStyle == null)
         fillStyle = width > 0 ? "#fff" : strokeStyle;
-      let _pxAlign = s.pxAlign == 1 && offset > 0;
-      _pxAlign && ctx.translate(offset, offset);
+      let _pxAlign = s.pxAlign == 1 && offset2 > 0;
+      _pxAlign && ctx.translate(offset2, offset2);
       if (!_points) {
         let lft = plotLft - width / 2, top = plotTop - width / 2, wid = plotWid + width, hgt = plotHgt + width;
         boundsClip = new Path2D();
@@ -42247,7 +45825,7 @@ ${bonuses}`;
         strokeFill(strokeStyle, width, s.dash, s.cap, fillStyle, stroke, fill, flags, gapsClip);
       else
         fillStroke(si, strokeStyle, width, s.dash, s.cap, fillStyle, stroke, fill, flags, boundsClip, gapsClip);
-      _pxAlign && ctx.translate(-offset, -offset);
+      _pxAlign && ctx.translate(-offset2, -offset2);
     }
     function fillStroke(si, strokeStyle, lineWidth2, lineDash, lineCap, fillStyle, strokePath, fillPath, flags, boundsClip, gapsClip) {
       let didStrokeFill = false;
@@ -42338,8 +45916,8 @@ ${bonuses}`;
       return axis._found = incrSpace;
     }
     function drawOrthoLines(offs, filts, ori, side, pos0, len, width, stroke, dash, cap) {
-      let offset = width % 2 / 2;
-      pxAlign == 1 && ctx.translate(offset, offset);
+      let offset2 = width % 2 / 2;
+      pxAlign == 1 && ctx.translate(offset2, offset2);
       setCtxStyle(stroke, width, dash, cap, stroke);
       ctx.beginPath();
       let x0, y0, x1, y1, pos1 = pos0 + (side == 0 || side == 3 ? -len : len);
@@ -42361,7 +45939,7 @@ ${bonuses}`;
         }
       }
       ctx.stroke();
-      pxAlign == 1 && ctx.translate(-offset, -offset);
+      pxAlign == 1 && ctx.translate(-offset2, -offset2);
     }
     function axesCalc(cycleNum) {
       let converged = true;
@@ -43899,6 +47477,78 @@ ${bonuses}`;
     return card;
   }
 
+  // src/renderer/charts/chartsDialogBlocks.ts
+  function innerBodyWidth(body) {
+    const style = getComputedStyle(body);
+    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    return Math.max(200, Math.floor(body.clientWidth - padding));
+  }
+  function dialogHeight() {
+    return document.getElementById("charts-dialog")?.clientHeight ?? 0;
+  }
+  function appendBlock(parent, title) {
+    const block = document.createElement("section");
+    block.className = "charts-block";
+    const titleRow = document.createElement("div");
+    titleRow.className = "charts-block-title";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    titleRow.appendChild(heading);
+    const plotHost = document.createElement("div");
+    plotHost.className = "charts-plot-host";
+    block.append(titleRow, plotHost);
+    parent.appendChild(block);
+    return { titleRow, plotHost };
+  }
+  function fillStacks(host, snapshot3, lookups) {
+    const stacks = relationshipSubjectSeatIds(snapshot3).map(
+      (seatId) => buildRelationshipStack({
+        subjectSeatId: seatId,
+        rows: relationshipRows(snapshot3, seatId),
+        nameOf: lookups.nameOf,
+        flagOf: lookups.flagOf,
+        seatNumberOf: lookups.seatNumberOf,
+        subjectIsViewer: isHumanSeatId(seatId)
+      })
+    );
+    const empty = Object.assign(document.createElement("p"), { className: "charts-empty", textContent: "No AI commander reports on any side." });
+    host.replaceChildren(...stacks.length > 0 ? stacks : [empty]);
+  }
+  function buildLineChartBlock(body, definition, snapshot3, lookups) {
+    const { titleRow, plotHost } = appendBlock(body, definition.title);
+    let select = null;
+    if (definition.options.length > 0) {
+      select = document.createElement("select");
+      select.className = "charts-select";
+      select.setAttribute("aria-label", `${definition.title} unit type`);
+      select.dataset.controlTooltip = `Show the total or one unit type for ${definition.title.toLowerCase()}.`;
+      definition.options.forEach((option2, index) => {
+        const element = document.createElement("option");
+        element.value = String(index);
+        element.textContent = option2.label;
+        select?.appendChild(element);
+      });
+      titleRow.appendChild(select);
+    }
+    const handle = createLineChart({
+      host: plotHost,
+      data: lineChartData(snapshot3, definition.id, null),
+      width: innerBodyWidth(body),
+      height: chartPlotHeight(dialogHeight(), titleRow.offsetHeight),
+      colorOf: lookups.colorOf,
+      nameOf: lookups.nameOf,
+      decimals: definition.decimals
+    });
+    return { definition, handle, select, titleRow };
+  }
+  function chosenUnitType(entry) {
+    if (entry.select === null) return null;
+    return entry.definition.options[Number(entry.select.value)]?.unitType ?? null;
+  }
+  function updateLineChart(entry, snapshot3) {
+    entry.handle.update(lineChartData(snapshot3, entry.definition.id, chosenUnitType(entry)));
+  }
+
   // src/shared/sideAgreements.ts
   var SIDE_AGREEMENT_KINDS = ["non_aggression", "ceasefire_in_place", "no_entry_zone", "joint_action", "information_sharing"];
   var SIDE_AGREEMENT_KIND_LABELS = {
@@ -44037,7 +47687,7 @@ ${bonuses}`;
   function itemLines(item, nameOf, displayText) {
     const counterpartName = nameOf(item.counterpartSeatId);
     const against = item.againstSeatId === null ? "" : `, against ${nameOf(item.againstSeatId)}`;
-    const head2 = `${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
+    const head2 = `${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent: ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
     const lines = [`Terms: ${displayText(item.terms)}`];
     if (item.zoneCodes.length > 0) lines.push(`Zone: ${item.zoneCodes.join(", ")}`);
     if (item.latestDecision) {
@@ -44309,9 +47959,9 @@ ${bonuses}`;
     context.strokeStyle = stripCssColor("--chrome-error", "#f0a8a8");
     context.lineWidth = 1;
     context.beginPath();
-    for (let offset = -height; offset < width; offset += HATCH_SPACING) {
-      context.moveTo(x + offset, y + height);
-      context.lineTo(x + offset + height, y);
+    for (let offset2 = -height; offset2 < width; offset2 += HATCH_SPACING) {
+      context.moveTo(x + offset2, y + height);
+      context.lineTo(x + offset2 + height, y);
     }
     context.stroke();
   }
@@ -44541,6 +48191,12 @@ ${bonuses}`;
   var openCounter = 0;
   var openEpoch = 0;
   var previousFocus = null;
+  var rawSnapshot = null;
+  var appliedCap = null;
+  function replayTurnCap() {
+    const state = currentReplay();
+    return state?.timeline.steps[state.index]?.turnNumber ?? null;
+  }
   function overlayElement() {
     return document.getElementById("charts-overlay");
   }
@@ -44549,76 +48205,6 @@ ${bonuses}`;
   }
   function matchIsLoaded() {
     return (rendererSharedState.gameState?.seats?.length ?? 0) > 0;
-  }
-  function innerBodyWidth(body) {
-    const style = getComputedStyle(body);
-    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-    return Math.max(200, Math.floor(body.clientWidth - padding));
-  }
-  function dialogHeight() {
-    return document.getElementById("charts-dialog")?.clientHeight ?? 0;
-  }
-  function appendBlock(parent, title) {
-    const block = document.createElement("section");
-    block.className = "charts-block";
-    const titleRow = document.createElement("div");
-    titleRow.className = "charts-block-title";
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    titleRow.appendChild(heading);
-    const plotHost = document.createElement("div");
-    plotHost.className = "charts-plot-host";
-    block.append(titleRow, plotHost);
-    parent.appendChild(block);
-    return { titleRow, plotHost };
-  }
-  function fillStacks(host, snapshot3, lookups) {
-    const stacks = relationshipSubjectSeatIds(snapshot3).map(
-      (seatId) => buildRelationshipStack({
-        subjectSeatId: seatId,
-        rows: relationshipRows(snapshot3, seatId),
-        nameOf: lookups.nameOf,
-        flagOf: lookups.flagOf,
-        seatNumberOf: lookups.seatNumberOf,
-        subjectIsViewer: isHumanSeatId(seatId)
-      })
-    );
-    const empty = Object.assign(document.createElement("p"), { className: "charts-empty", textContent: "No AI commander reports on any side." });
-    host.replaceChildren(...stacks.length > 0 ? stacks : [empty]);
-  }
-  function buildLineChartBlock(body, definition, snapshot3, lookups) {
-    const { titleRow, plotHost } = appendBlock(body, definition.title);
-    let select = null;
-    if (definition.options.length > 0) {
-      select = document.createElement("select");
-      select.className = "charts-select";
-      select.setAttribute("aria-label", `${definition.title} unit type`);
-      select.dataset.controlTooltip = `Show the total or one unit type for ${definition.title.toLowerCase()}.`;
-      definition.options.forEach((option2, index) => {
-        const element = document.createElement("option");
-        element.value = String(index);
-        element.textContent = option2.label;
-        select?.appendChild(element);
-      });
-      titleRow.appendChild(select);
-    }
-    const handle = createLineChart({
-      host: plotHost,
-      data: lineChartData(snapshot3, definition.id, null),
-      width: innerBodyWidth(body),
-      height: chartPlotHeight(dialogHeight(), titleRow.offsetHeight),
-      colorOf: lookups.colorOf,
-      nameOf: lookups.nameOf,
-      decimals: definition.decimals
-    });
-    return { definition, handle, select, titleRow };
-  }
-  function chosenUnitType(entry) {
-    if (entry.select === null) return null;
-    return entry.definition.options[Number(entry.select.value)]?.unitType ?? null;
-  }
-  function updateLineChart(entry, snapshot3) {
-    entry.handle.update(lineChartData(snapshot3, entry.definition.id, chosenUnitType(entry)));
   }
   function buildBody(body, snapshot3) {
     const lookups = seatLookups(snapshot3);
@@ -44697,7 +48283,10 @@ ${bonuses}`;
       entry.handle.resize(width, chartPlotHeight(height, entry.titleRow.offsetHeight));
     }
   }
-  function applySnapshot2(body, snapshot3) {
+  function applySnapshot2(body, raw) {
+    rawSnapshot = raw;
+    appliedCap = replayTurnCap();
+    const snapshot3 = appliedCap === null ? raw : capChartsSnapshot(raw, appliedCap);
     if (snapshot3.turns.length === 0) {
       showBodyMessage(body, "No turns have been recorded yet.");
       return;
@@ -44753,6 +48342,8 @@ ${bonuses}`;
   function closeDialog(overlay) {
     open = false;
     openCounter += 1;
+    rawSnapshot = null;
+    appliedCap = null;
     window.removeEventListener("resize", resizeCharts);
     destroyView();
     bodyElement()?.replaceChildren();
@@ -44766,6 +48357,12 @@ ${bonuses}`;
     document.getElementById("charts-dialog-close")?.addEventListener("click", () => closeDialog(overlay));
     wireBackdropDismiss(overlay, () => closeDialog(overlay));
     overlay.addEventListener("keydown", trapTabKey);
+    onReplayChange(followReplayTurn);
+  }
+  function followReplayTurn() {
+    const body = bodyElement();
+    if (!open || body === null || rawSnapshot === null || replayTurnCap() === appliedCap) return;
+    applySnapshot2(body, rawSnapshot);
   }
   function chartsDialogIsOpen() {
     return open;
@@ -44801,3562 +48398,6 @@ ${bonuses}`;
     } catch (error) {
       console.error("readMatchCharts refresh failed", error);
     }
-  }
-
-  // src/renderer/replay/replayBattleCopy.ts
-  function copyBattleState() {
-    return {
-      snapshot: rendererSharedState.tacticalBattleSnapshot,
-      marches: rendererSharedState.tacticalPendingMarches.map((row) => ({ ...row })),
-      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
-      airStrikes: [...rendererSharedState.pendingAirStrikes],
-      airDrops: [...rendererSharedState.pendingAirDrops],
-      missileLaunches: [...rendererSharedState.pendingMissileLaunches],
-      ferryOrders: [...rendererSharedState.pendingFerryOrders],
-      embarkOrders: [...rendererSharedState.pendingEmbarkOrders]
-    };
-  }
-
-  // src/renderer/replay/replayCamera.ts
-  function frameReplayStepIfFollowing() {
-    if (!rendererSharedState.replayFollowUnits || !replayActive()) return;
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    if (battle) {
-      const limit = tacticalBattleAreaFrameBox(battle.tacticalChildH3Indexes);
-      if (!limit) return;
-      fitBattleUnitsNow(battle.subUnits.map((unit) => unit.h3Index).filter((index) => index.length > 0), limit);
-      return;
-    }
-    const units = rendererSharedState.gameState?.units ?? [];
-    fitStrategicUnitsNow(units.map((unit) => unit.h3Index).filter((index) => index.length > 0));
-  }
-  function setReplayFollowUnits(on2) {
-    rendererSharedState.replayFollowUnits = on2;
-    if (on2) frameReplayStepIfFollowing();
-  }
-
-  // src/shared/consolidatedTurnUpdateToast.ts
-  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
-  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
-  var DEPLOYED_LINE_TYPE_ORDER = ["armor", "infantry", "naval", "air", "missile"];
-  function joinWithSerialComma(parts) {
-    if (parts.length <= 1) return parts[0] ?? "";
-    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
-    return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
-  }
-  function formatDeployedUnitsLine(deployed) {
-    if (!deployed) return null;
-    const parts = [];
-    for (const unitType of DEPLOYED_LINE_TYPE_ORDER) {
-      const count = deployed[unitType] ?? 0;
-      if (count > 0) parts.push(`${count.toLocaleString()} ${unitType}`);
-    }
-    if (parts.length === 0) return null;
-    const total = DEPLOYED_LINE_TYPE_ORDER.reduce((sum, unitType) => sum + (deployed[unitType] ?? 0), 0);
-    const noun = total === 1 ? "unit" : "units";
-    return `${joinWithSerialComma(parts)} ${noun} deployed`;
-  }
-  function formatDeploymentCapReachedLine(cappedTypes, player) {
-    if (player !== HUMAN_SEAT_ID) return null;
-    if (!cappedTypes || cappedTypes.length === 0) return null;
-    const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
-    if (ordered.length === 0) return null;
-    return `Maximum human ${joinWithSerialComma([...ordered])} units deployed.`;
-  }
-  function buildOtherTurnUpdatePrimaryLines(readyResult) {
-    const lines = [];
-    const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
-    if (deployedLine) lines.push(deployedLine);
-    const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
-    if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
-    const creditsAdded = readyResult.humanCreditsAdded ?? 0;
-    if (creditsAdded > 0) lines.push(formatCreditsAddedLine(creditsAdded));
-    const mercenariesHired = readyResult.humanMercenariesHired ?? 0;
-    if (mercenariesHired > 0) lines.push(formatMercenariesHiredLine(mercenariesHired));
-    const unitsDeserted = readyResult.humanUnitsDeserted ?? 0;
-    if (unitsDeserted > 0) lines.push(formatUnitsDesertedLine(unitsDeserted));
-    const hireOrdersUnfilled = readyResult.humanHireOrdersUnfilled ?? 0;
-    if (hireOrdersUnfilled > 0) lines.push(formatHireOrdersUnfilledLine(hireOrdersUnfilled));
-    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
-    if (deploymentCapLine) lines.push(deploymentCapLine);
-    return lines;
-  }
-  function stripLeadingBullet(line) {
-    return line.replace(/^\u2022\s*/, "");
-  }
-  function splitToastLinesByOwner(lines, ownerIdOf, ownsSection) {
-    const byOwner = /* @__PURE__ */ new Map();
-    const updates = [];
-    for (const entry of lines ?? []) {
-      const line = entry.line.trim();
-      if (line.length === 0) continue;
-      const ownerId = ownerIdOf(entry);
-      if (ownerId !== null && ownsSection(ownerId)) {
-        const existing = byOwner.get(ownerId);
-        if (existing) existing.push(line);
-        else byOwner.set(ownerId, [line]);
-      } else {
-        updates.push(line);
-      }
-    }
-    return { byOwner, updates };
-  }
-  function splitMissileStrikeLines(lines) {
-    return splitToastLinesByOwner(lines, (entry) => entry.controllerId, (ownerId) => isSeatId(ownerId));
-  }
-  function splitFortificationReportLines(lines) {
-    return splitToastLinesByOwner(
-      lines,
-      (entry) => entry.ownerId,
-      (ownerId) => isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID
-    );
-  }
-  function mergeStrikeLines(missileLines, fortificationLines) {
-    const merged = /* @__PURE__ */ new Map();
-    for (const [ownerId, lines] of missileLines) merged.set(ownerId, [...lines]);
-    for (const [ownerId, lines] of fortificationLines) {
-      const existing = merged.get(ownerId);
-      if (existing) existing.push(...lines);
-      else merged.set(ownerId, [...lines]);
-    }
-    return merged;
-  }
-  function buildConsolidatedTurnUpdateToastMessage(args) {
-    const { readyResult, combatFallbackBullets, turnReport } = args;
-    const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
-    const fortificationReports = splitFortificationReportLines(args.fortificationReportLines);
-    const sections = [];
-    const lossSections = buildTurnLossSections(
-      args.turnLossSummary,
-      turnReport?.viewerSeatId ?? null,
-      turnReport?.seats ?? [],
-      turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
-      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner),
-      args.battleLinesByOwner
-    );
-    sections.push(...lossSections);
-    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
-    if (lossSections.length === 0 && otherLines.length === 0) {
-      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
-    }
-    const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
-    if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
-    if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
-    const queuePauseLines = (args.queuePauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
-    if (queuePauseLines.length > 0) otherLines = [...otherLines, ...queuePauseLines];
-    if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
-    if (otherLines.length > 0) {
-      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
-      sections.push(...otherLines);
-    }
-    if (sections.length === 0) return null;
-    return sections.join("\n");
-  }
-
-  // src/shared/turnReportHexCodes.ts
-  var TURN_REPORT_UNKNOWN_HEX = "an unidentified hex";
-  function formatTurnReportHexList(codes) {
-    const known = /* @__PURE__ */ new Set();
-    let unknown = false;
-    for (const code of codes) {
-      const trimmed = code?.trim() ?? "";
-      if (trimmed.length === 0) unknown = true;
-      else known.add(trimmed);
-    }
-    const sorted = [...known].sort(compareCodeUnits);
-    if (unknown) sorted.push(TURN_REPORT_UNKNOWN_HEX);
-    return joinWithSerialComma(sorted);
-  }
-
-  // src/shared/missileStrikeReport.ts
-  function missileLaunchVisibleToViewer(record, viewerSeatId2, visibleHexes) {
-    if (viewerSeatId2 === null) return true;
-    if (record.player === viewerSeatId2) return true;
-    if (record.targetControllerId === viewerSeatId2) return true;
-    return visibleHexes.has(record.targetH3Index);
-  }
-  function countPhrase(count, singular, plural) {
-    if (count <= 0) return null;
-    return `${count} ${count === 1 ? singular : plural}`;
-  }
-  function formatMissileStrikeSummaryLine(entries) {
-    if (entries.length === 0) return null;
-    let urban = 0;
-    let airports = 0;
-    let seaports = 0;
-    let fortifications = 0;
-    let squadrons = 0;
-    const codes = [];
-    for (const entry of entries) {
-      urban += entry.record.urbanDestroyed;
-      airports += entry.record.airportsDestroyed;
-      seaports += entry.record.seaportsDestroyed;
-      fortifications += entry.record.fortificationsDestroyed;
-      squadrons += entry.record.destroyedAirUnitIds.length;
-      codes.push(entry.hexCode);
-    }
-    const phrases = [
-      countPhrase(urban, "city cell", "city cells"),
-      countPhrase(airports, "airport", "airports"),
-      countPhrase(seaports, "seaport", "seaports"),
-      countPhrase(fortifications, "fortification", "fortifications")
-    ].filter((part2) => part2 !== null);
-    const destroyed = phrases.length === 0 ? "destroyed nothing" : `destroyed ${joinWithSerialComma(phrases)}`;
-    const squadronClause = squadrons === 0 ? "" : `; ${squadrons} ${squadrons === 1 ? "squadron" : "squadrons"} lost`;
-    const strike = entries.length === 1 ? "strike" : "strikes";
-    return `Missile ${strike} in ${formatTurnReportHexList(codes)} ${destroyed}${squadronClause}.`;
-  }
-  function buildMissileStrikeToastLines(entries) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const entry of entries) {
-      const controller = entry.record.targetControllerId;
-      const key = controller !== null && isSeatId(controller) ? controller : null;
-      const group = groups.get(key);
-      if (group) group.push(entry);
-      else groups.set(key, [entry]);
-    }
-    const lines = [];
-    for (const [controllerId, group] of groups) {
-      const line = formatMissileStrikeSummaryLine(group);
-      if (line !== null) lines.push({ controllerId, line });
-    }
-    return lines;
-  }
-  function buildMissilePlaybackMoves(records) {
-    return records.map((record) => ({
-      unitId: record.unitId,
-      player: record.player,
-      unitType: "missile",
-      fromH3Index: record.fromH3Index,
-      targetH3Index: record.targetH3Index,
-      returnsToBase: false
-    }));
-  }
-
-  // src/shared/lossSummaryFromResolution.ts
-  function normalizeUnitType(raw) {
-    return isBuildUnitType(raw) ? raw : null;
-  }
-  function snapshotById(snapshots) {
-    const map = /* @__PURE__ */ new Map();
-    for (const s of snapshots) map.set(s.id, s);
-    return map;
-  }
-  function allRemovedSnapshots(args) {
-    const byId2 = /* @__PURE__ */ new Map();
-    for (const s of args.removedUnits ?? []) byId2.set(s.id, s);
-    for (const s of args.missileStrikeRemovedUnits ?? []) byId2.set(s.id, s);
-    for (const s of args.airStrikeRemovedUnits ?? []) byId2.set(s.id, s);
-    return [...byId2.values()];
-  }
-  function resolveLostUnit(victimId, snapshots, args) {
-    const snap = snapshots.get(victimId);
-    const meta = args.resolveUnitMeta(victimId) ?? (snap ? { player: snap.player, unitType: snap.unitType } : void 0);
-    if (!meta) return null;
-    const unitType = normalizeUnitType(meta.unitType);
-    if (!unitType) return null;
-    const player = meta.player;
-    const alwaysVisiblePlayer = args.perspectivePlayerId ?? HUMAN_SEAT_ID;
-    const visible = player === alwaysVisiblePlayer || !args.isVictimVisible || args.isVictimVisible(victimId, player);
-    if (!visible) return null;
-    const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
-    return { unitType, displayName, unitId: victimId };
-  }
-  function bucketForPlayer(summary, player) {
-    const existing = summary.byOwner[player];
-    if (existing) return existing;
-    const created = emptyPlayerLossSummary();
-    summary.byOwner[player] = created;
-    return created;
-  }
-  function pushToBucket(summary, player, bucket, unit) {
-    bucketForPlayer(summary, player)[bucket].push(unit);
-  }
-  function airStrikeAttackerLossUnitIdsFromMoves(moves) {
-    if (!moves || moves.length === 0) return [];
-    return moves.filter((m) => m.returnsToBase === false).map((m) => m.unitId);
-  }
-  function classifyAirStrikeKillCause(edge, args) {
-    const victimMeta = args.resolveUnitMeta(edge.victimId);
-    if (victimMeta?.unitType !== "air") return "airStrike";
-    const killerId = edge.killerIds?.[0];
-    if (!killerId) return "returnFire";
-    const killerMeta = args.resolveUnitMeta(killerId);
-    if (killerMeta && killerMeta.player !== victimMeta.player) return "returnFire";
-    return "airStrike";
-  }
-  function causeForAirStrikeRemovedUnit(snap, args) {
-    const edge = (args.killsByAirStrike ?? []).find((e) => e.victimId === snap.id);
-    if (edge) return classifyAirStrikeKillCause(edge, args);
-    if (args.airStrikeAttackerLossUnitIds?.includes(snap.id)) return "returnFire";
-    return "airStrike";
-  }
-  function buildTurnLossSummary(args) {
-    const summary = emptyTurnLossSummary();
-    const snapshots = snapshotById(allRemovedSnapshots(args));
-    const victimToCause = /* @__PURE__ */ new Map();
-    const assignFromEdges = (edges, cause) => {
-      for (const edge of edges ?? []) {
-        if (!victimToCause.has(edge.victimId)) victimToCause.set(edge.victimId, cause);
-      }
-    };
-    for (const edge of args.killsByAirStrike ?? []) {
-      if (!victimToCause.has(edge.victimId)) {
-        victimToCause.set(edge.victimId, classifyAirStrikeKillCause(edge, args));
-      }
-    }
-    assignFromEdges(args.killsByDirectFire, "ranged");
-    assignFromEdges(args.killsByReturnFire, "returnFire");
-    if (args.killsByMelee && args.killsByMelee.length > 0) {
-      assignFromEdges(args.killsByMelee, "melee");
-    } else {
-      assignFromEdges(args.kills, "melee");
-    }
-    for (const snap of args.missileStrikeRemovedUnits ?? []) {
-      if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, "missileStrike");
-    }
-    for (const snap of args.airStrikeRemovedUnits ?? []) {
-      if (!victimToCause.has(snap.id)) {
-        victimToCause.set(snap.id, causeForAirStrikeRemovedUnit(snap, args));
-      }
-    }
-    const claimed = /* @__PURE__ */ new Set();
-    const addVictim = (victimId, cause) => {
-      if (claimed.has(victimId)) return;
-      const unit = resolveLostUnit(victimId, snapshots, args);
-      if (!unit) return;
-      const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
-      const player = meta?.player ?? AI_SEAT_IDS[0];
-      pushToBucket(summary, player, cause, unit);
-      claimed.add(victimId);
-    };
-    for (const [victimId, cause] of victimToCause) {
-      addVictim(victimId, cause);
-    }
-    for (const snap of allRemovedSnapshots(args)) {
-      if (claimed.has(snap.id)) continue;
-      addVictim(snap.id, "other");
-    }
-    return summary;
-  }
-  function buildTurnLossSummaryFromReadyShape(args) {
-    return buildTurnLossSummary(args);
-  }
-
-  // src/shared/tacticalToastKillSlice.ts
-  function tacticalKillEdgesForStrategicStyleTurnUpdate(playback) {
-    return [
-      ...playback.killsByDirectFire ?? [],
-      ...playback.killsByReturnFire ?? [],
-      ...playback.killsByMelee ?? []
-    ];
-  }
-
-  // src/shared/unknownBattleContinentNames.ts
-  async function collectUnknownBattleContinentNames(unknownCombatHexes, unknownCasualtyHexes, fetchContinentNames) {
-    const unknownContinentNames = [];
-    if (!fetchContinentNames) return unknownContinentNames;
-    const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter(
-      (h3, idx, arr) => arr.indexOf(h3) === idx
-    );
-    for (const h3 of unknownHexes) {
-      const names = await fetchContinentNames(h3);
-      for (const n of names) {
-        if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
-      }
-    }
-    return unknownContinentNames;
-  }
-
-  // src/shared/destroyedInBattleLine.ts
-  var GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
-  function visibleDestroyedParents(units, viewerSeatId2, visibleHexes) {
-    if (viewerSeatId2 == null) return [...units];
-    return units.filter((unit) => unit.ownerId === viewerSeatId2 || visibleHexes.has(unit.h3Index));
-  }
-  function formatDestroyedInBattleLine(units) {
-    if (units.length === 0) return "";
-    const counts = /* @__PURE__ */ new Map();
-    for (const unit of units) counts.set(unit.unitType, (counts.get(unit.unitType) ?? 0) + 1);
-    const named = [];
-    const grouped = /* @__PURE__ */ new Set();
-    for (const unit of units) {
-      const count = counts.get(unit.unitType) ?? 0;
-      if (count > LOSS_TYPE_NAME_LIST_MAX && isBuildUnitType(unit.unitType)) {
-        grouped.add(unit.unitType);
-      } else {
-        named.push(unit.displayName);
-      }
-    }
-    const groups = GROUP_ORDER.flatMap((unitType) => {
-      if (!grouped.has(unitType)) return [];
-      const count = counts.get(unitType);
-      return count == null ? [] : [formatCollapsedTypeCount(count, unitType)];
-    });
-    return `${[...named, ...groups].join(", ")} destroyed in battle.`;
-  }
-  function destroyedInBattleLinesByOwner(units) {
-    const byOwner = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      const list = byOwner.get(unit.ownerId);
-      if (list) list.push(unit);
-      else byOwner.set(unit.ownerId, [unit]);
-    }
-    const lines = /* @__PURE__ */ new Map();
-    for (const [ownerId, list] of byOwner) {
-      const line = formatDestroyedInBattleLine(list);
-      if (line.length > 0) lines.set(ownerId, line);
-    }
-    return lines;
-  }
-
-  // src/shared/fortificationReport.ts
-  function fortificationReportVisibleToViewer(report, viewerSeatId2, exploredHexes) {
-    if (viewerSeatId2 === null) return true;
-    if (viewerSeatId2 === report.ownerId) return true;
-    return exploredHexes.has(report.h3Index);
-  }
-  function formatFortificationSummaryLine(entries) {
-    let total = 0;
-    const codes = [];
-    for (const entry of entries) {
-      if (entry.report.lost <= 0) continue;
-      total += entry.report.lost;
-      codes.push(entry.hexCode);
-    }
-    if (total === 0) return null;
-    const hit = total === 1 ? "hit" : "hits";
-    return `Fortifications in ${formatTurnReportHexList(codes)} absorbed ${total} ${hit}.`;
-  }
-  function buildFortificationToastLines(entries) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const entry of entries) {
-      const key = entry.report.ownerId;
-      const group = groups.get(key);
-      if (group) group.push(entry);
-      else groups.set(key, [entry]);
-    }
-    const lines = [];
-    for (const [ownerId, group] of groups) {
-      const line = formatFortificationSummaryLine(group);
-      if (line !== null) lines.push({ ownerId, line });
-    }
-    return lines;
-  }
-
-  // src/renderer/gameplay/fortificationUpdateLines.ts
-  function fortificationReportLinesFor(readySlice, viewer, hexCodeBattle) {
-    const entries = [];
-    for (const report of readySlice.fortificationReports ?? []) {
-      if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
-      entries.push({ report, hexCode: orderTargetHexCode(report.h3Index, hexCodeBattle) });
-    }
-    return buildFortificationToastLines(entries);
-  }
-
-  // src/shared/queuePauseReasons.ts
-  var QUEUE_PAUSE_REASON_ORDER = ["occupation", "allCellsFortified", "unitCap"];
-  var QUEUE_PAUSE_REASON_TEXT = {
-    occupation: "occupying units or fortifications required",
-    allCellsFortified: "every city cell fortified",
-    unitCap: "unit cap reached"
-  };
-  function sortQueuePauseReasons(reasons) {
-    return QUEUE_PAUSE_REASON_ORDER.filter((reason) => reasons.includes(reason));
-  }
-  function formatQueuePausedNote(reasons) {
-    const sorted = sortQueuePauseReasons(reasons);
-    if (sorted.length === 0) return null;
-    return `Queue paused: ${joinWithSerialComma(sorted.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]))}.`;
-  }
-  function formatQueuePausedLines(entries) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const entry of entries) {
-      const reasons = sortQueuePauseReasons(entry.reasons);
-      if (reasons.length === 0) continue;
-      const key = reasons.map((reason) => QUEUE_PAUSE_REASON_ORDER.indexOf(reason)).join(",");
-      const group = groups.get(key) ?? { reasons, codes: [] };
-      group.codes.push(entry.hexCode);
-      groups.set(key, group);
-    }
-    return [...groups.entries()].sort(([left], [right]) => compareCodeUnits(left, right)).map(([, group]) => {
-      const noun = group.codes.length === 1 ? "Queue" : "Queues";
-      const reasons = joinWithSerialComma(group.reasons.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]));
-      return `${noun} paused at ${formatTurnReportHexList(group.codes)}: ${reasons}.`;
-    });
-  }
-
-  // src/renderer/gameplay/queuePauseUpdateLines.ts
-  function queuePauseUpdateLinesFor(readySlice) {
-    const pauses = readySlice.humanNewlyPausedQueues ?? [];
-    return formatQueuePausedLines(
-      pauses.map((pause) => ({ hexCode: orderTargetHexCode(pause.h3Index, null), reasons: pause.reasons }))
-    );
-  }
-
-  // src/renderer/gameplay/readyResolutionAnnouncements.ts
-  function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
-    const allKills = readyResult.kills ?? [];
-    const viewerInvolved = (ownerId) => viewerSeatId2 !== null && ownerId === viewerSeatId2;
-    const viewerIsHuman = viewerSeatId2 !== null && isHumanSeatId(viewerSeatId2);
-    const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
-    const killerOwner = (id) => {
-      const removedPlayer = removedById.get(id)?.player;
-      if (removedPlayer) return removedPlayer;
-      return rendererSharedState.gameState?.units.find((unit) => unit.id === id)?.player ?? unitIdOwnerFromId(id);
-    };
-    const friendlyInvolvedKillVictimIds = new Set(
-      allKills.filter((k) => {
-        const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(killerOwner(id)));
-        const victimIsFriendly = viewerInvolved(victim?.player);
-        return killerIsFriendly || victimIsFriendly;
-      }).map((k) => k.victimId)
-    );
-    const friendlyInvolvedCombatHexes = new Set(
-      [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
-    );
-    const friendlyPlannedCombatHexes = new Set(
-      viewerIsHuman ? [
-        ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
-        ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
-        ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
-        ...(readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).flatMap((move) => [move.fromH3Index, move.targetH3Index]),
-        ...(readyResult.removedUnits ?? []).filter((unit) => viewerInvolved(unit.player)).map((unit) => unit.h3Index)
-      ] : []
-    );
-    for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
-    const knownHumanAirStrikeTargetHexes = new Set(
-      (readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).map((move) => move.targetH3Index)
-    );
-    const unknownCombatHexes = [
-      ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-      ...readyResult.rangedCombatHexes ?? [],
-      ...readyResult.meleeCombatHexes ?? [],
-      ...readyResult.combatHexes ?? []
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-    const unknownCasualtyHexes = [
-      ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-      ...readyResult.rangedCasualtyHexes ?? [],
-      ...readyResult.meleeCasualtyHexes ?? [],
-      ...readyResult.casualtyHexes ?? []
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-    const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
-    for (const removed of readyResult.removedUnits ?? []) {
-      if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
-    }
-    for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
-    for (const launch of readyResult.missileLaunches ?? []) {
-      if (launch.player !== viewerSeatId2) continue;
-      for (const victimId of launch.destroyedAirUnitIds) knownVictimIds.add(victimId);
-    }
-    const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => {
-      const removed = removedById.get(id);
-      if (viewerInvolved(removed?.player)) return false;
-      return !friendlyInvolvedKillVictimIds.has(id);
-    }).filter((id) => {
-      const removed = removedById.get(id);
-      return removed ? !visibleHexes.has(removed.h3Index) : false;
-    });
-    return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
-  }
-  function buildTacticalCommitReadyResultForToast(playback) {
-    const killsByDirectFire = playback.killsByDirectFire ?? [];
-    const killsByAirStrike = playback.killsByAirStrike ?? [];
-    const killsByReturnFire = playback.killsByReturnFire ?? [];
-    const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
-    const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : void 0;
-    const removedAll = [...playback.rangedRemovedUnits ?? [], ...playback.meleeRemovedUnits ?? []];
-    const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
-    const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
-    const airStrikeRemovedUnits = removedAll.filter((u) => {
-      if (airStrikeVictimIds.has(u.id)) return true;
-      if (u.player === HUMAN_SEAT_ID && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
-      return false;
-    });
-    return {
-      success: true,
-      kills,
-      killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : void 0,
-      killsByAirStrike: killsByAirStrike.length > 0 ? killsByAirStrike : void 0,
-      killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : void 0,
-      removedUnits: removedAll.length > 0 ? removedAll : void 0,
-      humanMoves: playback.humanMoves,
-      rangedCombatHexes: playback.rangedCombatHexes,
-      rangedCasualtyHexes: playback.rangedCasualtyHexes,
-      rangedRemovedUnits: playback.rangedRemovedUnits,
-      airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
-      infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
-      fortificationReports: playback.fortificationReports?.length ? playback.fortificationReports : void 0,
-      airStrikeAttemptCount: playback.airStrikeAttemptCount,
-      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
-      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
-      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
-    };
-  }
-  function buildPopupTurnLossSummary(args) {
-    const { readySlice, knownVictimIds, formatBaseUnitName, killsByMelee, killsByAirStrike } = args;
-    const removed = readySlice.removedUnits ?? [];
-    const metaMap = /* @__PURE__ */ new Map();
-    for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
-    for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
-    for (const u of readySlice.missileStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
-    const readyWithAir = readySlice;
-    return buildTurnLossSummaryFromReadyShape({
-      kills: readySlice.kills,
-      killsByDirectFire: readySlice.killsByDirectFire,
-      killsByReturnFire: readySlice.killsByReturnFire,
-      killsByMelee,
-      killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
-      removedUnits: removed,
-      airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
-      missileStrikeRemovedUnits: readySlice.missileStrikeRemovedUnits,
-      airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(readySlice.airStrikeMoves),
-      resolveDisplayName: (id) => {
-        const snap = removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id) ?? readySlice.missileStrikeRemovedUnits?.find((u) => u.id === id);
-        if (snap?.displayName) return snap.displayName;
-        return formatBaseUnitName(id);
-      },
-      resolveUnitMeta: (id) => metaMap.get(id),
-      isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id)
-    });
-  }
-  function formatHexCount(label, count) {
-    return `\u2022 ${label} at ${count.toLocaleString()} ${count === 1 ? "hex" : "hexes"}.`;
-  }
-  function buildCombatActivityFallbackBullets(readyResult) {
-    const bullets = [];
-    const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
-    if (rangedHexCount > 0) bullets.push(formatHexCount("Ranged engagements", rangedHexCount));
-    const meleeHexCount = readyResult.meleeCombatHexes?.length ?? 0;
-    if (meleeHexCount > 0) bullets.push(formatHexCount("Melee engagements", meleeHexCount));
-    const casualtyHexCount = (readyResult.rangedCasualtyHexes?.length ?? 0) + (readyResult.meleeCasualtyHexes?.length ?? 0) + (readyResult.airStrikeCasualtyHexes?.length ?? 0);
-    if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
-    return bullets;
-  }
-  function reportViewerSeatId() {
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    const viewer = readoutViewerSeatId(seats, rendererSharedState.viewAs);
-    return viewer ?? null;
-  }
-  function launchTurnSeats() {
-    return (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
-      seatId: seat.seatId,
-      seatOrder: seat.seatOrder,
-      homeRegion: seat.homeRegion,
-      kind: seat.kind,
-      nickname: seat.nickname
-    }));
-  }
-  async function announceResolutionTurnUpdate(args, deps) {
-    const parents = args.destroyedParents ?? (args.usePendingBattleParents ? takePendingDestroyedBattleParents() : []);
-    if (args.holdForBattle) {
-      console.debug("[agent-wars] announceResolutionTurnUpdate holding for battle", {
-        parentCount: parents.length,
-        reportTag: args.reportTag
-      });
-      stashHeldBattleTurnUpdate(
-        {
-          ...args,
-          holdForBattle: false,
-          usePendingBattleParents: false,
-          viewerSeatId: reportViewerSeatId(),
-          seats: launchTurnSeats(),
-          exploredHexes: getExploredHexSet(rendererSharedState.gameState)
-        },
-        deps,
-        parents
-      );
-      return;
-    }
-    const { readySlice, visibility, killToastFormatter, extraKills, reportTag, missileLaunches } = args;
-    const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
-    const turnLossSummary = buildPopupTurnLossSummary({
-      readySlice,
-      knownVictimIds,
-      formatBaseUnitName: killToastFormatter.formatBaseUnitName,
-      ...extraKills !== void 0 ? extraKills : {}
-    });
-    const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
-    const seats = args.seats ? [...args.seats] : launchTurnSeats();
-    const viewerSeatId2 = args.viewerSeatId !== void 0 ? args.viewerSeatId : reportViewerSeatId();
-    const visibleParents = visibleDestroyedParents(parents, viewerSeatId2, args.visibleHexes ?? /* @__PURE__ */ new Set());
-    const battleLinesByOwner = destroyedInBattleLinesByOwner(visibleParents);
-    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
-    let unknownBattleLine;
-    if (hasUnknownBattle) {
-      try {
-        const getContinentNames = window.gameApi?.getHexContinentNames;
-        const unknownContinentNames = await collectUnknownBattleContinentNames(
-          unknownCombatHexes,
-          unknownCasualtyHexes,
-          getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
-        );
-        unknownBattleLine = deps.formatUnknownBattleAnnouncement(unknownContinentNames);
-      } catch (err) {
-        console.error("unknown battle continent names failed", err);
-        unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
-      }
-    }
-    const missileStrikeLines = missileStrikeLinesFor(missileLaunches);
-    const queuePauseLines = queuePauseUpdateLinesFor(readySlice);
-    const fortificationReportLines = fortificationReportLinesFor(
-      readySlice,
-      {
-        viewerSeatId: viewerSeatId2,
-        exploredHexes: args.exploredHexes ?? getExploredHexSet(rendererSharedState.gameState)
-      },
-      args.hexCodeBattle ?? null
-    );
-    const updateText = buildConsolidatedTurnUpdateToastMessage({
-      readyResult: readySlice,
-      turnLossSummary,
-      combatFallbackBullets,
-      turnReport: {
-        viewerSeatId: viewerSeatId2,
-        seats,
-        transitions: readySlice.controlTransitions ?? []
-      },
-      unknownBattleLine,
-      missileStrikeLines,
-      queuePauseLines,
-      fortificationReportLines,
-      battleLinesByOwner
-    });
-    if (updateText) {
-      rememberUnitOrigins([
-        ...readySlice.removedUnits ?? [],
-        ...readySlice.airStrikeRemovedUnits ?? [],
-        ...readySlice.missileStrikeRemovedUnits ?? [],
-        ...readySlice.rangedRemovedUnits ?? [],
-        ...readySlice.meleeRemovedUnits ?? [],
-        ...visibleParents
-      ]);
-      const unitOriginByDisplayName = mergeDestroyedBattleParentFlags(
-        buildUnitOriginByLossDisplayName(turnLossSummary),
-        visibleParents
-      );
-      deps.showMapToast(updateText, {
-        isError: false,
-        unitOriginByDisplayName,
-        seats,
-        viewerSeatId: viewerSeatId2,
-        report: { kind: "turn", tag: reportTag }
-      });
-      deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
-    }
-  }
-  async function showHeldBattleTurnUpdate(includeBattleLines = true) {
-    const held2 = takeHeldBattleTurnUpdate();
-    console.debug("[agent-wars] showHeldBattleTurnUpdate", {
-      found: held2 != null,
-      includeBattleLines,
-      parentCount: held2?.destroyedParents.length ?? 0
-    });
-    if (!held2) return;
-    await announceResolutionTurnUpdate(
-      {
-        ...held2.inputs,
-        destroyedParents: includeBattleLines ? held2.destroyedParents : [],
-        holdForBattle: false,
-        usePendingBattleParents: false
-      },
-      held2.deps
-    );
-  }
-  function missileStrikeLinesFor(launches) {
-    const entries = (launches ?? []).map((record) => ({
-      record,
-      hexCode: orderTargetHexCode(record.targetH3Index, null)
-    }));
-    return buildMissileStrikeToastLines(entries);
-  }
-  function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
-    if (needsPlayback) {
-      enqueueResolutionPlaybackCompleteNotify(send);
-    } else {
-      dropQueuedResolutionPlaybackCompleteNotifies();
-      send();
-      notifyResolutionPlaybackFinished();
-    }
-  }
-
-  // src/renderer/gameplay/resolutionPlaybackPlan.ts
-  function planResolutionPlayback(input) {
-    const { readyResult, state, humanMoves, visibleHexesBeforeTurn, deps } = input;
-    const aiMoves = readyResult.aiMoves ?? [];
-    const resolutionMoves = [...humanMoves, ...aiMoves];
-    const visibleHexes = deps.getVisibleHexSet(state);
-    const visibleMissileLaunches = (readyResult.missileLaunches ?? []).filter(
-      (record) => missileLaunchVisibleToViewer(
-        record,
-        reportViewerSeatId(),
-        /* @__PURE__ */ new Set([...visibleHexesBeforeTurn, ...visibleHexes])
-      )
-    );
-    const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
-    const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
-    const airStrikeOutboundMoves = [
-      ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
-      ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves)
-    ];
-    const airStrikeReturnMoves = [
-      ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
-      ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves)
-    ];
-    const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
-    const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
-    const hasAirStrikeResolution = visibleMissileLaunches.length > 0 || (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
-    const hasDiceRolls = (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 || (readyResult.rangedDiceRolls?.length ?? 0) > 0 || (readyResult.meleeDiceRolls?.length ?? 0) > 0;
-    const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
-    const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
-    const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
-    const visibleMissileVictims = (readyResult.missileStrikeRemovedUnits ?? []).filter(
-      (unit) => visibleMissileVictimIds.has(unit.id)
-    );
-    const airStrikeRemovedForPlayback = [...readyResult.airStrikeRemovedUnits ?? [], ...visibleMissileVictims];
-    const airStrikeCasualtyHexesForPlayback = [
-      ...readyResult.airStrikeCasualtyHexes ?? [],
-      ...visibleMissileVictims.map((unit) => unit.h3Index).filter((hex) => !(readyResult.airStrikeCasualtyHexes ?? []).includes(hex))
-    ];
-    const airStrikeCombatHexesForPlayback = [
-      ...readyResult.airStrikeHexes ?? [],
-      ...visibleMissileLaunches.map((record) => record.targetH3Index).filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex))
-    ];
-    const needsCombatOrMovementAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
-    const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
-    return {
-      resolutionMoves,
-      visibleHexes,
-      visibleMissileLaunches,
-      sightCuesForPlayback,
-      airStrikeOutboundMoves,
-      airStrikeReturnMoves,
-      visibility,
-      unknownCombatHexes,
-      unknownCasualtyHexes,
-      airStrikeRemovedForPlayback,
-      airStrikeCasualtyHexesForPlayback,
-      airStrikeCombatHexesForPlayback,
-      needsCombatOrMovementAnimation,
-      needsAnimation
-    };
-  }
-
-  // src/shared/pendingMovementSidebarLabels.ts
-  function formatPendingMovementSidebarTargetLabel(destinationH3Index, distanceHexSteps) {
-    return formatOrderRowDetail({
-      targetCode: orderTargetHexCode(destinationH3Index, null),
-      distanceHexes: distanceHexSteps,
-      note: null
-    });
-  }
-  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
-    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
-    let steps = null;
-    if (origin) {
-      try {
-        steps = gridDistance(origin, destinationH3Index);
-      } catch {
-        steps = null;
-      }
-    }
-    return formatOrderRowDetail({
-      targetCode: orderTargetHexCode(destinationH3Index, battle),
-      distanceHexes: steps,
-      note: null
-    });
-  }
-
-  // src/renderer/gameplay/sidebarSupport.ts
-  function estimateHexesLeftForOrder(order) {
-    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
-    let total = 0;
-    for (const segment of order.routeSegments) {
-      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
-      total += Math.max(0, segment.hexes.length - 1);
-    }
-    return total;
-  }
-  function isPendingMovementOrderForDisplay(order) {
-    return estimateHexesLeftForOrder(order) > 0;
-  }
-  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
-    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
-    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
-    if (useMultiSelect) {
-      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
-      deps.toggleUnitSelection(unitId);
-    } else {
-      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
-      deps.replaceSelection([unitId]);
-    }
-    deps.syncUiAfterSelectionChange();
-  }
-  function formatPendingOrderSidebarLabel(order) {
-    return formatPendingMovementSidebarTargetLabel(order.destinationH3Index, estimateHexesLeftForOrder(order));
-  }
-  function formatKillToastLine(kill, formatDisplayUnitName) {
-    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
-    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
-  }
-  function buildTacticalSubUnitKillLabelOverlay(args) {
-    const byId2 = /* @__PURE__ */ new Map();
-    for (const row of args.subUnitsBeforeCommit ?? []) {
-      byId2.set(row.id, row.displayName);
-    }
-    for (const row of args.subUnitsAfterCommit ?? []) {
-      byId2.set(row.id, row.displayName);
-    }
-    for (const u of args.removedUnits ?? []) {
-      if (u.displayName) byId2.set(u.id, u.displayName);
-    }
-    return [...byId2.entries()].map(([id, displayName]) => ({ id, displayName }));
-  }
-  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
-    const removedUnitsForDisplay = removedUnits ?? [];
-    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      displayOrder: u.displayOrder
-    }));
-    const rosterById = /* @__PURE__ */ new Map();
-    for (const unit of state.units ?? []) {
-      rosterById.set(unit.id, {
-        id: unit.id,
-        unitType: unit.unitType,
-        displayOrder: unit.displayOrder,
-        player: unit.player
-      });
-    }
-    for (const unit of rosterFromRemoved) {
-      if (rosterById.has(unit.id)) continue;
-      rosterById.set(unit.id, {
-        id: unit.id,
-        unitType: unit.unitType,
-        displayOrder: unit.displayOrder,
-        player: unit.player
-      });
-    }
-    for (const unit of killLabelUnits ?? []) {
-      if (rosterById.has(unit.id)) continue;
-      rosterById.set(unit.id, unit);
-    }
-    const rosterForDisplay = [...rosterById.values()];
-    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
-    for (const u of removedUnitsForDisplay) {
-      if (u.displayName) displayNameById.set(u.id, u.displayName);
-    }
-    for (const row of tacticalSubUnitsForKillLabels ?? []) {
-      displayNameById.set(row.id, row.displayName);
-    }
-    const formatBaseUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
-    const formatDisplayUnitName = (unitId) => {
-      const baseName = formatBaseUnitName(unitId);
-      const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
-      if (!ownerId) return baseName;
-      return formatUnitNameForViewer({
-        baseName,
-        ownerId,
-        viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState?.seats ?? []),
-        seats: rendererSharedState.gameState?.seats ?? []
-      });
-    };
-    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
-    return { formatUnitName: formatDisplayUnitName, formatBaseUnitName, formatKillLine };
-  }
-  function syncUiAfterSelectionChange2(deps, options = {}) {
-    if (options.refreshHoverPreview !== false) {
-      void deps.refreshHoverRoutePreview();
-    }
-    deps.updateSidebar();
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    if (options.refreshStackCallout !== false) {
-      deps.refreshStackCalloutIfOpen();
-    }
-    deps.redraw();
-  }
-  function updatePendingOrdersSidebar2(deps) {
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    const rows = [];
-    const rowFor = (unitId, detail, onCancel) => sidebarOrderRowArgs(unitId, detail, onCancel, deps);
-    if (battle) {
-      for (const row of rendererSharedState.tacticalPendingMarches) {
-        const detail = formatTacticalDraftMarchPendingOrderTargetLabel(battle, row.subUnitId, row.destinationH3Index);
-        rows.push(rowFor(row.subUnitId, detail, () => {
-          rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-          deps.updatePendingOrdersSidebar?.();
-          deps.redraw?.();
-        }));
-      }
-      for (const ferry of rendererSharedState.pendingFerryOrders) {
-        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, battle), () => {
-          deps.cancelFerryForUnit(ferry.unitId);
-          deps.refreshStackCalloutIfOpen?.();
-        }));
-      }
-    } else {
-      for (const order of rendererSharedState.humanStandingOrders.filter((o) => deps.isPendingMovementOrderForDisplay(o))) {
-        rows.push(rowFor(order.unitId, deps.formatPendingOrderSidebarLabel(order), () => {
-          void deps.cancelOrderForUnit(order.unitId);
-        }));
-      }
-      for (const ferry of rendererSharedState.pendingFerryOrders) {
-        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry), () => deps.cancelFerryForUnit(ferry.unitId)));
-      }
-    }
-    renderSidebarOrderGroup("movement", rows);
-  }
-  function showSidebarError(message, showMapToast2, clearSidebarError2) {
-    showMapToast2(message, { isError: true });
-    clearSidebarError2();
-  }
-  function clearSidebarError() {
-    const el = document.getElementById("sidebar-error");
-    if (el) el.style.display = "none";
-  }
-
-  // src/renderer/gameplay/tacticalAnimationStart.ts
-  function tacticalPlaybackNeeded(playback) {
-    const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
-    const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-    const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
-    const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
-    const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
-    const hasDicePlayback = (playback?.airStrikeDiceRolls?.length ?? 0) > 0 || (playback?.rangedDiceRolls?.length ?? 0) > 0 || (playback?.meleeDiceRolls?.length ?? 0) > 0;
-    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
-    return needsResolutionPlayback;
-  }
-  function buildTacticalResolutionAnimation(input) {
-    const { playback, subUnitsBefore, deps } = input;
-    const tacticalMarchPlaybackUnits = subUnitsBefore?.length ? subUnitsBefore.map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      h3Index: u.h3Index
-    })) : void 0;
-    const airStrikeOutboundMoves = [
-      ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
-      ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves)
-    ];
-    const airStrikeReturnMoves = [
-      ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
-      ...buildAirDropReturnPlaybackMoves(playback.airDropMoves)
-    ];
-    return {
-      moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
-      startTime: Date.now(),
-      tacticalDeferResolutionClock: true,
-      ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
-      ...airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {},
-      ...airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {},
-      ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
-      ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
-      ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
-      rangedCombatHexes: playback.rangedCombatHexes,
-      rangedCasualtyHexes: playback.rangedCasualtyHexes,
-      rangedRemovedUnits: playback.rangedRemovedUnits,
-      ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
-      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
-      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
-      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
-      ...pickPlaybackDiceRolls(playback)
-    };
-  }
-
-  // src/shared/aiStrategyToastContent.ts
-  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
-  function trimToastField(raw) {
-    const trimmed = raw?.trim() ?? "";
-    return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function buildAiStrategyToastSections(fields) {
-    const sections = [];
-    const bullets = (fields.messages ?? []).filter((row) => row.text.trim().length > 0);
-    const strategy = trimToastField(fields.strategy);
-    if (bullets.length > 0) sections.push({ title: SIDE_MESSAGES_TITLE, body: "", bullets });
-    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
-    return sections;
-  }
-
-  // src/renderer/openRouter/commanderMessageTabsUi.ts
-  var tabState = null;
-  function bindCommanderMessageTabs() {
-    setAiStrategyToastHiddenListener(() => {
-      tabState = null;
-    });
-  }
-  function showCommanderMessageTabs(dispatches, statuses = [], options) {
-    if (replayActive() && options?.fromReplay !== true) return;
-    const opening = strategyToastHidden() || tabState === null;
-    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch))) return;
-    if (opening) {
-      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
-      tabState = initialCommanderMessageTabs(seats);
-    } else if (tabState) {
-      tabState = resetCommanderConsultMarks(tabState);
-    }
-    if (!tabState) return;
-    for (const dispatch of dispatches) {
-      tabState = commanderDispatchHasProse(dispatch) ? applyCommanderMessage(tabState, {
-        seatId: dispatch.seatId,
-        strategy: dispatch.strategy,
-        messages: dispatch.messages
-      }) : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
-    }
-    tabState = applyOpenTabAbsences(tabState, statuses);
-    if (!tabState.tabs.some((tab) => tab.enabled)) return;
-    showFilledAiStrategyToast(renderCommanderMessageTabs, false);
-  }
-  function applyOpenTabAbsences(state, statuses) {
-    let next = state;
-    for (const tab of state.tabs) {
-      const seat = (rendererSharedState.gameState?.seats ?? []).find((row) => row.seatId === tab.seatId);
-      const status = statuses.find((row) => row.seatId === tab.seatId);
-      const reason = resolveCommanderTabAbsence({
-        outTurn: seat?.outTurn ?? null,
-        status: status?.status ?? null,
-        storedReason: status?.absenceReason ?? null,
-        tacticalOtherSeat: seatIsOutsideThisBattle(tab.seatId, statuses),
-        consultedWithoutProse: tab.consultedWithoutProse
-      });
-      if (!reason) continue;
-      const turnNumber = reason === "knocked_out" ? seat?.outTurn ?? null : reason === "timed_out" ? status?.timedOutTurn ?? null : null;
-      next = applyCommanderAbsence(next, tab.seatId, formatCommanderAbsenceMessage(reason, turnNumber));
-    }
-    return next;
-  }
-  function seatIsOutsideThisBattle(seatId, statuses) {
-    const opposingPartyId = rendererSharedState.tacticalBattleSnapshot?.opposingPartyId;
-    const opponent = opposingPartyId ? statuses.find((row) => row.seatId === opposingPartyId) : void 0;
-    return seatOutsideTacticalConsult(seatId, opposingPartyId, opponent?.theater ?? null);
-  }
-  function renderCommanderMessageTabs(target) {
-    const host = target ?? document.getElementById("ai-strategy-toast-text");
-    if (!(host instanceof HTMLElement) || !tabState) return;
-    const state = tabState;
-    host.replaceChildren();
-    const list = document.createElement("div");
-    list.className = "ai-strategy-tab-bar";
-    list.setAttribute("role", "tablist");
-    for (const tab of state.tabs) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.setAttribute("role", "tab");
-      const flag = createSideNumberFlag(tab.seatId, rendererSharedState.gameState?.seats ?? []);
-      if (flag) button.appendChild(flag);
-      button.appendChild(document.createTextNode(tab.label));
-      button.title = tab.label;
-      button.disabled = !tab.enabled;
-      button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
-      button.addEventListener("click", () => {
-        if (!tab.enabled || !tabState) return;
-        tabState = { ...tabState, selectedSeatId: tab.seatId };
-        restartAiStrategyToastTimer();
-        renderCommanderMessageTabs();
-      });
-      list.append(button);
-    }
-    host.append(list);
-    const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
-    if (!selected?.enabled) return;
-    const sections = buildAiStrategyToastSections({ messages: selected.messages, strategy: selected.strategy });
-    const absence = selected.fromAbsence ? selected.message : null;
-    if (sections.length === 0 && !absence) return;
-    const panel = document.createElement("div");
-    panel.setAttribute("role", "tabpanel");
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    for (const section of sections) {
-      appendMapToastSectionHeader(panel, section.title);
-      if (section.bullets && section.bullets.length > 0) {
-        for (const bullet of dispatchMessagesInSideOrder(section.bullets, (seatId) => seatOrder(seats, seatId))) {
-          const item = document.createElement("div");
-          item.className = "commander-message-line";
-          const label = seatName2(seats, bullet.toSeatId);
-          item.appendChild(document.createTextNode(`${SIDE_MESSAGE_ARROW} `));
-          const flag = createMessagePartyFlag(bullet.toSeatId, seats);
-          if (flag) item.appendChild(flag);
-          const words = document.createElement("span");
-          setSideCodeText(words, { prefix: `${label}: `, rawText: bullet.text, seats, rawTooltip: true });
-          item.appendChild(words);
-          panel.appendChild(item);
-        }
-      } else {
-        const span = document.createElement("span");
-        span.className = "commander-message-body";
-        setSideCodeText(span, { prefix: "", rawText: section.body, seats, rawTooltip: true });
-        panel.append(span);
-      }
-    }
-    if (absence) {
-      const span = document.createElement("span");
-      span.style.display = "block";
-      span.textContent = absence;
-      panel.append(span);
-    }
-    host.append(panel);
-  }
-  function seatOrder(seats, seatId) {
-    return seats.find((seat) => seat.seatId === seatId)?.seatOrder ?? Number.MAX_SAFE_INTEGER;
-  }
-  function seatName2(seats, seatId) {
-    const seat = seats.find((row) => row.seatId === seatId);
-    return seat ? sideDisplayName(seat) : seatId;
-  }
-  function strategyToastHidden() {
-    const toast = document.getElementById("ai-strategy-toast");
-    return !(toast instanceof HTMLElement) || toast.classList.contains("hidden");
-  }
-
-  // src/renderer/replay/replayDialogs.ts
-  async function showReplayUpdateDialog(view2, replayView, deps) {
-    const result = view2.resolution;
-    const plan = planResolutionPlayback({
-      readyResult: result,
-      state: view2.snapshot,
-      humanMoves: result.humanMoves ?? [],
-      visibleHexesBeforeTurn: new Set(view2.visibleHexesBefore ?? []),
-      deps
-    });
-    if (!(plan.needsCombatOrMovementAnimation || Boolean(result.tacticalAutoStartH3Index))) return;
-    const killToastFormatter = deps.buildKillToastFormatterBundle(
-      view2.snapshot,
-      result.removedUnits,
-      void 0,
-      result.killLabelUnits
-    );
-    await announceResolutionTurnUpdate(
-      {
-        readySlice: result,
-        visibility: plan.visibility,
-        missileLaunches: plan.visibleMissileLaunches,
-        visibleHexes: plan.visibleHexes,
-        killToastFormatter,
-        reportTag: currentConsoleReportTag(),
-        holdForBattle: false,
-        destroyedParents: [],
-        viewerSeatId: replayView === "player" ? HUMAN_SEAT_ID : null,
-        seats: view2.snapshot.seats ?? [],
-        exploredHexes: new Set(view2.snapshot.exploredHexes ?? [])
-      },
-      {
-        showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }),
-        appendOpenRouterLog: () => {
-        },
-        formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement
-      }
-    );
-  }
-  async function showReplayBeatDialog(view2, replayView, deps) {
-    const result = view2.resolution;
-    const playback = result.tacticalResolutionPlayback;
-    if (!playback || !tacticalPlaybackNeeded(playback)) return;
-    const slice = buildTacticalCommitReadyResultForToast(playback);
-    const battle = result.tacticalBattle ?? view2.snapshot.tacticalBattleSession ?? null;
-    const battleCells = battle?.tacticalChildH3Indexes ?? [];
-    const visibleHexes = /* @__PURE__ */ new Set([...deps.getVisibleHexSet(view2.snapshot), ...battleCells]);
-    const visibility = deriveCombatVisibilityClassification(slice, visibleHexes, reportViewerSeatId());
-    const killToastFormatter = deps.buildKillToastFormatterBundle(
-      view2.snapshot,
-      slice.removedUnits,
-      buildTacticalSubUnitKillLabelOverlay({
-        subUnitsBeforeCommit: view2.subUnitsBefore ?? void 0,
-        subUnitsAfterCommit: view2.snapshot.tacticalBattleSession?.subUnits,
-        removedUnits: slice.removedUnits
-      })
-    );
-    await announceResolutionTurnUpdate(
-      {
-        readySlice: slice,
-        visibility,
-        killToastFormatter,
-        reportTag: currentConsoleReportTag(),
-        extraKills: { killsByMelee: playback.killsByMelee, killsByAirStrike: playback.killsByAirStrike },
-        hexCodeBattle: battle,
-        destroyedParents: [],
-        viewerSeatId: replayView === "player" ? HUMAN_SEAT_ID : null,
-        seats: view2.snapshot.seats ?? [],
-        exploredHexes: /* @__PURE__ */ new Set([...view2.snapshot.exploredHexes ?? [], ...battleCells])
-      },
-      {
-        showMapToast: (message, options) => deps.showMapToast(message, { ...options, skipReport: true }),
-        appendOpenRouterLog: () => {
-        },
-        formatUnknownBattleAnnouncement: deps.formatUnknownBattleAnnouncement
-      }
-    );
-  }
-  async function showReplayStepDialogs(view2, replayView, deps) {
-    hideMapToast();
-    deps.hideAiStrategyToast();
-    if (!replayActive()) return;
-    if (view2.resolution !== null) {
-      if (view2.ref.scope === "tactical") await showReplayBeatDialog(view2, replayView, deps);
-      else await showReplayUpdateDialog(view2, replayView, deps);
-    }
-    if (view2.dispatches.length > 0) showCommanderMessageTabs(view2.dispatches, [], { fromReplay: true });
-  }
-
-  // src/renderer/replay/replayMode.ts
-  var REPLAY_NO_TURNS_REASON = "This match has no recorded turns to replay yet.";
-  var REPLAY_STEP_FAILED_REASON = "That turn could not be loaded.";
-  var boundDeps = null;
-  var savedMarkers = null;
-  var savedBattle = null;
-  var savedSelection = [];
-  function bindReplayDeps(deps) {
-    boundDeps = deps;
-    registerReplayLeaver(leaveReplay);
-  }
-  function requireDeps() {
-    if (boundDeps === null) throw new Error("replay dependencies are not bound");
-    return boundDeps;
-  }
-  function entryDecision() {
-    return replayMayEnter({
-      matchLoaded: (rendererSharedState.gameState?.seats?.length ?? 0) > 0,
-      readyInFlight: rendererSharedState.readyRequestInFlight,
-      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
-      otherModalOpen: blockingDialogIsOpen() || chartsDialogIsOpen(),
-      newGameOpenMidMatch: newGameOverlayIsOpen() && rendererSharedState.gameState?.gameOver !== true
-    });
-  }
-  async function toggleReplay() {
-    if (replayLeaving !== null) {
-      await replayLeaving;
-      return;
-    }
-    if (replayActive()) {
-      await leaveReplay();
-      return;
-    }
-    await enterReplay();
-  }
-  async function enterReplay() {
-    const decision = entryDecision();
-    if (!decision.ok) {
-      if (decision.reason !== null) showMapToast(decision.reason, { isError: false, skipReport: true });
-      return;
-    }
-    const epoch = currentRendererMatchEpoch();
-    let timeline;
-    try {
-      timeline = await window.gameApi.readReplayTimeline();
-    } catch (error) {
-      console.error("readReplayTimeline failed", error);
-      showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
-      return;
-    }
-    if (!rendererMatchEpochCurrent(epoch) || replayActive() || replayLeaving !== null || !entryDecision().ok) return;
-    if (timeline.scope === "tactical" !== (rendererSharedState.tacticalBattleSnapshot != null)) return;
-    if (timeline.steps.length === 0) {
-      showMapToast(REPLAY_NO_TURNS_REASON, { isError: false, skipReport: true });
-      return;
-    }
-    const deps = requireDeps();
-    deps.hideBuildPopup();
-    deps.hideStackCallout();
-    savedSelection = [...rendererSharedState.selectedUnitIds];
-    clearSelectionLikeRightClick(deps.selectionDeps);
-    setAsideLastSeenMarkers();
-    savedBattle = timeline.scope === "tactical" ? copyBattleState() : null;
-    ordersTabWasSelected = selectedConsoleTabId() === ORDERS_TAB_ID2;
-    const last = timeline.steps.length - 1;
-    setReplay({ timeline, index: last, busy: false, matchEpoch: epoch, playing: false, stopRequested: false, session: nextReplaySession() });
-    document.body.dataset.replay = "on";
-    refreshConsoleHeader();
-    syncTacticalExitButtonElementVisibility();
-    try {
-      await showReplayStep(last);
-    } catch (error) {
-      console.error("entering replay could not show the last recorded step", error);
-      showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
-      await leaveReplay();
-    }
-  }
-  async function openReplay() {
-    if (replayLeaving !== null) await replayLeaving;
-    if (replayActive()) return;
-    await enterReplay();
-  }
-  function setAsideLastSeenMarkers() {
-    savedMarkers = {
-      observed: new Map(rendererSharedState.lastObservedEnemyByUnitId),
-      stale: new Map(rendererSharedState.clientStaleEnemyIntelByUnitId),
-      rendered: new Map(rendererSharedState.lastRenderedVisibleEnemyByUnitId)
-    };
-    rendererSharedState.lastObservedEnemyByUnitId.clear();
-    rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
-    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-  }
-  function restoreBattleState() {
-    if (savedBattle === null) return;
-    rendererSharedState.tacticalBattleSnapshot = savedBattle.snapshot;
-    rendererSharedState.tacticalPendingMarches = savedBattle.marches;
-    rendererSharedState.pendingRangedAttacks = savedBattle.rangedAttacks;
-    rendererSharedState.pendingAirStrikes = savedBattle.airStrikes;
-    rendererSharedState.pendingAirDrops = savedBattle.airDrops;
-    rendererSharedState.pendingMissileLaunches = savedBattle.missileLaunches;
-    rendererSharedState.pendingFerryOrders = savedBattle.ferryOrders;
-    rendererSharedState.pendingEmbarkOrders = savedBattle.embarkOrders;
-    savedBattle = null;
-  }
-  function restoreLastSeenMarkers() {
-    if (savedMarkers === null) return;
-    rendererSharedState.lastObservedEnemyByUnitId.clear();
-    rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
-    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-    for (const [key, value] of savedMarkers.observed) rendererSharedState.lastObservedEnemyByUnitId.set(key, value);
-    for (const [key, value] of savedMarkers.stale) rendererSharedState.clientStaleEnemyIntelByUnitId.set(key, value);
-    for (const [key, value] of savedMarkers.rendered) rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(key, value);
-    savedMarkers = null;
-  }
-  function restoreSelection(unitIds) {
-    if (unitIds.length === 0) return;
-    replaceSelection([...unitIds]);
-    const { updateSidebar: updateSidebar3, updateRangedSidebar: updateRangedSidebar4, redraw: redraw2 } = requireDeps().selectionDeps;
-    updateSidebar3();
-    updateRangedSidebar4();
-    redraw2();
-  }
-  function replayReadyDeps() {
-    return requireDeps().readyDeps();
-  }
-  async function loadReplayStep(index) {
-    const state = currentReplay();
-    const ref = state?.timeline.steps[index];
-    if (!state || state.busy || !ref) return null;
-    setReplay({ ...state, busy: true });
-    let view2 = null;
-    try {
-      view2 = await window.gameApi.readReplayStep({ recordId: ref.recordId });
-    } catch (error) {
-      console.error("readReplayStep failed", error);
-    }
-    const waiting = currentReplay();
-    if (!waiting || waiting.session !== state.session) return null;
-    setReplay({ ...waiting, busy: false });
-    if (!rendererMatchEpochCurrent(state.matchEpoch)) return null;
-    if (!view2) showMapToast(REPLAY_STEP_FAILED_REASON, { isError: false, skipReport: true });
-    return view2;
-  }
-  async function presentReplayStep(index, view2, options) {
-    const state = currentReplay();
-    if (!state) return;
-    setReplay({ ...state, busy: true });
-    let shown = false;
-    try {
-      await requireDeps().readyDeps().applyGameStateSnapshot(view2.snapshot, {
-        refreshStandingOrders: false,
-        updateGameStateSidebarUi: true,
-        updateSelectionUi: false,
-        updateGameOverUi: false,
-        updateReadyButton: true,
-        refreshBuildPopup: false,
-        redraw: !options.forPlayback,
-        replay: "step"
-      });
-      if (options.showDialogs) await showReplayStepDialogs(view2, state.timeline.view, requireDeps().readyDeps());
-      shown = true;
-    } finally {
-      const applied = currentReplay();
-      if (applied && applied.session === state.session) setReplay({ ...applied, ...shown ? { index } : {}, busy: false });
-    }
-  }
-  async function showReplayStep(index) {
-    if (currentReplay()?.playing) return;
-    const view2 = await loadReplayStep(index);
-    if (!view2) return;
-    await presentReplayStep(index, view2, { forPlayback: false, showDialogs: true });
-    if (replayLeaving === null) frameReplayStepIfFollowing();
-  }
-  var ORDERS_TAB_ID2 = "console-tab-orders";
-  var ordersTabWasSelected = false;
-  var replayLeaving = null;
-  function replayIsLeaving() {
-    return replayLeaving !== null;
-  }
-  function leaveReplay() {
-    if (replayLeaving !== null) return replayLeaving;
-    const leaving = runLeaveReplay().finally(() => {
-      replayLeaving = null;
-      setReplayLeaveRunning(false);
-    });
-    replayLeaving = leaving;
-    setReplayLeaveRunning(true);
-    return leaving;
-  }
-  function abandonReplayForNewMatch() {
-    if (!replayActive()) return;
-    clearResolutionPlaybackAnimationState();
-    abandonReplay();
-    savedSelection = [];
-    ordersTabWasSelected = false;
-    refreshConsoleHeader();
-    syncTacticalExitButtonElementVisibility();
-  }
-  async function runLeaveReplay() {
-    let state = currentReplay();
-    if (state?.playing) {
-      setReplay({ ...state, playing: false, stopRequested: true });
-      clearResolutionPlaybackAnimationState();
-    }
-    if (state?.busy || state?.playing) {
-      await waitForStepToSettle();
-      state = currentReplay();
-    }
-    if (!state) return;
-    if (rendererMatchEpochCurrent(state.matchEpoch)) {
-      try {
-        await showReplayStep(state.timeline.steps.length - 1);
-      } catch (error) {
-        console.error("leaving replay could not show the last recorded step", error);
-      }
-    }
-    if (!replayActive()) return;
-    setReplay(null);
-    delete document.body.dataset.replay;
-    restoreLastSeenMarkers();
-    restoreBattleState();
-    const selection = savedSelection;
-    savedSelection = [];
-    try {
-      const live = await fetchMatchSnapshot();
-      await requireDeps().readyDeps().applyGameStateSnapshot(live, {
-        refreshStandingOrders: true,
-        updateGameStateSidebarUi: true,
-        updateSelectionUi: true,
-        updateGameOverUi: false,
-        updateReadyButton: true,
-        refreshBuildPopup: false,
-        redraw: true,
-        replay: "leave"
-      });
-    } catch (error) {
-      console.error("leaving replay could not read the live match", error);
-    }
-    restoreSelection(selection);
-    refreshConsoleHeader();
-    syncTacticalExitButtonElementVisibility();
-    if (ordersTabWasSelected) selectConsoleTabKeepingCollapse(ORDERS_TAB_ID2);
-    ordersTabWasSelected = false;
-    syncChatPanelVisibility();
-    void maybeObserveAutoAdvance();
-  }
-
-  // src/renderer/gameplay/newGame.ts
-  function registerRegionRandomizeButtons() {
-    document.getElementById("new-game-start-month-randomize")?.addEventListener("click", () => {
-      randomizeNewGameStartMonth();
-      repaintNewGameMapPreview();
-    });
-    document.getElementById("new-game-start-month")?.addEventListener("change", () => {
-      repaintNewGameMapPreview();
-    });
-    document.getElementById("new-game-weather-bonus-select")?.addEventListener("change", () => {
-      repaintNewGameMapPreview();
-    });
-    document.getElementById("new-game-tech-bonus-select")?.addEventListener("change", () => {
-      repaintNewGameMapPreview();
-    });
-  }
-  function stopMatchWaitingUnderNewGame() {
-    if (!isMatchWaitingUnderNewGame()) return;
-    forgetMatchUnderNewGame();
-    void stopOpponentPlanning("new_game");
-    clearResolutionPlaybackAnimationState();
-    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
-      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
-    }
-    rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-    rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-    rendererSharedState.readyRequestInFlight = false;
-  }
-  function registerNewGameButton(deps) {
-    document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
-      toggleNewGameDialogCollapsed();
-    });
-    wireNewGameDialogMove();
-    document.getElementById("new-game-dialog-close")?.addEventListener("click", () => {
-      closeNewGameOverlayToMatch(deps);
-    });
-    registerRegionRandomizeButtons();
-    registerNewGameMapControls();
-    bindNewGameSides();
-    registerGameSizeSelect();
-    wireNewGameOptionsPopover();
-    wireHumanNicknameField();
-    document.getElementById("new-game-btn")?.addEventListener("click", async () => {
-      const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
-      if (!window.gameApi?.newGame) return;
-      const seatsStart = readNewGameSeatsStart();
-      if (seatsStart.blocked) {
-        showMapToast(seatsStart.blocked);
-        return;
-      }
-      if (!newGameHasAnyModel()) {
-        closeCommanderPopover();
-        closeNewGameOptionsPopover();
-        const startAnyway = await confirmStartWithNoModels();
-        if (!startAnyway) return;
-      }
-      const matchEpoch = advanceRendererMatchEpoch();
-      abandonReplayForNewMatch();
-      stopMatchWaitingUnderNewGame();
-      const cameraHold = holdNewGameMapPreviewCamera();
-      try {
-        const humanNickname = readHumanNicknameForStart();
-        const state = await window.gameApi.newGame({
-          ...readNewGameOptionChoices(),
-          startMonth: readNewGameStartMonth(),
-          ...readNewGameMapChoice(),
-          seats: seatsStart.seats,
-          turnLimit: seatsStart.turnLimit,
-          victoryRule: seatsStart.victoryRule,
-          aiOnlyBattles: seatsStart.aiOnlyBattles,
-          aiOnlyBeatLimit: seatsStart.aiOnlyBeatLimit,
-          sightCues: seatsStart.sightCues,
-          gameSize: readSelectedGameSizeFromDocument(),
-          ...humanNickname === void 0 ? {} : { humanNickname }
-        });
-        if (!rendererMatchEpochCurrent(matchEpoch)) return;
-        abandonReplayForNewMatch();
-        installRendererGameMap(state);
-        await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
-        rendererSharedState.gameState = state;
-        void refreshChatThread();
-        rendererSharedState.strategicScenarioInitialLeafletView = null;
-        tacticalReleaseRendererSessionForNewStrategicMatch(state);
-        clearObserveAfterKnockout();
-        clearRememberedUnitOrigins();
-        deps.rebuildUnitDisplayNameLookup(state);
-        deps.reconcileSelectionToCurrentState();
-        rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
-        rendererSharedState.lastObservedEnemyByUnitId.clear();
-        rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-        deps.updateClientStaleEnemyIntel(null, state);
-        rendererSharedState.initialCameraApplied = false;
-        deps.updateGameOverUI(state);
-        syncMapExtentToSnapshot(state, { refit: true });
-        if (state.hexes.length > 0) {
-          deps.applyInitialCameraForState(state);
-        }
-        deps.clearStrategicTooltipSummaryCaches();
-        rendererSharedState.humanStandingOrders = [];
-        rendererSharedState.hoverRoutePreview = null;
-        deps.clearPendingTacticalOrders();
-        discardStrategicOrderUiStash();
-        rendererSharedState.selectedUnitIds = [];
-        rendererSharedState.selectedUnitIdsAtMouseDown = [];
-        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
-        rendererSharedState.selectedHexIndex = null;
-        deps.hideStackCallout();
-        rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-        rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-        clearOpenRouterLog();
-        await readCommanderPoolAndApply(false);
-        hideAiStrategyToast();
-        clearConsoleReports();
-        deps.updateOpenRouterCostLabel();
-        deps.updateGameStateSidebar(state);
-        await deps.refreshHumanStandingOrders();
-        deps.updatePendingOrdersSidebar();
-        deps.updateRangedSidebar();
-        deps.updateSidebar();
-        await applyStartMatchAiChoice(startMatchAi, {
-          startPlanning: () => deps.startBackgroundRequestIfAllowed(),
-          updateReadyButtonState: () => deps.updateReadyButtonState()
-        });
-        await syncOpenRouterRunToggle();
-        deps.resizeAndRedraw();
-      } catch (err) {
-        console.error("newGame failed:", err);
-        showMapToast("The new game did not start. This screen stays open.");
-        if (releaseNewGameMapPreviewCamera(cameraHold)) void refreshNewGameMapPreview();
-      }
-    });
-  }
-  function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return false;
-    if (rendererSharedState.readyRequestInFlight) return false;
-    const overlay = document.getElementById("game-over-overlay");
-    const newGameBtn = document.getElementById("new-game-btn");
-    const opened = overlay?.classList.contains("hidden") === true;
-    if (opened && rendererSharedState.gameState && rendererSharedState.gameState.hexes.length > 0 && !rendererSharedState.gameState.gameOver) {
-      holdMatchUnderNewGame();
-      advanceRendererMatchEpoch();
-    }
-    hideGameOverStandings();
-    showNewGameBanner("newGame", selectedNewGameTab());
-    if (newGameBtn) {
-      newGameBtn.textContent = "Start game";
-      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
-    }
-    closeMatchOptionsDialogIfOpen();
-    resetNewGameOptionControls();
-    void (async () => {
-      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
-      refreshNewGameSides({ reset: true });
-      await refreshNewGameMapPreview();
-    })();
-    syncGameSizeCapPreview();
-    overlay?.classList.remove("hidden");
-    expandNewGameDialog();
-    if (opened) scrollNewGameDialogToTop();
-    placeNewGameDialogAtInset();
-    blurMapChromeIfFocused();
-    resetNewGameMapPreviewFrame();
-    repaintNewGameMapPreview();
-    setMainUIControlsEnabled2(false);
-    updateReadyButtonState2();
-    return opened;
-  }
-  async function refreshHumanStandingOrders2() {
-    if (!window.gameApi?.listHumanStandingOrders) {
-      rendererSharedState.humanStandingOrders = [];
-      return;
-    }
-    try {
-      rendererSharedState.humanStandingOrders = await window.gameApi.listHumanStandingOrders();
-    } catch {
-      rendererSharedState.humanStandingOrders = [];
-    }
-  }
-
-  // src/shared/tacticalStateAssertions.ts
-  function tacticalBoundaryPlanningExitAllowed(tacticalSnapshot, tacticalPhasePlanning) {
-    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_exit" };
-    return { ok: true };
-  }
-
-  // src/shared/tacticalAnnihilation.ts
-  function getTacticalAnnihilationOutcome(subUnits) {
-    let human = 0;
-    let opponent = 0;
-    for (const u of subUnits) {
-      if (u.player === HUMAN_SEAT_ID) human += 1;
-      else opponent += 1;
-    }
-    if (human > 0 && opponent > 0) return null;
-    if (human > 0 && opponent === 0) return "human_win";
-    if (human === 0 && opponent > 0) return "human_loss";
-    return "mutual";
-  }
-  function getTwoPartyAnnihilationOutcome(subUnits, partyA, partyB) {
-    let countA = 0;
-    let countB = 0;
-    for (const unit of subUnits) {
-      if (unit.player === partyA) countA += 1;
-      else if (unit.player === partyB) countB += 1;
-    }
-    if (countA > 0 && countB > 0) return null;
-    if (countA > 0) return partyA;
-    if (countB > 0) return partyB;
-    return "mutual";
-  }
-
-  // src/renderer/tactical/tacticalExitFlow.ts
-  var aiOnlyExitStarted = false;
-  function tacticalMaybeScheduleAnnihilationExit(session, io) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
-    const snap = session.getBattleSnapshot();
-    if (!snap || !session.getPhasePlanning()) return;
-    if (snap.leadPartyId != null) {
-      if (snap.aiOnlyEndReason == null) {
-        aiOnlyExitStarted = false;
-        return;
-      }
-      if (rendererSharedState.resolutionMoveAnimation) return;
-      const sentence = aiOnlyResultSentence(snap);
-      if (sentence == null) return;
-      const presentation = aiOnlyBattleEndPresentation(snap.aiOnlyEndReason, rendererSharedState.autoAdvance);
-      if (presentation === "leave_now") {
-        if (aiOnlyExitStarted) return;
-        aiOnlyExitStarted = true;
-        void leaveAiOnlyBattle(session, io, true);
-        return;
-      }
-      if (presentation === "timed_dialog") {
-        openAiOnlyBattleResultDialog(sentence, aiOnlyTimedResultOkTooltipText);
-        if (io.finishTimedAiOnlyResult) scheduleAiOnlyResultAutoClose(io.finishTimedAiOnlyResult);
-        io.redraw();
-        return;
-      }
-      openAiOnlyBattleResultDialog(sentence);
-      io.redraw();
-      return;
-    }
-    const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
-    if (outcome === null) return;
-    openTacticalAnnihilationOutcomeDialog(outcome);
-    io.redraw();
-  }
-  function aiOnlyResultSentence(snap) {
-    if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
-    if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
-    if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
-    if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
-    if (snap.aiOnlyEndReason === "beat_limit") return formatAiOnlyBeatLimitSentence(snap.tacticalTurnNumber - 1);
-    const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
-    if (winner == null || winner === "mutual") return "All units destroyed.";
-    const winnerSeat = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner);
-    return `${winnerSeat ? sideDisplayName(winnerSeat) : winner} wins the battle.`;
-  }
-  async function leaveAiOnlyBattle(session, io, autoAdvance) {
-    await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {
-    } });
-    if (session.getBattleSnapshot() != null) return;
-    rendererSharedState.aiOnlyBattleResultSentence = null;
-    const waitingHoldId = waitingHeldBattleTurnUpdateId();
-    if (autoAdvance) await maybeObserveAutoAdvance();
-    if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
-      await showHeldBattleTurnUpdate(true);
-    }
-  }
-  async function tacticalPerformBattleExit(session, io) {
-    const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
-    if (!boundary.ok) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    invalidateBackgroundAiRequest();
-    try {
-      if (io.endTacticalBattle) {
-        const ended = await io.endTacticalBattle();
-        attachDestroyedBattleParents(destroyedParentsFromEnd(ended));
-      }
-    } catch (err) {
-      console.error("endTacticalBattle failed:", err);
-      if (!rendererMatchEpochCurrent(matchEpoch)) return;
-      io.showMapToast("Could not exit tactical battle.", { isError: true });
-      return;
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    tacticalBattleExitTeardownTransientRendererState();
-    session.setBattleSnapshot(null);
-    clearAutomaticBattleFrameMemory();
-    closeTacticalAnnihilationOutcomeDialog();
-    session.setPhasePlanning(true);
-    exitTacticalMapView();
-    tacticalApplyStrategicSidebarForTacticalMode(false);
-    const tel = document.getElementById("tactical-entry-layer");
-    if (tel) hideTacticalEntryLayer(tel, false);
-    tacticalUpdateExitButtonVisibility();
-    try {
-      await io.refreshStrategicSnapshotAfterExit?.();
-    } catch (err) {
-      console.error("refreshStrategicSnapshotAfterExit failed:", err);
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    updateGameStateSidebar(rendererSharedState.gameState);
-    restoreStrategicOrderDraftsAfterTacticalSession();
-    io.refreshSidebarAfterTacticalDraftTeardown?.();
-    io.redraw();
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    frameAutomaticStrategicUnits();
-    await io.runReadyAfterExit();
-  }
-  function destroyedParentsFromEnd(ended) {
-    if (!ended || typeof ended !== "object" || !("destroyedParents" in ended)) return [];
-    const parents = ended.destroyedParents;
-    return Array.isArray(parents) ? parents : [];
-  }
-
-  // src/renderer/tactical/tacticalIpcHandlers.ts
-  function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned() {
-    const interruptedStrategicPlayback = rendererSharedState.resolutionMoveAnimation !== null || rendererSharedState.resolutionMoveAnimationFrameId !== null;
-    if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
-      cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
-    }
-    rendererSharedState.resolutionMoveAnimationFrameId = null;
-    rendererSharedState.resolutionMoveAnimation = null;
-    syncChatPanelVisibility();
-    if (interruptedStrategicPlayback) {
-      flushResolutionPlaybackCompleteNotifyCallbacks();
-    }
-    reconcileSelectionToCurrentState();
-    rendererSharedState.hoverRoutePreview = null;
-    rendererSharedState.hoverPreviewRequestSeq++;
-    rendererSharedState.hoveredHexH3 = null;
-    rendererSharedState.hoveredDetailHexH3 = null;
-    rendererSharedState.selectedUnitIdsAtMouseDown = [];
-    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
-    rendererSharedState.hideCommittedOrderLinesAfterReady = false;
-  }
-  function tacticalRendererApplyStartBattleIpcResult(result, fx) {
-    if (!result.success || !result.battle) {
-      fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
-      return;
-    }
-    stashStrategicOrderDraftsForTacticalSession();
-    fx.assignBattleSnapshot(result.battle);
-    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
-    fx.setPhasePlanning(true);
-    const skipped = result.skippedParentDisplayNames;
-    if (skipped && skipped.length > 0) {
-      fx.showMapToast(`Some units could not be placed tactically: ${skipped.join(", ")}.`, { isError: true });
-    }
-    fx.enterTacticalView(result.battle.tacticalChildH3Indexes);
-    fx.setStrategicSidebarTactical(true);
-    fx.refreshTacticalExitButton();
-    fx.scheduleAnnihilationExit();
-    fx.refreshReadyButton();
-    fx.syncTacticalEntryOverlay();
-    fx.redraw();
-    updateGameStateSidebar(rendererSharedState.gameState);
-    fx.refreshOrderSidebars?.();
-  }
-  function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
-    stashStrategicOrderDraftsForTacticalSession();
-    fx.assignBattleSnapshot(battle);
-    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
-    fx.setPhasePlanning(true);
-    fx.enterTacticalView(battle.tacticalChildH3Indexes);
-    fx.setStrategicSidebarTactical(true);
-    fx.refreshTacticalExitButton();
-    fx.scheduleAnnihilationExit();
-    fx.refreshReadyButton();
-    fx.syncTacticalEntryOverlay();
-    fx.redraw();
-    updateGameStateSidebar(rendererSharedState.gameState);
-    fx.refreshOrderSidebars?.();
-  }
-
-  // src/renderer/tactical/tacticalEntryFlow.ts
-  function buildDefaultTacticalBattleActivationSideEffects(bindings) {
-    return {
-      showMapToast: bindings.showMapToast,
-      assignBattleSnapshot: (battle) => {
-        rendererSharedState.tacticalBattleSnapshot = battle;
-        bindings.rebuildUnitDisplayNameLookup?.();
-      },
-      setPhasePlanning: (planning) => {
-        rendererSharedState.tacticalPhasePlanning = planning;
-      },
-      enterTacticalView: enterTacticalMapView,
-      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-      refreshTacticalExitButton: tacticalUpdateExitButtonVisibility,
-      scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
-      refreshReadyButton: bindings.refreshReadyButton,
-      syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
-      redraw: bindings.redraw,
-      refreshOrderSidebars: bindings.refreshOrderSidebars
-    };
-  }
-  async function startTacticalBattleFromEntryHex(enclosingStrategicH3Index, deps) {
-    const matchEpoch = currentRendererMatchEpoch();
-    if (deps.prepareStrategicUiBeforeTacticalStart) {
-      await deps.prepareStrategicUiBeforeTacticalStart();
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) {
-      dropHeldBattleTurnUpdate();
-      return;
-    }
-    const resumedSession = rendererSharedState.gameState?.tacticalBattleSession && rendererSharedState.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index && !rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.gameState.tacticalBattleSession : null;
-    if (resumedSession) {
-      deps.hideBuildPopup();
-      activateRestoredTacticalBattleFromMainSnapshot(resumedSession, deps.getActivationSideEffects());
-      return;
-    }
-    const ipc = deps.invokeStartTacticalBattle;
-    if (!ipc) {
-      deps.onMissingStartTacticalBattleIpc();
-      await showHeldBattleTurnUpdate(true);
-      return;
-    }
-    deps.hideBuildPopup();
-    let result;
-    try {
-      result = await ipc({ enclosingStrategicH3Index });
-    } catch (err) {
-      console.error("startTacticalBattle failed", err);
-      await showHeldBattleTurnUpdate(true);
-      return;
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) {
-      dropHeldBattleTurnUpdate();
-      return;
-    }
-    tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
-    if (!result.success || !result.battle) await showHeldBattleTurnUpdate(true);
-  }
-  function activateRestoredTacticalBattleFromMainSnapshot(battle, getActivationSideEffects) {
-    tacticalRendererActivateRestoredBattleSnapshot(battle, getActivationSideEffects());
-  }
-  async function performTacticalBattleExitWithGameApi(session, io) {
-    const waitingHoldId = waitingHeldBattleTurnUpdateId();
-    await tacticalPerformBattleExit(session, {
-      ...io,
-      endTacticalBattle: window.gameApi?.endTacticalBattle
-    });
-    if (session.getBattleSnapshot() != null) return;
-    if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
-      await showHeldBattleTurnUpdate(true);
-    }
-  }
-
-  // src/shared/buildQueueItemLabels.ts
-  function formatBuildQueueItemLabel(item) {
-    if (item === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_QUEUE_ITEM_LABEL;
-    if (item === CREDITS_QUEUE_ITEM) return CREDITS_QUEUE_ITEM_LABEL;
-    return item.charAt(0).toUpperCase() + item.slice(1);
-  }
-
-  // src/renderer/gameplay/buildQueuePopupFormatting.ts
-  function sanitizeBuildCountInputText(raw) {
-    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
-    if (digitsOnly.length === 0) return "1";
-    const parsed = parseInt(digitsOnly, 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
-    if (parsed > 99) return "99";
-    return String(parsed);
-  }
-  function escapeBuildPopupHtml(text) {
-    return escapeHtmlText(text);
-  }
-  function createBuildPopupCloseRow(onClose) {
-    const closeRow = document.createElement("div");
-    closeRow.className = "build-popup-close-row";
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.className = "unit-select build-close-btn";
-    closeBtn.textContent = "\xD7";
-    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
-    closeBtn.addEventListener("click", () => onClose());
-    closeRow.appendChild(closeBtn);
-    return closeRow;
-  }
-  function createBuildCountInput(tooltipText, initialValue) {
-    const countInput = document.createElement("input");
-    countInput.setAttribute("data-control-tooltip", tooltipText);
-    countInput.type = "text";
-    countInput.className = "build-count-input";
-    countInput.maxLength = 2;
-    countInput.inputMode = "numeric";
-    countInput.value = initialValue;
-    countInput.addEventListener("keydown", (event) => {
-      const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
-      if (allowed.includes(event.key)) return;
-      if (/^\d$/.test(event.key)) return;
-      event.preventDefault();
-    });
-    return countInput;
-  }
-  function readSanitizedBuildCount(input) {
-    const raw = sanitizeBuildCountInputText(input.value);
-    if (input.value !== raw) input.value = raw;
-    return parseInt(raw, 10);
-  }
-  function createQueuePausedNote(text) {
-    const note2 = document.createElement("div");
-    note2.className = "build-no-urban";
-    note2.textContent = text;
-    return note2;
-  }
-
-  // src/renderer/gameplay/buildQueueMultiSelect.ts
-  var nextBuildQueueTemplateRowKey = 1;
-  function createBuildQueueTemplateRow(unitType, count) {
-    return { rowKey: nextBuildQueueTemplateRowKey++, unitType, count };
-  }
-  function toBuildQueueTemplateEntries(template) {
-    return template.map(({ unitType, count }) => ({ unitType, count }));
-  }
-  function formatSelectedBuildHexCodesHtml(h3Indexes) {
-    const labels = h3Indexes.map(
-      (h3Index) => `<strong>${escapeBuildPopupHtml(`(${getStrategicHexCode(h3Index) ?? h3Index})`)}</strong>`
-    );
-    const suffix = ` (${h3Indexes.length} ${h3Indexes.length === 1 ? "hex" : "hexes"})`;
-    if (labels.length <= 1) return `${labels[0] ?? ""}${suffix}`;
-    if (labels.length === 2) return `${labels[0]} and ${labels[1]}${suffix}`;
-    return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}${suffix}`;
-  }
-  function buildQueueTemplateFromSnapshot(snapshot3) {
-    return snapshot3.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
-  }
-  function unionAvailableBuildUnitTypes(snapshots) {
-    const available = new Set(snapshots.flatMap((snapshot3) => snapshot3.availableUnitTypes));
-    return ALL_BUILD_QUEUE_ITEM_TYPES.filter((unitType) => available.has(unitType));
-  }
-  function countEligibleBuildHexes(snapshots, unitType) {
-    return snapshots.filter((snapshot3) => snapshot3.availableUnitTypes.includes(unitType)).length;
-  }
-  function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
-    const typeLabel = formatBuildQueueItemLabel(unitType);
-    if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
-      return `${typeLabel} (all hexes)`;
-    }
-    if (eligibleCount === 1) return `${typeLabel} (1 hex)`;
-    return `${typeLabel} (${Math.max(0, eligibleCount)} hexes)`;
-  }
-  function filterTemplateForBuildHex(template, snapshot3) {
-    const available = new Set(snapshot3.availableUnitTypes);
-    return template.filter((entry) => available.has(entry.unitType));
-  }
-  function templateEntriesForTurnEstimate(template) {
-    return template.map((entry, queueIndex) => ({
-      id: queueIndex + 1,
-      queueIndex,
-      unitType: entry.unitType,
-      count: entry.count
-    }));
-  }
-
-  // src/renderer/gameplay/buildQueueKeepBuilding.ts
-  function canArmKeepBuilding(snapshot3) {
-    return snapshot3.entries.length > 0 || snapshot3.keepBuilding && snapshot3.keepBuildingUnitType !== null;
-  }
-  function areAllKeepBuildingArmed(snapshots) {
-    return snapshots.length > 0 && snapshots.every((snapshot3) => snapshot3.keepBuilding);
-  }
-  function canArmKeepBuildingForAll(snapshots) {
-    return snapshots.length > 0 && snapshots.every((snapshot3) => canArmKeepBuilding(snapshot3));
-  }
-  function appendKeepBuildingCheckbox(args) {
-    const row = document.createElement("div");
-    row.className = "build-keep-building-row";
-    const label = document.createElement("label");
-    label.className = "build-keep-building-label";
-    label.setAttribute("data-control-tooltip", args.tooltipText);
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "build-keep-building-checkbox";
-    checkbox.checked = args.checked;
-    checkbox.disabled = args.disabled;
-    checkbox.addEventListener("change", () => {
-      void args.onChange(checkbox.checked);
-    });
-    const text = document.createElement("span");
-    text.textContent = "Keep building";
-    label.appendChild(checkbox);
-    label.appendChild(text);
-    row.appendChild(label);
-    args.section.appendChild(row);
-  }
-
-  // src/shared/queueItemTooltipText.ts
-  var QUEUE_ITEM_TOOLTIP_TEXT = {
-    infantry: "The cheapest unit. It cannot shoot on the world map, and it can shoot in a battle.",
-    armor: "Costs more than infantry, shoots one hex on the world map, and cannot enter mountains, wetlands, or arctic.",
-    naval: "Needs a seaport, shoots two hexes on the world map, and can carry land units.",
-    air: "Strikes from an airport and does not march. A hex needs an airport to build it.",
-    missile: "Launches once on the world map and is then gone. It cannot fire in a battle.",
-    fortification: "Protects one city cell. It is not a unit, and a hit removes it before a unit.",
-    credits: "Adds 20 credits to the treasury. It is not a unit and does not count toward a unit cap."
-  };
-  function queueItemTooltipText(value) {
-    if (!isBuildQueueItemType(value)) return null;
-    return QUEUE_ITEM_TOOLTIP_TEXT[value];
-  }
-
-  // src/renderer/chrome/syncQueueItemSelectTooltip.ts
-  function syncQueueItemSelectTooltip(select, emptyText) {
-    select.setAttribute("data-control-tooltip", queueItemTooltipText(select.value) ?? emptyText);
-  }
-
-  // src/renderer/gameplay/buildQueueMultiPopup.ts
-  async function loadSelectedBuildSnapshots(h3Indexes) {
-    if (!window.gameApi?.getHexBuildQueue) return [];
-    const snapshots = await Promise.all(
-      h3Indexes.map(async (h3Index) => {
-        try {
-          return await window.gameApi.getHexBuildQueue({ h3Index });
-        } catch (err) {
-          console.error("getHexBuildQueue failed:", { h3Index, err });
-          return null;
-        }
-      })
-    );
-    return snapshots.filter((snapshot3) => snapshot3 !== null);
-  }
-  function copyBuildQueueTemplate(template) {
-    return template.map((row) => ({ ...row }));
-  }
-  async function restoreTemplateAfterFailedApply(applyResult, previousTemplate, liveTemplate) {
-    if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
-    if (applyResult.ok) return true;
-    if (!applyResult.anyHexWritten) {
-      rendererSharedState.buildQueueTemplate = previousTemplate;
-      return true;
-    }
-    const seedHex = rendererSharedState.selectedBuildHexH3s[0];
-    const snapshots = seedHex ? await loadSelectedBuildSnapshots([seedHex]) : [];
-    if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
-    const snapshot3 = snapshots[0];
-    rendererSharedState.buildQueueTemplate = snapshot3 ? buildQueueTemplateFromSnapshot(snapshot3) : previousTemplate;
-    return true;
-  }
-  async function commitEditedTemplate(deps, nextTemplate) {
-    const previousTemplate = copyBuildQueueTemplate(rendererSharedState.buildQueueTemplate);
-    rendererSharedState.buildQueueTemplate = nextTemplate;
-    const applyResult = await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
-    const stillCurrent = await restoreTemplateAfterFailedApply(
-      applyResult,
-      previousTemplate,
-      nextTemplate
-    );
-    if (!stillCurrent) return;
-    void renderMultiBuildQueueIntoMount(deps);
-  }
-  function formatMultiQueueSummary(snapshots) {
-    if (rendererSharedState.buildQueueTemplate.length === 0) return "<strong>Queue:</strong> (none)";
-    const queueTotalCost = sumQueuedProductionCost(rendererSharedState.buildQueueTemplate);
-    const turns = snapshots.map(
-      (snapshot3) => estimateTurnsToCompleteQueuedProduction(
-        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot3)),
-        snapshot3.storedPoints,
-        snapshot3.urbanHexCount
-      )
-    );
-    const numericTurns = turns.filter((turn) => turn !== null);
-    if (numericTurns.length !== turns.length) {
-      return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ? turns`;
-    }
-    const minimum = Math.min(...numericTurns);
-    const maximum = Math.max(...numericTurns);
-    const turnsDisplay = minimum === maximum ? String(minimum) : `${minimum}\u2013${maximum}`;
-    const turnLabel = minimum === 1 && maximum === 1 ? "turn" : "turns";
-    return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${turnsDisplay} ${turnLabel}`;
-  }
-  function buildQueueEditBlockedByPlayback() {
-    return resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation);
-  }
-  async function renderMultiBuildQueueIntoMount(deps) {
-    const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
-    const selectedH3Indexes = [...rendererSharedState.selectedBuildHexH3s];
-    const selectionSignature = selectedH3Indexes.join("|");
-    const snapshots = await loadSelectedBuildSnapshots(selectedH3Indexes);
-    if (requestSeq !== rendererSharedState.buildPopupRequestSeq || rendererSharedState.buildPopupHexH3 !== deps.h3Index || rendererSharedState.selectedBuildHexH3s.join("|") !== selectionSignature) {
-      return;
-    }
-    if (snapshots.length !== selectedH3Indexes.length) {
-      console.error("renderMultiBuildQueueIntoMount: incomplete snapshot load", {
-        selectedCount: selectedH3Indexes.length,
-        loadedCount: snapshots.length
-      });
-      deps.mount.innerHTML = "";
-      deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
-      const errorLine = document.createElement("div");
-      errorLine.className = "build-no-urban";
-      errorLine.textContent = "Failed to load build queues for the selected hexes.";
-      deps.mount.appendChild(errorLine);
-      placeOpenBuildPopup();
-      return;
-    }
-    deps.mount.innerHTML = "";
-    deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
-    const section = document.createElement("div");
-    section.className = "build-queue-section";
-    const descriptionLine = document.createElement("div");
-    descriptionLine.innerHTML = formatSelectedBuildHexCodesHtml(selectedH3Indexes);
-    section.appendChild(descriptionLine);
-    const descriptionSpacer = document.createElement("div");
-    descriptionSpacer.style.height = "0.5em";
-    section.appendChild(descriptionSpacer);
-    const techLineHtml = formatSelectedHexTechLineHtml({
-      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
-      baselineUrbanHexCounts: selectedH3Indexes.map((h3Index) => baselineUrbanHexCountForStrategicHex(h3Index))
-    });
-    if (techLineHtml) {
-      const techLine = document.createElement("div");
-      techLine.innerHTML = techLineHtml;
-      section.appendChild(techLine);
-      const techSpacer = document.createElement("div");
-      techSpacer.style.height = "0.5em";
-      section.appendChild(techSpacer);
-    }
-    const totalProduction = snapshots.reduce((sum, snapshot3) => sum + snapshot3.urbanHexCount, 0);
-    const pointsLine = document.createElement("div");
-    pointsLine.innerHTML = `<strong>Production:</strong> ${formatProductionCapacityAmount(totalProduction.toLocaleString())} / turn`;
-    section.appendChild(pointsLine);
-    const productionQueueSpacer = document.createElement("div");
-    productionQueueSpacer.style.height = "0.5em";
-    section.appendChild(productionQueueSpacer);
-    const queueSummaryLine = document.createElement("div");
-    queueSummaryLine.innerHTML = formatMultiQueueSummary(snapshots);
-    section.appendChild(queueSummaryLine);
-    const productionSpacer = document.createElement("div");
-    productionSpacer.style.height = "0.5em";
-    section.appendChild(productionSpacer);
-    const unionTypes = unionAvailableBuildUnitTypes(snapshots);
-    const head2 = document.createElement("div");
-    head2.className = "build-queue-head";
-    const title = document.createElement("span");
-    title.className = "build-queue-title";
-    title.textContent = "Build Queue";
-    const buildBtn = document.createElement("button");
-    buildBtn.type = "button";
-    buildBtn.className = "unit-select stack-unit-toggle";
-    buildBtn.textContent = UNIT_SELECT_GLYPH;
-    buildBtn.setAttribute("data-control-tooltip", multiBuildAddTooltipText);
-    buildBtn.addEventListener("click", async () => {
-      if (buildQueueEditBlockedByPlayback()) return;
-      const defaultUnitType = unionTypes[0];
-      if (!defaultUnitType) return;
-      await commitEditedTemplate(deps, [
-        ...rendererSharedState.buildQueueTemplate,
-        createBuildQueueTemplateRow(defaultUnitType, 1)
-      ]);
-    });
-    head2.appendChild(title);
-    head2.appendChild(buildBtn);
-    section.appendChild(head2);
-    const list = document.createElement("div");
-    list.className = "build-queue-list";
-    rendererSharedState.buildQueueTemplate.forEach((entry) => {
-      const rowKey = entry.rowKey;
-      const row = document.createElement("div");
-      row.className = "build-queue-row";
-      const typeSelect = document.createElement("select");
-      const rowTypes = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
-        (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
-      );
-      for (const unitType of rowTypes) {
-        const eligibleCount = countEligibleBuildHexes(snapshots, unitType);
-        const opt = document.createElement("option");
-        opt.value = unitType;
-        opt.textContent = formatBuildUnitTypeOptionLabel(unitType, eligibleCount, snapshots.length);
-        typeSelect.appendChild(opt);
-      }
-      typeSelect.value = entry.unitType;
-      syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
-      row.appendChild(typeSelect);
-      const countInput = createBuildCountInput(multiBuildCountTooltipText, String(entry.count));
-      row.appendChild(countInput);
-      typeSelect.addEventListener("change", async () => {
-        syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
-        if (buildQueueEditBlockedByPlayback()) {
-          void renderMultiBuildQueueIntoMount(deps);
-          return;
-        }
-        const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
-        if (entryIndex < 0) return;
-        const updated = [...rendererSharedState.buildQueueTemplate];
-        updated[entryIndex] = {
-          rowKey,
-          unitType: typeSelect.value,
-          count: readSanitizedBuildCount(countInput)
-        };
-        await commitEditedTemplate(deps, updated);
-      });
-      countInput.addEventListener("input", async () => {
-        if (buildQueueEditBlockedByPlayback()) {
-          void renderMultiBuildQueueIntoMount(deps);
-          return;
-        }
-        const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
-        if (entryIndex < 0) return;
-        const updated = [...rendererSharedState.buildQueueTemplate];
-        updated[entryIndex] = {
-          rowKey,
-          unitType: typeSelect.value,
-          count: readSanitizedBuildCount(countInput)
-        };
-        await commitEditedTemplate(deps, updated);
-      });
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "unit-select";
-      removeBtn.textContent = "x";
-      removeBtn.setAttribute("data-control-tooltip", multiHexQueueRemoveTooltipText);
-      removeBtn.addEventListener("click", async () => {
-        if (buildQueueEditBlockedByPlayback()) return;
-        await commitEditedTemplate(
-          deps,
-          rendererSharedState.buildQueueTemplate.filter((row2) => row2.rowKey !== rowKey)
-        );
-      });
-      row.appendChild(removeBtn);
-      list.appendChild(row);
-    });
-    section.appendChild(list);
-    appendKeepBuildingCheckbox({
-      section,
-      checked: areAllKeepBuildingArmed(snapshots),
-      disabled: !canArmKeepBuildingForAll(snapshots),
-      tooltipText: multiKeepBuildingTooltipText,
-      onChange: async (keepBuilding) => {
-        if (buildQueueEditBlockedByPlayback()) {
-          void renderMultiBuildQueueIntoMount(deps);
-          return;
-        }
-        await deps.setKeepBuilding(keepBuilding);
-        void renderMultiBuildQueueIntoMount(deps);
-      }
-    });
-    deps.mount.appendChild(section);
-    placeOpenBuildPopup();
-  }
-
-  // src/renderer/gameplay/hirePanel.ts
-  async function fetchHirePanelData(h3Index) {
-    let view2 = null;
-    let caption = null;
-    try {
-      view2 = await window.gameApi?.getHexHireView({ h3Index }) ?? null;
-    } catch (err) {
-      console.error("getHexHireView failed:", err);
-    }
-    try {
-      if (window.gameApi?.getHexNamingTooltipLine) {
-        caption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
-      }
-    } catch (err) {
-      console.error("getHexNamingTooltipLine failed:", err);
-    }
-    return { view: view2, caption };
-  }
-  function renderHirePanel(panel, h3Index, data, deps) {
-    panel.innerHTML = "";
-    panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
-    appendCaption(panel, h3Index, data.caption);
-    appendTechLine(panel, h3Index);
-    const view2 = data.view;
-    if (!view2) {
-      panel.appendChild(note(HIRE_VIEW_FAILED));
-      if (!panel.hidden) placeOpenBuildPopup();
-      return;
-    }
-    appendFunds(panel, view2);
-    if (view2.raiseShortage) appendShortage(panel, view2.raiseShortage);
-    const unavailable = view2.hireAvailable ? null : visibleBlockedReason(view2.unavailableReason);
-    if (unavailable) panel.appendChild(note(unavailable));
-    if (view2.raise) appendRaise(panel, h3Index, view2, deps);
-    else if (!view2.raiseShortage) {
-      const raiseBlocked = visibleBlockedReason(view2.raiseBlockedReason);
-      if (raiseBlocked && raiseBlocked !== unavailable) panel.appendChild(note(raiseBlocked));
-    }
-    if (view2.rehireUnits.length > 0) appendRehires(panel, h3Index, view2, deps);
-    if (view2.pendingOrders.length > 0) appendOrders(panel, h3Index, view2, deps);
-    if (!panel.hidden) placeOpenBuildPopup();
-  }
-  function appendCaption(panel, h3Index, caption) {
-    const strategicCode = getStrategicHexCode(h3Index);
-    const prefix = strategicCode ? `<strong>(${escapeBuildPopupHtml(strategicCode)})</strong> ` : "";
-    const text = caption && caption.text.trim().length > 0 ? `${prefix}${formatHexNamingCaptionHtml(caption)}` : prefix;
-    if (!text) return;
-    const line = document.createElement("div");
-    line.innerHTML = text;
-    panel.append(line, spacer());
-  }
-  function appendTechLine(panel, h3Index) {
-    const techLineHtml = formatProducedUnitTechLineHtml({
-      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
-      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index)
-    });
-    if (!techLineHtml) return;
-    const techLine = document.createElement("div");
-    techLine.innerHTML = techLineHtml;
-    panel.append(techLine, spacer());
-  }
-  function appendFunds(panel, view2) {
-    const raise = view2.raise;
-    if (!raise) return;
-    appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft));
-  }
-  function appendLabeledAmount(panel, label, value) {
-    panel.append(fundLine(label, value), spacer());
-  }
-  function spacer() {
-    const gap = document.createElement("div");
-    gap.style.height = "0.5em";
-    return gap;
-  }
-  function endsWithSpacer(panel) {
-    const last = panel.lastElementChild;
-    return last instanceof HTMLElement && last.style.height === "0.5em" && last.childNodes.length === 0;
-  }
-  function fundLine(label, value) {
-    const line = document.createElement("div");
-    line.innerHTML = `<strong>${label}:</strong> ${escapeBuildPopupHtml(value)}`;
-    return line;
-  }
-  function visibleBlockedReason(text) {
-    if (!text || text === RAISE_REASON_CAPACITY_USED || text === RAISE_REASON_OCCUPIED) return null;
-    return text;
-  }
-  function note(text, className = "build-no-urban") {
-    const line = document.createElement("div");
-    line.className = className;
-    line.textContent = text;
-    return line;
-  }
-  function appendShortage(panel, sentence) {
-    if (!sentence) return;
-    panel.append(note(sentence, "hire-funds-warning"), spacer());
-  }
-  function selectedHireCount(countText) {
-    const raw = sanitizeBuildCountInputText(countText);
-    const count = parseInt(raw, 10);
-    if (!Number.isInteger(count) || count < HIRE_COUNT_MIN || count > HIRE_COUNT_MAX) return null;
-    return count;
-  }
-  function appendRaise(panel, h3Index, view2, deps) {
-    const raise = view2.raise;
-    if (!raise) return;
-    const shortage = document.createElement("div");
-    const section = document.createElement("div");
-    section.className = "build-queue-section";
-    const row = document.createElement("div");
-    row.className = "build-queue-row";
-    const typeSelect = document.createElement("select");
-    typeSelect.className = "unit-select";
-    for (const option2 of raise.options) {
-      const choice = document.createElement("option");
-      choice.value = option2.unitType;
-      choice.textContent = formatHireOptionLabel(option2);
-      typeSelect.appendChild(choice);
-    }
-    const countInput = createBuildCountInput(hireCountTooltipText, "1");
-    syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
-    typeSelect.addEventListener("change", () => {
-      syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
-      shortage.replaceChildren();
-    });
-    countInput.addEventListener("input", () => {
-      const raw = sanitizeBuildCountInputText(countInput.value);
-      if (countInput.value !== raw) countInput.value = raw;
-      shortage.replaceChildren();
-    });
-    const button = hireButton();
-    button.addEventListener("click", () => {
-      const count = selectedHireCount(countInput.value);
-      const option2 = raise.options.find((row2) => row2.unitType === typeSelect.value);
-      if (count == null || !option2) return;
-      const label = hireShortageLabel(view2.funds.credits, option2.fee * count, option2.unitCost * count, raise.capacityLeft);
-      if (label) {
-        shortage.replaceChildren();
-        appendShortage(shortage, label);
-        return;
-      }
-      void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({
-        kind: "raise",
-        h3Index,
-        unitType: typeSelect.value,
-        count
-      }));
-    });
-    row.append(typeSelect, countInput, button);
-    section.appendChild(row);
-    panel.append(shortage, section);
-  }
-  function appendRehires(panel, h3Index, view2, deps) {
-    const section = document.createElement("div");
-    section.className = "build-queue-section";
-    section.appendChild(head(REHIRE_SECTION_TITLE));
-    for (const unit of view2.rehireUnits) {
-      const row = document.createElement("div");
-      row.className = "build-queue-row";
-      const label = document.createElement("span");
-      label.className = "unit-label";
-      setUnitNameContent(label, unit.unitId, formatHireOrderLabel({
-        kind: "rehire",
-        unitType: unit.unitType,
-        count: 1,
-        displayName: unit.displayName,
-        fee: unit.fee
-      }));
-      const button = hireButton();
-      button.addEventListener("click", () => {
-        void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({ kind: "rehire", unitId: unit.unitId }));
-      });
-      row.append(label, button);
-      section.appendChild(row);
-    }
-    panel.appendChild(section);
-  }
-  function appendOrders(panel, h3Index, view2, deps) {
-    if (!endsWithSpacer(panel)) panel.appendChild(spacer());
-    const section = document.createElement("div");
-    section.className = "build-queue-section hire-orders";
-    section.appendChild(head(PENDING_HIRE_SECTION_TITLE));
-    for (const order of view2.pendingOrders) {
-      const row = document.createElement("div");
-      row.className = "build-queue-row";
-      const label = document.createElement("span");
-      const text = formatHireOrderLabel(order);
-      if (order.kind === "rehire" && order.unitId) {
-        label.className = "unit-label";
-        setUnitNameContent(label, order.unitId, text);
-      } else {
-        label.textContent = text;
-      }
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "unit-select";
-      button.textContent = "x";
-      button.setAttribute("data-control-tooltip", hireRemoveTooltipText);
-      button.addEventListener("click", () => {
-        void submitHire(panel, h3Index, deps, () => window.gameApi.removeHireOrder({ orderId: order.orderId }));
-      });
-      row.append(label, button);
-      section.append(row, spacer());
-    }
-    panel.appendChild(section);
-  }
-  function head(title) {
-    const row = document.createElement("div");
-    row.className = "build-queue-head";
-    const text = document.createElement("span");
-    text.className = "build-queue-title";
-    text.textContent = title;
-    row.appendChild(text);
-    return row;
-  }
-  function hireButton() {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "unit-select";
-    button.textContent = HIRE_BUTTON_LABEL;
-    button.setAttribute("data-control-tooltip", hireSubmitTooltipText);
-    return button;
-  }
-  async function submitHire(panel, h3Index, deps, mutate) {
-    if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
-    if (!window.gameApi?.placeHireOrder || !window.gameApi.removeHireOrder) return;
-    let result;
-    try {
-      result = await mutate();
-    } catch (err) {
-      console.error("hire order failed:", err);
-      if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
-      deps.showMapToast(HIRE_ORDER_UPDATE_FAILED, { isError: true });
-      return;
-    }
-    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
-    if (!result.success) {
-      deps.showMapToast(result.reason ?? HIRE_ORDER_UPDATE_FAILED, { isError: true });
-      return;
-    }
-    await deps.refreshGameStateAfterBuildQueueChange();
-    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
-    const data = await fetchHirePanelData(h3Index);
-    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
-    renderHirePanel(panel, h3Index, data, deps);
-  }
-
-  // src/renderer/gameplay/buildHirePopup.ts
-  var tabHex = null;
-  var tabChoice = "build";
-  var hireRequestSeq = 0;
-  async function renderBuildOrHirePopupIntoMount(mount, h3Index, deps) {
-    const popup = document.getElementById("build-popup");
-    if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
-      popup?.classList.remove("build-popup-wide");
-      await deps.renderBuildPanel(mount, h3Index);
-      return;
-    }
-    const requestSeq = ++hireRequestSeq;
-    const data = await fetchHirePanelData(h3Index);
-    if (rendererSharedState.buildPopupHexH3 !== h3Index || requestSeq !== hireRequestSeq) return;
-    if (isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index) && (data.view == null || data.view.hireAvailable === false)) {
-      popup?.classList.remove("build-popup-wide");
-      await deps.renderBuildPanel(mount, h3Index);
-      return;
-    }
-    if (!isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index)) {
-      mount.innerHTML = "";
-      popup?.classList.add("build-popup-wide");
-      const panel = document.createElement("div");
-      panel.className = "hire-panel";
-      mount.appendChild(panel);
-      if (data.view == null) {
-        renderHireFailure(panel, deps);
-        placeOpenBuildPopup();
-        return;
-      }
-      renderHirePanel(panel, h3Index, data, deps);
-      return;
-    }
-    if (tabHex !== h3Index) {
-      tabHex = h3Index;
-      tabChoice = "build";
-    }
-    mount.innerHTML = "";
-    popup?.classList.add("build-popup-wide");
-    const tabBar = document.createElement("div");
-    tabBar.className = "build-popup-tab-bar";
-    tabBar.setAttribute("role", "tablist");
-    const buildTab = tabButton(BUILD_TAB_LABEL);
-    const hireTab = tabButton(HIRE_TAB_LABEL);
-    tabBar.append(buildTab, hireTab);
-    const buildPanel = document.createElement("div");
-    buildPanel.setAttribute("role", "tabpanel");
-    const hirePanel = document.createElement("div");
-    hirePanel.className = "hire-panel";
-    hirePanel.setAttribute("role", "tabpanel");
-    mount.append(tabBar, buildPanel, hirePanel);
-    const show = (choice) => {
-      tabChoice = choice;
-      tabHex = h3Index;
-      buildTab.setAttribute("aria-selected", choice === "build" ? "true" : "false");
-      hireTab.setAttribute("aria-selected", choice === "hire" ? "true" : "false");
-      buildPanel.hidden = choice !== "build";
-      hirePanel.hidden = choice !== "hire";
-    };
-    buildTab.addEventListener("click", () => {
-      show("build");
-      placeOpenBuildPopup();
-    });
-    hireTab.addEventListener("click", () => {
-      show("hire");
-      placeOpenBuildPopup();
-    });
-    show(tabChoice);
-    renderHirePanel(hirePanel, h3Index, data, deps);
-    await deps.renderBuildPanel(buildPanel, h3Index);
-  }
-  function tabButton(label) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.setAttribute("role", "tab");
-    button.textContent = label;
-    if (label === BUILD_TAB_LABEL) button.setAttribute("data-control-tooltip", buildTabTooltipText);
-    else if (label === HIRE_TAB_LABEL) button.setAttribute("data-control-tooltip", hireTabTooltipText);
-    return button;
-  }
-  function renderHireFailure(panel, deps) {
-    const note2 = document.createElement("div");
-    note2.className = "build-no-urban";
-    note2.textContent = HIRE_VIEW_FAILED;
-    panel.append(createBuildPopupCloseRow(deps.hideBuildPopup), note2);
-  }
-
-  // src/renderer/gameplay/buildQueuePopup.ts
-  function rowTypeOptions(available, current) {
-    return available.includes(current) ? [...available] : [current, ...available];
-  }
-  function isBuildQueueSelectInPopupFocused() {
-    const popup = document.getElementById("build-popup");
-    const active2 = document.activeElement;
-    return !!popup && active2 instanceof HTMLSelectElement && popup.contains(active2);
-  }
-  function isBuildPopupOrEntryTarget(target) {
-    if (!(target instanceof Node)) return false;
-    const popup = document.getElementById("build-popup");
-    const layer = document.getElementById("build-entry-layer");
-    const tacticalLayer = document.getElementById("tactical-entry-layer");
-    return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target));
-  }
-  function createBuildQueuePopupHandler(deps) {
-    let buildEntryInteractionChain = Promise.resolve();
-    let popupLifecycleRevision = 0;
-    async function runBuildQueueMutation(args) {
-      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
-      try {
-        const result = await args.mutate();
-        if (!result.success) {
-          deps.showMapToast(result.reason ?? args.failureMessage, { isError: true });
-          return false;
-        }
-        if (args.refreshState) await deps.refreshGameStateAfterBuildQueueChange();
-        return true;
-      } catch (err) {
-        console.error("runBuildQueueMutation failed:", err);
-        deps.showMapToast(args.failureMessage, { isError: true });
-        return false;
-      }
-    }
-    async function applyCurrentTemplateToHexes(h3Indexes) {
-      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
-        return { ok: false, anyHexWritten: false };
-      }
-      if (!window.gameApi?.applyBuildQueueTemplateToHexes) {
-        return { ok: false, anyHexWritten: false };
-      }
-      try {
-        const result = await window.gameApi.applyBuildQueueTemplateToHexes({
-          h3Indexes,
-          entries: toBuildQueueTemplateEntries(rendererSharedState.buildQueueTemplate)
-        });
-        const anyHexWritten = result.applied.length > 0;
-        if (anyHexWritten) await deps.refreshGameStateAfterBuildQueueChange();
-        if (!result.success) {
-          const failureReason = result.reason ?? result.failed[0]?.reason ?? "Failed to synchronize build queues.";
-          deps.showMapToast(failureReason, { isError: true });
-          return { ok: false, anyHexWritten };
-        }
-        return { ok: true };
-      } catch (err) {
-        console.error("applyCurrentTemplateToHexes failed:", err);
-        deps.showMapToast("Failed to synchronize build queues.", { isError: true });
-        return { ok: false, anyHexWritten: false };
-      }
-    }
-    function restoreRejectedBuildQueueControls(typeSelect, countInput, entry) {
-      typeSelect.value = entry.unitType;
-      syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
-      countInput.value = String(entry.count);
-    }
-    function rejectedBuildQueueEditStillShown(typeSelect, countInput, submittedUnitType, submittedCountText) {
-      return typeSelect.value === submittedUnitType && countInput.value === submittedCountText;
-    }
-    function restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index) {
-      if (!resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
-      void renderBuildQueueIntoMount(mount, h3Index);
-      return true;
-    }
-    async function renderBuildQueueIntoMount(mount, h3Index) {
-      if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
-        await renderMultiBuildQueueIntoMount({
-          mount,
-          h3Index,
-          hideBuildPopup: hideBuildPopup3,
-          applyTemplate: applyCurrentTemplateToHexes,
-          setKeepBuilding: async (keepBuilding) => {
-            if (!window.gameApi?.setHexesKeepBuilding) return false;
-            return runBuildQueueMutation({
-              mutate: () => window.gameApi.setHexesKeepBuilding({
-                h3Indexes: [...rendererSharedState.selectedBuildHexH3s],
-                keepBuilding
-              }),
-              failureMessage: "Failed to update Keep building.",
-              refreshState: true
-            });
-          }
-        });
-        return;
-      }
-      if (!window.gameApi?.getHexBuildQueue) return;
-      const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
-      let snapshot3 = null;
-      let namingCaption = null;
-      try {
-        snapshot3 = await window.gameApi.getHexBuildQueue({ h3Index });
-        if (window.gameApi.getHexNamingTooltipLine) {
-          namingCaption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
-        }
-      } catch (err) {
-        console.error("getHexBuildQueue failed:", err);
-      }
-      if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot3 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
-      mount.innerHTML = "";
-      mount.appendChild(createBuildPopupCloseRow(hideBuildPopup3));
-      const section = document.createElement("div");
-      section.className = "build-queue-section";
-      const strategicCode = getStrategicHexCode(h3Index);
-      const llmPrefixHtml = strategicCode ? `<strong>(${escapeBuildPopupHtml(strategicCode)})</strong> ` : "";
-      if (namingCaption && namingCaption.text.trim().length > 0) {
-        const descriptionLine = document.createElement("div");
-        descriptionLine.innerHTML = `${llmPrefixHtml}${formatHexNamingCaptionHtml(namingCaption)}`;
-        section.appendChild(descriptionLine);
-        const descriptionSpacer = document.createElement("div");
-        descriptionSpacer.style.height = "0.5em";
-        section.appendChild(descriptionSpacer);
-      } else if (llmPrefixHtml) {
-        const codeLine = document.createElement("div");
-        codeLine.innerHTML = llmPrefixHtml;
-        section.appendChild(codeLine);
-        const codeSpacer = document.createElement("div");
-        codeSpacer.style.height = "0.5em";
-        section.appendChild(codeSpacer);
-      }
-      const techLineHtml = formatProducedUnitTechLineHtml({
-        techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
-        baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index)
-      });
-      if (techLineHtml) {
-        const techLine = document.createElement("div");
-        techLine.innerHTML = techLineHtml;
-        section.appendChild(techLine);
-        const techSpacer = document.createElement("div");
-        techSpacer.style.height = "0.5em";
-        section.appendChild(techSpacer);
-      }
-      const pointsLine = document.createElement("div");
-      const productionCapacity = snapshot3.urbanHexCount;
-      const productionDetail = productionCapacity > 0 ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn` : "(none)";
-      pointsLine.innerHTML = `<strong>Production (Build):</strong> ${productionDetail}`;
-      section.appendChild(pointsLine);
-      const productionQueueSpacer = document.createElement("div");
-      productionQueueSpacer.style.height = "0.5em";
-      section.appendChild(productionQueueSpacer);
-      const queueSummaryLine = document.createElement("div");
-      const queueTotalCost = sumQueuedProductionCost(snapshot3.entries);
-      if (snapshot3.entries.length === 0) {
-        queueSummaryLine.innerHTML = `<strong>Queue:</strong> (none)`;
-      } else {
-        const queueTurns = estimateTurnsToCompleteQueuedProduction(
-          snapshot3.entries,
-          snapshot3.storedPoints,
-          productionCapacity
-        );
-        const queueTurnsDisplay = queueTurns === null ? "?" : queueTurns.toLocaleString();
-        const turnLabel = queueTurns === 1 ? "turn" : "turns";
-        queueSummaryLine.innerHTML = `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${queueTurnsDisplay} ${turnLabel}`;
-      }
-      section.appendChild(queueSummaryLine);
-      const productionSpacer = document.createElement("div");
-      productionSpacer.style.height = "0.5em";
-      section.appendChild(productionSpacer);
-      const pausedNote = snapshot3.controlledByRequester ? formatQueuePausedNote(snapshot3.pausedReasons ?? []) : null;
-      if (pausedNote) section.appendChild(createQueuePausedNote(pausedNote));
-      if (!snapshot3.controlledByRequester) {
-        mount.appendChild(section);
-        placeOpenBuildPopup();
-        return;
-      }
-      if (!snapshot3.buildSectionVisible) {
-        const noUrban = document.createElement("div");
-        noUrban.className = "build-no-urban";
-        noUrban.textContent = snapshot3.noBuildReason ?? "This hex cannot build units.";
-        section.appendChild(noUrban);
-        mount.appendChild(section);
-        placeOpenBuildPopup();
-        return;
-      }
-      const head2 = document.createElement("div");
-      head2.className = "build-queue-head";
-      const title = document.createElement("span");
-      title.className = "build-queue-title";
-      title.textContent = "Build Queue";
-      const buildBtn = document.createElement("button");
-      buildBtn.type = "button";
-      buildBtn.className = "unit-select stack-unit-toggle";
-      buildBtn.textContent = UNIT_SELECT_GLYPH;
-      buildBtn.setAttribute("data-control-tooltip", buildAddTooltipText);
-      buildBtn.addEventListener("click", async () => {
-        if (!window.gameApi?.addHexBuildQueueEntry) return;
-        const success = await runBuildQueueMutation({
-          mutate: () => window.gameApi.addHexBuildQueueEntry({ h3Index }),
-          failureMessage: "Failed to add build queue entry.",
-          refreshState: true
-        });
-        if (!success) return;
-        void renderBuildQueueIntoMount(mount, h3Index);
-      });
-      head2.appendChild(title);
-      head2.appendChild(buildBtn);
-      section.appendChild(head2);
-      const list = document.createElement("div");
-      list.className = "build-queue-list";
-      const options = snapshot3.availableUnitTypes;
-      for (const entry of snapshot3.entries) {
-        const row = document.createElement("div");
-        row.className = "build-queue-row";
-        const typeSelect = document.createElement("select");
-        for (const unitType of rowTypeOptions(options, entry.unitType)) {
-          const opt = document.createElement("option");
-          opt.value = unitType;
-          opt.textContent = formatBuildQueueItemLabel(unitType);
-          typeSelect.appendChild(opt);
-        }
-        typeSelect.value = entry.unitType;
-        syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
-        const countInput = createBuildCountInput(buildCountTooltipText, String(entry.count));
-        async function submitBuildQueueEntryEdit(failureMessage) {
-          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
-          if (!window.gameApi?.updateHexBuildQueueEntry) return;
-          const submittedUnitType = typeSelect.value;
-          const submittedCount = readSanitizedBuildCount(countInput);
-          const submittedCountText = countInput.value;
-          const success = await runBuildQueueMutation({
-            mutate: () => window.gameApi.updateHexBuildQueueEntry({
-              h3Index,
-              entryId: entry.id,
-              unitType: submittedUnitType,
-              count: submittedCount
-            }),
-            failureMessage,
-            refreshState: true
-          });
-          if (!success) {
-            if (rejectedBuildQueueEditStillShown(
-              typeSelect,
-              countInput,
-              submittedUnitType,
-              submittedCountText
-            )) {
-              restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
-              await renderBuildQueueIntoMount(mount, h3Index);
-            }
-            return;
-          }
-          void renderBuildQueueIntoMount(mount, h3Index);
-        }
-        typeSelect.addEventListener("change", async () => {
-          syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
-          await submitBuildQueueEntryEdit("Failed to update build queue entry.");
-        });
-        row.appendChild(typeSelect);
-        countInput.addEventListener("input", async () => {
-          await submitBuildQueueEntryEdit("Failed to update build count.");
-        });
-        row.appendChild(countInput);
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "unit-select";
-        removeBtn.textContent = "x";
-        removeBtn.setAttribute("data-control-tooltip", singleHexQueueRemoveTooltipText);
-        removeBtn.addEventListener("click", async () => {
-          if (!window.gameApi?.removeHexBuildQueueEntry) return;
-          const success = await runBuildQueueMutation({
-            mutate: () => window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id }),
-            failureMessage: "Failed to remove build queue entry.",
-            refreshState: true
-          });
-          if (!success) return;
-          void renderBuildQueueIntoMount(mount, h3Index);
-        });
-        row.appendChild(removeBtn);
-        list.appendChild(row);
-      }
-      section.appendChild(list);
-      appendKeepBuildingCheckbox({
-        section,
-        checked: snapshot3.keepBuilding,
-        disabled: !canArmKeepBuilding(snapshot3),
-        tooltipText: keepBuildingTooltipText,
-        onChange: async (keepBuilding) => {
-          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
-          if (!window.gameApi?.setHexesKeepBuilding) return;
-          const success = await runBuildQueueMutation({
-            mutate: () => window.gameApi.setHexesKeepBuilding({
-              h3Indexes: [h3Index],
-              keepBuilding
-            }),
-            failureMessage: "Failed to update Keep building.",
-            refreshState: true
-          });
-          void renderBuildQueueIntoMount(mount, h3Index);
-          if (!success) return;
-        }
-      });
-      mount.appendChild(section);
-      placeOpenBuildPopup();
-    }
-    function clientPointForBuildEntryHex(h3Index, fallbackClientX, fallbackClientY) {
-      const layer = document.getElementById("build-entry-layer");
-      const button = layer?.querySelector(
-        `.build-entry-btn[data-h3-index="${CSS.escape(h3Index)}"]`
-      );
-      if (!button) return { clientX: fallbackClientX, clientY: fallbackClientY };
-      const rect2 = button.getBoundingClientRect();
-      return {
-        clientX: rect2.left + rect2.width / 2,
-        clientY: rect2.top + rect2.height / 2
-      };
-    }
-    async function processBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
-      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
-      const multiSelect = shiftKey && isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index) && rendererSharedState.selectedBuildHexH3s.every((hex) => isHumanBuildEntryHexIndex(rendererSharedState.gameState, hex));
-      const lifecycleRevision = popupLifecycleRevision;
-      if (isHoverOrderPlanningActive() || deps.shouldRenderTacticalHexes()) return;
-      rendererSharedState.selectedHexIndex = h3Index;
-      const popup = document.getElementById("build-popup");
-      const popupOpen = !!popup && !popup.classList.contains("hidden");
-      if (!multiSelect) {
-        const togglesSinglePopup = rendererSharedState.selectedBuildHexH3s.length === 1 && rendererSharedState.selectedBuildHexH3s[0] === h3Index && popupOpen && rendererSharedState.buildPopupHexH3 === h3Index;
-        if (togglesSinglePopup) {
-          hideBuildPopup3();
-          return;
-        }
-        rendererSharedState.selectedBuildHexH3s = [h3Index];
-        rendererSharedState.buildQueueTemplate = [];
-        showBuildPopup2(h3Index, clientX, clientY);
-        return;
-      }
-      const existingIndex = rendererSharedState.selectedBuildHexH3s.indexOf(h3Index);
-      if (existingIndex >= 0) {
-        rendererSharedState.selectedBuildHexH3s = rendererSharedState.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
-        if (rendererSharedState.selectedBuildHexH3s.length === 0) {
-          hideBuildPopup3();
-          return;
-        }
-        if (rendererSharedState.selectedBuildHexH3s.length === 1) rendererSharedState.buildQueueTemplate = [];
-        const remainingAnchor = rendererSharedState.selectedBuildHexH3s.at(-1);
-        rendererSharedState.selectedHexIndex = remainingAnchor;
-        const anchorPoint = clientPointForBuildEntryHex(remainingAnchor, clientX, clientY);
-        showBuildPopup2(remainingAnchor, anchorPoint.clientX, anchorPoint.clientY);
-        return;
-      }
-      const priorCount = rendererSharedState.selectedBuildHexH3s.length;
-      const seedHex = priorCount === 1 ? rendererSharedState.selectedBuildHexH3s[0] : void 0;
-      rendererSharedState.selectedBuildHexH3s = [...rendererSharedState.selectedBuildHexH3s, h3Index];
-      if (priorCount === 0) {
-        rendererSharedState.buildQueueTemplate = [];
-        showBuildPopup2(h3Index, clientX, clientY);
-        return;
-      }
-      if (priorCount === 1) {
-        const seedSnapshot = seedHex ? await window.gameApi?.getHexBuildQueue({ h3Index: seedHex }) : null;
-        if (lifecycleRevision !== popupLifecycleRevision) return;
-        if (!seedSnapshot) {
-          deps.showMapToast("Failed to load the build queue template.", { isError: true });
-          rendererSharedState.selectedBuildHexH3s = rendererSharedState.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
-          deps.requestRedraw();
-          return;
-        }
-        rendererSharedState.buildQueueTemplate = buildQueueTemplateFromSnapshot(seedSnapshot);
-        await applyCurrentTemplateToHexes([...rendererSharedState.selectedBuildHexH3s]);
-      } else {
-        await applyCurrentTemplateToHexes([h3Index]);
-      }
-      if (lifecycleRevision !== popupLifecycleRevision) return;
-      showBuildPopup2(h3Index, clientX, clientY);
-    }
-    function handleBuildEntryClick2(h3Index, clientX, clientY, shiftKey) {
-      buildEntryInteractionChain = buildEntryInteractionChain.then(() => processBuildEntryClick(h3Index, clientX, clientY, shiftKey)).catch((err) => {
-        console.error("handleBuildEntryClick failed:", err);
-        deps.showMapToast("Failed to update build selection.", { isError: true });
-      });
-      return buildEntryInteractionChain;
-    }
-    function hideBuildPopup3() {
-      const el = document.getElementById("build-popup");
-      const wasOpen = !!el && !el.classList.contains("hidden");
-      const hadBuildState = rendererSharedState.buildPopupHexH3 !== null || rendererSharedState.selectedBuildHexH3s.length > 0 || rendererSharedState.buildQueueTemplate.length > 0;
-      if (!wasOpen && !hadBuildState) return;
-      popupLifecycleRevision++;
-      rendererSharedState.buildPopupHexH3 = null;
-      rendererSharedState.buildPopupRequestSeq++;
-      rendererSharedState.selectedBuildHexH3s = [];
-      rendererSharedState.buildQueueTemplate = [];
-      if (el) {
-        el.classList.add("hidden");
-        el.removeAttribute("data-open");
-        el.removeAttribute("data-x");
-        el.removeAttribute("data-y");
-        el.setAttribute("aria-hidden", "true");
-      }
-      const body = document.getElementById("build-popup-body");
-      if (body) body.innerHTML = "";
-      deps.requestRedraw();
-      if (wasOpen) deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
-    }
-    const popupDeps = {
-      renderBuildPanel: renderBuildQueueIntoMount,
-      hideBuildPopup: hideBuildPopup3,
-      refreshGameStateAfterBuildQueueChange: deps.refreshGameStateAfterBuildQueueChange,
-      showMapToast: deps.showMapToast
-    };
-    function showBuildPopup2(h3Index, clientX, clientY) {
-      if (isHoverOrderPlanningActive()) return;
-      if (deps.shouldRenderTacticalHexes()) return;
-      deps.hideStackCallout();
-      deps.clearTerrainTooltipTimer();
-      deps.hideTerrainTooltipVisual();
-      const el = document.getElementById("build-popup");
-      const body = document.getElementById("build-popup-body");
-      if (!el || !body) return;
-      hidePlanningChromeToasts();
-      rendererSharedState.buildPopupHexH3 = h3Index;
-      el.setAttribute("data-open", "true");
-      el.setAttribute("data-x", String(clientX));
-      el.setAttribute("data-y", String(clientY));
-      el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-      el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
-      el.classList.remove("hidden");
-      el.setAttribute("aria-hidden", "false");
-      void renderBuildOrHirePopupIntoMount(body, h3Index, popupDeps);
-      deps.requestRedraw();
-    }
-    function refreshBuildPopupIfOpen2() {
-      if (deps.shouldRenderTacticalHexes()) {
-        hideBuildPopup3();
-        return;
-      }
-      const el = document.getElementById("build-popup");
-      const body = document.getElementById("build-popup-body");
-      if (!el || el.classList.contains("hidden") || !rendererSharedState.buildPopupHexH3 || !body) return;
-      void renderBuildOrHirePopupIntoMount(body, rendererSharedState.buildPopupHexH3, popupDeps);
-    }
-    return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup3, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
-  }
-
-  // src/renderer/gameplay/tacticalBattlePromptPreference.ts
-  var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
-  function readTacticalBattlesInterceptPromptEnabled() {
-    try {
-      const v = localStorage.getItem(STORAGE_KEY);
-      if (v === null) return true;
-      return v !== "0" && v !== "false";
-    } catch {
-      return true;
-    }
-  }
-  function writeTacticalBattlesInterceptPromptEnabled(enabled) {
-    try {
-      localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
-    } catch {
-    }
-  }
-
-  // src/shared/ordersHeldForPlayback.ts
-  function ordersHeldUntilMovementEnds(orders, units, moves) {
-    const originH3ByUnitId = {};
-    const held2 = [];
-    for (const order of orders) {
-      if (!order.destinationH3Index) continue;
-      const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === HUMAN_SEAT_ID);
-      if (!unit || unit.h3Index !== order.destinationH3Index) continue;
-      const move = moves.find(
-        (candidate) => candidate.unitId === order.unitId && candidate.fromH3Index !== order.destinationH3Index
-      );
-      if (!move) continue;
-      originH3ByUnitId[order.unitId] = move.fromH3Index;
-      held2.push({
-        ...order,
-        routeSegments: order.routeSegments?.map((segment) => ({
-          turn: segment.turn,
-          hexes: segment.hexes.map((hex) => [hex[0], hex[1]])
-        }))
-      });
-    }
-    return { orders: held2, originH3ByUnitId };
-  }
-  function ferriesHeldUntilMovementEnds(ferryOrders, moves) {
-    const held2 = [];
-    for (const order of ferryOrders) {
-      const move = moves.find((candidate) => candidate.unitId === order.unitId);
-      if (!move || move.fromH3Index === move.toH3Index || move.toH3Index !== order.destinationH3Index) continue;
-      const flown = move.pathH3Indexes && move.pathH3Indexes.length >= 2 ? move.pathH3Indexes : void 0;
-      const ordered = order.pathH3Indexes && order.pathH3Indexes.length >= 2 ? order.pathH3Indexes : void 0;
-      const path = flown ?? ordered ?? [move.fromH3Index, move.toH3Index];
-      held2.push({ unitId: order.unitId, pathH3Indexes: [...path] });
-    }
-    return held2;
-  }
-
-  // src/shared/ipc/tacticalOpponentPlanMerge.ts
-  function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
-    if (plan == null) return false;
-    return plan.movementOrders.length + plan.rangedAttacks.length + plan.airStrikes.length + (plan.airDropOrders?.length ?? 0) + plan.ferryOrders.length + plan.embarkOrders.length > 0;
-  }
-  function tacticalDraftAlreadyDecided(plan) {
-    return tacticalOpponentPlanPayloadHasAnyOrders(plan) || plan?.exitBattle === true;
-  }
-  function nextTacticalOpponentDraftAfterPostBeatPlan(tacticalOpponentPlan) {
-    if (tacticalOpponentPlan != null && tacticalDraftAlreadyDecided(tacticalOpponentPlan)) {
-      return { draft: tacticalOpponentPlan, startBackgroundPrefetch: false };
-    }
-    return { draft: null, startBackgroundPrefetch: true };
-  }
-
-  // src/renderer/tactical/applyTacticalPostBeatConsultSideEffects.ts
-  function isTacticalPostBeatConsultOnCommit(obj) {
-    if (typeof obj !== "object" || obj === null) return false;
-    const r = obj;
-    return r.kind === "tactical" && typeof r.battleId === "string" && typeof r.attachTacticalOpponentPlanToIpc === "boolean";
-  }
-  function applyTacticalPostBeatConsultSideEffects(payload2, deps) {
-    if (payload2.kind !== "tactical") return;
-    if (payload2.battleId !== rendererSharedState.tacticalBattleSnapshot?.battleId) return;
-    if (payload2.attachTacticalOpponentPlanToIpc) {
-      const { startBackgroundPrefetch } = nextTacticalOpponentDraftAfterPostBeatPlan(payload2.tacticalOpponentPlan);
-      if (startBackgroundPrefetch && tacticalBattleHasAiSide()) deps.startBackgroundRequestIfAllowed();
-    } else if (rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
-      deps.startBackgroundRequestIfAllowed();
-    }
-    void readCommanderPoolAndApply(true);
-    if (typeof payload2.cost === "number" && Number.isFinite(payload2.cost)) {
-      void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
-    }
-    deps.appendOpenRouterLog("Tactical post-beat consultation applied.", false);
-    deps.redraw();
-    deps.updateReadyButtonState();
-  }
-  function tacticalBattleHasAiSide() {
-    const units = rendererSharedState.tacticalBattleSnapshot?.subUnits;
-    if (!units) return false;
-    return units.some((unit) => isAiSeatId(unit.player));
-  }
-
-  // src/shared/marchPathHelpers.ts
-  function findPathTailFromCurrentPosition(storedPathH3Indexes, currentH3) {
-    if (storedPathH3Indexes.length === 0) return null;
-    if (storedPathH3Indexes[0] === currentH3) return storedPathH3Indexes;
-    for (let i = 1; i < storedPathH3Indexes.length; i++) {
-      if (storedPathH3Indexes[i] === currentH3) return storedPathH3Indexes.slice(i);
-    }
-    return null;
-  }
-
-  // src/shared/tacticalMarchContinuations.ts
-  function filterTacticalMarchContinuationsToPresentSubUnits(continuations, presentSubUnitIds) {
-    return continuations.filter((row) => presentSubUnitIds.has(row.subUnitId));
-  }
-
-  // src/renderer/tactical/tacticalPendingMarchPath.ts
-  function buildTacticalPendingMarchRowsFromContinuations(args) {
-    const livingIds = new Set(args.battle.subUnits.map((u) => u.id));
-    const livingContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
-      args.continuations,
-      livingIds
-    );
-    return livingContinuations.map((cont) => {
-      const prev = args.previousBySubUnitId.get(cont.subUnitId);
-      const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
-      const newUnitH3 = sub?.h3Index;
-      if (prev?.pathH3Indexes && newUnitH3) {
-        const tail = findPathTailFromCurrentPosition(prev.pathH3Indexes, newUnitH3);
-        if (tail) {
-          const result2 = buildTacticalMarchDraftDestinationPreview(
-            args.battle,
-            cont.subUnitId,
-            cont.destinationH3Index,
-            { overridePathH3Indexes: tail }
-          );
-          if (result2.preview.valid && result2.preview.segments.length > 0) {
-            return {
-              subUnitId: cont.subUnitId,
-              destinationH3Index: cont.destinationH3Index,
-              pathH3Indexes: [...tail],
-              cachedSegments: result2.preview.segments
-            };
-          }
-        }
-      }
-      const result = buildTacticalMarchDraftDestinationPreview(
-        args.battle,
-        cont.subUnitId,
-        cont.destinationH3Index
-      );
-      return {
-        subUnitId: cont.subUnitId,
-        destinationH3Index: cont.destinationH3Index,
-        ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
-        ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
-      };
-    });
-  }
-  function buildTacticalPendingMarchRowFromDraft(args) {
-    const result = buildTacticalMarchDraftDestinationPreview(
-      args.battle,
-      args.subUnitId,
-      args.destinationH3Index
-    );
-    return {
-      subUnitId: args.subUnitId,
-      destinationH3Index: args.destinationH3Index,
-      ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
-      ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
-    };
-  }
-
-  // src/renderer/gameplay/readyTacticalCommit.ts
-  async function runTacticalReadyCommit(context) {
-    const { deps, matchEpoch } = context;
-    if (!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning)) return false;
-    if (!window.gameApi) return true;
-    const beatReportTag = currentConsoleReportTag();
-    const commit = window.gameApi.commitHumanTacticalDraftOrders;
-    if (!commit) {
-      deps.showSidebarError("Tactical commit is not available in this build.");
-      deps.updateReadyButtonState();
-      return true;
-    }
-    const livingSubUnitIds = new Set(rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => u.id));
-    rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter(
-      (row) => livingSubUnitIds.has(row.subUnitId)
-    );
-    const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({
-      unitId: r.subUnitId,
-      toH3Index: r.destinationH3Index
-    }));
-    const commitResult = await commit({
-      movementOrders,
-      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
-      airStrikes: [...rendererSharedState.pendingAirStrikes],
-      airDropOrders: [...rendererSharedState.pendingAirDrops],
-      ferryOrders: [...rendererSharedState.pendingFerryOrders],
-      embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
-      useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
-      aiPlanningRunEnabled: rendererSharedState.runButtonOn
-    });
-    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    if (!commitResult.success) {
-      deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
-      deps.updateReadyButtonState();
-      return true;
-    }
-    void refreshChatThread();
-    const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
-    const playback = commitResult.tacticalResolutionPlayback;
-    const needsResolutionPlayback = tacticalPlaybackNeeded(playback);
-    if (playback && needsResolutionPlayback) {
-      if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
-      rendererSharedState.resolutionMoveAnimationFrameId = null;
-      rendererSharedState.resolutionMoveAnimation = buildTacticalResolutionAnimation({
-        playback,
-        subUnitsBefore: tacticalSubUnitsBeforeCommit,
-        deps
-      });
-      syncChatPanelVisibility();
-    }
-    if (commitResult.tacticalBattle) {
-      rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
-    }
-    if (rendererSharedState.resolutionMoveAnimation != null && rendererSharedState.tacticalBattleSnapshot != null) {
-      deps.updateGameStateSidebar(rendererSharedState.gameState);
-      deps.syncTacticalExitButton?.();
-    }
-    reconcileSelectionToCurrentState();
-    if (commitResult.tacticalPostBeatConsultDeferred) {
-      rendererSharedState.pendingDeferredTacticalPostBeatConsult = true;
-      rendererSharedState.deferredResolutionConsultNotifySent = false;
-    }
-    if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
-      applyTacticalPostBeatConsultSideEffects(commitResult, deps);
-    } else if (!commitResult.tacticalPostBeatConsultDeferred) {
-      const plan = "tacticalOpponentPlan" in commitResult ? commitResult.tacticalOpponentPlan : null;
-      if (!tacticalOpponentPlanPayloadHasAnyOrders(plan) && rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
-        deps.startBackgroundRequestIfAllowed();
-      }
-      void readCommanderPoolAndApply(true);
-    }
-    const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
-    rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
-      battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
-      continuations: commitResult.tacticalMarchContinuations,
-      previousBySubUnitId: previousPendingMarches
-    }) : [];
-    rendererSharedState.pendingRangedAttacks = [];
-    rendererSharedState.pendingAirStrikes = [];
-    rendererSharedState.pendingAirDrops = [];
-    rendererSharedState.pendingMissileLaunches = [];
-    rendererSharedState.pendingFerryOrders = [];
-    rendererSharedState.pendingEmbarkOrders = [];
-    rendererSharedState.rangedModeActive = false;
-    rendererSharedState.airStrikeModeActive = false;
-    rendererSharedState.airDropModeActive = false;
-    rendererSharedState.missileLaunchModeActive = false;
-    try {
-      const refreshedStrategic = await fetchMatchSnapshot();
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-      await deps.applyGameStateSnapshot(refreshedStrategic, {
-        refreshStandingOrders: false,
-        updateGameStateSidebarUi: false,
-        updateSelectionUi: false,
-        updateGameOverUi: false,
-        updateReadyButton: false,
-        refreshBuildPopup: true,
-        redraw: false
-      });
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    } catch (err) {
-      console.error("tactical commit: failed to refresh strategic game state snapshot", err);
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    }
-    if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
-      const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
-      const visibleHexes = /* @__PURE__ */ new Set([
-        ...deps.getVisibleHexSet(rendererSharedState.gameState),
-        ...rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes ?? []
-      ]);
-      const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes, reportViewerSeatId());
-      const killToastFormatter = deps.buildKillToastFormatterBundle(
-        rendererSharedState.gameState,
-        tacticalReadySlice.removedUnits,
-        buildTacticalSubUnitKillLabelOverlay({
-          subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
-          subUnitsAfterCommit: rendererSharedState.tacticalBattleSnapshot?.subUnits,
-          removedUnits: tacticalReadySlice.removedUnits
-        })
-      );
-      const battleForReport = commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot;
-      await announceResolutionTurnUpdate(
-        {
-          readySlice: tacticalReadySlice,
-          visibility,
-          killToastFormatter,
-          reportTag: beatReportTag,
-          extraKills: {
-            killsByMelee: playback.killsByMelee,
-            killsByAirStrike: playback.killsByAirStrike
-          },
-          hexCodeBattle: battleForReport ?? null,
-          // A battle has no fog, so an opponent's absorbed hits are visible. visibleHexes does not feed this filter.
-          exploredHexes: /* @__PURE__ */ new Set([
-            ...getExploredHexSet(rendererSharedState.gameState),
-            ...battleForReport?.tacticalChildH3Indexes ?? []
-          ])
-        },
-        deps
-      );
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    }
-    await deps.refreshTacticalTerrainOverridesForRenderer();
-    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    deps.updateSidebar();
-    deps.updateGameStateSidebar(rendererSharedState.gameState);
-    if (rendererSharedState.resolutionMoveAnimation?.tacticalDeferResolutionClock) {
-      rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
-      rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
-    }
-    if (rendererSharedState.resolutionMoveAnimation && needsResolutionPlayback && rendererSharedState.resolutionMoveAnimationFrameId === null) {
-      rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
-    }
-    deps.redraw();
-    deps.scheduleTacticalAnnihilationExit?.();
-    if (commitResult.tacticalPostBeatConsultDeferred) {
-      const bid = commitResult.tacticalBattle?.battleId;
-      if (bid) {
-        const sendTacticalNotify = () => {
-          void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: "tactical", battleId: bid });
-          rendererSharedState.deferredResolutionConsultNotifySent = true;
-          deps.updateReadyButtonState();
-        };
-        scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
-      }
-    }
-    deps.updateReadyButtonState();
-    return true;
-  }
-
-  // src/shared/knockoutNotice.ts
-  var REASON_ORDER = ["home_control", "no_city_hexes", "home_cities_destroyed"];
-  function formatKnockoutNotice(input) {
-    const sentences = [input.victimIsHuman ? "You are out of the match." : `${input.victimName} is out of the match.`];
-    const held2 = new Set(input.reasons);
-    for (const reason of REASON_ORDER) {
-      if (!held2.has(reason)) continue;
-      if (reason === "home_control") {
-        const outBy = input.outByName ?? "A side";
-        sentences.push(
-          input.globalHome ? `${outBy} holds all of its home.` : `${outBy} holds ${input.controlShareLabel} of its home's cities.`
-        );
-      } else if (reason === "no_city_hexes") sentences.push("It holds no city hexes.");
-      else sentences.push("Its home has no cities left.");
-    }
-    sentences.push("Its land is now neutral and its cities stop building.");
-    if (input.remainingUnits > 0) {
-      sentences.push(`Its last ${input.remainingUnits} units hold their hexes as neutral garrisons and fire on any unit in range.`);
-    }
-    return sentences.join(" ");
-  }
-
-  // src/renderer/gameplay/knockoutNotices.ts
-  function announceKnockouts(knockouts, before, afterSeats, removedUnitIdsBySeat) {
-    if (knockouts.length === 0) return;
-    const notices = knockouts.map((row) => noticeText(row, before, afterSeats, removedUnitIdsBySeat));
-    const tag = currentConsoleReportTag();
-    for (const notice of notices) {
-      const body = document.createElement("p");
-      body.textContent = notice;
-      recordConsoleReport("notice", tag, body);
-    }
-    showMapToast(notices.join("\n\n"), { isError: false, report: { kind: "notice", tag }, skipReport: true });
-  }
-  function noticeText(row, before, afterSeats, removedUnitIdsBySeat) {
-    const seats = afterSeats ?? before?.seats ?? [];
-    const victim = seats.find((seat) => seat.seatId === row.seatId);
-    const outBy = row.outBy === null ? null : seats.find((seat) => seat.seatId === row.outBy);
-    const removed = new Set(removedUnitIdsBySeat?.[row.seatId] ?? []);
-    const remaining = (before?.units ?? []).filter((unit) => unit.player === row.seatId && !removed.has(unit.id)).length;
-    const share = activeGameMap().controlWinMinUrbanShare;
-    return formatKnockoutNotice({
-      victimName: victim ? sideDisplayName(victim) : row.seatId,
-      victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
-      outByName: outBy ? sideDisplayName(outBy) : null,
-      reasons: row.reasons,
-      globalHome: share === null,
-      controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`,
-      remainingUnits: remaining
-    });
   }
 
   // src/shared/knockoutDialogCopy.ts
@@ -52299,6 +52340,9 @@ ${bonuses}`;
         if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "c") {
           e.preventDefault();
           toggleChartsDialog();
+        } else if (!e.repeat && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "p") {
+          e.preventDefault();
+          void toggleReplay();
         }
         return;
       }
@@ -52477,6 +52521,53 @@ ${bonuses}`;
     });
   }
 
+  // src/shared/panelShiftClamp.ts
+  function clampPanelShift(wanted, homeStart, size, areaStart, areaEnd) {
+    const lowest = areaStart - homeStart;
+    const highest = Math.max(lowest, areaEnd - homeStart - size);
+    return Math.min(Math.max(wanted, lowest), highest);
+  }
+
+  // src/renderer/replay/replayPanelDrag.ts
+  var offset = { x: 0, y: 0 };
+  function applyOffset2(panel) {
+    panel.style.transform = offset.x === 0 && offset.y === 0 ? "" : `translate(${offset.x}px, ${offset.y}px)`;
+  }
+  function clampOffset(panel, wantedX, wantedY) {
+    const area = panel.offsetParent?.getBoundingClientRect();
+    const box = panel.getBoundingClientRect();
+    if (!area || box.width === 0) return;
+    offset.x = clampPanelShift(wantedX, box.left - offset.x, box.width, area.left, area.right);
+    offset.y = clampPanelShift(wantedY, box.top - offset.y, box.height, area.top, area.bottom);
+  }
+  function keepReplayPanelInArea(panel) {
+    if (offset.x === 0 && offset.y === 0) return;
+    clampOffset(panel, offset.x, offset.y);
+    applyOffset2(panel);
+  }
+  function wireReplayPanelDrag(panel) {
+    const grip = document.getElementById("replay-panel-drag");
+    if (!grip) return;
+    let grab = null;
+    grip.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      grip.setPointerCapture(event.pointerId);
+      grab = { pointerX: event.clientX, pointerY: event.clientY, startX: offset.x, startY: offset.y };
+    });
+    grip.addEventListener("pointermove", (event) => {
+      if (!grab) return;
+      clampOffset(panel, grab.startX + event.clientX - grab.pointerX, grab.startY + event.clientY - grab.pointerY);
+      applyOffset2(panel);
+    });
+    const endDrag2 = () => {
+      grab = null;
+    };
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) grip.addEventListener(type, endDrag2);
+    const area = panel.parentElement;
+    if (area) new ResizeObserver(() => keepReplayPanelInArea(panel)).observe(area);
+  }
+
   // src/shared/replaySliderPreview.ts
   var REPLAY_SLIDER_PREVIEW_INTERVAL_MS = 250;
   function createSliderPreviewScheduler(options) {
@@ -52543,6 +52634,105 @@ ${bonuses}`;
         forget();
       }
     };
+  }
+
+  // src/renderer/replay/replayStepPreview.ts
+  function sliderMayShowStep() {
+    return replayActive() && currentReplay()?.playing !== true && !replayIsLeaving();
+  }
+  async function previewReplayStep(index) {
+    if (!sliderMayShowStep()) return;
+    try {
+      const view2 = await loadReplayStep(index);
+      if (!view2 || !sliderMayShowStep()) return;
+      await presentReplayStep(index, view2, { forPlayback: false, showDialogs: false });
+      frameReplayStepIfFollowing();
+    } catch (error) {
+      console.error("replay slider preview failed", error);
+    }
+  }
+  async function showReleasedReplayStep(index, settle3) {
+    await settle3();
+    await waitForStepToSettle();
+    if (!sliderMayShowStep()) return;
+    try {
+      await showReplayStep(index);
+    } catch (error) {
+      console.error("replay slider release could not show the step", error);
+    }
+  }
+
+  // src/renderer/replay/replayPanelSlider.ts
+  var sliderDragging = false;
+  var dragMoved = false;
+  var pendingSliderReleases = 0;
+  var sliderPreview = null;
+  function sliderThumbPinned() {
+    return sliderDragging || pendingSliderReleases > 0;
+  }
+  function showFromSlider(index, scheduler, redraw2) {
+    pendingSliderReleases += 1;
+    void showReleasedReplayStep(index, () => scheduler.settle()).catch((error) => {
+      console.error("replay slider release failed", error);
+    }).finally(() => {
+      pendingSliderReleases -= 1;
+      if (pendingSliderReleases === 0) redraw2();
+    });
+  }
+  function endSliderDrag(slider, scheduler, redraw2) {
+    if (!sliderDragging) return;
+    sliderDragging = false;
+    const moved = dragMoved;
+    dragMoved = false;
+    if (moved && currentReplay() !== null) showFromSlider(Number(slider.value), scheduler, redraw2);
+    redraw2();
+  }
+  function followThumb(slider, scheduler) {
+    const state = currentReplay();
+    const step = state?.timeline.steps[Number(slider.value)];
+    const turn = state && step ? stepNumber(step, state.timeline.scope) : void 0;
+    const field = document.getElementById("replay-turn-input");
+    if (turn === void 0 || !field) return;
+    field.value = String(turn);
+    field.removeAttribute("aria-invalid");
+    if (!sliderDragging) return;
+    if (!dragMoved) {
+      dragMoved = true;
+      hideMapToast();
+      hideAiStrategyToast();
+    }
+    scheduler.request(Number(slider.value));
+  }
+  function wireReplaySlider(slider, redraw2) {
+    const scheduler = createSliderPreviewScheduler({
+      intervalMs: REPLAY_SLIDER_PREVIEW_INTERVAL_MS,
+      show: previewReplayStep,
+      now: () => performance.now(),
+      setTimer: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimer: (handle) => window.clearTimeout(handle)
+    });
+    sliderPreview = scheduler;
+    const endDrag2 = () => endSliderDrag(slider, scheduler, redraw2);
+    slider.addEventListener("pointerdown", () => {
+      sliderDragging = true;
+      dragMoved = false;
+    });
+    slider.addEventListener("pointercancel", endDrag2);
+    window.addEventListener("pointerup", () => {
+      if (sliderDragging) window.setTimeout(endDrag2, 0);
+    });
+    slider.addEventListener("input", () => followThumb(slider, scheduler));
+    slider.addEventListener("change", () => {
+      sliderDragging = false;
+      dragMoved = false;
+      showFromSlider(Number(slider.value), scheduler, redraw2);
+    });
+  }
+  function forgetSliderWhenReplayEnds() {
+    if (currentReplay() !== null) return;
+    sliderPreview?.cancel();
+    sliderDragging = false;
+    dragMoved = false;
   }
 
   // src/renderer/replay/replayPlayback.ts
@@ -52634,32 +52824,6 @@ ${bonuses}`;
     if (state?.playing) setReplay({ ...state, stopRequested: true });
   }
 
-  // src/renderer/replay/replayStepPreview.ts
-  function sliderMayShowStep() {
-    return replayActive() && currentReplay()?.playing !== true && !replayIsLeaving();
-  }
-  async function previewReplayStep(index) {
-    if (!sliderMayShowStep()) return;
-    try {
-      const view2 = await loadReplayStep(index);
-      if (!view2 || !sliderMayShowStep()) return;
-      await presentReplayStep(index, view2, { forPlayback: false, showDialogs: false });
-      frameReplayStepIfFollowing();
-    } catch (error) {
-      console.error("replay slider preview failed", error);
-    }
-  }
-  async function showReleasedReplayStep(index, settle3) {
-    await settle3();
-    await waitForStepToSettle();
-    if (!sliderMayShowStep()) return;
-    try {
-      await showReplayStep(index);
-    } catch (error) {
-      console.error("replay slider release could not show the step", error);
-    }
-  }
-
   // src/renderer/replay/replayPanel.ts
   var SHOW_SEEK_LABEL = "Show the turn slider";
   var HIDE_SEEK_LABEL = "Hide the turn slider";
@@ -52675,12 +52839,6 @@ ${bonuses}`;
   var BEAT_NOUN = "Beat";
   var expanded4 = false;
   var slide4 = null;
-  var sliderDragging = false;
-  var pendingSliderReleases = 0;
-  function sliderThumbPinned() {
-    return sliderDragging || pendingSliderReleases > 0;
-  }
-  var sliderPreview = null;
   function byId(id) {
     return document.getElementById(id);
   }
@@ -52693,6 +52851,7 @@ ${bonuses}`;
     slide4?.cancel();
     slide4 = null;
     panel.dataset.state = expanded4 ? "expanded" : "compact";
+    keepReplayPanelInArea(panel);
   }
   function slidePanel2(panel, from, to) {
     slide4 = startPanelHeightSlide(panel, from, to, (finished) => {
@@ -52742,7 +52901,10 @@ ${bonuses}`;
       panel.setAttribute("hidden", "");
       return;
     }
-    panel.removeAttribute("hidden");
+    if (panel.hasAttribute("hidden")) {
+      panel.removeAttribute("hidden");
+      keepReplayPanelInArea(panel);
+    }
     byId("replay-follow-units")?.setAttribute("aria-pressed", String(rendererSharedState.replayFollowUnits));
     const label = byId("replay-panel-label");
     if (label) label.textContent = replayLabel(state.timeline.steps, state.index, state.timeline.scope);
@@ -52761,13 +52923,17 @@ ${bonuses}`;
       field.removeAttribute("aria-invalid");
     }
     if (field) field.disabled = !canSeek(position);
+    const rewind = byId("replay-rewind");
     const back = byId("replay-step-back");
     const forward = byId("replay-step-forward");
     const play = byId("replay-play");
+    const fastForward = byId("replay-fast-forward");
+    if (rewind) rewind.disabled = !canStepBack(position);
     if (back) back.disabled = !canStepBack(position);
     if (forward) forward.disabled = !canStepForward(position);
     if (play) syncPlayButton(play, position);
-    keepFocusInPanel(focused, [back, forward, play]);
+    if (fastForward) fastForward.disabled = !canStepForward(position);
+    keepFocusInPanel(focused, [rewind, back, forward, play, fastForward]);
   }
   function shownNumberText(state) {
     const step = state.timeline.steps[state.index];
@@ -52811,53 +52977,6 @@ ${bonuses}`;
     });
     field.addEventListener("blur", () => commitTurnField(field));
   }
-  function endSliderDrag() {
-    if (!sliderDragging) return;
-    sliderDragging = false;
-    renderReplayPanel();
-  }
-  function wireSlider(slider) {
-    const scheduler = createSliderPreviewScheduler({
-      intervalMs: REPLAY_SLIDER_PREVIEW_INTERVAL_MS,
-      show: previewReplayStep,
-      now: () => performance.now(),
-      setTimer: (fn, ms) => window.setTimeout(fn, ms),
-      clearTimer: (handle) => window.clearTimeout(handle)
-    });
-    sliderPreview = scheduler;
-    slider.addEventListener("pointerdown", () => {
-      sliderDragging = true;
-    });
-    slider.addEventListener("pointercancel", endSliderDrag);
-    window.addEventListener("pointerup", () => {
-      if (sliderDragging) window.setTimeout(endSliderDrag, 0);
-    });
-    slider.addEventListener("input", () => {
-      const state = currentReplay();
-      const step = state?.timeline.steps[Number(slider.value)];
-      const turn = state && step ? stepNumber(step, state.timeline.scope) : void 0;
-      const field = byId("replay-turn-input");
-      if (turn === void 0 || !field) return;
-      field.value = String(turn);
-      field.removeAttribute("aria-invalid");
-      if (sliderDragging) scheduler.request(Number(slider.value));
-    });
-    slider.addEventListener("change", () => {
-      sliderDragging = false;
-      pendingSliderReleases += 1;
-      void showReleasedReplayStep(Number(slider.value), () => scheduler.settle()).catch((error) => {
-        console.error("replay slider release failed", error);
-      }).finally(() => {
-        pendingSliderReleases -= 1;
-        if (pendingSliderReleases === 0) renderReplayPanel();
-      });
-    });
-  }
-  function forgetSliderWhenReplayEnds() {
-    if (currentReplay() !== null) return;
-    sliderPreview?.cancel();
-    sliderDragging = false;
-  }
   function wireReplayPanel() {
     const panel = byId("replay-panel");
     const bar = byId("replay-panel-bar");
@@ -52872,6 +52991,9 @@ ${bonuses}`;
       setReplayFollowUnits(!rendererSharedState.replayFollowUnits);
       renderReplayPanel();
     });
+    byId("replay-rewind")?.addEventListener("click", () => {
+      if (currentReplay()) void showReplayStep(0);
+    });
     byId("replay-step-back")?.addEventListener("click", () => {
       const state = currentReplay();
       if (state) void showReplayStep(state.index - 1);
@@ -52880,12 +53002,17 @@ ${bonuses}`;
       const state = currentReplay();
       if (state) void showReplayStep(state.index + 1);
     });
+    byId("replay-fast-forward")?.addEventListener("click", () => {
+      const state = currentReplay();
+      if (state) void showReplayStep(state.timeline.steps.length - 1);
+    });
     byId("replay-play")?.addEventListener("click", () => {
       if (currentReplay()?.playing) requestReplayPlaybackStop();
       else void startReplayPlayback();
     });
+    wireReplayPanelDrag(panel);
     wireTurnField(field);
-    wireSlider(slider);
+    wireReplaySlider(slider, renderReplayPanel);
     onReplayChange(forgetSliderWhenReplayEnds);
     onReplayChange(renderReplayPanel);
   }

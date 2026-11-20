@@ -80,7 +80,7 @@ export interface ReplayEntryState {
   /**
    * Whether another dialog is open.
    *
-   * Contract: True for a blocking dialog or the charts dialog.
+   * Contract: True for a blocking dialog. The charts dialog does not count.
    * When to use: Refusing silently.
    * Expected outcome: True refuses with no sentence.
    * Exceptions: None.

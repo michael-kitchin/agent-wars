@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as path from 'path';
 import { test } from 'node:test';
-import { getFunctionSource, readRendererSource } from './testSupport/rendererSourceAssertions';
+import { assertMatches, getFunctionSource, readRendererSource } from './testSupport/rendererSourceAssertions';
 
 const DIALOG_IDS = ['charts-overlay', 'charts-dialog', 'charts-dialog-title', 'charts-dialog-close', 'charts-dialog-body'] as const;
 
@@ -49,6 +49,7 @@ test('the window key handler routes the charts key and Escape to the dialog', ()
 test('the dialog and its chart modules paint text as text', () => {
   const files = [
     'chartsDialog.ts',
+    'chartsDialogBlocks.ts',
     'lineChart.ts',
     'relationshipStack.ts',
     'relationshipTimeline.ts',
@@ -96,7 +97,7 @@ test('the line chart uses the shared zoom, pan, and tooltip rules and listens fo
 });
 
 test('the dialog sizes plots by the quarter rule and builds every chart from the shared rules', () => {
-  const dialog = readRendererSource('charts', 'chartsDialog.ts');
+  const dialog = readRendererSource('charts', 'chartsDialog.ts') + readRendererSource('charts', 'chartsDialogBlocks.ts');
   for (const name of ['chartPlotHeight', 'lineChartData', 'relationshipRows', 'relationshipStrip', 'currentRendererMatchEpoch']) {
     assert.equal(dialog.includes(name), true, name);
   }
@@ -148,9 +149,10 @@ test('a backdrop click closes the dialog only when the press started on the back
 
 test('the stacks are drawn only for reported sides, in content-width flex columns', () => {
   const dialog = readRendererSource('charts', 'chartsDialog.ts');
-  assert.equal(getFunctionSource(dialog, 'fillStacks').includes('relationshipSubjectSeatIds'), true);
+  const blocks = readRendererSource('charts', 'chartsDialogBlocks.ts');
+  assert.equal(getFunctionSource(blocks, 'fillStacks').includes('relationshipSubjectSeatIds'), true);
   assert.equal(getFunctionSource(dialog, 'buildBody').includes('relationshipSubjectSeatIds'), true, 'the strip select lists reported sides');
-  assert.equal(dialog.includes('gridTemplateColumns'), false);
+  assert.equal(dialog.includes('gridTemplateColumns') || blocks.includes('gridTemplateColumns'), false);
   const css = readRepoFile('static', 'chartsChrome.css');
   assert.match(css, /\.charts-stack-grid \{[^}]*display: flex;/);
 });
@@ -185,4 +187,11 @@ test('a strip tooltip draws a bold lead-in and bullet runs as one list, with tex
   assert.match(css, /\.charts-tooltip-lead \{[^}]*font-weight: 600/);
   assert.match(css, /\.charts-tooltip-list \{[^}]*list-style: disc/);
   assert.match(css, /\.charts-tooltip-line:has\(> \.charts-tooltip-lead\) \{ display: block/);
+});
+
+test('while replay is on the charts end at the shown turn and follow it', () => {
+  const source = readRendererSource('charts', 'chartsDialog.ts');
+  assertMatches(getFunctionSource(source, 'applySnapshot'), /appliedCap = replayTurnCap\(\);\s+const snapshot = appliedCap === null \? raw : capChartsSnapshot\(raw, appliedCap\);/, 'each applied snapshot is cut at the replay turn');
+  assertMatches(getFunctionSource(source, 'wireChartsDialog'), /onReplayChange\(followReplayTurn\);/, 'the dialog follows replay changes');
+  assertMatches(getFunctionSource(source, 'followReplayTurn'), /replayTurnCap\(\) === appliedCap\) return;\s+applySnapshot\(body, rawSnapshot\);/, 'a new turn redraws from the snapshot already read');
 });

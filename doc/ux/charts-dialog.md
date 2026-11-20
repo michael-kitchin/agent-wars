@@ -79,7 +79,7 @@ Each row is an AI commander, in side order, and the commander is the side that k
 
 A text legend under the strip says: "Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record a matching proposed or active agreement."
 
-**Tooltip.** Hovering a cell lists every matching agreement, active first and then proposed, with no cap, built by `agreementCellTooltip` in `src/shared/agreementStripText.ts`. The heading is bold and reads "{name} (turn {n})", and an empty cell says "No matching agreements." Each agreement has a head line that opens with the bold lead-in "Agreement #{id}:", followed in regular weight by "{kind} with {name}, turns {start} to {end}, {active or proposed}, intent {intent}", with ", against {name}" added for a joint action. Every line under it is a bullet in a list: "Terms: ...", "Zone: ..." when it has one, "Decision on turn {n}: {keep or break}" with ": {reason}" when there is a reason, "Breach this turn: ..." when breached, and "{name} records it as #{id} ({standing})" or "{name} records no matching agreement". The head line carries `lead` and the detail lines carry `bullet` in `AgreementTooltipLine`, and `tooltipLineElements` in `src/renderer/charts/stripTimelineCore.ts` draws them. Side codes in terms and reasons print as display names. A long tooltip wraps, and it opens above the pointer when it would pass the bottom of the dialog body. Kind labels are `SIDE_AGREEMENT_KIND_LABELS` and intent labels are `SIDE_AGREEMENT_INTENT_LABELS` in `src/shared/sideAgreements.ts`.
+**Tooltip.** Hovering a cell lists every matching agreement, active first and then proposed, with no cap, built by `agreementCellTooltip` in `src/shared/agreementStripText.ts`. The heading is bold and reads "{name} (turn {n})", and an empty cell says "No matching agreements." Each agreement has a head line that opens with the bold lead-in "Agreement #{id}:", followed in regular weight by "{kind} with {name}, turns {start} to {end}, {active or proposed}, intent: {intent}", with ", against {name}" added for a joint action. Every line under it is a bullet in a list: "Terms: ...", "Zone: ..." when it has one, "Decision on turn {n}: {keep or break}" with ": {reason}" when there is a reason, "Breach this turn: ..." when breached, and "{name} records it as #{id} ({standing})" or "{name} records no matching agreement". The head line carries `lead` and the detail lines carry `bullet` in `AgreementTooltipLine`, and `tooltipLineElements` in `src/renderer/charts/stripTimelineCore.ts` draws them. Side codes in terms and reasons print as display names. A long tooltip wraps, and it opens above the pointer when it would pass the bottom of the dialog body. Kind labels are `SIDE_AGREEMENT_KIND_LABELS` and intent labels are `SIDE_AGREEMENT_INTENT_LABELS` in `src/shared/sideAgreements.ts`.
 
 ## Inputs and Responses
 
@@ -104,6 +104,7 @@ A text legend under the strip says: "Number: active agreements. +N: proposed agr
 ### Other
 
 - The dialog reads the charts when it opens, and again after each strategic turn resolves while it is open. A battle beat does not refresh it. Every chart gains the new turn and keeps its zoom, each dropdown keeps its choice, and the body keeps its scroll position. There is no timer.
+- While replay is on, the charts show the match as it stood on the turn replay shows and follow the replay slider, as the map does. Turns, agreement states, decisions, and attacks after that turn are left out, a side that left later is still in, and the horizontal axis ends at that turn. The cut is made on the snapshot already read, with no new read (`capChartsSnapshot` in `src/shared/chartsTurnCap.ts`). Zoom, selectors, and scroll position are kept. Leaving replay shows the whole match. See [replay-panel.md](replay-panel.md).
 - When Ready opens the melee intercept list, or knocks the human seat out, the dialog closes first, so that dialog is not hidden under it.
 - A refresh that finds a new match has started, or a save has been loaded, closes the dialog instead of drawing the old match (`currentRendererMatchEpoch`). A refresh whose read fails is logged and keeps the charts on screen.
 - Resizing the window resizes every chart. Nothing overflows the dialog horizontally at the smallest window the app allows. The stacks wrap onto more rows when they do not fit side by side. A long heading wraps, and a long side name in a row card ends in an ellipsis.
@@ -145,7 +146,9 @@ None.
 
 - `static/index.html` (`#charts-overlay`, `#charts-dialog`, `#charts-dialog-close`, `#charts-dialog-body`)
 - `static/chartsChrome.css`
-- `src/renderer/charts/chartsDialog.ts` (`wireChartsDialog`, `toggleChartsDialog`, `refreshChartsDialogIfOpen`, `closeChartsDialogIfOpen`)
+- `src/renderer/charts/chartsDialog.ts` (`wireChartsDialog`, `toggleChartsDialog`, `refreshChartsDialogIfOpen`, `closeChartsDialogIfOpen`, `followReplayTurn`)
+- `src/renderer/charts/chartsDialogBlocks.ts` (`buildLineChartBlock`, `fillStacks`)
+- `src/shared/chartsTurnCap.ts` (`capChartsSnapshot`)
 - `src/renderer/chrome/modalDialogKit.ts` (`trapTabWithin`, `wireBackdropDismiss`: the Tab trap and the click-the-backdrop rule)
 - `src/renderer/chrome/gameMenuActions.ts` (`openChartsDialog`, the game menu's Charts… checkbox)
 - `src/renderer/charts/lineChart.ts`

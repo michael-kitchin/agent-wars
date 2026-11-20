@@ -72,7 +72,7 @@ Replay opens over Strategic planning, over Tactical planning, and over Game over
 
 ### Charts overlay
 
-The charts dialog opens over any mode that has a match loaded and does not change the mode. It is described in [charts-dialog.md](charts-dialog.md). While it is open, no map key acts. Closing it returns to the mode it opened over.
+The charts dialog opens over any mode that has a match loaded and does not change the mode. It is described in [charts-dialog.md](charts-dialog.md). While it is open, no map key acts except C, which closes it, and P, which turns replay on or off. Closing it returns to the mode it opened over.
 
 ## Transitions
 

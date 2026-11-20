@@ -203,7 +203,7 @@ function itemLines(
   const counterpartName = nameOf(item.counterpartSeatId);
   const against = item.againstSeatId === null ? '' : `, against ${nameOf(item.againstSeatId)}`;
   const head = `${SIDE_AGREEMENT_KIND_LABELS[item.kind]} with ${counterpartName}, `
-    + `turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
+    + `turns ${item.startTurn} to ${item.endTurn}, ${item.standing}, intent: ${SIDE_AGREEMENT_INTENT_LABELS[item.intent]}${against}`;
   const lines: string[] = [`Terms: ${displayText(item.terms)}`];
   if (item.zoneCodes.length > 0) lines.push(`Zone: ${item.zoneCodes.join(', ')}`);
   if (item.latestDecision) {

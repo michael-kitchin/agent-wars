@@ -73,7 +73,7 @@ test('an empty cell has the heading and the no-match line', () => {
 test('an item head has a bold lead-in and then names kind, side, turns, standing, and intent', () => {
   const { lines } = tooltipOf(cellOf([item()]));
   assert.equal(lines[0].lead, 'Agreement #7:');
-  assert.equal(lines[0].text, 'Non-aggression with GPT 6.2 Sol, turns 3 to 8, active, intent opportunistic');
+  assert.equal(lines[0].text, 'Non-aggression with GPT 6.2 Sol, turns 3 to 8, active, intent: opportunistic');
   assert.deepEqual(lines.map((line) => line.emphasis), [true, false]);
   assert.equal(lines[1].text, 'Terms: no fire between GPT 6.2 Sol and us');
 });

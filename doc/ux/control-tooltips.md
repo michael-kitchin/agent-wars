@@ -84,9 +84,12 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Chat panel cancel: Discard this message. It has not been sent.
 - Replay panel expand control, while the panel is compact: Show the slider and the turn field.
 - Replay panel expand control, while the panel is expanded: Hide the slider and the turn field.
+- Replay panel Rewind: Go to the first turn.
 - Replay panel Step back: Go back one turn.
 - Replay panel Step forward: Go forward one turn.
 - Replay panel Play: Play the turns forward with their animations.
+- Replay panel Fast forward: Go to the last turn.
+- Replay panel drag grip: Drag to move this panel.
 - Replay panel Follow units: Fit the map to the visible units on every step. Click again to stop.
 - Replay panel Pause, while playback runs: Stop after this turn.
 - Selection panel close: Clear the selection. Queued orders stay.
@@ -225,9 +228,10 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 ## Source Anchors
 
 - `static/index.html` (`#charts-dialog-close`)
-- `src/renderer/charts/chartsDialog.ts` (`buildLineChartBlock`, `buildBody`)
+- `src/renderer/charts/chartsDialog.ts` (`buildBody`)
+- `src/renderer/charts/chartsDialogBlocks.ts` (`buildLineChartBlock`)
 - `src/renderer/charts/agreementStripBlock.ts` (`KIND_CONTROL_TOOLTIP`, `WITH_CONTROL_TOOLTIP`)
-- `static/index.html` (`#replay-panel-expand`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`, `#replay-follow-units`)
+- `static/index.html` (`#replay-panel-expand`, `#replay-rewind`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`, `#replay-fast-forward`, `#replay-panel-drag`, `#replay-follow-units`)
 - `src/renderer/replay/replayPanel.ts` (`SHOW_SEEK_TIP`, `HIDE_SEEK_TIP`, `PLAY_TIP`, `PAUSE_TIP`)
 - `static/index.html` (`#control-tooltip`, `#chat-panel-grip`, `#chat-panel-expand`, `#chat-panel-recipient`, `#chat-panel-input`, `#chat-panel-send`)
 - `src/renderer/chat/chatPanel.ts` (`syncExpandControl`)

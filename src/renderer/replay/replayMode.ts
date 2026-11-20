@@ -9,7 +9,6 @@
 
 import { replayMayEnter } from '../../shared/replayNavigation';
 import type { ReplayStepView } from '../../shared/replayTypes';
-import { chartsDialogIsOpen } from '../charts/chartsDialog';
 import { syncChatPanelVisibility } from '../chat/chatPanelVisibility';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
 import { refreshConsoleHeader, selectConsoleTabKeepingCollapse, selectedConsoleTabId } from '../chrome/consoleFrame';
@@ -179,7 +178,7 @@ function entryDecision(): ReturnType<typeof replayMayEnter> {
     matchLoaded: (S.gameState?.seats?.length ?? 0) > 0,
     readyInFlight: S.readyRequestInFlight,
     playbackRunning: S.resolutionMoveAnimation != null,
-    otherModalOpen: blockingDialogIsOpen() || chartsDialogIsOpen(),
+    otherModalOpen: blockingDialogIsOpen(),
     newGameOpenMidMatch: newGameOverlayIsOpen() && S.gameState?.gameOver !== true,
   });
 }

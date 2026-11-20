@@ -517,6 +517,10 @@ export function wireInitCore(deps: InitCoreDeps): void {
       if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         toggleChartsDialog();
+      } else if (!e.repeat && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'p') {
+        // Replay can run under the open charts, which then follow its turn.
+        e.preventDefault();
+        void toggleReplay();
       }
       return;
     }

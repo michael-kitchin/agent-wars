@@ -7,28 +7,18 @@
  * Exceptions: A failed read shows `The charts could not be loaded.` in the body.
  */
 
-import {
-  lineChartData,
-  relationshipRows,
-  relationshipStrip,
-  relationshipSubjectSeatIds,
-} from '../../shared/matchChartSeries';
-import {
-  LINE_CHART_DEFINITIONS,
-  chartPlotHeight,
-  chartsDialogMayOpen,
-  type LineChartDefinition,
-} from '../../shared/chartsDialogState';
+import { relationshipStrip, relationshipSubjectSeatIds } from '../../shared/matchChartSeries';
+import { LINE_CHART_DEFINITIONS, chartPlotHeight, chartsDialogMayOpen } from '../../shared/chartsDialogState';
 import type { MatchChartsSnapshot } from '../../shared/matchStatistics';
-import { isHumanSeatId } from '../../shared/seatIds';
+import { capChartsSnapshot } from '../../shared/chartsTurnCap';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { rendererSharedState as S } from '../core/state';
 import { blockingDialogIsOpen } from '../chrome/blockingDialogGuards';
+import { currentReplay, onReplayChange } from '../replay/replayState';
 import { trapTabWithin, wireBackdropDismiss } from '../chrome/modalDialogKit';
-import { buildLegend, seatLookups, type SeatLookups } from './chartSeatLookups';
-import type { ChartsView, LineChartEntry } from './chartsDialogTypes';
-import { createLineChart } from './lineChart';
-import { buildRelationshipStack } from './relationshipStack';
+import { buildLegend, seatLookups } from './chartSeatLookups';
+import { appendBlock, buildLineChartBlock, dialogHeight, fillStacks, innerBodyWidth, updateLineChart } from './chartsDialogBlocks';
+import type { ChartsView } from './chartsDialogTypes';
 import { createAgreementStripBlock } from './agreementStripBlock';
 import { createRelationshipTimeline } from './relationshipTimeline';
 
@@ -93,6 +83,39 @@ let openEpoch = 0;
 let previousFocus: HTMLElement | null = null;
 
 /**
+ * The last snapshot read, before any replay cap.
+ *
+ * Purpose: Moving the replay slider redraws the charts from it with no new read.
+ * When to use: Set by `applySnapshot`, cleared on close.
+ * Expected outcome: The whole match's snapshot, or null while closed.
+ * Exceptions: None.
+ */
+let rawSnapshot: MatchChartsSnapshot | null = null;
+
+/**
+ * The replay turn the charts were last drawn at.
+ *
+ * Purpose: A replay change that leaves the turn alone redraws nothing.
+ * When to use: Set by `applySnapshot`, read by `followReplayTurn`.
+ * Expected outcome: A turn number while replay caps the charts, otherwise null.
+ * Exceptions: None.
+ */
+let appliedCap: number | null = null;
+
+/**
+ * The turn replay is showing.
+ *
+ * Purpose: While replay is on, the charts end at that turn.
+ * When to use: Each time a snapshot is applied, and on each replay change.
+ * Expected outcome: The shown step's strategic turn, or null when replay is off.
+ * Exceptions: None.
+ */
+function replayTurnCap(): number | null {
+  const state = currentReplay();
+  return state?.timeline.steps[state.index]?.turnNumber ?? null;
+}
+
+/**
  * Finds the overlay element.
  *
  * Purpose: Every function reaches the dialog through its ids.
@@ -126,144 +149,6 @@ function bodyElement(): HTMLElement | null {
  */
 function matchIsLoaded(): boolean {
   return (S.gameState?.seats?.length ?? 0) > 0;
-}
-
-/**
- * The width the charts may use inside the body.
- *
- * Purpose: Every plot is as wide as the pane allows.
- * When to use: Building and resizing charts.
- * Expected outcome: The body's width less its padding, at least 200.
- * Exceptions: None.
- */
-function innerBodyWidth(body: HTMLElement): number {
-  const style = getComputedStyle(body);
-  const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-  return Math.max(200, Math.floor(body.clientWidth - padding));
-}
-
-/**
- * The dialog's height.
- *
- * Purpose: A chart block is at most a quarter of it.
- * When to use: Building and resizing charts.
- * Expected outcome: The dialog's height in pixels, 0 when it is missing.
- * Exceptions: None.
- */
-function dialogHeight(): number {
-  return document.getElementById('charts-dialog')?.clientHeight ?? 0;
-}
-
-/**
- * Builds a block with a title row and an empty plot host.
- *
- * Purpose: Every chart has a title row, then the plot.
- * When to use: The line charts and the stance strip.
- * Expected outcome: The block, its title row, and its plot host, appended to `parent`.
- * Exceptions: None.
- */
-function appendBlock(parent: HTMLElement, title: string): { readonly titleRow: HTMLElement; readonly plotHost: HTMLElement } {
-  const block = document.createElement('section');
-  block.className = 'charts-block';
-  const titleRow = document.createElement('div');
-  titleRow.className = 'charts-block-title';
-  const heading = document.createElement('h3');
-  heading.textContent = title;
-  titleRow.appendChild(heading);
-  const plotHost = document.createElement('div');
-  plotHost.className = 'charts-plot-host';
-  block.append(titleRow, plotHost);
-  parent.appendChild(block);
-  return { titleRow, plotHost };
-}
-
-/**
- * Fills the stack grid with one stack per side that at least one commander reports on.
- *
- * Purpose: The stacks sit in content-width columns, in side order. A side no commander reports on, such as the only AI seat, gets no stack.
- * When to use: Building the body and refreshing it.
- * Expected outcome: The host's children are replaced. With no reported side it holds `No AI commander reports on any side.`, which only a malformed snapshot reaches, because a real match always has an AI seat.
- * Exceptions: None.
- */
-function fillStacks(host: HTMLElement, snapshot: MatchChartsSnapshot, lookups: SeatLookups): void {
-  const stacks = relationshipSubjectSeatIds(snapshot).map((seatId) =>
-    buildRelationshipStack({
-      subjectSeatId: seatId,
-      rows: relationshipRows(snapshot, seatId),
-      nameOf: lookups.nameOf,
-      flagOf: lookups.flagOf,
-      seatNumberOf: lookups.seatNumberOf,
-      subjectIsViewer: isHumanSeatId(seatId),
-    })
-  );
-  const empty = Object.assign(document.createElement('p'), { className: 'charts-empty', textContent: 'No AI commander reports on any side.' });
-  host.replaceChildren(...(stacks.length > 0 ? stacks : [empty]));
-}
-
-/**
- * Builds one line chart block with its selector.
- *
- * Purpose: A title row with an optional unit-type selector, then the plot, at most a quarter of the dialog tall.
- * When to use: Building the body, once per definition.
- * Expected outcome: The chart's entry.
- * Exceptions: None.
- */
-function buildLineChartBlock(
-  body: HTMLElement,
-  definition: LineChartDefinition,
-  snapshot: MatchChartsSnapshot,
-  lookups: SeatLookups
-): LineChartEntry {
-  const { titleRow, plotHost } = appendBlock(body, definition.title);
-  let select: HTMLSelectElement | null = null;
-  if (definition.options.length > 0) {
-    select = document.createElement('select');
-    select.className = 'charts-select';
-    select.setAttribute('aria-label', `${definition.title} unit type`);
-    select.dataset.controlTooltip = `Show the total or one unit type for ${definition.title.toLowerCase()}.`;
-    definition.options.forEach((option, index) => {
-      const element = document.createElement('option');
-      element.value = String(index);
-      element.textContent = option.label;
-      select?.appendChild(element);
-    });
-    titleRow.appendChild(select);
-  }
-  const handle = createLineChart({
-    host: plotHost,
-    data: lineChartData(snapshot, definition.id, null),
-    width: innerBodyWidth(body),
-    height: chartPlotHeight(dialogHeight(), titleRow.offsetHeight),
-    colorOf: lookups.colorOf,
-    nameOf: lookups.nameOf,
-    decimals: definition.decimals,
-  });
-  return { definition, handle, select, titleRow };
-}
-
-/**
- * Reads a chart's chosen unit type.
- *
- * Purpose: A refresh keeps the player's selector choice.
- * When to use: Redrawing a chart with a selector.
- * Expected outcome: The unit type, or null for the total or a chart with no selector.
- * Exceptions: None.
- */
-function chosenUnitType(entry: LineChartEntry): string | null {
-  if (entry.select === null) return null;
-  return entry.definition.options[Number(entry.select.value)]?.unitType ?? null;
-}
-
-/**
- * Redraws one line chart from a snapshot using its selector.
- *
- * Purpose: A selector change and a refresh share one path.
- * When to use: After the selector changes and after a refresh.
- * Expected outcome: The chart shows the snapshot.
- * Exceptions: None.
- */
-function updateLineChart(entry: LineChartEntry, snapshot: MatchChartsSnapshot): void {
-  entry.handle.update(lineChartData(snapshot, entry.definition.id, chosenUnitType(entry)));
 }
 
 /**
@@ -385,12 +270,15 @@ function resizeCharts(): void {
 /**
  * Applies a fresh snapshot to the open dialog.
  *
- * Purpose: A refresh keeps each chart's zoom, each selector's choice, and the body's scroll position. The first snapshot with turns builds the body.
- * When to use: Opening and refreshing.
+ * Purpose: A refresh keeps each chart's zoom, each selector's choice, and the body's scroll position. The first snapshot with turns builds the body. While replay is on, the snapshot is cut off at the turn replay shows.
+ * When to use: Opening, refreshing, and a replay turn change.
  * Expected outcome: The charts show the snapshot, or `No turns have been recorded yet.` when it has none.
  * Exceptions: None.
  */
-function applySnapshot(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
+function applySnapshot(body: HTMLElement, raw: MatchChartsSnapshot): void {
+  rawSnapshot = raw;
+  appliedCap = replayTurnCap();
+  const snapshot = appliedCap === null ? raw : capChartsSnapshot(raw, appliedCap);
   if (snapshot.turns.length === 0) {
     showBodyMessage(body, 'No turns have been recorded yet.');
     return;
@@ -491,6 +379,8 @@ function openDialog(overlay: HTMLElement): void {
 function closeDialog(overlay: HTMLElement): void {
   open = false;
   openCounter += 1;
+  rawSnapshot = null;
+  appliedCap = null;
   window.removeEventListener('resize', resizeCharts);
   destroyView();
   bodyElement()?.replaceChildren();
@@ -513,6 +403,21 @@ export function wireChartsDialog(): void {
   document.getElementById('charts-dialog-close')?.addEventListener('click', () => closeDialog(overlay));
   wireBackdropDismiss(overlay, () => closeDialog(overlay));
   overlay.addEventListener('keydown', trapTabKey);
+  onReplayChange(followReplayTurn);
+}
+
+/**
+ * Redraws the open charts when replay moves to another turn.
+ *
+ * Purpose: The charts show the match as it stood on the turn replay shows, following the slider as the map does, and return to the whole match when replay ends.
+ * When to use: Subscribed with `onReplayChange` by `wireChartsDialog`.
+ * Expected outcome: Nothing happens while the dialog is closed, before its first read, or when the turn is unchanged.
+ * Exceptions: None.
+ */
+function followReplayTurn(): void {
+  const body = bodyElement();
+  if (!open || body === null || rawSnapshot === null || replayTurnCap() === appliedCap) return;
+  applySnapshot(body, rawSnapshot);
 }
 
 /**

@@ -321,13 +321,16 @@
         <input type="text" id="replay-turn-input" class="replay-turn-input" inputmode="numeric" autocomplete="off" aria-label="Turn" data-control-tooltip="Type a turn number and press Enter to go to that turn." />
         <input type="range" id="replay-slider" class="replay-slider" min="0" max="0" step="1" value="0" aria-label="Turn" data-control-tooltip="Drag to a turn. The map follows the thumb, and the turn's dialogs open when you let go." />
       </div>
+      <div id="replay-panel-drag" class="replay-panel-drag" aria-hidden="true" data-control-tooltip="Drag to move this panel."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5h.01M11 5h.01M5 8h.01M11 8h.01M5 11h.01M11 11h.01"></path></svg></div>
       <div id="replay-panel-bar" class="replay-panel-bar">
         <button type="button" id="replay-panel-expand" class="replay-panel-expand" aria-expanded="false" aria-controls="replay-panel-seek" aria-label="Show the turn slider" data-control-tooltip="Show the slider and the turn field."><svg class="chrome-icon replay-panel-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"></path></svg></button>
         <button type="button" id="replay-follow-units" class="replay-panel-btn" aria-pressed="false" aria-label="Follow units" data-control-tooltip="Fit the map to the visible units on every step. Click again to stop."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.3"></circle><path d="M10 10l4 4"></path></svg></button>
         <p id="replay-panel-label" class="replay-panel-label"></p>
+        <button type="button" id="replay-rewind" class="replay-panel-btn" aria-label="Rewind to the first turn" data-control-tooltip="Go to the first turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3L2 8l6 5zM14 3L8 8l6 5z"></path></svg></button>
         <button type="button" id="replay-step-back" class="replay-panel-btn" aria-label="Step back one turn" data-control-tooltip="Go back one turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3v10M13 3L6 8l7 5z"></path></svg></button>
         <button type="button" id="replay-step-forward" class="replay-panel-btn" aria-label="Step forward one turn" data-control-tooltip="Go forward one turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3v10M3 3l7 5-7 5z"></path></svg></button>
         <button type="button" id="replay-play" class="replay-panel-btn" aria-label="Play" data-control-tooltip="Play the turns forward with their animations."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3l9 5-9 5z"></path></svg></button>
+        <button type="button" id="replay-fast-forward" class="replay-panel-btn" aria-label="Fast forward to the last turn" data-control-tooltip="Go to the last turn."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3l6 5-6 5zM8 3l6 5-6 5z"></path></svg></button>
       </div>
     </section>
   </div>

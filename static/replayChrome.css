@@ -14,7 +14,8 @@ body[data-replay="on"] #build-entry-layer {
 
 /* ---------- Replay panel ---------- */
 /* The panel takes the selection panel's place at the map's bottom-left, with the same face and the same 50 px bar. It sits
-   above the new-game panel (7002), so it stays usable at game over, and below the charts overlay (7080). replayPanel.ts
+   above the new-game panel (7002), so it stays usable at game over, and below the start and load confirmations (7070). While the charts overlay
+   (7080) shows, the panel rises above it, still under the tooltips (7100), so replay can be stepped with the charts open. replayPanel.ts
    sets data-state to compact or expanded. Expanded, the seek row (turn field and slider) shows above the bar. */
 .replay-panel {
   position: absolute;
@@ -34,6 +35,32 @@ body[data-replay="on"] #build-entry-layer {
   border-radius: 6px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   font-size: 13px;
+}
+.replay-panel-drag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+  touch-action: none;
+  color: var(--chrome-disabled);
+}
+.replay-panel-drag:hover {
+  color: var(--chrome-text);
+}
+.replay-panel-drag .chrome-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+body:has(#charts-overlay:not([hidden])) .replay-panel {
+  z-index: 7085;
 }
 .replay-panel[hidden] {
   display: none;

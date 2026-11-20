@@ -98,9 +98,12 @@ const REPLAY_PANEL_IDS = [
   'replay-panel-bar',
   'replay-panel-expand',
   'replay-panel-label',
+  'replay-panel-drag',
+  'replay-rewind',
   'replay-step-back',
   'replay-step-forward',
   'replay-play',
+  'replay-fast-forward',
 ] as const;
 
 test('the replay panel markup is on the page once, and the panel code uses the shared rules without innerHTML', () => {
@@ -336,16 +339,16 @@ test('Start game drops replay as soon as it advances the match epoch', () => {
 
 test('a step button that a draw disables hands its focus to the slider or another replay control', () => {
   const panel = readRendererSource('replay', 'replayPanel.ts');
-  assertMatches(getFunctionSource(panel, 'renderReplayPanel'), /const focused = document\.activeElement;[\s\S]*keepFocusInPanel\(focused, \[back, forward, play\]\);\r?\n\}$/, 'the draw reads focus first and hands it on last');
+  assertMatches(getFunctionSource(panel, 'renderReplayPanel'), /const focused = document\.activeElement;[\s\S]*keepFocusInPanel\(focused, \[rewind, back, forward, play, fastForward\]\);\r?\n\}$/, 'the draw reads focus first and hands it on last');
   const keep = getFunctionSource(panel, 'keepFocusInPanel');
   assertMatches(keep, /!focused\.disabled \|\| !buttons\.includes\(focused\)\) return;/, 'focus moves only off a bar button that is now disabled');
   assertMatches(keep, /expanded \? byId<HTMLInputElement>\('replay-slider'\)/, 'the slider is the first choice while it is shown');
 });
 
 test('the replay slider keeps focus, and p and Escape still reach replay from it', () => {
-  const slider = getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'wireSlider');
-  assert.equal(slider.includes('.blur()'), false, 'the slider does not drop focus after a step');
-  assertMatches(slider, /showReleasedReplayStep\(Number\(slider\.value\), \(\) => scheduler\.settle\(\)\)/, 'a release waits for the previews to settle and then shows the step');
+  const sliderSource = readRendererSource('replay', 'replayPanelSlider.ts');
+  assert.equal(sliderSource.includes('.blur()'), false, 'the slider does not drop focus after a step');
+  assertMatches(getFunctionSource(sliderSource, 'showFromSlider'), /showReleasedReplayStep\(index, \(\) => scheduler\.settle\(\)\)/, 'a release waits for the previews to settle and then shows the step');
   const render = getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'renderReplayPanel');
   assertMatches(render, /slider\.disabled = !canSeek\(position\);/, 'the slider is disabled through canSeek');
   assertMatches(render, /field\.disabled = !canSeek\(position\);/, 'the turn field is disabled through canSeek');
@@ -373,19 +376,25 @@ test('the entry wrapper drops a live snapshot during replay before any side effe
 
 test('the slider previews steps while it is dragged and shows the released step with its dialogs', () => {
   const panel = readRendererSource('replay', 'replayPanel.ts');
-  const slider = getFunctionSource(panel, 'wireSlider');
+  const sliderSource = readRendererSource('replay', 'replayPanelSlider.ts');
+  const slider = getFunctionSource(sliderSource, 'wireReplaySlider');
   assertMatches(slider, /createSliderPreviewScheduler\(\{[\s\S]*show: previewReplayStep,/, 'the slider builds one preview scheduler');
-  assertMatches(slider, /if \(sliderDragging\) scheduler\.request\(Number\(slider\.value\)\)/, 'input asks for a preview only during a pointer drag, so a key step frames and applies once');
-  assert.equal(slider.includes('currentReplay()?.busy'), false, 'a release is no longer dropped while a step loads');
+  const follow = getFunctionSource(sliderSource, 'followThumb');
+  assertMatches(follow, /if \(!sliderDragging\) return;[\s\S]*scheduler\.request\(Number\(slider\.value\)\);/, 'input asks for a preview only during a pointer drag, so a key step frames and applies once');
+  assertMatches(follow, /if \(!dragMoved\) \{[\s\S]*hideMapToast\(\);\s+hideAiStrategyToast\(\);/, 'the first movement of a drag closes both dialogs');
+  assertMatches(getFunctionSource(sliderSource, 'endSliderDrag'), /if \(moved && currentReplay\(\) !== null\) showFromSlider\(/, 'a moved drag that fires no change shows its step again with its dialogs');
+  assert.equal(sliderSource.includes('currentReplay()?.busy'), false, 'a release is no longer dropped while a step loads');
   const render = getFunctionSource(panel, 'renderReplayPanel');
   assertMatches(render, /if \(!sliderThumbPinned\(\)\) slider\.value = String\(state\.index\);/, 'a drag keeps the thumb where the pointer put it');
   assertMatches(render, /document\.activeElement !== field && !sliderThumbPinned\(\)\)/, 'a drag keeps the field the drag wrote');
-  assertMatches(getFunctionSource(panel, 'sliderThumbPinned'), /return sliderDragging \|\| pendingSliderReleases > 0;/, 'a release still loading pins the thumb as a drag does');
-  const change = slider.slice(slider.indexOf("addEventListener('change'"));
-  const raised = change.indexOf('pendingSliderReleases += 1;');
-  assert.ok(raised >= 0 && raised < change.indexOf('showReleasedReplayStep('), 'a release pins the thumb before it starts showing the step');
-  assertMatches(change, /\.finally\(\(\) => \{\s+pendingSliderReleases -= 1;\s+if \(pendingSliderReleases === 0\) renderReplayPanel\(\);/, 'the pin is lifted after the step shows or fails, and only then is the panel redrawn');
-  const forget = getFunctionSource(panel, 'forgetSliderWhenReplayEnds');
+  assertMatches(getFunctionSource(sliderSource, 'sliderThumbPinned'), /return sliderDragging \|\| pendingSliderReleases > 0;/, 'a release still loading pins the thumb as a drag does');
+  assertMatches(slider.slice(slider.indexOf("addEventListener('change'")), /showFromSlider\(Number\(slider\.value\), scheduler, redraw\);/, 'a release shows the released step');
+  const show = getFunctionSource(sliderSource, 'showFromSlider');
+  const raised = show.indexOf('pendingSliderReleases += 1;');
+  assert.ok(raised >= 0 && raised < show.indexOf('showReleasedReplayStep('), 'a release pins the thumb before it starts showing the step');
+  assertMatches(show, /\.finally\(\(\) => \{\s+pendingSliderReleases -= 1;\s+if \(pendingSliderReleases === 0\) redraw\(\);/, 'the pin is lifted after the step shows or fails, and only then is the panel redrawn');
+  assertMatches(getFunctionSource(panel, 'wireReplayPanel'), /wireReplaySlider\(slider, renderReplayPanel\);/, 'the panel redraw is the slider\'s redraw');
+  const forget = getFunctionSource(sliderSource, 'forgetSliderWhenReplayEnds');
   assertMatches(forget, /sliderPreview\?\.cancel\(\);[\s\S]*sliderDragging = false;/, 'ending replay cancels previews and the drag');
   const present = getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'presentReplayStep');
   assertMatches(present, /if \(options\.showDialogs\) await showReplayStepDialogs\(/, 'a preview opens no dialog');
@@ -423,4 +432,35 @@ test('follow units sits before the label and frames each shown step once, with t
   const camera = readRendererSource('replay', 'replayCamera.ts');
   assertMatches(getFunctionSource(camera, 'frameReplayStepIfFollowing'), /if \(!S\.replayFollowUnits \|\| !replayActive\(\)\) return;/, 'the fit runs only while the toggle and replay are on');
   assertMatches(getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'renderReplayPanel'), /setAttribute\('aria-pressed', String\(S\.replayFollowUnits\)\)/, 'the toggle shows its state');
+});
+
+test('Rewind and Fast forward jump to the ends and follow the step rules', () => {
+  const panel = readRendererSource('replay', 'replayPanel.ts');
+  const render = getFunctionSource(panel, 'renderReplayPanel');
+  assertMatches(render, /rewind\.disabled = !canStepBack\(position\);/, 'Rewind is disabled whenever Step back is');
+  assertMatches(render, /fastForward\.disabled = !canStepForward\(position\);/, 'Fast forward is disabled whenever Step forward is');
+  const wire = getFunctionSource(panel, 'wireReplayPanel');
+  assertMatches(wire, /'replay-rewind'[\s\S]*?showReplayStep\(0\)/, 'Rewind shows the first step');
+  assertMatches(wire, /'replay-fast-forward'[\s\S]*?showReplayStep\(state\.timeline\.steps\.length - 1\)/, 'Fast forward shows the last step');
+  const html = readRepoFile('static', 'index.html');
+  const order = ['replay-rewind', 'replay-step-back', 'replay-step-forward', 'replay-play', 'replay-fast-forward'].map((id) => html.indexOf(`id="${id}"`));
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'the bar buttons run Rewind, Step back, Step forward, Play, Fast forward');
+});
+
+test('the replay panel moves by its grip and rises above the charts only while they show', () => {
+  const drag = readRendererSource('replay', 'replayPanelDrag.ts');
+  assertMatches(drag, /setPointerCapture\(event\.pointerId\)/, 'the grip captures the pointer');
+  assert.equal(/style\.(width|height)\b/.test(drag), false, 'the grip never resizes the panel');
+  assertMatches(getFunctionSource(readRendererSource('replay', 'replayPanel.ts'), 'settlePanel'), /keepReplayPanelInArea\(panel\);/, 'a settled slide keeps a moved panel inside the map');
+  const css = readRepoFile('static', 'replayChrome.css');
+  assertMatches(css, /\.replay-panel \{[^}]*z-index: 7040;/, 'the panel stays under the confirmations');
+  assertMatches(css, /body:has\(#charts-overlay:not\(\[hidden\]\)\) \.replay-panel \{\s+z-index: 7085;/, 'the panel rises over the charts overlay');
+});
+
+test('replay starts with the charts open, and P reaches it from the open charts', () => {
+  const entry = getFunctionSource(readRendererSource('replay', 'replayMode.ts'), 'entryDecision');
+  assert.equal(entry.includes('chartsDialogIsOpen'), false, 'the open charts do not refuse replay');
+  const keys = readRendererSource('map', 'initCore.ts');
+  const charts = keys.slice(keys.indexOf('if (shouldIgnoreGlobalKeydown(e) && !(isRangeInputTarget'), keys.indexOf("if (e.key === 'Shift'"));
+  assertMatches(charts, /!e\.shiftKey[^\n]*e\.key\.toLowerCase\(\) === 'p'\) \{\s+(\/\/[^\n]*\s+)?e\.preventDefault\(\);\s+void toggleReplay\(\);/, 'P toggles replay while the charts are open');
 });

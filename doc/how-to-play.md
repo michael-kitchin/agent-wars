@@ -407,11 +407,11 @@ Hover a chart for each side's value at that turn. Scroll over a chart to zoom th
 
 ### Replay
 
-Press **P**, or check **Playback…** in the game menu, to look back at turns already played. A panel at the map's bottom-left steps back and forward through the turns, and its arrow shows a slider for jumping to one. **Play** runs every turn's movement and combat up to the present. The magnifying glass keeps the map fitted to the units at every step. Press **P** again or Escape to return.
+Press **P**, or check **Playback…** in the game menu, to look back at turns already played. A panel at the map's bottom-left steps back and forward through the turns, jumps to the first or last turn with the double arrows, and its arrow shows a slider for jumping to any turn. **Play** runs every turn's movement and combat up to the present. The magnifying glass keeps the map fitted to the units at every step. Drag the dotted grip in the panel's upper-right corner to move the panel out of the way. Press **P** again or Escape to return.
 
 
 
-Each step shows the map as you saw it then, with that turn's messages. After the match, or while you're watching, replay shows every side. Replay changes nothing, and while it's on, Ready and map clicks do nothing. Inside a battle, **P** replays that battle's beats instead.
+Each step shows the map as you saw it then, with that turn's messages. After the match, or while you're watching, replay shows every side. Replay changes nothing, and while it's on, Ready and map clicks do nothing. Inside a battle, **P** replays that battle's beats instead. The [Charts](#charts) can stay open over replay. They show the match as it stood on the turn you are viewing, and follow the slider.
 
 ## Agent-Only Games
 
