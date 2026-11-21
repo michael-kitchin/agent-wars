@@ -225,6 +225,8 @@ test('ready knocks out the seat whose home another seat controls', (t) => {
     for (const h3 of getScenarioHomeRegionHexes(victim!.homeRegion)) {
       setHexController(h3, AI_SEAT_IDS[0]);
     }
+    // Units standing on a home hex keep it, and the rule needs 90% of the home's urban cells lost.
+    dbRun('DELETE FROM units WHERE player = ?', [AI_SEAT_IDS[1]]);
     const result = ready();
     assert.equal(result.success, true);
     const knockout = result.knockouts?.find((row) => row.seatId === AI_SEAT_IDS[1]);

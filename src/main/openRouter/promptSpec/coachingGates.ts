@@ -119,11 +119,11 @@ export interface CoachingGates {
    */
   readonly includeScenarioWinPaths: boolean;
   /**
-   * Urban share the control win is using, when this consultation is regional.
+   * Urban share the home-loss knockout is using.
    *
-   * Contract: A number selects the urban-share coaching bullet. Null or absent keeps the every-hex bullet.
-   * When to use: Set from the same effective share the winner used. Do not read the active map here.
-   * Expected outcome: Absent on the global map and in tactical mode.
+   * Contract: A number selects the urban-share coaching bullet. Null or absent keeps the every-hex bullet, which applies only when the every-hex fallback is in force.
+   * When to use: Set from the same effective share the knockout rule used, on every map. Do not read the active map here.
+   * Expected outcome: The profile share on every map once the terrain classification cache is loaded. Absent in tactical mode.
    * Exceptions: None.
    */
   readonly controlWinMinUrbanShare?: number | null;

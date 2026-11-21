@@ -1,13 +1,15 @@
-import type { HomeControlProgress } from '../gameActions/homeControlProgress';
+import type { KnockoutStatusForSeat, SideKnockoutStatus } from '../gameActions/knockoutStatus';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { isSeatActive, sortSeatsByOrder } from '../../shared/seatRoster';
+import { NEAR_KNOCKOUT_MAX_CITY_HEXES } from '../../shared/victoryRules';
+import { formatHomeRegionHexCodesForPrompt } from './consultPromptPartsHelpers';
 import { SECTION_TITLE_SCENARIO_OBJECTIVE, topLevelHeading } from './promptSpec/sectionHeadings';
 
 /** First sentence of the strategic win reminder (single source for prompts and matrix tests). */
 export const WIN_CONDITION_REMINDER_FIRST_SENTENCE =
-  'Your goal is to be the last side standing. A side is knocked out when one other side controls its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side\'s units become neutral garrisons and its land becomes neutral.';
+  'Your goal is to be the last side standing. A side is knocked out when other sides and Neutral together hold its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side\'s units become neutral garrisons and its land becomes neutral.';
 
 /**
  * Turn-limit sentence appended to the last-side goal.
@@ -34,13 +36,17 @@ export const MUTUAL_WIPE_GOAL_SENTENCE =
 const WIN_CONDITION_REMINDER_SECOND_SENTENCE =
   'Enemy units can be destroyed through ranged and melee combat, and production capacity can be destroyed through air strikes. Review the rules, below, for how to order this.';
 
-/** Substring matched by matrix tests for the control-based branch of the scenario objective. */
+/** Substring matched by matrix tests for the home-loss branch of the scenario objective when no share applies. */
 export const REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET =
-  'Controlling all hexes intersecting the enemy home region';
+  'Other sides and Neutral together holding every hex of the enemy home region';
 
 /** Substring matched by matrix tests for the urban-elimination branch of the scenario objective. */
 export const REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET =
   'Eliminating all urban production (tactical urban hexes) in the enemy home region';
+
+/** Substring matched by matrix tests for the no-city-hexes branch of the scenario objective. */
+export const REGION_VS_REGION_SCENARIO_NO_CITY_SNIPPET =
+  'Taking every city hex the enemy holds anywhere';
 
 /**
  * The generic objective used when the snapshot has no recognised scenario id.
@@ -54,10 +60,10 @@ export const GENERIC_OBJECTIVE_SENTENCE =
   'Your goal is to destroy the enemy force or take enemy territory.';
 
 /**
- * Percent label for a regional urban-share control win.
+ * Percent label for the home-loss share.
  *
  * Purpose: The reminder, the objective snippet, and the coaching bullet must print the same percent.
- * When to use: Whenever a numeric control-win share is shown to the commander.
+ * When to use: Whenever a numeric home-loss share is shown to the commander.
  * Expected outcome: `Math.round(share * 100)`. `0.75` is 75.
  * Exceptions: None.
  */
@@ -67,22 +73,22 @@ export function controlWinUrbanSharePercent(share: number): number {
 }
 
 /**
- * Control branch of the regional scenario objective.
+ * Home-loss branch of the scenario objective when a share applies.
  *
- * Purpose: Line (1) of the win block names the urban-cell share.
+ * Purpose: Line (1) of the knockout block names the urban-cell share that other sides and Neutral must hold together.
  * When to use: `buildScenarioObjectiveRulesBlock` when the effective share is a number.
  * Expected outcome: The percent comes from `controlWinUrbanSharePercent`.
  * Exceptions: None.
  */
 function regionalControlSnippet(share: number): string {
   const pct = controlWinUrbanSharePercent(share);
-  return `Controlling enemy home region hexes that together hold at least ${pct}% of its original urban cells`;
+  return `Other sides and Neutral together holding enemy home region hexes with at least ${pct}% of its original urban cells`;
 }
 
 /**
- * Coaching bullet for a regional urban-share control win.
+ * Coaching bullet for the home-loss share.
  *
- * Purpose: The context block and the scenario objective name the same percent.
+ * Purpose: The context block and the scenario objective name the same percent, and the bullet tells the commander that a side with few city hexes is close to being knocked out.
  * When to use: Strategic coaching when the effective share is a number.
  * Expected outcome: The percent comes from `controlWinUrbanSharePercent`.
  * Exceptions: None.
@@ -90,7 +96,7 @@ function regionalControlSnippet(share: number): string {
 export function regionalWinPathsBullet(share: number): string {
   logTrace('scenarioGoals regionalWinPathsBullet', { share });
   const pct = controlWinUrbanSharePercent(share);
-  return `- Win by being the last side standing: knock out each enemy by controlling its home region (at least ${pct}% of its original urban cells), or by destroying or taking all of its cities. Those are the cells that matter.`;
+  return `- Win by being the last side standing: an enemy is knocked out when other sides and Neutral together hold its home region (at least ${pct}% of its original urban cells), when its home cities are destroyed, or when it holds no city hex anywhere. Those are the cells that matter. A side with only a few city hexes left is close to being knocked out.`;
 }
 
 /**
@@ -139,44 +145,6 @@ export function buildTacticalBattleGoalClause(): string {
 }
 
 /**
- * Urban progress against one enemy home, and that enemy's progress against ours.
- *
- * Purpose: The objective block prints one pair of lines per enemy instead of a single human-and-opponent pair.
- * When to use: `buildScenarioProgressLines` when a share is in force.
- * Expected outcome: `ownAgainstEnemy` is always printed. `enemyAgainstOwn` is printed only when that enemy holds any of our home's urban cells.
- * Exceptions: None.
- */
-export type EnemyUrbanProgress = {
-  /**
-   * The enemy's full home display name.
-   *
-   * Contract: `homeRegion`, not the short name.
-   * When to use: Both progress labels.
-   * Expected outcome: A non-empty name.
-   * Exceptions: None.
-   */
-  readonly name: string;
-  /**
-   * Urban cells of that enemy's home that this commander controls.
-   *
-   * Contract: The pair helper's `ownAgainstEnemy`, or the older opponent-against-human progress.
-   * When to use: The "in hexes you control" line.
-   * Expected outcome: Held, total, and needed counts.
-   * Exceptions: None.
-   */
-  readonly ownAgainstEnemy: HomeControlProgress;
-  /**
-   * Urban cells of this commander's home that the enemy controls.
-   *
-   * Contract: The pair helper's `enemyAgainstOwn`, or the older human-against-opponent progress.
-   * When to use: The "in hexes {name} controls" line, only when `heldUrbanCells` is greater than zero.
-   * Expected outcome: Held, total, and needed counts.
-   * Exceptions: None.
-   */
-  readonly enemyAgainstOwn: HomeControlProgress;
-};
-
-/**
  * Active enemies' home names in seat order, or the two-sided human home when the roster is absent.
  *
  * Purpose: The objective line lists every enemy home.
@@ -219,7 +187,7 @@ function ownHomeName(state: GameStateSnapshot): string {
  *
  * Purpose: Home names, win paths, and the visibility sentence do not change during a match, so they belong in the system prompt.
  * When to use: Strategic system-prompt assembly when `scenarioId` is `region_vs_region`.
- * Expected outcome: The heading, the scenario id, home names, the two win paths, and the outline sentence. '' for any other scenario. No urban-share counts.
+ * Expected outcome: The heading, the scenario id, home names, the three knockout paths, and the outline sentence. '' for any other scenario. No urban-share counts.
  * Exceptions: None.
  */
 export function buildScenarioObjectiveRulesBlock(
@@ -243,70 +211,116 @@ export function buildScenarioObjectiveRulesBlock(
   const share = options?.controlWinMinUrbanShare;
   const controlSnippet = typeof share === 'number' ? regionalControlSnippet(share) : REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET;
   lines.push(
-    '- Win at end of turn by either:\n' +
+    '- Knock an enemy out at the end of a turn by any of these:\n' +
       `    (1) ${controlSnippet}, OR\n` +
-      `    (2) ${REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET}.`
+      `    (2) ${REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET}, OR\n` +
+      `    (3) ${REGION_VS_REGION_SCENARIO_NO_CITY_SNIPPET}.`
   );
   lines.push('- Every home-region outline is always visible on the map.');
   return lines.join('\n');
 }
 
 /**
- * Urban-share progress bullets for the situation message.
+ * Phrase for how many city hexes a side holds.
  *
- * Purpose: These counts change as hexes change hands, so they stay out of the cached system prompt.
- * When to use: Under Scenario Progress on a strategic region-versus-region consultation.
- * Expected outcome: One or two bullets per enemy when a share is set and progress was supplied. [] otherwise.
+ * Purpose: The knockout status lines read the same way for every count.
+ * When to use: `ownStatusLines` and `enemyStatusLines`.
+ * Expected outcome: `no city hexes`, `1 city hex`, or `${n} city hexes`.
  * Exceptions: None.
  */
-export function buildScenarioProgressLines(
-  state: GameStateSnapshot,
-  options?: {
-    readonly controlWinMinUrbanShare?: number | null;
-    readonly progress?: { readonly ai: HomeControlProgress; readonly human: HomeControlProgress } | null;
-    readonly enemyProgress?: readonly EnemyUrbanProgress[] | null;
-  }
-): string[] {
-  logDebug('scenarioGoals buildScenarioProgressLines', {
-    scenarioId: state.scenarioId,
-    controlWinMinUrbanShare: options?.controlWinMinUrbanShare ?? null,
-    enemyProgressCount: options?.enemyProgress?.length ?? 0,
-  });
-  if (state.scenarioId !== 'region_vs_region' || typeof options?.controlWinMinUrbanShare !== 'number') return [];
-  return enemyProgressRows(state, options).flatMap((row) => {
-    const lines = [
-      `- ${row.name} home urban cells in hexes you control: ${row.ownAgainstEnemy.heldUrbanCells} of ${row.ownAgainstEnemy.totalUrbanCells} (you need ${row.ownAgainstEnemy.neededUrbanCells}).`,
-    ];
-    if (row.enemyAgainstOwn.heldUrbanCells > 0) {
-      lines.push(
-        `- Your home urban cells in hexes ${row.name} controls: ${row.enemyAgainstOwn.heldUrbanCells} of ${row.enemyAgainstOwn.totalUrbanCells} (they need ${row.enemyAgainstOwn.neededUrbanCells}).`
-      );
-    }
-    return lines;
-  });
+function cityHexPhrase(count: number): string {
+  if (count === 0) return 'no city hexes';
+  return count === 1 ? '1 city hex' : `${count} city hexes`;
 }
 
 /**
- * Progress rows for the urban-share bullets.
+ * Listing of city hexes with their codes and urban cells.
  *
- * Purpose: Callers may pass per-enemy pairs, or the older two-sided pair, which is labeled with the human home name.
- * When to use: Only from `buildScenarioProgressLines`.
- * Expected outcome: Per-enemy rows when supplied. Otherwise one row from `progress` when that object is present. Otherwise none.
+ * Purpose: A side close to being knocked out has its city hexes named so a commander can go for them.
+ * When to use: The second line under a near-knockout side.
+ * Expected outcome: `${code} (${cells} urban cell(s))` items joined with `, `.
  * Exceptions: None.
  */
-function enemyProgressRows(
-  state: GameStateSnapshot,
-  options: {
-    readonly progress?: { readonly ai: HomeControlProgress; readonly human: HomeControlProgress } | null;
-    readonly enemyProgress?: readonly EnemyUrbanProgress[] | null;
-  } | undefined
-): readonly EnemyUrbanProgress[] {
-  if (options?.enemyProgress && options.enemyProgress.length > 0) return options.enemyProgress;
-  if (!options?.progress) return [];
-  const names = enemyHomeNames(state);
-  return [{
-    name: names[0] ?? 'the enemy',
-    ownAgainstEnemy: options.progress.ai,
-    enemyAgainstOwn: options.progress.human,
-  }];
+function cityHexListing(cityHexes: SideKnockoutStatus['cityHexes']): string {
+  return cityHexes
+    .map((hex) => `${formatHomeRegionHexCodesForPrompt([hex.h3Index])} (${hex.urbanCells} urban ${hex.urbanCells === 1 ? 'cell' : 'cells'})`)
+    .join(', ');
+}
+
+/**
+ * Whether a side's city hexes should be listed.
+ *
+ * Purpose: Only a side that holds at least one and at most `NEAR_KNOCKOUT_MAX_CITY_HEXES` city hexes is listed.
+ * When to use: `ownStatusLines` and `enemyStatusLines`.
+ * Expected outcome: True for a count from 1 through the near-knockout limit.
+ * Exceptions: None.
+ */
+function isNearKnockout(row: SideKnockoutStatus): boolean {
+  return row.cityHexes.length >= 1 && row.cityHexes.length <= NEAR_KNOCKOUT_MAX_CITY_HEXES;
+}
+
+/**
+ * Knockout status lines for the commander's own side.
+ *
+ * Purpose: The commander sees how many city hexes it holds and how much of its home is lost.
+ * When to use: First in `buildScenarioProgressLines`.
+ * Expected outcome: The share or every-hex line, then the city hex listing when the side is near knockout.
+ * Exceptions: None.
+ */
+function ownStatusLines(row: SideKnockoutStatus): string[] {
+  const loss = row.homeLoss;
+  const held = cityHexPhrase(row.cityHexes.length);
+  const lines = [
+    loss.everyHexRule
+      ? `- Your side: you hold ${held}. Other sides and Neutral hold ${loss.lostHexes} of your ${loss.totalHexes} home hexes. You are knocked out if they hold all of them, or if you lose every city hex.`
+      : `- Your side: you hold ${held}. Other sides and Neutral hold ${loss.lostUrbanCells} of your home's ${loss.totalUrbanCells} original urban cells. You are knocked out if they reach ${loss.neededUrbanCells}, or if you lose every city hex.`,
+  ];
+  if (isNearKnockout(row)) lines.push(`  Your city hexes: ${cityHexListing(row.cityHexes)}.`);
+  return lines;
+}
+
+/**
+ * Knockout status lines for one enemy.
+ *
+ * Purpose: The commander sees how close an enemy is to being knocked out, and which of its city hexes it knows about.
+ * When to use: Once per enemy in `buildScenarioProgressLines`.
+ * Expected outcome: The share or every-hex line, then a listing line when the enemy is near knockout. The listing respects the hexes the viewer has explored. A missing explored list means every hex is explored.
+ * Exceptions: None.
+ */
+function enemyStatusLines(state: GameStateSnapshot, row: SideKnockoutStatus): string[] {
+  const loss = row.homeLoss;
+  const held = cityHexPhrase(row.cityHexes.length);
+  const lines = [
+    loss.everyHexRule
+      ? `- ${row.name}: holds ${held}. Other sides and Neutral hold ${loss.lostHexes} of its ${loss.totalHexes} home hexes. It is knocked out if they hold all of them, or if it loses every city hex.`
+      : `- ${row.name}: holds ${held}. Other sides and Neutral hold ${loss.lostUrbanCells} of its home's ${loss.totalUrbanCells} original urban cells, ${row.viewerHeldHomeUrbanCells} of them yours. It is knocked out if they reach ${loss.neededUrbanCells}, or if it loses every city hex.`,
+  ];
+  if (!isNearKnockout(row)) return lines;
+  const explored = state.exploredHexes ? new Set(state.exploredHexes) : null;
+  const known = explored ? row.cityHexes.filter((hex) => explored.has(hex.h3Index)) : row.cityHexes;
+  if (known.length === row.cityHexes.length) {
+    lines.push(`  Its city hexes: ${cityHexListing(known)}. Taking all of them knocks it out.`);
+  } else if (known.length > 0) {
+    lines.push(`  Its known city hexes: ${cityHexListing(known)}. Some of its city hexes are unexplored.`);
+  } else {
+    lines.push('  Its city hexes are unexplored.');
+  }
+  return lines;
+}
+
+/**
+ * Knockout status bullets for the situation message.
+ *
+ * Purpose: These counts change as hexes change hands, so they stay out of the cached system prompt.
+ * When to use: Under Scenario Progress on a strategic region-versus-region consultation.
+ * Expected outcome: The commander's own lines, then each enemy's lines in the order of `status.enemies`. [] when the scenario is not region_vs_region or `status` is null.
+ * Exceptions: None.
+ */
+export function buildScenarioProgressLines(state: GameStateSnapshot, status: KnockoutStatusForSeat | null): string[] {
+  logDebug('scenarioGoals buildScenarioProgressLines', {
+    scenarioId: state.scenarioId,
+    enemyCount: status?.enemies.length ?? 0,
+  });
+  if (state.scenarioId !== 'region_vs_region' || !status) return [];
+  return [...ownStatusLines(status.own), ...status.enemies.flatMap((row) => enemyStatusLines(state, row))];
 }

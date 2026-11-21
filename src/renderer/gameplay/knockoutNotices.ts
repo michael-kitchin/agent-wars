@@ -103,7 +103,7 @@ function noticeText(
     victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
     outByName: outBy ? sideDisplayName(outBy) : null,
     reasons: row.reasons,
-    globalHome: share === null,
+    everyHexRule: share === null,
     controlShareLabel: share === null ? '' : `${Math.round(share * 100)}%`,
     remainingUnits: remaining,
   });

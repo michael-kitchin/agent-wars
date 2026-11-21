@@ -14,7 +14,7 @@ This guide covers a match, from the new-game screen to the end. Downloading the 
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning. For each turn, every side gives combat, movement, and production orders at the same time, based on partial, subjective views of the battlefield. Once everyone is ready, the game carries out those orders together and works out what happened (think: "Axis & Allies" meets "Diplomacy", with a software referee). Your opponents are AI commanders, each played by an LLM you choose (and pay for).
 
-You win by being the last side standing. A side is knocked out when another side holds its home, when it holds no city anywhere, or when its home has no cities left. There's an optional turn limit, and the details are in [Winning and Losing](#winning-and-losing).
+You win by being the last side standing. A side is knocked out when other sides and Neutral together hold its home, when it holds no city anywhere, or when its home has no cities left. There's an optional turn limit, and the details are in [Winning and Losing](#winning-and-losing).
 
 I'm a geographer by training, so Agent Wars focuses more on geospatial features than nationality. Players start with home regions made up of real-world countries, provinces, or states, but those are mostly labels. What really matters is on the ground: the size and placement of cities, and how terrain and coastlines shape what players can do. Unit origins, terrain familiarity, technology levels, and weather still matter, but not as much.
 
@@ -40,7 +40,7 @@ The new-game screen opens when you start Agent Wars. It has three sections, Map,
 | Turn length     | One month                                                | One week                                                                         |
 | Weather changes | Every turn                                               | Roughly every four turns                                                         |
 | Prices          | As in [Units at a Glance](#units-at-a-glance)            | Each map sets its own, shown in the Forces section.                              |
-| Taking a home   | Hold every hex of it.                                    | Hold its hexes with at least 75% of its original city cells.                     |
+| Losing a home   | Other sides and Neutral hold 90% of its original city cells. | Other sides and Neutral hold 90% of its original city cells.                 |
 
 If you're new to Agent Wars, start with a regional game. It's smaller and faster, so it's a better place to learn.
 
@@ -571,15 +571,13 @@ Agent Wars is a last-side-standing game, more or less. The full rules are in [re
 
 At the end of each turn, a side is knocked out when any of these is true:
 
-- Another side holds its home.
+- Other sides and Neutral together hold at least 90% of its home's original city cells.
 - It holds no city hex anywhere.
 - Its own home has no cities left.
 
-| Map | Holding a home means |
-| --- | --- |
-| Global | Holding every hex of it |
-| Regional | Holding home hexes with at least 75% of that home's original city cells. Bombing doesn't lower that target. |
-| Regional, for a home that started with no city cells | Holding every hex of it |
+A home hex counts as lost when another side or Neutral holds it. A hex nobody holds counts for no one, so two homes that share hexes don't knock each other out on turn 1. Bombing doesn't lower the 90% target. A home that started with no city cells is lost when every hex of it is held by other sides or Neutral. The notice says "Other sides and Neutral hold 90% of its home's cities", and names the side holding the most of it.
+
+Every commander is told how many city hexes each side holds and how much of its home is lost. A side with five or fewer city hexes has its city hexes listed.
 
 A knocked-out side's land and units become neutral. Losing every unit isn't a knockout by itself, and a side with no units left can still build.
 

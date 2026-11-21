@@ -198,7 +198,7 @@ test('formatHumanKnockoutDialog names the side or the reason', () => {
     place: 2,
     seatCount: 4,
     reasons: ['home_control'],
-    globalHome: false,
+    everyHexRule: false,
     controlShareLabel: '75%',
   });
   assert.equal(named.title, "You're out");
@@ -210,7 +210,7 @@ test('formatHumanKnockoutDialog names the side or the reason', () => {
     place: 3,
     seatCount: 4,
     reasons: ['no_city_hexes', 'home_cities_destroyed'],
-    globalHome: true,
+    everyHexRule: true,
     controlShareLabel: '',
   });
   assert.equal(unnamed.lead, 'You hold no city hexes. Your home has no cities left.');

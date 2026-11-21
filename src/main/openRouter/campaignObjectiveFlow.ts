@@ -29,6 +29,7 @@ import {
   type CampaignPlan,
   type CampaignUnitInput,
 } from './campaignRules';
+import { readActivePactPartnerSeatIds } from './campaignPactPartners';
 import { knownCampaignCities, type CampaignCity } from './campaignTargetSelection';
 
 /**
@@ -117,7 +118,7 @@ export interface CampaignStateInputs {
 /**
  * Derives campaign inputs from one briefing snapshot.
  *
- * Purpose: Ground units are the seat's infantry and armor that are not aboard a carrier. Enemy units are visible units of active enemy seats, and enemy ground units are the infantry and armor among them. Cities follow `knownCampaignCities`. A hex in more than one enemy home has no assumed owner.
+ * Purpose: Ground units are the seat's infantry and armor that are not aboard a carrier. Enemy units are visible units of active enemy seats, and enemy ground units are the infantry and armor among them. Cities follow `knownCampaignCities`, and the commander's active non-aggression and ceasefire partners are exempt from the finishing weight. A hex in more than one enemy home has no assumed owner.
  * When to use: Once per resolve and once per plan build.
  * Expected outcome: The inputs above. Ground units already assigned to a sea operation are omitted. An unexplored hex in two enemy homes is not a candidate.
  * Exceptions: None.
@@ -159,6 +160,7 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
     controllerByH3,
     explored,
     homeSeatByH3,
+    finishingExemptSeatIds: readActivePactPartnerSeatIds({ seatId, turnNumber: state.turnNumber, activeSeatIds: activeEnemySeatIds }),
   });
   const ownControlledLandHexes = (state.strategicControl ?? [])
     .filter((row) => row.controllerPlayerId === seatId && landUnitCanOccupyHex(row.h3Index, landMass))

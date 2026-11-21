@@ -41,7 +41,7 @@ export interface KnockoutNoticeInput {
    *
    * Contract: The display name the caller supplies, or null when no seat is credited.
    * When to use: The home-control sentence.
-   * Expected outcome: The name, or "A side" when null.
+   * Expected outcome: The name is appended as "the most". Null omits it.
    * Exceptions: None.
    */
   readonly outByName: string | null;
@@ -55,20 +55,20 @@ export interface KnockoutNoticeInput {
    */
   readonly reasons: readonly string[];
   /**
-   * True on the global map, where control means the whole home.
+   * True when the every-hex fallback applies, so the home is lost only when other sides and Neutral hold every hex.
    *
    * Contract: False uses `controlShareLabel`.
    * When to use: The home-control sentence.
-   * Expected outcome: "holds all of its home" when true.
+   * Expected outcome: "Other sides and Neutral hold all of its home" when true.
    * Exceptions: None.
    */
-  readonly globalHome: boolean;
+  readonly everyHexRule: boolean;
   /**
-   * The control share as a percent, such as "75%".
+   * The home-loss share as a percent, such as "90%".
    *
-   * Contract: Used only for a regional home-control sentence.
-   * When to use: A regional map.
-   * Expected outcome: "{OutBy} holds 75% of its home's cities."
+   * Contract: Used only when `everyHexRule` is false.
+   * When to use: A share-based home-control sentence.
+   * Expected outcome: "Other sides and Neutral hold 90% of its home's cities, {OutBy} the most."
    * Exceptions: None.
    */
   readonly controlShareLabel: string;
@@ -97,9 +97,11 @@ export function formatKnockoutNotice(input: KnockoutNoticeInput): string {
   for (const reason of REASON_ORDER) {
     if (!held.has(reason)) continue;
     if (reason === 'home_control') {
-      const outBy = input.outByName ?? 'A side';
+      const most = input.outByName ? `, ${input.outByName} the most` : '';
       sentences.push(
-        input.globalHome ? `${outBy} holds all of its home.` : `${outBy} holds ${input.controlShareLabel} of its home's cities.`
+        input.everyHexRule
+          ? `Other sides and Neutral hold all of its home${most}.`
+          : `Other sides and Neutral hold ${input.controlShareLabel} of its home's cities${most}.`
       );
     } else if (reason === 'no_city_hexes') sentences.push('It holds no city hexes.');
     else sentences.push('Its home has no cities left.');

@@ -759,7 +759,7 @@ The tactical battle UI displays the battlefield from the opening of §12, with e
 
 The shipped scenario id is `region_vs_region`. Details: [region-vs-region.md](region-vs-region.md). After combat, production, and control updates, `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts` knocks out every active seat that meets any of these, and stores every reason that holds:
 
-1. **Home control.** Another active seat meets the control rule against this seat's home. On the global map that is every strategic hex of the home. On a regional map the held hexes must contain at least 75% of that home's generated urban cells (`controlWinMinUrbanShare` on the loaded map). Bombing does not lower the target. A home with no generated urban cells falls back to every hex. A fortified hex still counts for its current controller until `fortifiedCount` is 0 (§4.6).
+1. **Home control.** Other seats and Neutral together hold at least 90% (`HOME_CONTROL_WIN_MIN_URBAN_SHARE`, `controlWinMinUrbanShare` on the loaded map) of this seat's home's original urban cells, on every map. A home hex held by another seat or by Neutral is lost, and a hex with no controller counts for no one. Bombing does not lower the target. A home with no original urban cells, or a match whose classification cache is not loaded, uses the every-hex fallback: the seat is out only when every home hex is lost. A fortified hex still counts for its current controller until `fortifiedCount` is 0 (§4.6). The seat holding the most of the home is credited as `outBy`; Neutral is never credited.
 2. **No city hexes.** The seat controls no strategic hex whose current `urbanHexCount` is greater than zero.
 3. **Home cities destroyed.** The current urban sum of the seat's own home is zero.
 

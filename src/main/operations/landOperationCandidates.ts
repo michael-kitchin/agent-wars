@@ -14,34 +14,14 @@ import { readCampaignObjectives } from '../gameDb/campaignObjectiveMemory';
 import { logDebug } from '../logger';
 import { campaignInputsFromState, campaignLandSteps } from '../openRouter/campaignObjectiveFlow';
 import {
-  CAMPAIGN_ENEMY_HOME_WEIGHT,
-  CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP,
   CAMPAIGN_MAX_LAND_STEPS,
+  campaignScoreBeats,
   chooseStagingHex,
-  type CampaignCity,
 } from '../openRouter/campaignTargetSelection';
 import type { OperationCandidate } from '../../shared/operationTypes';
 import { countObjectiveReinforcers, LIFT_OBJECTIVE_CLEAR_RADIUS } from './liftRules';
 import type { LiftTerrain } from './liftTerrain';
 import { OPERATION_MENU_LAND_ROWS } from './operationRules';
-
-/**
- * True when the first city outranks the second.
- *
- * Purpose: The menu uses the same cross-multiply as the campaign's own target choice, so a float score cannot reorder a tie.
- * When to use: Sorting the cities that passed the step cap.
- * Expected outcome: True only when the first score is strictly greater.
- * Exceptions: None.
- */
-function scoreBeats(city: CampaignCity, steps: number, other: CampaignCity, otherSteps: number): boolean {
-  const weight = city.inEnemyHome ? CAMPAIGN_ENEMY_HOME_WEIGHT : 1;
-  const otherWeight = other.inEnemyHome ? CAMPAIGN_ENEMY_HOME_WEIGHT : 1;
-  const left =
-    city.urbanHexCount * weight * (otherSteps + 2) * (CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP + other.knownFortifiedCount);
-  const right =
-    other.urbanHexCount * otherWeight * (steps + 2) * (CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP + city.knownFortifiedCount);
-  return left > right;
-}
 
 /**
  * Lists the campaign targets this seat could choose.
@@ -81,8 +61,8 @@ export function listLandOperationCandidates(args: {
   cities.sort((left, right) => {
     const leftSteps = steps.get(left.h3Index) ?? 0;
     const rightSteps = steps.get(right.h3Index) ?? 0;
-    if (scoreBeats(left, leftSteps, right, rightSteps)) return -1;
-    if (scoreBeats(right, rightSteps, left, leftSteps)) return 1;
+    if (campaignScoreBeats(left, leftSteps, right, rightSteps)) return -1;
+    if (campaignScoreBeats(right, rightSteps, left, leftSteps)) return 1;
     if (leftSteps !== rightSteps) return leftSteps - rightSteps;
     return left.h3Index < right.h3Index ? -1 : left.h3Index > right.h3Index ? 1 : 0;
   });

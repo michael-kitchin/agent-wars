@@ -56,7 +56,7 @@ The player sees the same overlay as New game. On a watch, it waits until the wor
 
 ### Knocked out
 
-When Ready knocks out the human seat and the match goes on, the player sees a dialog titled "You're out". On a watch, that dialog waits until the world-map sight cues, movement, combat, and dice have finished. The first sentence is "{OutBy} knocked you out on turn {N}." when a side is credited. That name is `sideDisplayName` (`src/shared/sideNicknames.ts`). A null nickname shows `Human` for the human seat and the short home name for an AI seat. Otherwise the reason: a side holds the home, the player holds no city hexes, or the home has no cities left. The next sentence is "You placed {ordinal} of {n}." Watch the rest closes the dialog and switches to Observe, with View as on "All sides, no fog" and auto-advance on. End game calls `game:endMatch`, which ranks the seats still active and opens Game over. The map, the top bar, the console, and the selection panel do not accept input while the dialog is open. A match that ends on the same turn shows Game over and does not open this dialog.
+When Ready knocks out the human seat and the match goes on, the player sees a dialog titled "You're out". On a watch, that dialog waits until the world-map sight cues, movement, combat, and dice have finished. The first sentence is "{OutBy} knocked you out on turn {N}." when a side is credited. That name is `sideDisplayName` (`src/shared/sideNicknames.ts`). A null nickname shows `Human` for the human seat and the short home name for an AI seat. Otherwise the reason: "Other sides and Neutral hold {share} of your home's cities." (or "Other sides and Neutral hold all of your home." when the map profile's `controlWinMinUrbanShare` is null), the player holds no city hexes, or the home has no cities left (`reasonLead` in `src/shared/knockoutDialogCopy.ts`). The credited side is the one holding the most of the player's home, for every reason, so a knockout by Neutral-held land with no side holding any of it has no credited side. The next sentence is "You placed {ordinal} of {n}." Watch the rest closes the dialog and switches to Observe, with View as on "All sides, no fog" and auto-advance on. End game calls `game:endMatch`, which ranks the seats still active and opens Game over. The map, the top bar, the console, and the selection panel do not accept input while the dialog is open. A match that ends on the same turn shows Game over and does not open this dialog.
 
 ### Observe
 
@@ -158,7 +158,7 @@ On the map, tactical play limits orders to the battle area and shows the battle 
 
 ## Open Questions
 
-None.
+- The knockout notice and the knocked-out dialog take their share wording from the map profile (`controlWinMinUrbanShare` in `src/renderer/gameplay/knockoutNotices.ts` and `knockoutDialog.ts`). A home that started with no original urban cells is judged by the every-hex rule on the engine side, but the text still says "90% of its home's cities". The spec does not say whether the wording should follow the engine's per-home fallback.
 
 ## Code Entry Points
 

@@ -70,7 +70,8 @@ test('a home with no cities and no urban knocks that seat out while the other ho
     const knockedOut = outcome.knockouts.find((row) => row.seatId === AI_SEAT_IDS[0]);
     assert.ok(knockedOut?.reasons.includes('no_city_hexes'));
     assert.ok(knockedOut?.reasons.includes('home_cities_destroyed'));
-    assert.equal(knockedOut?.reasons.indexOf('no_city_hexes'), 0);
+    const reasons = knockedOut?.reasons ?? [];
+    assert.ok(reasons.indexOf('no_city_hexes') < reasons.indexOf('home_cities_destroyed'));
     assert.equal(outcome.winnerSeatId, HUMAN_SEAT_ID);
     assert.equal(outcome.endReason, 'last_side_standing');
   });

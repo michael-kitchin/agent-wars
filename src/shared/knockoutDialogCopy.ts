@@ -102,20 +102,20 @@ export interface HumanKnockoutDialogInput {
    */
   readonly reasons: readonly string[];
   /**
-   * True on the global map, where control means the whole home.
+   * True when the every-hex fallback applies, so the home is lost only when other sides and Neutral hold every hex.
    *
    * Contract: False uses `controlShareLabel`.
    * When to use: A home-control reason with no credited seat.
-   * Expected outcome: "all of your home" when true.
+   * Expected outcome: "Other sides and Neutral hold all of your home." when true.
    * Exceptions: None.
    */
-  readonly globalHome: boolean;
+  readonly everyHexRule: boolean;
   /**
-   * The control share as a percent, such as "75%".
+   * The home-loss share as a percent, such as "90%".
    *
-   * Contract: Used only for a regional home-control reason with no credited seat.
-   * When to use: A regional map.
-   * Expected outcome: "A side holds 75% of your home's cities."
+   * Contract: Used only for a home-control reason with no credited seat, when `everyHexRule` is false.
+   * When to use: A share-based home-control sentence.
+   * Expected outcome: "Other sides and Neutral hold 90% of your home's cities."
    * Exceptions: None.
    */
   readonly controlShareLabel: string;
@@ -155,9 +155,9 @@ function reasonLead(input: HumanKnockoutDialogInput): string {
     if (!held.has(reason)) continue;
     if (reason === 'home_control') {
       sentences.push(
-        input.globalHome
-          ? 'A side holds all of your home.'
-          : `A side holds ${input.controlShareLabel} of your home's cities.`
+        input.everyHexRule
+          ? 'Other sides and Neutral hold all of your home.'
+          : `Other sides and Neutral hold ${input.controlShareLabel} of your home's cities.`
       );
     } else if (reason === 'no_city_hexes') sentences.push('You hold no city hexes.');
     else sentences.push('Your home has no cities left.');

@@ -185,7 +185,7 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 
 ## Open Questions by Document
 
-None.
+- [modes-and-transitions.md](ux/modes-and-transitions.md): whether the knockout notice and dialog wording should follow the engine's per-home every-hex fallback.
 
 ## Known Deviations by Document
 

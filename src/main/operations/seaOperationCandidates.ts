@@ -69,6 +69,7 @@ export function listKnownEnemyCities(state: GameStateSnapshot, seatId: string): 
     controllerByH3,
     explored,
     homeSeatByH3,
+    finishingExemptSeatIds: new Set<string>(),
   }).map((city) => ({
     h3Index: city.h3Index,
     urbanHexCount: city.urbanHexCount,

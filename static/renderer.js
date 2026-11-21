@@ -58,13 +58,43 @@
     return new Set(hexes);
   }
 
+  // src/shared/victoryRules.ts
+  var HOME_CONTROL_WIN_MIN_URBAN_SHARE = 0.9;
+  var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
+  var DEFAULT_TURN_LIMIT = 30;
+  var DEFAULT_VICTORY_RULE = "last_side_standing";
+  var VICTORY_RULE_LABELS = {
+    last_side_standing: "Deathmatch",
+    most_city_hexes_at_turn_limit: "Most city hexes at turn limit"
+  };
+  var UNLIMITED_TURN_LIMIT_LABEL = "Unlimited";
+  function countCityHexesBySeat(control, infrastructure) {
+    const urbanByHex = new Map(infrastructure.map((row) => [row.h3Index, row.urbanHexCount]));
+    const counts = /* @__PURE__ */ new Map();
+    for (const row of control) {
+      if (!row.controllerPlayerId || !isSeatId(row.controllerPlayerId)) continue;
+      if ((urbanByHex.get(row.h3Index) ?? 0) <= 0) continue;
+      counts.set(row.controllerPlayerId, (counts.get(row.controllerPlayerId) ?? 0) + 1);
+    }
+    return counts;
+  }
+  function rankSeatsByCityHexes(seatIds, cityHexCountBySeat) {
+    const places = /* @__PURE__ */ new Map();
+    for (const seatId of seatIds) {
+      const held2 = cityHexCountBySeat.get(seatId) ?? 0;
+      const better = seatIds.filter((other) => (cityHexCountBySeat.get(other) ?? 0) > held2).length;
+      places.set(seatId, 1 + better);
+    }
+    return places;
+  }
+
   // src/shared/activeGameMap.ts
   var GLOBAL_GAME_MAP = {
     id: "global",
     displayName: "Global",
     strategicResolution: 1,
     tacticalResolution: 4,
-    controlWinMinUrbanShare: null,
+    controlWinMinUrbanShare: HOME_CONTROL_WIN_MIN_URBAN_SHARE,
     rules: {
       infantryCost: 20,
       armorCost: 40,
@@ -30069,35 +30099,6 @@ ${bonuses}`;
     return document.getElementById(id)?.value ?? "";
   }
 
-  // src/shared/victoryRules.ts
-  var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
-  var DEFAULT_TURN_LIMIT = 30;
-  var DEFAULT_VICTORY_RULE = "last_side_standing";
-  var VICTORY_RULE_LABELS = {
-    last_side_standing: "Deathmatch",
-    most_city_hexes_at_turn_limit: "Most city hexes at turn limit"
-  };
-  var UNLIMITED_TURN_LIMIT_LABEL = "Unlimited";
-  function countCityHexesBySeat(control, infrastructure) {
-    const urbanByHex = new Map(infrastructure.map((row) => [row.h3Index, row.urbanHexCount]));
-    const counts = /* @__PURE__ */ new Map();
-    for (const row of control) {
-      if (!row.controllerPlayerId || !isSeatId(row.controllerPlayerId)) continue;
-      if ((urbanByHex.get(row.h3Index) ?? 0) <= 0) continue;
-      counts.set(row.controllerPlayerId, (counts.get(row.controllerPlayerId) ?? 0) + 1);
-    }
-    return counts;
-  }
-  function rankSeatsByCityHexes(seatIds, cityHexCountBySeat) {
-    const places = /* @__PURE__ */ new Map();
-    for (const seatId of seatIds) {
-      const held2 = cityHexCountBySeat.get(seatId) ?? 0;
-      const better = seatIds.filter((other) => (cityHexCountBySeat.get(other) ?? 0) > held2).length;
-      places.set(seatId, 1 + better);
-    }
-    return places;
-  }
-
   // src/shared/aiOnlyBeatLimit.ts
   var AI_ONLY_BEAT_LIMIT_UNLIMITED = "unlimited";
   var AI_ONLY_BEAT_LIMIT_OPTIONS = TURN_LIMIT_OPTIONS;
@@ -42507,9 +42508,9 @@ ${bonuses}`;
     for (const reason of REASON_ORDER) {
       if (!held2.has(reason)) continue;
       if (reason === "home_control") {
-        const outBy = input.outByName ?? "A side";
+        const most = input.outByName ? `, ${input.outByName} the most` : "";
         sentences.push(
-          input.globalHome ? `${outBy} holds all of its home.` : `${outBy} holds ${input.controlShareLabel} of its home's cities.`
+          input.everyHexRule ? `Other sides and Neutral hold all of its home${most}.` : `Other sides and Neutral hold ${input.controlShareLabel} of its home's cities${most}.`
         );
       } else if (reason === "no_city_hexes") sentences.push("It holds no city hexes.");
       else sentences.push("Its home has no cities left.");
@@ -42545,7 +42546,7 @@ ${bonuses}`;
       victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
       outByName: outBy ? sideDisplayName(outBy) : null,
       reasons: row.reasons,
-      globalHome: share === null,
+      everyHexRule: share === null,
       controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`,
       remainingUnits: remaining
     });
@@ -48417,7 +48418,7 @@ ${bonuses}`;
       if (!held2.has(reason)) continue;
       if (reason === "home_control") {
         sentences.push(
-          input.globalHome ? "A side holds all of your home." : `A side holds ${input.controlShareLabel} of your home's cities.`
+          input.everyHexRule ? "Other sides and Neutral hold all of your home." : `Other sides and Neutral hold ${input.controlShareLabel} of your home's cities.`
         );
       } else if (reason === "no_city_hexes") sentences.push("You hold no city hexes.");
       else sentences.push("Your home has no cities left.");
@@ -48439,7 +48440,7 @@ ${bonuses}`;
       place: row.place,
       seatCount: Math.max(seats.length, 1),
       reasons: row.reasons,
-      globalHome: share === null,
+      everyHexRule: share === null,
       controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`
     }));
     if (choice === "watch") {

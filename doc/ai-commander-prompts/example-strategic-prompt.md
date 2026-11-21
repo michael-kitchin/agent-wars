@@ -10,7 +10,7 @@ This copy is opponent 1's latest strategic consultation: Southern Africa against
 
 You command Southern Africa in a WEGO (simultaneous movement) hex wargame with 2 sides. Every other side is your enemy, and so are neutral garrisons.
 
-Your goal is to be the last side standing. A side is knocked out when one other side controls its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side's units become neutral garrisons and its land becomes neutral.
+Your goal is to be the last side standing. A side is knocked out when other sides and Neutral together hold its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side's units become neutral garrisons and its land becomes neutral.
 
 If every side would be knocked out on the same turn, none is knocked out and the match ends. The side holding the most city hexes wins. If several sides hold that many, no single side wins. Enemy units can be destroyed through ranged and melee combat, and production capacity can be destroyed through air strikes. Review the rules, below, for how to order this.
 
@@ -19,7 +19,7 @@ If every side would be knocked out on the same turn, none is knocked out and the
 - Scenario: region_vs_region
 - Your home region: Southern Africa
 - Enemy home regions: Eastern Africa
-- Win at end of turn by either: (1) Controlling all hexes intersecting the enemy home region, OR (2) Eliminating all urban production (tactical urban hexes) in the enemy home region.
+- Knock an enemy out at the end of a turn by any of these: (1) Other sides and Neutral together holding enemy home region hexes with at least 90% of its original urban cells, OR (2) Eliminating all urban production (tactical urban hexes) in the enemy home region, OR (3) Taking every city hex the enemy holds anywhere.
 - Every home-region outline is always visible on the map.
 - Your home region hexes are: QY, PU, PL, R7, Q6, SK, SG, T8
 - Eastern Africa home region hexes are: JC, JG, HZ, JP, KI, KK, LS, I5, LZ, LU, KR, KO, NE, ND, M9, OQ, OK, NA, M7, OS, P1, PV, RD, OT, OP, P5, PM
@@ -274,7 +274,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 ## Winning
 
-- Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter.
+- Win by being the last side standing: an enemy is knocked out when other sides and Neutral together hold its home region (at least 90% of its original urban cells), when its home cities are destroyed, or when it holds no city hex anywhere. Those are the cells that matter. A side with only a few city hexes left is close to being knocked out.
 - When more than one home region lists the same cells, the listed shared cells count toward each of those sides, so holding them serves defence and attack at once.
 
 ## Using the Briefing
@@ -625,6 +625,8 @@ Persistent: 0 of 5 slots used. Stored: 0 of 15 slots used.
 - Controlled: 3 of 190 land hexes (2%)
 - Your home region control: 9 of 12 hexes (75%)
 - Your control of Eastern Africa's home region: 1 of 31 hexes (3%)
+- Your side: you hold 9 city hexes. Other sides and Neutral hold 0 of your home's 180 original urban cells. You are knocked out if they reach 162, or if you lose every city hex.
+- Eastern Africa: holds 7 city hexes. Other sides and Neutral hold 20 of its home's 310 original urban cells, 12 of them yours. It is knocked out if they reach 279, or if it loses every city hex.
 
 ## Air Operations Status
 

@@ -62,7 +62,7 @@ export async function offerHumanKnockoutChoice(
     place: row.place,
     seatCount: Math.max(seats.length, 1),
     reasons: row.reasons,
-    globalHome: share === null,
+    everyHexRule: share === null,
     controlShareLabel: share === null ? '' : `${Math.round(share * 100)}%`,
   }));
   if (choice === 'watch') {

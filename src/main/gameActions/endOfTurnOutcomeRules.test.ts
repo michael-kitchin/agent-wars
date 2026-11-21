@@ -53,7 +53,7 @@ function decide(args: {
   seats: readonly SeatRecord[];
   turnNumber?: number;
   victory?: VictorySettings;
-  control?: (attacker: SeatId, victim: SeatId) => boolean;
+  homeLost?: (victim: SeatId) => boolean;
   cities?: Readonly<Record<string, number>>;
   intact?: Readonly<Record<string, number>>;
   homeCells?: (victim: SeatId, controller: SeatId) => number;
@@ -64,7 +64,7 @@ function decide(args: {
     turnNumber: args.turnNumber ?? 1,
     seats: args.seats,
     victory: args.victory ?? GLOBAL_LIMIT,
-    controlWinMet: args.control ?? (() => false),
+    homeControlLost: args.homeLost ?? (() => false),
     cityHexCountBySeat: cities,
     intactHomeUrbanCellsBySeat: intact,
     homeCityCellsControlledBy: args.homeCells ?? (() => 0),
@@ -76,7 +76,8 @@ test('one of four seats loses its home to an earlier seat and shares last place'
   const seats = [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2), seat(AI_SEAT_IDS[1], 3), seat(AI_SEAT_IDS[2], 4)];
   const outcome = decide({
     seats,
-    control: (attacker, victim) => attacker === AI_SEAT_IDS[0] && victim === AI_SEAT_IDS[2],
+    homeLost: (victim) => victim === AI_SEAT_IDS[2],
+    homeCells: (victim, controller) => (victim === AI_SEAT_IDS[2] && controller === AI_SEAT_IDS[0] ? 5 : 0),
   });
   assert.deepEqual(outcome.knockouts, [{
     seatId: AI_SEAT_IDS[2],
@@ -110,7 +111,7 @@ test('a mutual wipe before the turn limit ends the match without knockouts', () 
   const outcome = decide({
     seats: [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2)],
     turnNumber: 10,
-    control: () => true,
+    homeLost: () => true,
     cities: { [HUMAN_SEAT_ID]: 3, [AI_SEAT_IDS[0]]: 1 },
   });
   assert.equal(outcome.knockouts.length, 0);
@@ -125,7 +126,7 @@ test('a mutual wipe on the turn limit keeps the turn-limit reason', () => {
   const outcome = decide({
     seats: [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2)],
     turnNumber: 30,
-    control: () => true,
+    homeLost: () => true,
   });
   assert.equal(outcome.endReason, 'turn_limit');
   assert.equal(outcome.knockouts.length, 0);
@@ -135,7 +136,7 @@ test('a regional mutual wipe ends the match', () => {
   const outcome = decide({
     seats: [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2)],
     victory: REGIONAL,
-    control: () => true,
+    homeLost: () => true,
   });
   assert.equal(outcome.endReason, 'mutual_elimination');
   assert.equal(outcome.gameOver, true);
@@ -175,7 +176,7 @@ test('a seat already out stays out of a later mutual ranking', () => {
 test('the last side standing wins when one other seat loses its home', () => {
   const outcome = decide({
     seats: [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2)],
-    control: (attacker, victim) => attacker === HUMAN_SEAT_ID && victim === AI_SEAT_IDS[0],
+    homeLost: (victim) => victim === AI_SEAT_IDS[0],
   });
   assert.equal(outcome.endReason, 'last_side_standing');
   assert.equal(outcome.winnerSeatId, HUMAN_SEAT_ID);
@@ -192,7 +193,7 @@ test('a seat with no city hex is out even while its home still has urban cells',
   assert.equal(outcome.winnerSeatId, HUMAN_SEAT_ID);
 });
 
-test('outBy is the seat holding the most home city cells, or the control seat, or nobody', () => {
+test('outBy is the seat holding the most home city cells, or nobody', () => {
   const seats = [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2), seat(AI_SEAT_IDS[1], 3)];
   const byCells = decide({
     seats,
@@ -212,14 +213,14 @@ test('outBy is the seat holding the most home city cells, or the control seat, o
     intact: { [AI_SEAT_IDS[1]]: 5 },
   });
   assert.equal(none.knockouts[0]?.outBy, null);
-  const byControl = decide({
+  const byHomeLoss = decide({
     seats,
     cities: { [AI_SEAT_IDS[1]]: 0 },
-    control: (attacker, victim) => attacker === HUMAN_SEAT_ID && victim === AI_SEAT_IDS[1],
+    homeLost: (victim) => victim === AI_SEAT_IDS[1],
     homeCells: (victim, controller) => (victim === AI_SEAT_IDS[1] && controller === AI_SEAT_IDS[0] ? 5 : 0),
   });
-  assert.equal(byControl.knockouts[0]?.outBy, HUMAN_SEAT_ID);
-  assert.equal(byControl.knockouts[0]?.reasons[0], 'home_control');
+  assert.equal(byHomeLoss.knockouts[0]?.outBy, AI_SEAT_IDS[0]);
+  assert.equal(byHomeLoss.knockouts[0]?.reasons[0], 'home_control');
 });
 
 test('the turn limit ranks remaining seats and a tie leaves no winner', () => {
@@ -244,14 +245,55 @@ test('the turn limit ranks remaining seats and a tie leaves no winner', () => {
   assert.equal(before.finalPlaces.size, 0);
 });
 
-test('a seat already out is not an attacker and is not knocked out again', () => {
+test('a seat already out is not asked about its home and is not knocked out again', () => {
   const seats = [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2), seat(AI_SEAT_IDS[1], 3, 2)];
+  const asked: SeatId[] = [];
   const outcome = decide({
     seats,
-    control: (attacker) => attacker === AI_SEAT_IDS[1],
+    homeLost: (victim) => {
+      asked.push(victim);
+      return false;
+    },
     cities: { [AI_SEAT_IDS[1]]: 0 },
     intact: { [AI_SEAT_IDS[1]]: 0 },
   });
   assert.equal(outcome.knockouts.length, 0);
   assert.equal(outcome.gameOver, false);
+  assert.equal(asked.includes(AI_SEAT_IDS[1]), false);
+});
+
+test('a lost home credits the seat holding the most of it, not the first seat', () => {
+  const seats = [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2), seat(AI_SEAT_IDS[1], 3)];
+  const outcome = decide({
+    seats,
+    homeLost: (victim) => victim === AI_SEAT_IDS[1],
+    homeCells: (victim, controller) => {
+      if (victim !== AI_SEAT_IDS[1]) return 0;
+      if (controller === HUMAN_SEAT_ID) return 4;
+      if (controller === AI_SEAT_IDS[0]) return 6;
+      return 0;
+    },
+  });
+  assert.equal(outcome.knockouts[0]?.reasons[0], 'home_control');
+  assert.equal(outcome.knockouts[0]?.outBy, AI_SEAT_IDS[0]);
+});
+
+test('equal home city cells credit the seat with the lower seat order', () => {
+  const seats = [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2), seat(AI_SEAT_IDS[1], 3)];
+  const outcome = decide({
+    seats,
+    homeLost: (victim) => victim === AI_SEAT_IDS[1],
+    homeCells: (victim, controller) => (victim === AI_SEAT_IDS[1] && controller !== AI_SEAT_IDS[1] ? 5 : 0),
+  });
+  assert.equal(outcome.knockouts[0]?.outBy, HUMAN_SEAT_ID);
+});
+
+test('a home held entirely by Neutral is lost with no seat credited', () => {
+  const seats = [seat(HUMAN_SEAT_ID, 1), seat(AI_SEAT_IDS[0], 2)];
+  const outcome = decide({
+    seats,
+    homeLost: (victim) => victim === AI_SEAT_IDS[0],
+  });
+  assert.deepEqual(outcome.knockouts[0]?.reasons, ['home_control']);
+  assert.equal(outcome.knockouts[0]?.outBy, null);
 });

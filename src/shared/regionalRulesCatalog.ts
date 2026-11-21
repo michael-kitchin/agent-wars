@@ -40,16 +40,6 @@ export interface RegionalMapRules {
 }
 
 /**
- * Share of generated enemy-home urban cells a regional control win requires.
- *
- * Purpose: A regional control win needs controlled enemy home hexes holding at least this share of the enemy home's generated urban cells.
- * When to use: Installing a regional profile.
- * Expected outcome: `0.75`.
- * Exceptions: None.
- */
-export const REGIONAL_CONTROL_WIN_MIN_URBAN_SHARE = 0.75;
-
-/**
  * Packs a resolution pair into one catalog row.
  *
  * Purpose: Keeps each map on one line.

@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { NEAR_KNOCKOUT_MAX_CITY_HEXES } from '../../shared/victoryRules';
 import { logDebug, logTrace } from '../logger';
 
 /**
@@ -30,14 +31,24 @@ export const CAMPAIGN_MAX_LAND_STEPS = 12;
 export const CAMPAIGN_STAGING_MIN_STEPS = 2;
 
 /**
- * Score multiplier for a city inside an enemy home.
+ * Score multiplier for a city held by the enemy whose home contains it.
  *
- * Purpose: Knocking a side out means taking its home cities.
- * When to use: `scoreCampaignCity` and the integer rank comparison.
+ * Purpose: Knocking a side out means taking its home cities. A home city another side already holds does not get the bonus.
+ * When to use: `campaignCityWeight`.
  * Expected outcome: 2.
  * Exceptions: None.
  */
 export const CAMPAIGN_ENEMY_HOME_WEIGHT = 2;
+
+/**
+ * Score multiplier for a city whose holder is close to being knocked out.
+ *
+ * Purpose: A side with `NEAR_KNOCKOUT_MAX_CITY_HEXES` city hexes or fewer can be finished by taking those cities, so they outrank larger cities that are farther away.
+ * When to use: `campaignCityWeight`.
+ * Expected outcome: 3.
+ * Exceptions: None.
+ */
+export const CAMPAIGN_FINISHING_WEIGHT = 3;
 
 /**
  * Known fortified cells that halve a city's score.
@@ -52,7 +63,7 @@ export const CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP = 4;
 /**
  * One enemy city the campaign may take.
  *
- * Purpose: Scoring reads urban count, home membership, and known forts from one row.
+ * Purpose: Scoring reads urban count, home holding, the holder's nearness to knockout, and known forts from one row.
  * When to use: The output of `knownCampaignCities`.
  * Expected outcome: `urbanHexCount` is at least 1 and `ownerSeatId` is an active enemy.
  * Exceptions: None.
@@ -89,11 +100,29 @@ export interface CampaignCity {
    * Whether the hex sits in an active enemy home.
    *
    * Contract: True when the home seat is an active enemy, including an explored city whose controller is a different enemy.
-   * When to use: The score weight.
+   * When to use: Describing the city. The score weight reads `heldByHomeSide`.
    * Expected outcome: True or false.
    * Exceptions: None.
    */
   readonly inEnemyHome: boolean;
+  /**
+   * Whether the city's holder is the active enemy whose home contains it.
+   *
+   * Contract: True only when the home seat is an active enemy and equals `ownerSeatId`.
+   * When to use: The home weight in `campaignCityWeight`.
+   * Expected outcome: True or false.
+   * Exceptions: None.
+   */
+  readonly heldByHomeSide: boolean;
+  /**
+   * Whether the holder is close to being knocked out and open to the finishing weight.
+   *
+   * Contract: True when the holder has at most `NEAR_KNOCKOUT_MAX_CITY_HEXES` cities in the candidate list, and the viewer has no active pact with it.
+   * When to use: The finishing weight in `campaignCityWeight`.
+   * Expected outcome: True or false.
+   * Exceptions: None.
+   */
+  readonly ownerNearKnockout: boolean;
   /**
    * Fortified cells the side has seen.
    *
@@ -108,7 +137,7 @@ export interface CampaignCity {
 /**
  * Cities the side may march on, under the fog rule.
  *
- * Purpose: Urban count is public. Control and fortifications count only on explored hexes. An unexplored city inside exactly one active enemy home counts as held by that side, with no fortification penalty.
+ * Purpose: Urban count is public. Control and fortifications count only on explored hexes. An unexplored city inside exactly one active enemy home counts as held by that side, with no fortification penalty. A holder with at most `NEAR_KNOCKOUT_MAX_CITY_HEXES` cities in the result is near knockout, unless it is in `finishingExemptSeatIds`.
  * When to use: Once per consult, from inputs derived from the snapshot.
  * Expected outcome: Enemy cities only. A hex the caller omitted from `homeSeatByH3` because it lies in more than one enemy home is not a candidate. Neutral and knocked-out sides are never targets.
  * Exceptions: None.
@@ -119,6 +148,15 @@ export function knownCampaignCities(args: {
   readonly controllerByH3: ReadonlyMap<string, string | null>;
   readonly explored: ReadonlySet<string>;
   readonly homeSeatByH3: ReadonlyMap<string, string>;
+  /**
+   * Holders whose cities never get the finishing weight: the viewer's active pact partners.
+   *
+   * Contract: Seat ids from `readActivePactPartnerSeatIds`. Empty when the caller does not rank by weight.
+   * When to use: Setting `ownerNearKnockout`.
+   * Expected outcome: A city held by one of these seats has `ownerNearKnockout` false.
+   * Exceptions: None.
+   */
+  readonly finishingExemptSeatIds: ReadonlySet<string>;
 }): CampaignCity[] {
   const cities: CampaignCity[] = [];
   for (const row of args.infrastructure) {
@@ -132,11 +170,34 @@ export function knownCampaignCities(args: {
       urbanHexCount: row.urbanHexCount,
       ownerSeatId: owner,
       inEnemyHome: homeSeat !== null && args.activeEnemySeatIds.has(homeSeat),
+      heldByHomeSide: homeSeat !== null && owner === homeSeat,
+      ownerNearKnockout: false,
       knownFortifiedCount: explored ? Math.max(0, Math.trunc(row.fortifiedCount ?? 0)) : 0,
     });
   }
-  logTrace('campaignTargetSelection knownCampaignCities', { rowCount: args.infrastructure.length, cityCount: cities.length });
-  return cities;
+  const cityCountByOwner = new Map<string, number>();
+  for (const city of cities) cityCountByOwner.set(city.ownerSeatId, (cityCountByOwner.get(city.ownerSeatId) ?? 0) + 1);
+  const marked = cities.map((city) => ({
+    ...city,
+    ownerNearKnockout:
+      (cityCountByOwner.get(city.ownerSeatId) ?? 0) <= NEAR_KNOCKOUT_MAX_CITY_HEXES
+      && !args.finishingExemptSeatIds.has(city.ownerSeatId),
+  }));
+  logTrace('campaignTargetSelection knownCampaignCities', { rowCount: args.infrastructure.length, cityCount: marked.length });
+  return marked;
+}
+
+/**
+ * Score multiplier for one city.
+ *
+ * Purpose: A city held by its own home side counts double, and a city whose holder is close to being knocked out counts triple. Both together count six times.
+ * When to use: `scoreCampaignCity` and `campaignScoreBeats`.
+ * Expected outcome: 1, `CAMPAIGN_ENEMY_HOME_WEIGHT`, `CAMPAIGN_FINISHING_WEIGHT`, or their product.
+ * Exceptions: None.
+ */
+export function campaignCityWeight(city: CampaignCity): number {
+  logTrace('campaignTargetSelection campaignCityWeight', { h3Index: city.h3Index });
+  return (city.heldByHomeSide ? CAMPAIGN_ENEMY_HOME_WEIGHT : 1) * (city.ownerNearKnockout ? CAMPAIGN_FINISHING_WEIGHT : 1);
 }
 
 /**
@@ -144,32 +205,30 @@ export function knownCampaignCities(args: {
  *
  * Purpose: Callers and tests can show the formula. Ranking uses `campaignScoreBeats` so an exact tie does not depend on float equality.
  * When to use: Tests and any display of the score. Target choice does not compare these numbers.
- * Expected outcome: `urban × home weight ÷ ((steps + 2) × (1 + known forts ÷ 4))`.
+ * Expected outcome: `urban × weight ÷ ((steps + 2) × (1 + known forts ÷ 4))`, where weight is `campaignCityWeight`.
  * Exceptions: None.
  */
 export function scoreCampaignCity(city: CampaignCity, landSteps: number): number {
-  const homeWeight = city.inEnemyHome ? CAMPAIGN_ENEMY_HOME_WEIGHT : 1;
   const fortificationFactor = 1 + city.knownFortifiedCount / CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP;
   logTrace('campaignTargetSelection scoreCampaignCity', { h3Index: city.h3Index, landSteps });
-  return (city.urbanHexCount * homeWeight) / ((landSteps + 2) * fortificationFactor);
+  return (city.urbanHexCount * campaignCityWeight(city)) / ((landSteps + 2) * fortificationFactor);
 }
 
 /**
  * True when the first city ranks strictly above the second.
  *
- * Purpose: Cross-multiplying `urban × home weight` and `(steps + 2) × (4 + known forts)` keeps ties exact.
- * When to use: `chooseCampaignTarget` only.
+ * Purpose: Cross-multiplying `urban × weight` and `(steps + 2) × (4 + known forts)` keeps ties exact. Campaigns and land operations rank cities with this one comparator.
+ * When to use: `chooseCampaignTarget` and the land operation candidate ranking.
  * Expected outcome: True only when the first score is strictly greater. Equal scores return false so the caller can break the tie by steps, then H3 index.
  * Exceptions: None.
  */
-function campaignScoreBeats(city: CampaignCity, steps: number, other: CampaignCity, otherSteps: number): boolean {
-  const weight = city.inEnemyHome ? CAMPAIGN_ENEMY_HOME_WEIGHT : 1;
-  const otherWeight = other.inEnemyHome ? CAMPAIGN_ENEMY_HOME_WEIGHT : 1;
+export function campaignScoreBeats(city: CampaignCity, steps: number, other: CampaignCity, otherSteps: number): boolean {
+  logTrace('campaignTargetSelection campaignScoreBeats', { h3Index: city.h3Index, otherH3Index: other.h3Index });
   const left =
-    city.urbanHexCount * weight * (otherSteps + 2) * (CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP + other.knownFortifiedCount);
+    city.urbanHexCount * campaignCityWeight(city) * (otherSteps + 2) * (CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP + other.knownFortifiedCount);
   const right =
     other.urbanHexCount *
-    otherWeight *
+    campaignCityWeight(other) *
     (steps + 2) *
     (CAMPAIGN_FORTIFICATIONS_PER_PENALTY_STEP + city.knownFortifiedCount);
   return left > right;

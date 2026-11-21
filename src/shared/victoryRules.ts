@@ -10,6 +10,26 @@
 import { isSeatId, type SeatId } from './seatIds';
 
 /**
+ * Share of a home's original urban cells that other sides and Neutral must hold to knock its side out.
+ *
+ * Purpose: One home-loss threshold serves every map, so a side keeps fighting while it holds more than a tenth of its home.
+ * When to use: Building a map profile's `controlWinMinUrbanShare`.
+ * Expected outcome: `0.9`.
+ * Exceptions: None.
+ */
+export const HOME_CONTROL_WIN_MIN_URBAN_SHARE = 0.9;
+
+/**
+ * City hexes a side may hold and still count as close to being knocked out.
+ *
+ * Purpose: A side at or below this count is near the no-city-hexes knockout, so the strategic briefing lists its city hexes and campaign scoring favors its cities.
+ * When to use: Deciding whether to list a side's city hexes or to apply the campaign finishing weight.
+ * Expected outcome: `5`.
+ * Exceptions: None.
+ */
+export const NEAR_KNOCKOUT_MAX_CITY_HEXES = 5;
+
+/**
  * The two ways a match can end by the rules.
  *
  * Purpose: One id is stored for the match. The new-game control labels `last_side_standing` as Deathmatch.

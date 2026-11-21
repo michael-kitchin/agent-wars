@@ -39,7 +39,7 @@ import {
 } from '../navalMovementMessages';
 import { AIR_PLAN_ROUTE_PROMPT_SUFFIX, getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
-import { homeControlProgressForSeat } from '../gameActions/endOfTurnOutcome';
+import { knockoutStatusForSeat } from '../gameActions/knockoutStatus';
 import { buildSidesPromptBlock } from './promptSpec/sidesBlock';
 import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -222,16 +222,16 @@ export function buildConsultPromptParts(input: {
   const sharedHomeHexes = homePartitions
     ? homePartitions.intersection
     : hexesInMoreThanOneHome([ownHomeHexes(state), ...enemyHomes.map((home) => home.hexes)]);
-  let homeControl: ReturnType<typeof homeControlProgressForSeat> = null;
+  let knockoutStatus: ReturnType<typeof knockoutStatusForSeat> = null;
   if (coordinateContext.mode !== 'tactical') {
     try {
-      homeControl = homeControlProgressForSeat(ownSeat);
+      knockoutStatus = knockoutStatusForSeat(ownSeat);
     } catch (err) {
-      logError('openRouterBuildSystemPrompt: home control progress failed', err);
-      homeControl = null;
+      logError('openRouterBuildSystemPrompt: knockoutStatusForSeat failed', err);
+      knockoutStatus = null;
     }
   }
-  const controlWinMinUrbanShare = homeControl?.controlWinMinUrbanShare;
+  const controlWinMinUrbanShare = knockoutStatus?.share;
   const seatCount = state.seats && state.seats.length > 0 ? state.seats.length : 2;
   const coachingGates: CoachingGates = {
     coordinateMode: coordinateContext.mode,
@@ -396,7 +396,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
       scenarioHomeLines.push(`- These hexes are in more than one home region: ${formatHomeRegionHexCodesForPrompt(sharedHomeHexes)}`);
     }
     if (typeof controlWinMinUrbanShare === 'number') {
-      scenarioHomeLines.push('- Those hex counts are territory, and the control win is the urban-cell share in the scenario objective.');
+      scenarioHomeLines.push('- Those hex counts are territory, and the home-loss knockout is the urban-cell share in the scenario objective.');
     }
   }
 
@@ -406,14 +406,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   )}\n\n${contextCoaching}`;
   const urbanProgress = coordinateContext.mode === 'tactical'
     ? []
-    : buildScenarioProgressLines(state, {
-        controlWinMinUrbanShare,
-        enemyProgress: homeControl?.pairs.map((pair) => ({
-          name: pair.enemyName,
-          ownAgainstEnemy: pair.ownAgainstEnemy,
-          enemyAgainstOwn: pair.enemyAgainstOwn,
-        })),
-      });
+    : buildScenarioProgressLines(state, knockoutStatus);
   const progressLines = coordinateContext.mode === 'tactical'
     ? []
     : [

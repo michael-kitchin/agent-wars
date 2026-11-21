@@ -49,14 +49,14 @@ export interface EndOfTurnOutcomeInput {
    */
   readonly victory: VictorySettings;
   /**
-   * Whether one active seat meets the home-control rule against another.
+   * Whether a seat has lost its home to other sides and Neutral together.
    *
-   * Contract: True only when `attacker` meets `computeHomeControlProgress(...).controlWinMet` against `victim`'s home.
-   * When to use: Reason `home_control`, and `outBy` when that reason holds.
+   * Contract: True only when `computeHomeLossProgress(...).homeLost` holds for the victim's home. A home hex is lost when another seat, active or not, or Neutral holds it. A hex with no controller is not lost.
+   * When to use: Reason `home_control`.
    * Expected outcome: True or false. The callee is not asked about a seat that is already out.
    * Exceptions: The callee's exceptions propagate.
    */
-  readonly controlWinMet: (attacker: SeatId, victim: SeatId) => boolean;
+  readonly homeControlLost: (victim: SeatId) => boolean;
   /**
    * City hexes each seat controls.
    *
@@ -79,7 +79,7 @@ export interface EndOfTurnOutcomeInput {
    * Home city cells of `victim` that `controller` holds.
    *
    * Contract: Generated urban cells in the victim's home on hexes `controller` controls.
-   * When to use: `outBy` when `home_control` is not among the reasons.
+   * When to use: Crediting `outBy` for every knockout reason.
    * Expected outcome: A non-negative integer.
    * Exceptions: The callee's exceptions propagate.
    */
@@ -107,7 +107,7 @@ export interface SeatKnockout {
   /**
    * The seat credited with the knockout.
    *
-   * Contract: The control-rule seat when `home_control` holds. Otherwise the active seat holding the most of this seat's home city cells, or null when that count is 0.
+   * Contract: For every reason, the active seat other than this one that holds the most of this seat's original home urban cells. A tie goes to the lower seat order. Null when no seat holds any, so Neutral is never credited.
    * When to use: The roster's `out_by`.
    * Expected outcome: A `SeatId` or null.
    * Exceptions: None.
@@ -229,17 +229,13 @@ export function decideEndOfTurnOutcome(input: EndOfTurnOutcomeInput): EndOfTurnO
   logDebug('decideEndOfTurnOutcome', { turnNumber: input.turnNumber, activeCount: active.length, rule: input.victory.rule });
   const reasonsFor = (victim: SeatRecord): SeatOutReason[] => {
     const reasons: SeatOutReason[] = [];
-    const controlled = active.some((attacker) => attacker.seatId !== victim.seatId && input.controlWinMet(attacker.seatId, victim.seatId));
-    if (controlled) reasons.push('home_control');
+    if (input.homeControlLost(victim.seatId)) reasons.push('home_control');
     if ((input.cityHexCountBySeat.get(victim.seatId) ?? 0) === 0) reasons.push('no_city_hexes');
     if ((input.intactHomeUrbanCellsBySeat.get(victim.seatId) ?? 0) === 0) reasons.push('home_cities_destroyed');
     return reasons;
   };
-  const outByFor = (victim: SeatRecord, reasons: readonly SeatOutReason[]): SeatId | null => {
+  const outByFor = (victim: SeatRecord): SeatId | null => {
     const others = active.filter((seat) => seat.seatId !== victim.seatId);
-    if (reasons.includes('home_control')) {
-      return others.find((seat) => input.controlWinMet(seat.seatId, victim.seatId))?.seatId ?? null;
-    }
     let best: SeatId | null = null;
     let bestCount = 0;
     for (const seat of others) {
@@ -264,7 +260,7 @@ export function decideEndOfTurnOutcome(input: EndOfTurnOutcomeInput): EndOfTurnO
   const place = active.length - qualified.length + 1;
   const knockouts: SeatKnockout[] = qualified.map(({ seat, reasons }) => ({
     seatId: seat.seatId,
-    outBy: outByFor(seat, reasons),
+    outBy: outByFor(seat),
     reasons,
     place,
   }));

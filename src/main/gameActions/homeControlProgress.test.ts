@@ -6,7 +6,7 @@
 import { type SeatId } from '../../shared/seatIds';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { computeHomeControlProgress } from './homeControlProgress';
+import { computeHomeControlProgress, computeHomeLossProgress } from './homeControlProgress';
 
 /**
  * Builds a control map from the hexes one side holds.
@@ -94,4 +94,127 @@ test('holding exactly the threshold meets the share', () => {
   assert.equal(progress.neededUrbanCells, 75);
   assert.equal(progress.heldUrbanCells, 75);
   assert.equal(progress.controlWinMet, true);
+});
+
+const LOSS_URBAN = new Map([
+  ['h1', 10],
+  ['h2', 5],
+  ['h3', 0],
+]);
+
+/**
+ * Computes the loss progress of owner `a1`'s three-hex home for a given control map and share.
+ *
+ * Purpose: Every loss case shares the same home and baseline.
+ * When to use: Each loss case below.
+ * Expected outcome: The `HomeLossProgress` for the arguments.
+ * Exceptions: None.
+ */
+function lossFor(control: Map<string, string>, share: number | null) {
+  return computeHomeLossProgress({
+    homeHexes: ['h1', 'h2', 'h3'],
+    ownerSeatId: 'a1',
+    controlByHex: control,
+    baselineUrbanCellsForHex: (hex) => LOSS_URBAN.get(hex) ?? 0,
+    minUrbanShare: share,
+  });
+}
+
+test('cells held by other seats or Neutral are lost, and the home is lost at 90 percent', () => {
+  const loss = lossFor(
+    new Map([
+      ['h1', 'a2'],
+      ['h2', 'neutral'],
+      ['h3', 'a1'],
+    ]),
+    0.9
+  );
+  assert.equal(loss.lostUrbanCells, 15);
+  assert.equal(loss.neededUrbanCells, 14);
+  assert.equal(loss.lostHexes, 2);
+  assert.equal(loss.totalHexes, 3);
+  assert.equal(loss.everyHexRule, false);
+  assert.equal(loss.homeLost, true);
+});
+
+test('hexes with no controller or held by the owner are not lost', () => {
+  const uncontrolled = lossFor(
+    new Map([
+      ['h1', 'a2'],
+      ['h3', 'a1'],
+    ]),
+    0.9
+  );
+  assert.equal(uncontrolled.lostUrbanCells, 10);
+  assert.equal(uncontrolled.homeLost, false);
+  const ownerHeld = lossFor(
+    new Map([
+      ['h1', 'a2'],
+      ['h2', 'a1'],
+      ['h3', 'a1'],
+    ]),
+    0.9
+  );
+  assert.equal(ownerHeld.homeLost, false);
+});
+
+test('without a share, the home is lost only when every hex is held by others', () => {
+  const partial = lossFor(
+    new Map([
+      ['h1', 'a2'],
+      ['h2', 'neutral'],
+    ]),
+    null
+  );
+  assert.equal(partial.everyHexRule, true);
+  assert.equal(partial.neededUrbanCells, 0);
+  assert.equal(partial.homeLost, false);
+  const all = lossFor(
+    new Map([
+      ['h1', 'a2'],
+      ['h2', 'neutral'],
+      ['h3', 'a3'],
+    ]),
+    null
+  );
+  assert.equal(all.homeLost, true);
+});
+
+test('a home with no original urban cells uses the every-hex rule', () => {
+  const loss = computeHomeLossProgress({
+    homeHexes: ['h1', 'h2'],
+    ownerSeatId: 'a1',
+    controlByHex: new Map([['h1', 'a2']]),
+    baselineUrbanCellsForHex: () => 0,
+    minUrbanShare: 0.9,
+  });
+  assert.equal(loss.everyHexRule, true);
+  assert.equal(loss.homeLost, false);
+});
+
+test('the needed cells round up from the share', () => {
+  const loss = computeHomeLossProgress({
+    homeHexes: ['h1'],
+    ownerSeatId: 'a1',
+    controlByHex: new Map([['h1', 'a2']]),
+    baselineUrbanCellsForHex: () => 10,
+    minUrbanShare: 0.9,
+  });
+  assert.equal(loss.neededUrbanCells, 9);
+});
+
+test('an empty home has no loss and is not lost', () => {
+  const loss = lossFor(new Map(), 0.9);
+  const empty = computeHomeLossProgress({
+    homeHexes: [],
+    ownerSeatId: 'a1',
+    controlByHex: new Map(),
+    baselineUrbanCellsForHex: () => 5,
+    minUrbanShare: 0.9,
+  });
+  assert.equal(loss.homeLost, false);
+  assert.deepEqual(
+    [empty.lostUrbanCells, empty.totalUrbanCells, empty.neededUrbanCells, empty.lostHexes, empty.totalHexes, empty.homeLost],
+    [0, 0, 0, 0, 0, false]
+  );
 });

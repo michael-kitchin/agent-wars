@@ -214,15 +214,15 @@ export function buildStrategyBlock(mode: 'strategic' | 'tactical'): string {
 }
 
 /**
- * Names the two strategic win paths.
+ * Names how an enemy is knocked out when no urban share applies.
  *
- * Purpose: Territorial effort needs a target; the scenario-objective section is easy to skip.
- * When to use: When `includeScenarioWinPaths` is true.
- * Expected outcome: Control of enemy home hexes, or destruction of enemy home production.
+ * Purpose: Territorial effort needs a target; the scenario-objective section is easy to skip. The bullet also says that a side with few city hexes left is close to being knocked out.
+ * When to use: When `includeScenarioWinPaths` is true and the effective share is null.
+ * Expected outcome: Other sides and Neutral holding every hex of the enemy home, destruction of its home cities, or loss of every city hex.
  * Exceptions: None.
  */
 const WIN_PATHS_BULLET =
-  '- Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter.';
+  '- Win by being the last side standing: an enemy is knocked out when other sides and Neutral together hold every hex of its home region, when its home cities are destroyed, or when it holds no city hex anywhere. Those are the cells that matter. A side with only a few city hexes left is close to being knocked out.';
 
 /**
  * Free-for-all reminder for a match of three or more seats.

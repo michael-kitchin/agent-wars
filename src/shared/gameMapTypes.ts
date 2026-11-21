@@ -235,11 +235,11 @@ export interface GameMapProfile {
    */
   readonly tacticalResolution: number;
   /**
-   * Urban share required for a regional control win.
+   * Urban share of a home that other sides and Neutral must hold to knock its side out.
    *
-   * Contract: `null` means a control win needs every enemy home hex. A number means the controlled enemy home hexes must hold at least that share of the enemy home's generated urban cells.
-   * When to use: End-of-turn victory and the regional win sentence.
-   * Expected outcome: `null` on the global map. `0.75` on a regional map.
+   * Contract: A number is the share of the home's original urban cells that other sides and Neutral must hold together. `null` means every home hex must be held by them.
+   * When to use: End-of-turn knockout and the win-rule sentences.
+   * Expected outcome: `HOME_CONTROL_WIN_MIN_URBAN_SHARE` (`0.9`) on every shipped map.
    * Exceptions: None.
    */
   readonly controlWinMinUrbanShare: number | null;
