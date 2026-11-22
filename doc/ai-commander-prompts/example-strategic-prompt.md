@@ -167,7 +167,9 @@ Campaign Orders, under Standing Order Status, lists each campaign unit whose sta
 
 Best Options lists advance rows for campaign units. An advance row is a one-step move toward the campaign hex. Copy it into explicit_move like an approach row.
 
-To choose a different target, set "campaignTarget" to the hex code of an enemy city in your final JSON. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped. You may instead launch a land row of Operation Options; both do the same thing.
+A city your ground units cannot reach within 12 land steps can still be the target when a campaign lift can carry them there. Its distance is the march to a port you hold, the sailing turns, and 4 turns for loading and landing. The engine gathers the ground units that cannot walk to the campaign at a port and sails them as a campaign lift. A lift carries at most your posture's lift share of your ground units, and it sails only with at least 1.5 times the enemy units within 2 hexes of the target and those that can reach it first, less your ground units already near it. Each later lift lands beside the target or on a hex you hold near it, so a landing is reinforced lift by lift. A target that waits 10 turns with no campaign lift is dropped, and the engine does not pick it again for 20 turns.
+
+To choose a different target, set "campaignTarget" to the hex code of an enemy city in your final JSON. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land or by a campaign lift. An unknown or unreachable city is dropped. You may instead launch a land row of Operation Options; both do the same thing.
 
 ## Operations
 
@@ -193,6 +195,8 @@ Units and ships in an operation already have their orders. Leave them alone and 
 
 Outside an operation, a standing order does not move a unit while it is aboard a ship. An explicit_move or a disembark unloads it where the ship is.
 
+A campaign lift is the campaign's own sea operation. It is listed with your operations and can be cancelled like one, but it uses a slot of its own and does not count against your sea operations. Give its units and ships no orders unless you mean to take them out. After you cancel one, the engine launches no new campaign lift for 10 turns.
+
 ## Postures
 
 Your posture is what you put your effort into. The engine remembers it and leans production, operations, and the campaign the same way until you change it. Set it with "posture" in your reply. It holds for 6 turns before it can change. If you never set one you are on overland.
@@ -201,6 +205,8 @@ Your posture is what you put your effort into. The engine remembers it and leans
 - maritime: build ships to your full cap and lift up to half your ground units. Sea and air options come first. Like the Pacific island-hopping campaign: land where the enemy is weak and bypass where it is strong.
 - strangle: keep queuing a missile in a city that reaches an enemy city until you are at the missile cap, bank more credits, and strike city, airport, and seaport cells before units. Like the Combined Bomber Offensive and the Battle of the Atlantic: destroy what builds and moves the enemy's force.
 - blitz: assault with half the usual mass, run twice the air operations, and let the engine launch against a lightly held objective. Like the 1940 campaign in France: strike before the enemy has massed, and accept thin odds for speed.
+
+Which posture fits depends on how you can reach the enemy you mean to beat. Overland fits an enemy whose home your ground units can reach by land. Blitz fits one of those whose home is lightly held. Maritime fits an enemy you can reach only by sea: its full naval cap and larger lift share are what a campaign lift needs. Strangle fits an enemy you cannot reach, or one whose home holds more ground units than you could land. The Posture section lists each enemy and the postures that fit it.
 
 The historical names are illustrations of an idea. Decide from the map and the tables in front of you, not from how those campaigns went.
 
@@ -368,7 +374,7 @@ Include optional "callbacks" for re-consultation planning. Each response replace
 
 Legal events and their parameters: turns (n: fires after n turns have passed since the subscription); unit_engaged (unitId: fires when that unit takes part in combat); unit_destroyed (side or unitId: fires when an own or enemy unit, or a named unit, is destroyed); unit_arrived (unitId: fires when that unit's standing march arrives); threat_escalation (unitId, severity: fires when that unit's threat reaches the named severity); infrastructure_destroyed (targetType, hex (omit both for an unfiltered watch): fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed; omitting targetType and hex watches any).
 
-Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.
+Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land or by a campaign lift. An unknown or unreachable city is dropped.
 
 Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"`<letter>`"}. To launch against a city that is not listed, add {"action":"launch","objective":"`<hex code>`","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"`<operation id>`"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".
 
@@ -540,6 +546,8 @@ Units at featured hexes: NA(u), PZ(A), Q6(U), RE(a), SG(B), SK(B)
 
 - Posture: overland, the default. You may set another at any time.
 - Effect: Land options are listed first, and the engine launches only against undefended objectives.
+- Ships: 1 of your naval cap of 8. On maritime a campaign lift could carry up to 1 ground unit.
+- Fit, Eastern Africa: home reachable by land, 2 ground units at home. Fits: overland, or blitz while its home is this lightly held.
 
 ## Active Operations
 

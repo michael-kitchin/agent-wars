@@ -15,8 +15,8 @@ import {
   campaignOrderFor,
   chooseHomeDefenders,
   nextCampaignPhase,
-  resolveCampaignObjective,
 } from './campaignRules';
+import { resolveCampaignObjective as resolveObjectiveWithSea } from './campaignObjectiveResolution';
 import {
   chooseCampaignTarget,
   chooseStagingHex,
@@ -65,6 +65,20 @@ const SIX_AT_HOME = [
   { id: 'a5', h3Index: '4:0' },
   { id: 'a6', h3Index: '5:0' },
 ];
+
+/**
+ * Resolves an objective for a land-only campaign.
+ *
+ * Purpose: These cases cover the land rules, so they pass no sea routes, no running lift, and no skip.
+ * When to use: The resolve case below.
+ * Expected outcome: The result of `resolveCampaignObjective` with the sea inputs left empty.
+ * Exceptions: None.
+ */
+function resolveCampaignObjective(
+  args: Omit<Parameters<typeof resolveObjectiveWithSea>[0], 'seaStepsByH3' | 'campaignLiftRunning' | 'skip'>
+): ReturnType<typeof resolveObjectiveWithSea> {
+  return resolveObjectiveWithSea({ ...args, seaStepsByH3: new Map(), campaignLiftRunning: false, skip: null });
+}
 
 /**
  * One city row for the rank tests.

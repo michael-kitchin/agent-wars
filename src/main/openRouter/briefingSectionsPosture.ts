@@ -65,13 +65,22 @@ export function postureEffectLine(posture: Posture, campaignEnabled: boolean): s
  *
  * Purpose: The commander can see the hold without a separate refusal note.
  * When to use: When standing orders are on and the consult is not a battle. Pass null when the seat has no stored row.
- * Expected outcome: The heading, the posture line, and the effect line. The change sentence says the next turn while that turn is still ahead, and says the posture may change now otherwise.
+ * Expected outcome: The heading, the posture line, and the effect line, then each of `fitLines` on its own line when any are passed. The change sentence says the next turn while that turn is still ahead, and says the posture may change now otherwise.
  * Exceptions: None.
  */
 export function buildPostureSection(args: {
   readonly stored: StoredPosture | null;
   readonly turnNumber: number;
   readonly campaignEnabled: boolean;
+  /**
+   * Extra lines printed after the effect line.
+   *
+   * Contract: Each entry is one complete line, printed as given and in order. Absent or empty prints nothing extra.
+   * When to use: Pass the posture fit lines built for this consult.
+   * Expected outcome: Each line on its own line at the end of the section.
+   * Exceptions: None.
+   */
+  readonly fitLines?: readonly string[];
 }): string {
   const posture = args.stored?.posture ?? DEFAULT_POSTURE;
   const status = args.stored === null
@@ -83,7 +92,8 @@ export function buildPostureSection(args: {
     turnNumber: args.turnNumber,
     campaignEnabled: args.campaignEnabled,
   });
-  return `${topLevelHeading(SECTION_TITLE_POSTURE)}\n\n${status}\n- Effect: ${postureEffectLine(posture, args.campaignEnabled)}`;
+  const fitText = (args.fitLines ?? []).map((line) => `\n${line}`).join('');
+  return `${topLevelHeading(SECTION_TITLE_POSTURE)}\n\n${status}\n- Effect: ${postureEffectLine(posture, args.campaignEnabled)}${fitText}`;
 }
 
 /**

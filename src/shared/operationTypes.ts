@@ -48,6 +48,16 @@ export type OperationPhase = 'muster' | 'transit' | 'assault' | 'return';
 export type OperationSource = 'engine' | 'commander';
 
 /**
+ * Why a sea operation was launched.
+ *
+ * Purpose: A raid takes one city for its own sake. A campaign lift ships the ground units that cannot walk to the campaign and uses a slot of its own.
+ * When to use: Stored operations, to pick the slot, the landing hexes, and the briefing words.
+ * Expected outcome: `raid` or `campaign`.
+ * Exceptions: None.
+ */
+export type OperationPurpose = 'raid' | 'campaign';
+
+/**
  * The methods a stored row may contain.
  *
  * Purpose: Parsing rejects anything outside this list.
@@ -96,6 +106,16 @@ export const OPERATION_PHASES: readonly OperationPhase[] = ['muster', 'transit',
  * Exceptions: None.
  */
 export const OPERATION_SOURCES: readonly OperationSource[] = ['engine', 'commander'];
+
+/**
+ * The purposes a stored row may contain.
+ *
+ * Purpose: Parsing rejects anything outside this list.
+ * When to use: When reading a stored operation.
+ * Expected outcome: `raid` and `campaign`.
+ * Exceptions: None.
+ */
+export const OPERATION_PURPOSES: readonly OperationPurpose[] = ['raid', 'campaign'];
 
 /**
  * The objective, the force, and the phase kept between turns.
@@ -205,6 +225,24 @@ export interface Operation {
    * Exceptions: None.
    */
   readonly phaseTurn: number;
+  /**
+   * Why the operation was launched.
+   *
+   * Contract: A member of `OPERATION_PURPOSES`. Absent means `raid`, which is what every operation stored by an earlier version is.
+   * When to use: Read through `operationPurposeOf` or `isCampaignLift`, never directly.
+   * Expected outcome: `campaign` only on a campaign lift. Otherwise absent or `raid`.
+   * Exceptions: None.
+   */
+  readonly purpose?: OperationPurpose;
+  /**
+   * Fewest troops at the port with which a campaign lift may sail when its muster times out.
+   *
+   * Contract: A positive integer, set only on a campaign lift. Absent means the usual minimum for a sea operation.
+   * When to use: The muster timeout of a sea operation.
+   * Expected outcome: The force the lift needs for what waits at its target.
+   * Exceptions: None.
+   */
+  readonly minGroundUnits?: number;
 }
 
 /**

@@ -9,6 +9,7 @@
 
 import { NEAR_KNOCKOUT_MAX_CITY_HEXES } from '../../shared/victoryRules';
 import { logDebug, logTrace } from '../logger';
+import { CAMPAIGN_MAX_SEA_STEPS } from './campaignSeaConstants';
 
 /**
  * Farthest target the engine picks, in land steps.
@@ -237,19 +238,27 @@ export function campaignScoreBeats(city: CampaignCity, steps: number, other: Cam
 /**
  * The enemy city the engine would pick.
  *
- * Purpose: The highest score within `CAMPAIGN_MAX_LAND_STEPS` wins. Ties go to fewer steps, then the lower H3 index.
- * When to use: When the stored target is missing, not a candidate, or out of reach.
- * Expected outcome: The chosen H3 index, or null when no candidate is within the cap.
+ * Purpose: The highest score wins. A city's distance is its land steps when they are within `CAMPAIGN_MAX_LAND_STEPS`, otherwise its sea steps when they are within `CAMPAIGN_MAX_SEA_STEPS`. Ties go to fewer steps, then the lower H3 index.
+ * When to use: When the stored target is missing, not a candidate, or out of reach. Pass `seaStepsByH3` to let the campaign choose a city across the water.
+ * Expected outcome: The chosen H3 index, or null when no candidate is within either cap. Without `seaStepsByH3` only land steps count.
  * Exceptions: None.
  */
 export function chooseCampaignTarget(
   cities: readonly CampaignCity[],
-  landStepsFromForce: ReadonlyMap<string, number>
+  landStepsFromForce: ReadonlyMap<string, number>,
+  seaStepsByH3?: ReadonlyMap<string, number>
 ): string | null {
   let best: { readonly h3Index: string; readonly city: CampaignCity; readonly steps: number } | null = null;
   for (const city of cities) {
-    const steps = landStepsFromForce.get(city.h3Index);
-    if (steps === undefined || steps > CAMPAIGN_MAX_LAND_STEPS) continue;
+    const landSteps = landStepsFromForce.get(city.h3Index);
+    const seaSteps = seaStepsByH3?.get(city.h3Index);
+    const steps =
+      landSteps !== undefined && landSteps <= CAMPAIGN_MAX_LAND_STEPS
+        ? landSteps
+        : seaSteps !== undefined && seaSteps <= CAMPAIGN_MAX_SEA_STEPS
+          ? seaSteps
+          : undefined;
+    if (steps === undefined) continue;
     const better =
       best === null ||
       campaignScoreBeats(city, steps, best.city, best.steps) ||

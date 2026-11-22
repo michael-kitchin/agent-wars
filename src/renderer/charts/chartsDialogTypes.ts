@@ -10,6 +10,7 @@
 import type { LineChartDefinition } from '../../shared/chartsDialogState';
 import type { AgreementStripBlockHandle } from './agreementStripBlock';
 import type { LineChartHandle } from './lineChart';
+import type { PostureStripBlockHandle } from './postureStripBlock';
 import type { RelationshipTimelineHandle } from './relationshipTimeline';
 
 /**
@@ -113,6 +114,15 @@ export interface ChartsView {
    * Exceptions: None.
    */
   readonly agreements: AgreementStripBlockHandle;
+  /**
+   * The posture block under the agreements block.
+   *
+   * Contract: Alive until the dialog closes.
+   * When to use: Update, resize, and destroy.
+   * Expected outcome: A handle that also exposes its title row.
+   * Exceptions: None.
+   */
+  readonly postures: PostureStripBlockHandle;
   /**
    * The line charts.
    *

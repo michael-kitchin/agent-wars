@@ -89,6 +89,37 @@ test('a stored land method is dropped and a sea sibling remains', () => {
   });
 });
 
+test('a campaign lift with its troop minimum reads back equal', () => {
+  withTempGameDb('aw-operation-memory-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    const lift: Operation = { ...sampleOperation('a1-op5'), purpose: 'campaign', minGroundUnits: 8 };
+    writeOperationsForSeat(ops, 'a1', [lift]);
+    assert.deepEqual(readOperations(ops).get('a1'), [lift]);
+  });
+});
+
+test('an operation stored without a purpose reads back with no purpose key', () => {
+  withTempGameDb('aw-operation-memory-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    writeOperationsForSeat(ops, 'a1', [sampleOperation('a1-op3')]);
+    const read = readOperations(ops).get('a1')?.[0];
+    assert.ok(read);
+    assert.equal('purpose' in read, false);
+    assert.equal('minGroundUnits' in read, false);
+  });
+});
+
+test('an unknown purpose or a bad troop minimum drops that operation and keeps a valid sibling', () => {
+  withTempGameDb('aw-operation-memory-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    const valid = { ...sampleOperation('a1-op3'), purpose: 'campaign', minGroundUnits: 3 };
+    upsertGameConfigValue(ops, OPERATIONS_CONFIG_KEY, JSON.stringify({
+      a1: [{ ...sampleOperation('a1-op4'), purpose: 'escort' }, { ...sampleOperation('a1-op5'), minGroundUnits: 0 }, valid],
+    }));
+    assert.deepEqual(readOperations(ops).get('a1'), [valid]);
+  });
+});
+
 test('nextOperationId uses the plain id, then the b suffix', () => {
   const plain = nextOperationId('a1', [], 4);
   assert.equal(plain, 'a1-op4');

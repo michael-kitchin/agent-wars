@@ -277,7 +277,7 @@ export function buildFinalJsonContractInstruction(args: {
   const memoryParagraph = [memoryClause, memoryLimits].map((part) => part.trim()).filter((part) => part.length > 0).join(' ');
   const campaignParagraph =
     gates.includeCampaignTarget === true
-      ? 'Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.'
+      ? 'Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land or by a campaign lift. An unknown or unreachable city is dropped.'
       : '';
   const operationsParagraph =
     gates.includeOperations === true

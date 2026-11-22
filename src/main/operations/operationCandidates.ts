@@ -1,4 +1,3 @@
-import { isLandUnitType } from '../../shared/landUnitType';
 /**
  * The landings a seat could start, and the campaign cities it could turn to.
  *
@@ -11,16 +10,18 @@ import { isLandUnitType } from '../../shared/landUnitType';
 import type { GameStateSnapshot } from '../gameDb';
 import { listUnitsForSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
-import { CAMPAIGN_CONTACT_RADIUS } from '../openRouter/campaignRules';
 import { campaignPlanForState, loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import { GAME_SIZE_MULTIPLIER, parseGameSize } from '../../shared/gameSize';
+import { isCampaignLift } from '../../shared/operationPurpose';
 import type { Operation, OperationCandidate, OperationChoiceMethod, OperationMethod } from '../../shared/operationTypes';
 import type { PostureMenuMethod, PostureSettings } from '../../shared/postureTypes';
 import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import { listAirOperationCandidates } from './airOperationCandidates';
 import { listLandOperationCandidates } from './landOperationCandidates';
+import { liftProtectedUnitIds } from './liftRules';
 import { buildLiftTerrain } from './liftTerrain';
 import {
+  CAMPAIGN_LIFT_MAX_PER_SIZE,
   OPERATION_MAX_AIR_PER_SIZE,
   OPERATION_MAX_SEA_PER_SIZE,
   OPERATION_MENU_AIR_ROWS,
@@ -88,19 +89,46 @@ function rowsInMenuOrder(
 /**
  * Whether this method still has a free slot.
  *
- * Purpose: A full sea slot must not skip the air search, and a full air slot must not skip the sea search.
+ * Purpose: A full sea slot must not skip the air search, and a full air slot must not skip the sea search. A campaign lift fills a slot of its own, not this one.
  * When to use: Before each method's search. Pass the seat's posture so an air factor raises the air slot.
- * Expected outcome: True when the stored operations of that method are fewer than its slots.
+ * Expected outcome: True when the stored operations of that method, not counting campaign lifts, are fewer than its slots.
  * Exceptions: None.
  */
-function methodHasRoom(
+export function methodHasRoom(
   state: GameStateSnapshot,
   active: readonly Operation[],
   method: OperationMethod,
   settings: PostureSettings,
 ): boolean {
-  const running = active.filter((operation) => operation.method === method).length;
+  const running = active.filter((operation) => operation.method === method && !isCampaignLift(operation)).length;
   return running < operationSlotsForState(state, method, settings);
+}
+
+/**
+ * How many campaign lifts this match allows one seat.
+ *
+ * Purpose: The campaign lift check and the briefing stop at the same count.
+ * When to use: Before the engine looks for a campaign lift to launch.
+ * Expected outcome: `CAMPAIGN_LIFT_MAX_PER_SIZE` times the match's size multiplier. An unknown size uses the small multiplier.
+ * Exceptions: None.
+ */
+export function campaignLiftSlotsForState(state: GameStateSnapshot): number {
+  const slots = CAMPAIGN_LIFT_MAX_PER_SIZE * GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)];
+  logTrace('operationCandidates campaignLiftSlotsForState', { gameSize: state.gameSize ?? null, slots });
+  return slots;
+}
+
+/**
+ * Whether the seat may run one more campaign lift.
+ *
+ * Purpose: Campaign lifts have a slot of their own, apart from raids.
+ * When to use: Before the engine builds a campaign lift.
+ * Expected outcome: True when the stored campaign lifts are fewer than the campaign lift slots.
+ * Exceptions: None.
+ */
+export function campaignLiftHasRoom(state: GameStateSnapshot, active: readonly Operation[]): boolean {
+  const running = active.filter((operation) => isCampaignLift(operation)).length;
+  return running < campaignLiftSlotsForState(state);
 }
 
 /**
@@ -154,12 +182,13 @@ export function operationCandidatesForSeat(args: {
       ? buildLiftTerrain({ state: args.state, seatId: args.seatId, landMass })
       : terrain;
     const plan = campaignPlanForState(args.state);
-    const protectedUnitIds = new Set<string>([...(plan?.defenderUnitIds ?? []), ...(args.withheldIds ?? [])]);
-    for (const unit of seen.units) {
-      if (unit.player !== args.seatId) continue;
-      if (!isLandUnitType(unit.unitType)) continue;
-      if (terrain.enemyUnitsWithin(unit.h3Index, CAMPAIGN_CONTACT_RADIUS) > 0) protectedUnitIds.add(unit.id);
-    }
+    const protectedUnitIds = liftProtectedUnitIds({
+      state: seen,
+      seatId: args.seatId,
+      terrain,
+      defenderUnitIds: plan?.defenderUnitIds ?? [],
+      withheldIds: args.withheldIds ?? new Set<string>(),
+    });
     const onlyObjectiveH3 = args.only?.objectiveH3;
     const land = includeLand || onlyLand
       ? listLandOperationCandidates({

@@ -48,6 +48,26 @@ export const CAMPAIGN_PHASES: readonly CampaignPhase[] = ['assemble', 'assault']
 export const CAMPAIGN_SOURCES: readonly CampaignSource[] = ['engine', 'commander'];
 
 /**
+ * How the campaign force reaches its target.
+ *
+ * Purpose: A target the ground units can walk to differs from one the engine ships them to.
+ * When to use: Stored objectives, the briefing, the posture report, the keep rule, and the sea-target expiry. The campaign lift launch does not read it: it launches for any stored objective, land or sea, carrying the ground units that cannot walk to the waypoint.
+ * Expected outcome: `land` when ground units march to the target, `sea` when the target is out of land reach and campaign lifts are expected to carry them.
+ * Exceptions: None.
+ */
+export type CampaignApproach = 'land' | 'sea';
+
+/**
+ * The approaches a stored row may contain.
+ *
+ * Purpose: Parsing rejects anything outside this list.
+ * When to use: When reading a stored objective.
+ * Expected outcome: `land` and `sea`.
+ * Exceptions: None.
+ */
+export const CAMPAIGN_APPROACHES: readonly CampaignApproach[] = ['land', 'sea'];
+
+/**
  * The target, staging hex, and phase kept between consults.
  *
  * Purpose: One row per AI seat, replaced once per strategic consult.
@@ -101,6 +121,63 @@ export interface CampaignObjective {
    * Exceptions: None.
    */
   readonly chosenTurn: number;
+  /**
+   * How the force reaches the target.
+   *
+   * Contract: Absent means `land`, which is what every earlier save holds. `sea` means the target is out of land reach and campaign lifts are expected to carry the force. The lift launch does not check it.
+   * When to use: The briefing, the posture report, the keep rule, and the expiry rule. Read it with `campaignApproachOf`.
+   * Expected outcome: One of `CAMPAIGN_APPROACHES`, or absent.
+   * Exceptions: None.
+   */
+  readonly approach?: CampaignApproach;
+  /**
+   * The turn the last campaign lift for this target launched.
+   *
+   * Contract: Absent until a campaign lift launches for the current target. A new target starts without it.
+   * When to use: The expiry rule counts the wait from this turn.
+   * Expected outcome: An integer turn number, or absent.
+   * Exceptions: None.
+   */
+  readonly liftLaunchedTurn?: number;
+  /**
+   * The turn the commander last cancelled a campaign lift for this target.
+   *
+   * Contract: Absent until the commander cancels a campaign lift for the current target. A new target starts without it. While fewer than `CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS` turns have passed since this turn, the engine launches no new campaign lift.
+   * When to use: The lift launch reads it to respect the commander's cancel.
+   * Expected outcome: An integer turn number, or absent.
+   * Exceptions: None.
+   */
+  readonly liftCancelledTurn?: number;
+  /**
+   * A sea target the engine dropped and will not pick again for a while.
+   *
+   * Contract: Present together with `skippedTurn`, or absent together with it.
+   * When to use: Target choice leaves this city out while the skip is active.
+   * Expected outcome: A non-empty H3 index, or absent.
+   * Exceptions: None.
+   */
+  readonly skippedTargetH3?: string;
+  /**
+   * The turn the skipped target was dropped.
+   *
+   * Contract: Present together with `skippedTargetH3`, or absent together with it.
+   * When to use: The skip stays active for a fixed number of turns after this one.
+   * Expected outcome: An integer turn number, or absent.
+   * Exceptions: None.
+   */
+  readonly skippedTurn?: number;
+}
+
+/**
+ * Reads an objective's approach with the default applied.
+ *
+ * Purpose: A stored row without the field is a land campaign, so every reader applies the same default.
+ * When to use: Wherever code branches on how the force reaches the target.
+ * Expected outcome: `land` when the field is absent, otherwise the stored value.
+ * Exceptions: None.
+ */
+export function campaignApproachOf(objective: Pick<CampaignObjective, 'approach'>): CampaignApproach {
+  return objective.approach ?? 'land';
 }
 
 

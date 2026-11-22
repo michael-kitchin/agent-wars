@@ -95,3 +95,23 @@ test('a home city held by another side loses to an equal city held by its home s
   const chosen = chooseCampaignTarget([taken, city('held', 20, true, false)], steps);
   assert.equal(chosen, 'held');
 });
+
+test('a sea-only city competes with land cities under the same score', () => {
+  const land = new Map([['land', 5]]);
+  const sea = new Map([['sea', 12]]);
+  const seaHome = city('sea', 30, true, false);
+  assert.equal(chooseCampaignTarget([seaHome, city('land', 10, false, false)], land, sea), 'sea');
+  const minorHome = city('minor', 10, true, true);
+  const minorSteps = new Map([
+    ['land', 5],
+    ['minor', 8],
+  ]);
+  assert.equal(chooseCampaignTarget([seaHome, city('land', 10, false, false), minorHome], minorSteps, sea), 'minor');
+});
+
+test('a sea city beyond the sea step limit is not chosen, and no sea steps match the land-only rule', () => {
+  assert.equal(chooseCampaignTarget([city('far', 30, true, false)], new Map(), new Map([['far', 17]])), null);
+  assert.equal(chooseCampaignTarget([city('far', 30, true, false)], new Map(), new Map([['far', 16]])), 'far');
+  assert.equal(chooseCampaignTarget([city('far', 30, true, false)], new Map()), null);
+  assert.equal(chooseCampaignTarget([city('near', 5, false, false)], new Map([['near', 3]])), 'near');
+});

@@ -9,6 +9,8 @@
 
 import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
+import { isCampaignLift } from '../../shared/operationPurpose';
+import { writeCampaignLiftLaunchedTurn } from '../gameDb/campaignObjectiveMemory';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
 import { activeAiSeatIds } from '../../shared/seatRoster';
@@ -38,6 +40,7 @@ import {
   writeOperationsForSeat,
 } from '../gameDb/operationMemory';
 import { buildLiftTerrain } from './liftTerrain';
+import { campaignLiftForSeat, campaignLiftLandings } from './campaignLiftLaunch';
 import { applyOperationActions } from './operationActions';
 import { advanceOperation } from './operationAdvance';
 import { operationCandidatesForSeat } from './operationCandidates';
@@ -85,14 +88,14 @@ function readStoredOrders(seatId: string, coordinates: KnockoutCoordinates): Rea
 /**
  * The landing with the shortest sail from a port, then the lowest hex.
  *
- * Purpose: A loaded force needs one beach, and every caller must pick the same one.
+ * Purpose: A loaded force needs one beach, and every caller must pick the same one. A raid passes the target's own landings, and a campaign lift also passes the hexes the seat holds near the target.
  * When to use: When a muster is ready to load.
  * Expected outcome: A landing hex, or null when no beach can be sailed to.
  * Exceptions: None.
  */
-function chooseLanding(terrain: ReturnType<typeof buildLiftTerrain>, objectiveH3: string, fromH3: string): string | null {
+function chooseLandingAmong(terrain: ReturnType<typeof buildLiftTerrain>, hexes: readonly string[], fromH3: string): string | null {
   let best: { readonly hex: string; readonly sail: number } | null = null;
-  for (const hex of terrain.landingHexes(objectiveH3)) {
+  for (const hex of hexes) {
     const sail = terrain.sailTurns(fromH3, hex);
     if (sail === null) continue;
     if (best === null || sail < best.sail || (sail === best.sail && hex < best.hex)) best = { hex, sail };
@@ -178,6 +181,9 @@ export function buildOperationFacts(args: {
   }
   const enemyCities = new Set(listKnownEnemyCities(args.state, args.seatId).map((city) => city.h3Index));
   const controlByHex = new Map((args.state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  const landings = isCampaignLift(args.operation)
+    ? campaignLiftLandings({ state: args.state, seatId: args.seatId, landMass, terrain, targetH3: args.operation.objectiveH3 })
+    : terrain.landingHexes(args.operation.objectiveH3);
   return {
     turnNumber: args.state.turnNumber,
     unitHexById: new Map(own.map((unit) => [unit.id, unit.h3Index])),
@@ -187,7 +193,7 @@ export function buildOperationFacts(args: {
     objectiveIsOwn: controlByHex.get(args.operation.objectiveH3) === args.seatId,
     objectiveIsEnemyCity: enemyCities.has(args.operation.objectiveH3),
     objectiveHasEnemyUnit: terrain.enemyUnitsWithin(args.operation.objectiveH3, 0) > 0,
-    chooseLanding: (fromH3) => chooseLanding(terrain, args.operation.objectiveH3, fromH3),
+    chooseLanding: (fromH3) => chooseLandingAmong(terrain, landings, fromH3),
     chooseReturnPort: (fromH3) => chooseReturnPort({ fromH3, seatId: args.seatId, state: args.state, terrain }),
   };
 }
@@ -195,9 +201,9 @@ export function buildOperationFacts(args: {
 /**
  * Advances one seat's stored operations and launches into any free slot.
  *
- * Purpose: The seat counts enemy units that fog would hide. It launches only a sea or air row the posture counts as clear, after that row has waited one turn.
+ * Purpose: The seat counts enemy units that fog would hide. It launches only a sea or air row the posture counts as clear, after that row has waited one turn. After the raids, it also launches a campaign lift toward a stored campaign target, with no offer wait, when the lift slot and the required force allow.
  * When to use: Once per active AI seat, after knocked-out seats have been cleared.
- * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until a row the posture counts as clear has been offered on an earlier turn. Land rows are not launched.
+ * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until a row the posture counts as clear has been offered on an earlier turn. Land rows are not launched. A campaign lift launch also stamps the stored objective with the launch turn and marks the seat for a consult.
  * Exceptions: Propagates a database or terrain error. The caller logs it and leaves this seat's previous list in place only when the write has not run.
  */
 export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: KnockoutCoordinates): void {
@@ -300,6 +306,28 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
       unitCount: launched.unitIds.length,
       carrierCount: launched.carrierIds.length,
     });
+  }
+  const lift = campaignLiftForSeat({ state, seatId, landMass, active: kept, withheldIds });
+  if (lift !== null) {
+    const liftFacts = buildOperationFacts({ state, seatId, operation: lift, coordinates });
+    if (liftFacts !== null) {
+      const liftStep = advanceOperation(lift, liftFacts);
+      applyOperationActions({ seatId, actions: liftStep.actions, state, coordinates });
+      if (liftStep.next !== null) {
+        kept.push(liftStep.next);
+        seatEvent = true;
+        writeCampaignLiftLaunchedTurn(configOps, seatId, state.turnNumber);
+      }
+      logDebug('operationTurnFlow campaign lift launched', {
+        seatId,
+        id: lift.id,
+        stored: liftStep.next !== null,
+        musterH3: lift.musterH3,
+        unitCount: lift.unitIds.length,
+        carrierCount: lift.carrierIds.length,
+        minGroundUnits: lift.minGroundUnits,
+      });
+    }
   }
   const offerEmpty = offer.announcedTurn === null && offer.clearOfferTurn === null;
   writeOperationOffer(configOps, seatId, offerEmpty ? null : offer);

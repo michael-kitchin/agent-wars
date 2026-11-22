@@ -11,6 +11,9 @@ import { isLandUnitType } from '../../shared/landUnitType';
 import type { GameStateSnapshot } from '../gameDb';
 import { logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
+import { campaignApproachOf } from '../../shared/campaignTypes';
+import { isCampaignLift } from '../../shared/operationPurpose';
 import { CAMPAIGN_OPERATION_ID, type Operation, type OperationCandidate } from '../../shared/operationTypes';
 import { CAMPAIGN_MASS_RADIUS, type CampaignPlan } from './campaignRules';
 import { LIFT_OBJECTIVE_CLEAR_RADIUS } from '../operations/liftRules';
@@ -103,7 +106,7 @@ function airOperationBullet(state: GameStateSnapshot, operation: Operation, form
  *
  * Purpose: Each stage has its own sentence, and every hex goes through the briefing's formatter.
  * When to use: Once per operation, after the operations have been sorted.
- * Expected outcome: A markdown list line. An air operation uses the air sentences. Counts of one use the singular noun and, on an assault, the singular verb.
+ * Expected outcome: A markdown list line. An air operation uses the air sentences. Counts of one use the singular noun and, on an assault, the singular verb. A campaign lift says `campaign lift by sea to` and `campaign lift turned back from` where a raid says `by sea to` and `turned back from`.
  * Exceptions: None.
  */
 function operationBullet(state: GameStateSnapshot, operation: Operation, format: (h3Index: string) => string): string {
@@ -114,9 +117,10 @@ function operationBullet(state: GameStateSnapshot, operation: Operation, format:
   const city = `an enemy city with ${urban} ${noun(urban, 'city cell')}`;
   const units = operation.unitIds.join(', ');
   const ships = operation.carrierIds.join(', ');
+  const bySea = isCampaignLift(operation) ? 'campaign lift by sea' : 'by sea';
   if (operation.phase === 'muster') {
     const atPort = arrived(state, operation, operation.musterH3);
-    return `- ${operation.id}: by sea to ${objective}, ${city}. Mustering at ${muster}: ${atPort.ground} of ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} and ${atPort.ships} of ${operation.carrierIds.length} ${noun(operation.carrierIds.length, 'ship')} are there. Units: ${units}. Ships: ${ships}.`;
+    return `- ${operation.id}: ${bySea} to ${objective}, ${city}. Mustering at ${muster}: ${atPort.ground} of ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} and ${atPort.ships} of ${operation.carrierIds.length} ${noun(operation.carrierIds.length, 'ship')} are there. Units: ${units}. Ships: ${ships}.`;
   }
   if (operation.phase === 'transit') {
     const landing = operation.landingH3 === null ? 'an unknown landing' : format(operation.landingH3);
@@ -124,15 +128,16 @@ function operationBullet(state: GameStateSnapshot, operation: Operation, format:
     const aboard = cargo.length === 0
       ? 'with 0 ground units aboard'
       : `with ${cargo.length} ${noun(cargo.length, 'ground unit')} aboard: ${cargo.join(', ')}`;
-    return `- ${operation.id}: by sea to ${objective}, ${city}. At sea, heading for ${landing}, ${aboard}. Ships: ${ships}.`;
+    return `- ${operation.id}: ${bySea} to ${objective}, ${city}. At sea, heading for ${landing}, ${aboard}. Ships: ${ships}.`;
   }
   if (operation.phase === 'assault') {
     const verb = operation.unitIds.length === 1 ? 'is' : 'are';
-    return `- ${operation.id}: by sea to ${objective}, ${city}. Landed. ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} ${verb} marching on it: ${units}.`;
+    return `- ${operation.id}: ${bySea} to ${objective}, ${city}. Landed. ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} ${verb} marching on it: ${units}.`;
   }
   const cargo = cargoAboardIds(state, operation);
   const aboard = cargo.length === 0 ? '' : ` with ${cargo.join(', ')} aboard`;
-  return `- ${operation.id}: turned back from ${objective}. Returning to ${muster}${aboard}. Units: ${units}. Ships: ${ships}.`;
+  const turnedBack = isCampaignLift(operation) ? 'campaign lift turned back' : 'turned back';
+  return `- ${operation.id}: ${turnedBack} from ${objective}. Returning to ${muster}${aboard}. Units: ${units}. Ships: ${ships}.`;
 }
 
 /**
@@ -249,7 +254,7 @@ export function buildOperationOptionsSection(args: {
  *
  * Purpose: The briefing and the no-briefing situation message share one wording.
  * When to use: When `ordersEnabled` is true and the mode is not tactical. Pass the seat's stored operations and, when a menu was built, its table.
- * Expected outcome: An empty string when there is no operation, no campaign plan, no options, and no note. Otherwise the H1 heading, the previous turn's note when it is non-empty, the campaign bullet first when a plan was passed, the operation bullets, one paragraph telling the commander to leave a stored operation's units alone, and the options table when it is non-empty. A campaign with no stored operation does not get that paragraph.
+ * Expected outcome: An empty string when there is no operation, no campaign plan, no options, and no note. Otherwise the H1 heading, the previous turn's note when it is non-empty, the campaign bullet first when a plan was passed (a sea campaign names the lowest-id campaign lift whose objective is the campaign target, when one is stored), the operation bullets, one paragraph telling the commander to leave a stored operation's units alone, and the options table when it is non-empty. A campaign with no stored operation does not get that paragraph.
  * Exceptions: None.
  */
 export function buildOperationsSection(args: {
@@ -262,7 +267,14 @@ export function buildOperationsSection(args: {
 }): string {
   const options = args.options ?? '';
   const note = args.note ?? '';
-  const campaign = args.campaignPlan == null ? null : campaignBullet({ state: args.state, plan: args.campaignPlan, format: args.format });
+  const targetH3 = args.campaignPlan?.objective.targetH3;
+  const liftId = args.operations
+    .filter((operation) => isCampaignLift(operation) && operation.objectiveH3 === targetH3)
+    .map((operation) => operation.id)
+    .sort(compareCodeUnits)[0] ?? null;
+  const campaign = args.campaignPlan == null
+    ? null
+    : campaignBullet({ state: args.state, plan: args.campaignPlan, format: args.format, liftId });
   logTrace('briefingSectionsOperations buildOperationsSection', {
     operationCount: args.operations.length,
     hasOptions: options.length > 0,
@@ -290,18 +302,33 @@ export function buildOperationsSection(args: {
  *
  * Purpose: The commander sees the campaign in the same list as sea and air operations.
  * When to use: When a campaign plan was built for this consult.
- * Expected outcome: An assemble sentence when the force is gathering at a staging hex. An assault sentence otherwise, including when there is no staging hex.
+ * Expected outcome: An assemble sentence when the force is gathering at a staging hex. An assault sentence otherwise, including when there is no staging hex. For a sea objective, a sentence naming the campaign lift that carries the force, or saying the campaign waits for one when `liftId` is null.
  * Exceptions: None.
  */
 function campaignBullet(args: {
   readonly state: GameStateSnapshot;
   readonly plan: CampaignPlan;
   readonly format: (h3Index: string) => string;
+  /**
+   * The id of the stored campaign lift serving the campaign target.
+   *
+   * Contract: The lowest id, by code unit, of the seat's campaign lifts whose objective is the plan's target. Null when none is stored.
+   * When to use: Read only for a sea objective, to name the lift or say the campaign waits for one.
+   * Expected outcome: An operation id, or null.
+   * Exceptions: None.
+   */
+  readonly liftId: string | null;
 }): string {
   const objective = args.plan.objective;
   const target = args.format(objective.targetH3);
   const urban = (args.state.strategicInfrastructure ?? []).find((row) => row.h3Index === objective.targetH3)?.urbanHexCount ?? 0;
   const city = `an enemy city with ${urban} ${noun(urban, 'city cell')}`;
+  if (campaignApproachOf(objective) === 'sea') {
+    const lift = args.liftId === null
+      ? 'Waiting for a campaign lift: enough ground units at a port and ships to carry them.'
+      : `Campaign lift ${args.liftId} is carrying the force.`;
+    return `- ${CAMPAIGN_OPERATION_ID}: by sea to ${target}, ${city}. ${lift}`;
+  }
   if (objective.phase === 'assemble' && objective.stagingH3 !== null) {
     const verb = args.plan.massedCount === 1 ? 'is' : 'are';
     return `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, ${city}. Assembling at ${args.format(objective.stagingH3)}: ${args.plan.massedCount} of ${args.plan.threshold} ground units ${verb} within ${CAMPAIGN_MASS_RADIUS} hexes.`;

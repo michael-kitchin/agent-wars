@@ -13,12 +13,13 @@
 /**
  * Whether weather icons show when the app opens.
  *
- * Purpose: The map shows each hex's weather until the player turns Weather off; the choice lasts until the app closes.
+ * Purpose: The map starts without weather icons until the player turns Weather on; the choice lasts until the app
+ *   closes. The new-game preview does not use it: the preview follows the dialog's month and weather bonus.
  * When to use: The initial value of the renderer's stored Weather choice.
- * Expected outcome: `true`.
+ * Expected outcome: `false`.
  * Exceptions: None.
  */
-export const DEFAULT_WEATHER_ICONS_SHOWN = true;
+export const DEFAULT_WEATHER_ICONS_SHOWN = false;
 
 /**
  * Whether Tech is on when the app opens.

@@ -26,7 +26,7 @@ import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import type { Operation, OperationCandidate } from '../../shared/operationTypes';
 import { buildLiftTerrain } from './liftTerrain';
-import { operationCandidatesForSeat, operationMenuRows, operationSlotsForState } from './operationCandidates';
+import { campaignLiftHasRoom, methodHasRoom, operationCandidatesForSeat, operationMenuRows, operationSlotsForState } from './operationCandidates';
 
 /**
  * One stored sea operation.
@@ -60,6 +60,16 @@ test('full sea slots give no candidates', () => {
     active: [fillingOperation()],
   });
   assert.deepEqual(candidates, []);
+});
+
+test('a campaign lift fills its own slot and leaves the raid slot free', () => {
+  const state = { gameSize: 'small' } as GameStateSnapshot;
+  const settings = POSTURE_SETTINGS.overland;
+  const lift: Operation = { ...fillingOperation(), purpose: 'campaign' };
+  assert.equal(methodHasRoom(state, [lift], 'sea', settings), true);
+  assert.equal(campaignLiftHasRoom(state, [lift]), false);
+  assert.equal(methodHasRoom(state, [fillingOperation()], 'sea', settings), false);
+  assert.equal(campaignLiftHasRoom(state, [fillingOperation()]), true);
 });
 
 /**

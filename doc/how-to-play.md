@@ -385,6 +385,7 @@ The console's **Command** tab (its header reads Commanders) is where you run the
 - **Waiting:** while commanders plan, the line above Ready reads **Commanders planning**, and Ready shows **AI:**, a timer, and `(xN)` for how many are still planning. You can keep giving orders while you wait. Only Ready waits for them.
 - **Stop** during a plan stops it. If the turn hasn't resolved yet, Ready can resolve it without those orders.
 - **Not every turn:** with **Events** on (the default) in the tool groups, a commander is consulted when something it's watching happens, when it has an unread message, and at least every five turns. In between, its standing orders run. Turn Events off to consult every commander every turn, at more cost.
+- **Campaigns and postures:** with the Orders tool group on, each commander's ground units work toward one enemy city at a time, its campaign. When they can't march there, the game gathers them at a port and ships them across the sea, and later landings reinforce the first. A commander that calls a crossing off gets no new one for 10 turns. Each commander also picks a posture, overland, maritime, strangle, or blitz, that leans what it builds and which operations it runs, and keeps it for at least 6 turns. The [Charts](#charts) show each commander's posture turn by turn.
 - **Tool groups** are the tools a commander's model may use: Precomputation, Events, Planning, Assessment, Estimation, Memory, Orders, and Production. Leave them at their defaults unless you're experimenting. [ai-tools.md](ai-tools.md) describes each.
 - **The activity log** at the bottom records each consult, retry, and error. Its filter shows one commander's lines.
 
@@ -399,7 +400,7 @@ After Ready, the map toast and the Reports tab give each side a section when it 
 - **Hex tooltips:** rest the pointer on a hex for its place name, control, production, tech, features, terrain, weather, and effects.
 - **Unit tooltips:** rest the pointer on a unit's flag, in the stack list or anywhere else it appears, for the bonuses it was born with.
 - **Hold T** to hide terrain fill and show hex codes and tech icons.
-- **Map modes:** click the toggle on the minimap's lower-left corner to show the buttons under it. **Weather** shows the weather icons, **Tech** each hex's tech tier, **Control** who holds each hex (on by default), **Production** a production label on every hex, and **Legend** the terrain key. The legend's menu sets the map colors: Standard, Topographic, Nautical, or Night.
+- **Map modes:** click the toggle on the minimap's lower-left corner to show the buttons under it. **Weather** shows the weather icons (off by default), **Tech** each hex's tech tier, **Control** who holds each hex (on by default), **Production** a production label on every hex, and **Legend** the terrain key. The legend's menu sets the map colors: Standard, Topographic, Nautical, or Night.
 
 
 
@@ -407,9 +408,9 @@ After Ready, the map toast and the Reports tab give each side a section when it 
 
 Press **C**, or check **Charts…** in the game menu, to see how the match is going. Press **C** again, press Escape, or click outside to close it. The charts show every side and every turn, whatever fog of war is set to, and no AI commander ever sees them.
 
-*The Charts in a four-side agent-only game: relationships at the top, then stance and agreements over time, then the line charts.*
+*The Charts in a four-side agent-only game: relationships at the top, then stance, agreements, and posture over time, then the line charts.*
 
-![The Charts in a four-side agent-only game: relationships at the top, then stance and agreements over time, then the line charts.](media/charts-whole-screen.png)
+![The Charts in a four-side agent-only game: relationships at the top, then stance, agreements, and posture over time, then the line charts.](media/charts-whole-screen.png)
 
 - **Relationships:** a card for each side the commanders report on, headed "How they see you" for yours. Each line is one commander's view: its color is the stance, its width is trust, and a dashed line is a report more than three turns old. The table under it adds threat, the hexes that commander took from that side in the last five turns, and when it last reported. Use it to see who's turning on whom.
 
@@ -433,6 +434,7 @@ Press **C**, or check **Charts…** in the game menu, to see how the match is go
 
   ![Hovering S. France's turn 18: an active non-aggression deal with SEGAS, which SEGAS records too, and a proposed one with N. France, which N. France doesn't.](media/charts-agreements-strip-w-popup.png)
 
+- **Posture over time:** a row for each AI commander, and a cell for each turn, colored by the posture the commander held: overland, maritime, strangle, or blitz. A full color means the posture's lead activity ran that turn: the land campaign assaulting for overland, a sea operation at sea or landed for maritime, a missile launched for strangle, an air operation for blitz. A lighter color means the commander declared the posture but that activity did not run. A colored outline means the commander never declared a posture and is on the default, overland. A gray outline means the turn is not recorded, which is true of every turn played before 3.4.0, or the commander is out of the match. Hovering a turn names each commander's posture.
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep, units lost per turn, and model cost so far. Built and mercenary units can show one unit type.
 
   *Line charts showing every turn. The list beside Built units is open, to show one unit type.*

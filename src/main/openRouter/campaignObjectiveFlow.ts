@@ -11,8 +11,9 @@ import { isLandUnitType } from '../../shared/landUnitType';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
+import { operationUnitIdsForSeat, readOperations } from '../gameDb/operationMemory';
+import { isCampaignLift } from '../../shared/operationPurpose';
 import { postureSettingsForSeat } from '../gameDb/postureMemory';
-import { operationUnitIdsForSeat } from '../gameDb/operationMemory';
 import { briefingOwnSeatId, ownHomeHexes } from '../briefing/briefingPerspective';
 import { getLandStepDistances, landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { isAiSeatId } from '../../shared/seatIds';
@@ -25,10 +26,12 @@ import {
   buildCampaignPlan,
   campaignAssaultMinUnitsFor,
   campaignWaypoint,
-  resolveCampaignObjective,
   type CampaignPlan,
   type CampaignUnitInput,
 } from './campaignRules';
+import { resolveCampaignObjective } from './campaignObjectiveResolution';
+import { campaignSeaRoutesForState } from './campaignSeaFlow';
+import { campaignSkipFor } from './campaignSeaRules';
 import { readActivePactPartnerSeatIds } from './campaignPactPartners';
 import { knownCampaignCities, type CampaignCity } from './campaignTargetSelection';
 
@@ -228,7 +231,7 @@ export function campaignLandSteps(
  *
  * Purpose: The briefing that follows this call reads the row this function just wrote.
  * When to use: Once per strategic consult, only when standing orders are on. The caller checks that flag.
- * Expected outcome: Outside `region_vs_region`, or when the terrain cache is missing, null and nothing written. Otherwise the resolved objective, also written for the seat; null clears the seat's entry.
+ * Expected outcome: Outside `region_vs_region`, or when the terrain cache is missing, null and nothing written. Otherwise the resolved objective, also written for the seat; null clears the seat's entry. The choice may be a city across the water when a campaign lift could carry the force there, and a sea target that waited too long for a lift is dropped and skipped for a while.
  * Exceptions: Propagates a database error.
  */
 export function resolveCampaignObjectiveForSeat(state: GameStateSnapshot): CampaignObjective | null {
@@ -244,16 +247,39 @@ export function resolveCampaignObjectiveForSeat(state: GameStateSnapshot): Campa
   const ops = { getOne: dbGetOne, run: dbRun };
   const stored = readCampaignObjectives(ops).get(seatId) ?? null;
   const groundUnitHexes = inputs.groundUnits.map((unit) => unit.h3Index);
+  const landStepsFromForce = campaignLandSteps(inputs, landMass, groundUnitHexes);
+  const campaignLiftRunning = (readOperations({ getOne: dbGetOne }).get(seatId) ?? []).some(
+    (operation) => isCampaignLift(operation) && operation.objectiveH3 === stored?.targetH3
+  );
+  const storedSteps = stored === null ? undefined : landStepsFromForce.get(stored.targetH3);
+  const skip = campaignSkipFor({
+    stored,
+    turnNumber: state.turnNumber,
+    storedLandReachable: storedSteps !== undefined && storedSteps <= CAMPAIGN_REACH_LIMIT_STEPS,
+    campaignLiftRunning,
+  });
+  const routes = campaignSeaRoutesForState({
+    state,
+    seatId,
+    landMass,
+    cities: inputs.cities,
+    landStepsFromForce,
+    mustTestH3: stored?.targetH3 ?? null,
+    skipH3: skip?.targetH3 ?? null,
+  });
   const next = resolveCampaignObjective({
     stored,
     turnNumber: state.turnNumber,
     cities: inputs.cities,
-    landStepsFromForce: campaignLandSteps(inputs, landMass, groundUnitHexes),
+    landStepsFromForce,
     ownControlledLandHexes: inputs.ownControlledLandHexes,
     landStepsFromTarget: (targetH3) => campaignLandSteps(inputs, landMass, [targetH3]),
     groundUnitHexes,
     hopDistance: computeGridDistanceWithPathFallbackPure,
     assaultMinUnits,
+    seaStepsByH3: new Map([...routes].map(([cityH3, route]) => [cityH3, route.seaSteps])),
+    campaignLiftRunning,
+    skip,
   });
   writeCampaignObjectiveForSeat(ops, seatId, next);
   logDebug('campaignObjectiveFlow resolveCampaignObjectiveForSeat', {

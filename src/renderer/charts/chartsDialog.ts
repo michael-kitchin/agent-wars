@@ -1,5 +1,5 @@
 /**
- * The charts dialog: opens on the charts key, shows the relationship stacks, the stance strip, and nine line charts.
+ * The charts dialog: opens on the charts key, shows the relationship stacks, the stance, agreement, and posture strips, and nine line charts.
  *
  * Purpose: Shows how the match has gone for every side, whatever fog of war is set to.
  * When to use: `wireChartsDialog` once at start-up. The key handler calls `toggleChartsDialog`. The turn handler refreshes or closes it.
@@ -20,6 +20,7 @@ import { buildLegend, seatLookups } from './chartSeatLookups';
 import { appendBlock, buildLineChartBlock, dialogHeight, fillStacks, innerBodyWidth, updateLineChart } from './chartsDialogBlocks';
 import type { ChartsView } from './chartsDialogTypes';
 import { createAgreementStripBlock } from './agreementStripBlock';
+import { createPostureStripBlock } from './postureStripBlock';
 import { createRelationshipTimeline } from './relationshipTimeline';
 
 /**
@@ -154,7 +155,7 @@ function matchIsLoaded(): boolean {
 /**
  * Builds the whole body for a snapshot with turns.
  *
- * Purpose: In order: the relationship stacks, the stance strip, the agreements block, the legend, and the nine line charts.
+ * Purpose: In order: the relationship stacks, the stance strip, the agreements block, the posture block, the legend, and the nine line charts.
  * When to use: Opening the dialog and the first refresh after an empty snapshot.
  * Expected outcome: `view` is set and the body is filled.
  * Exceptions: None.
@@ -200,6 +201,16 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
     snapshot,
   });
 
+  const postureBlock = appendBlock(body, 'Posture over time');
+  const postures = createPostureStripBlock({
+    ...postureBlock,
+    width: innerBodyWidth(body),
+    plotHeightFor: (titleRowHeight) => chartPlotHeight(dialogHeight(), titleRowHeight),
+    nameOf: lookups.nameOf,
+    flagOf: lookups.flagOf,
+    snapshot,
+  });
+
   body.appendChild(buildLegend(snapshot, lookups));
   const lines = LINE_CHART_DEFINITIONS.map((definition) => buildLineChartBlock(body, definition, snapshot, lookups));
   latestSnapshot = snapshot;
@@ -211,7 +222,7 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
       if (latestSnapshot !== null) updateLineChart(entry, latestSnapshot);
     });
   }
-  view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, agreements, lines };
+  view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, agreements, postures, lines };
 }
 
 /**
@@ -226,6 +237,7 @@ function destroyView(): void {
   if (view === null) return;
   view.strip.destroy();
   view.agreements.destroy();
+  view.postures.destroy();
   for (const entry of view.lines) entry.handle.destroy();
   view = null;
   latestSnapshot = null;
@@ -262,6 +274,7 @@ function resizeCharts(): void {
   const height = dialogHeight();
   view.strip.resize(width, chartPlotHeight(height, view.stripTitleRow.offsetHeight));
   view.agreements.resize(width, chartPlotHeight(height, view.agreements.titleRow.offsetHeight));
+  view.postures.resize(width, chartPlotHeight(height, view.postures.titleRow.offsetHeight));
   for (const entry of view.lines) {
     entry.handle.resize(width, chartPlotHeight(height, entry.titleRow.offsetHeight));
   }
@@ -293,6 +306,7 @@ function applySnapshot(body: HTMLElement, raw: MatchChartsSnapshot): void {
   fillStacks(view.stackHost, snapshot, lookups);
   view.strip.update(relationshipStrip(snapshot, view.subjectSelect.value));
   view.agreements.update(snapshot);
+  view.postures.update(snapshot);
   for (const entry of view.lines) updateLineChart(entry, snapshot);
   body.scrollTop = scrollTop;
 }

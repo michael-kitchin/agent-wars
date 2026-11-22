@@ -7,7 +7,7 @@
  * Exceptions: A parse error is logged and treated as an empty memory. A database error from the write propagates.
  */
 
-import { CAMPAIGN_PHASES, CAMPAIGN_SOURCES, type CampaignObjective } from '../../shared/campaignTypes';
+import { CAMPAIGN_APPROACHES, CAMPAIGN_PHASES, CAMPAIGN_SOURCES, type CampaignObjective } from '../../shared/campaignTypes';
 import type { GameConfigKvDbOps } from './gameConfigKv';
 import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { logDebug, logError, logTrace } from '../logger';
@@ -27,7 +27,7 @@ export const CAMPAIGN_OBJECTIVES_CONFIG_KEY = 'campaign_objectives';
  *
  * Purpose: A bad seat entry is dropped without dropping the other seats.
  * When to use: While reading the campaign row.
- * Expected outcome: The objective, or null when a field is missing or the wrong type. An empty staging string is rejected.
+ * Expected outcome: The objective, or null when a field is missing or the wrong type. An empty staging string is rejected. The approach, lift launch turn, lift cancel turn, and skip fields are optional, and an invalid one rejects the entry. A row from before those fields existed reads back without them.
  * Exceptions: None.
  */
 function parseCampaignObjective(value: unknown): CampaignObjective | null {
@@ -39,12 +39,23 @@ function parseCampaignObjective(value: unknown): CampaignObjective | null {
   if (typeof phase !== 'string' || !(CAMPAIGN_PHASES as readonly string[]).includes(phase)) return null;
   if (typeof source !== 'string' || !(CAMPAIGN_SOURCES as readonly string[]).includes(source)) return null;
   if (typeof chosenTurn !== 'number' || !Number.isInteger(chosenTurn)) return null;
+  const { approach, liftLaunchedTurn, liftCancelledTurn, skippedTargetH3, skippedTurn } = row;
+  if (approach !== undefined && (typeof approach !== 'string' || !(CAMPAIGN_APPROACHES as readonly string[]).includes(approach))) return null;
+  if (liftLaunchedTurn !== undefined && (typeof liftLaunchedTurn !== 'number' || !Number.isInteger(liftLaunchedTurn))) return null;
+  if (liftCancelledTurn !== undefined && (typeof liftCancelledTurn !== 'number' || !Number.isInteger(liftCancelledTurn))) return null;
+  if ((skippedTargetH3 === undefined) !== (skippedTurn === undefined)) return null;
+  if (skippedTargetH3 !== undefined && (typeof skippedTargetH3 !== 'string' || skippedTargetH3.length === 0)) return null;
+  if (skippedTurn !== undefined && (typeof skippedTurn !== 'number' || !Number.isInteger(skippedTurn))) return null;
   return {
     targetH3,
     stagingH3: stagingH3 as string | null,
     phase: phase as CampaignObjective['phase'],
     source: source as CampaignObjective['source'],
     chosenTurn,
+    ...(approach !== undefined ? { approach: approach as CampaignObjective['approach'] } : {}),
+    ...(liftLaunchedTurn !== undefined ? { liftLaunchedTurn: liftLaunchedTurn as number } : {}),
+    ...(liftCancelledTurn !== undefined ? { liftCancelledTurn: liftCancelledTurn as number } : {}),
+    ...(skippedTargetH3 !== undefined ? { skippedTargetH3: skippedTargetH3 as string, skippedTurn: skippedTurn as number } : {}),
   };
 }
 
@@ -99,4 +110,43 @@ export function writeCampaignObjectiveForSeat(
   for (const key of [...all.keys()].sort()) record[key] = all.get(key)!;
   logDebug('writeCampaignObjectiveForSeat', { seatId, cleared: objective === null, seatCount: all.size });
   upsertGameConfigValue(ops, CAMPAIGN_OBJECTIVES_CONFIG_KEY, JSON.stringify(record));
+}
+
+/**
+ * Records the turn a campaign lift launched for one seat's target.
+ *
+ * Purpose: The expiry rule counts the wait for a lift from this turn, so a target that keeps launching lifts is not dropped.
+ * When to use: When the engine stores a new campaign lift for the seat.
+ * Expected outcome: The seat's stored objective gains `liftLaunchedTurn`. Other seats and fields are unchanged. Nothing is written when the seat has no objective.
+ * Exceptions: Propagates a database error.
+ */
+export function writeCampaignLiftLaunchedTurn(
+  ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
+  seatId: string,
+  turnNumber: number
+): void {
+  logDebug('writeCampaignLiftLaunchedTurn', { seatId, turnNumber });
+  const objective = readCampaignObjectives(ops).get(seatId);
+  if (objective === undefined) return;
+  writeCampaignObjectiveForSeat(ops, seatId, { ...objective, liftLaunchedTurn: turnNumber });
+}
+
+/**
+ * Records the turn the commander cancelled a campaign lift for one seat's target.
+ *
+ * Purpose: The lift launch waits `CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS` turns after a cancel, so the engine does not relaunch the lift the commander just stopped.
+ * When to use: When a commander cancel removes a campaign lift. Pass the cancelled lift's objective as `targetH3`.
+ * Expected outcome: The seat's stored objective gains `liftCancelledTurn` when its target is `targetH3`. Other seats and fields are unchanged. Nothing is written when the seat has no objective or its target is another city, so a cancel never holds off lifts for a target chosen after it.
+ * Exceptions: Propagates a database error.
+ */
+export function writeCampaignLiftCancelledTurn(
+  ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
+  seatId: string,
+  turnNumber: number,
+  targetH3: string
+): void {
+  logDebug('writeCampaignLiftCancelledTurn', { seatId, turnNumber, targetH3 });
+  const objective = readCampaignObjectives(ops).get(seatId);
+  if (objective === undefined || objective.targetH3 !== targetH3) return;
+  writeCampaignObjectiveForSeat(ops, seatId, { ...objective, liftCancelledTurn: turnNumber });
 }

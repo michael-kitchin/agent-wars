@@ -12,6 +12,8 @@ import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { isLandUnitType } from '../../shared/landUnitType';
 import type { GameStateSnapshot } from '../gameDb';
 import { logTrace } from '../logger';
+import { CAMPAIGN_CONTACT_RADIUS } from '../openRouter/campaignRules';
+import type { LiftTerrain } from './liftTerrain';
 
 /**
  * Hexes around a city that must be empty of other sides before that city is a clear objective.
@@ -213,4 +215,79 @@ export function countObjectiveReinforcers(args: {
     count,
   });
   return count;
+}
+
+/**
+ * Inputs for the units a sea force must leave alone.
+ *
+ * Purpose: Raids and campaign lifts protect the same units, so both pass the same inputs.
+ * When to use: As the argument of `liftProtectedUnitIds`.
+ * Expected outcome: Plain values and read-only collections.
+ * Exceptions: None.
+ */
+export interface LiftProtectedUnitArgs {
+  /**
+   * The snapshot with the full unit list.
+   *
+   * Contract: Includes units the seat has not seen, so a hidden enemy still counts as contact.
+   * When to use: Reading the seat's own ground units.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly state: GameStateSnapshot;
+  /**
+   * The seat whose units are checked.
+   *
+   * Contract: An AI seat id.
+   * When to use: Selecting the seat's own infantry and armor.
+   * Expected outcome: A non-empty string.
+   * Exceptions: None.
+   */
+  readonly seatId: string;
+  /**
+   * Terrain checks for enemy units nearby.
+   *
+   * Contract: Only `enemyUnitsWithin` is used.
+   * When to use: Finding units in contact with an enemy.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly terrain: Pick<LiftTerrain, 'enemyUnitsWithin'>;
+  /**
+   * Ground units that guard the campaign's home.
+   *
+   * Contract: Ids from the campaign plan, or an empty list.
+   * When to use: Always protected.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly defenderUnitIds: readonly string[];
+  /**
+   * Units already released or taken out earlier in this tick.
+   *
+   * Contract: Ids the commander has just taken, or an empty set.
+   * When to use: Always protected.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly withheldIds: ReadonlySet<string>;
+}
+
+/**
+ * The ids of units a sea force must not take.
+ *
+ * Purpose: Home defenders, withheld units, and ground units in contact with an enemy stay where they are, for raids and campaign lifts alike.
+ * When to use: Before building a sea force.
+ * Expected outcome: A new set of the defenders, the withheld ids, and each of the seat's infantry and armor with another side's unit within `CAMPAIGN_CONTACT_RADIUS`.
+ * Exceptions: None.
+ */
+export function liftProtectedUnitIds(args: LiftProtectedUnitArgs): Set<string> {
+  const protectedIds = new Set<string>([...args.defenderUnitIds, ...args.withheldIds]);
+  for (const unit of args.state.units) {
+    if (unit.player !== args.seatId) continue;
+    if (!isLandUnitType(unit.unitType)) continue;
+    if (args.terrain.enemyUnitsWithin(unit.h3Index, CAMPAIGN_CONTACT_RADIUS) > 0) protectedIds.add(unit.id);
+  }
+  logTrace('liftRules liftProtectedUnitIds', { seatId: args.seatId, protectedCount: protectedIds.size });
+  return protectedIds;
 }

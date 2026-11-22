@@ -10,6 +10,7 @@
 import type { SideStance } from './sideMessages';
 import type { SeatRecord } from './seatRoster';
 import type { AgreementHistory } from './agreementHistoryTypes';
+import type { Posture } from './postureTypes';
 
 export { RELATIONSHIP_SCALE_MAX } from './sideMessages';
 
@@ -267,6 +268,53 @@ export interface HexesTaken {
 }
 
 /**
+ * One AI seat's posture at one strategic turn.
+ *
+ * Contract: One report per AI seat still in the match. The human seat has none.
+ * When to use: A recorded `side_statistics` event and the charts' posture strip.
+ * Expected outcome: The posture in force, whether the commander declared it, and whether its lead activity ran.
+ * Exceptions: None.
+ */
+export interface PostureReport {
+  /**
+   * The AI seat the report belongs to.
+   *
+   * Contract: An AI seat id.
+   * When to use: Matching a report to a row of the strip.
+   * Expected outcome: The seat id.
+   * Exceptions: None.
+   */
+  readonly seatId: string;
+  /**
+   * The posture in force.
+   *
+   * Contract: The stored posture, or `DEFAULT_POSTURE` when none is stored.
+   * When to use: Choosing the cell's color.
+   * Expected outcome: A member of `POSTURES`.
+   * Exceptions: None.
+   */
+  readonly posture: Posture;
+  /**
+   * Whether the commander ever declared a posture.
+   *
+   * Contract: True when a posture row is stored for the seat.
+   * When to use: Telling a declared posture from the default.
+   * Expected outcome: A boolean.
+   * Exceptions: None.
+   */
+  readonly declared: boolean;
+  /**
+   * Whether the posture's lead activity ran this turn.
+   *
+   * Contract: Overland: the land campaign assaulting. Maritime: a sea operation at sea or landed. Blitz: an air operation. Strangle: a missile launched since the previous strategic step.
+   * When to use: Choosing between full and light shading.
+   * Expected outcome: A boolean.
+   * Exceptions: None.
+   */
+  readonly acting: boolean;
+}
+
+/**
  * Everything recorded for one strategic turn.
  *
  * Contract: The payload of a `side_statistics` event.
@@ -311,6 +359,15 @@ export interface TurnStatistics {
    * Exceptions: None.
    */
   readonly hexesTaken: readonly HexesTaken[] | null;
+  /**
+   * Each active AI seat's posture.
+   *
+   * Contract: Optional. A missing value means the turn was recorded before posture reports existed. Readers validate it, and a bad value never hides the turn's other statistics.
+   * When to use: The posture strip.
+   * Expected outcome: One report per AI seat still in the match, in side order.
+   * Exceptions: None.
+   */
+  readonly postures?: readonly PostureReport[];
 }
 
 /**

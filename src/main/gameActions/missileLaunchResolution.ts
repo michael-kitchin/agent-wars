@@ -291,11 +291,12 @@ function updateClearedFlags(h3Index: string, isUrban: boolean, isAirport: boolea
  *
  * Purpose: A spent missile is not a loss. It leaves the map without a casualty row.
  * When to use: After the launch's damage has been applied.
- * Expected outcome: The unit, its standing order, and its pending launch are gone, and the launch is noted for the units-lost count (`noteSpentMissile`).
+ * Expected outcome: The unit, its standing order, and its pending launch are gone, and the launch and its owner seat are noted for the units-lost count and the posture reports (`noteSpentMissile`).
  * Exceptions: None.
  */
 function spendMissile(unitId: string): void {
-  noteSpentMissile(unitId);
+  const ownerSeatId = dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [unitId])?.player ?? null;
+  noteSpentMissile(unitId, ownerSeatId);
   dbRun('DELETE FROM units WHERE id = ?', [unitId]);
   dbRun('DELETE FROM standing_orders WHERE unit_id = ?', [unitId]);
   dbRun('DELETE FROM pending_missile_launches WHERE unit_id = ?', [unitId]);

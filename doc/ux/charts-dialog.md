@@ -1,6 +1,6 @@
 # Charts Dialog
 
-The dialog the charts key opens: a relationship stack for each side an AI commander reports on, a stance timeline, an agreements timeline, and nine line charts of every side over every turn.
+The dialog the charts key opens: a relationship stack for each side an AI commander reports on, a stance timeline, an agreements timeline, a posture timeline, and nine line charts of every side over every turn.
 
 ## Purpose
 
@@ -23,12 +23,13 @@ One modal dialog, centered, 90% of the window's width and height, over the top b
 1. **Relationships.** One stack per side that at least one AI commander reports on, in side order (`relationshipSubjectSeatIds` in `src/shared/matchChartSeries.ts`). A commander never reports on its own side, so a side whose only possible reporter is itself has no stack: with the human and one AI opponent, only the human's stack shows. The human seat is a subject like any other. Each stack is a column as wide as its content, with its graph and row card centered in it. The columns are spread evenly across the row, a single stack sits centered, and a dialog too narrow for every column wraps them onto another row. Each stack is headed "How they see you" for the human seat and "How they see {flag} {name}" for the others. It holds a spoke graph over a row card, and both show how the AI commanders regard that side. A snapshot with no AI seat, which a real match never has, shows "No AI commander reports on any side." in place of the stacks.
 2. **Stance over time.** A strip of cells, one row per reporting commander and one cell per turn, as wide as a line chart. A `How they see` dropdown names the side the strip is about, and lists the sides that have a stack, in side order, the first selected. A side with no stack is not offered.
 3. **Agreements over time.** A strip of cells directly under the stance strip, one row per AI commander and one cell per turn, as wide as a line chart. A `Kind` dropdown offers All and the five agreement kinds, and a `With` dropdown offers All sides and every side in the match. Both start on All. See [The agreement strip](#the-agreement-strip).
-4. **A legend.** Each side's color swatch, flag, and name, once, above the line charts.
-5. **Nine line charts,** in this order: Built units, Mercenary units, Hexes held, Production per turn, Stored production points, Credits, Upkeep per turn, Units lost per turn, and Model cost so far (USD). The X axis is the strategic turn and the Y axis is the count. Each side has one line in its `--seat-N-bar` color. Model cost lists AI sides only. A turn with no value for a side is a gap in its line. Built units has a dropdown for Total, Infantry, Armor, Naval, Air, or Missile. Mercenary units has one for Total, Infantry, Armor, Naval, or Air. The numbers are the ones recorded at each turn boundary (`TurnStatistics` in `src/shared/matchStatistics.ts`). The chart rules are in `src/shared/matchChartSeries.ts`.
+4. **Posture over time.** A strip of cells directly under the agreement strip, one row per AI commander and one cell per turn, as wide as a line chart. It has no dropdown. See [The posture strip](#the-posture-strip).
+5. **A legend.** Each side's color swatch, flag, and name, once, above the line charts.
+6. **Nine line charts,** in this order: Built units, Mercenary units, Hexes held, Production per turn, Stored production points, Credits, Upkeep per turn, Units lost per turn, and Model cost so far (USD). The X axis is the strategic turn and the Y axis is the count. Each side has one line in its `--seat-N-bar` color. Model cost lists AI sides only. A turn with no value for a side is a gap in its line. Built units has a dropdown for Total, Infantry, Armor, Naval, Air, or Missile. Mercenary units has one for Total, Infantry, Armor, Naval, or Air. The numbers are the ones recorded at each turn boundary (`TurnStatistics` in `src/shared/matchStatistics.ts`). The chart rules are in `src/shared/matchChartSeries.ts`.
 
 Every dropdown in the dialog uses the field colors of the top bar's View as select (`--field-text` on `--field-bg` with a `--field-border` edge), so its text is readable both on the closed control and in the open list.
 
-A line chart, with its title row, axes, and labels, is at most a quarter of the dialog's height (`chartBlockHeight` in `src/shared/chartsDialogState.ts`). So are the stance strip and the agreement strip, and the agreement strip's block counts its title row and its legend. The relationship stacks are not held to that rule.
+A line chart, with its title row, axes, and labels, is at most a quarter of the dialog's height (`chartBlockHeight` in `src/shared/chartsDialogState.ts`). So are the stance strip, the agreement strip, and the posture strip, and the agreement and posture blocks count their title rows and their legends. The relationship stacks are not held to that rule.
 
 ### The spoke graph
 
@@ -81,18 +82,42 @@ A text legend under the strip says: "Number: active agreements. +N: proposed agr
 
 **Tooltip.** Hovering a cell lists every matching agreement, active first and then proposed, with no cap, built by `agreementCellTooltip` in `src/shared/agreementStripText.ts`. The heading is bold and reads "{name} (turn {n})", and an empty cell says "No matching agreements." Each agreement has a head line that opens with the bold lead-in "Agreement #{id}:", followed in regular weight by "{kind} with {name}, turns {start} to {end}, {active or proposed}, intent: {intent}", with ", against {name}" added for a joint action. Every line under it is a bullet in a list: "Terms: ...", "Zone: ..." when it has one, "Decision on turn {n}: {keep or break}" with ": {reason}" when there is a reason, "Breach this turn: ..." when breached, and "{name} records it as #{id} ({standing})" or "{name} records no matching agreement". The head line carries `lead` and the detail lines carry `bullet` in `AgreementTooltipLine`, and `tooltipLineElements` in `src/renderer/charts/stripTimelineCore.ts` draws them. Side codes in terms and reasons print as display names. A long tooltip wraps, and it opens above the pointer when it would pass the bottom of the dialog body. Kind labels are `SIDE_AGREEMENT_KIND_LABELS` and intent labels are `SIDE_AGREEMENT_INTENT_LABELS` in `src/shared/sideAgreements.ts`.
 
+### The posture strip
+
+Each row is an AI commander, in side order. The human seat never has a row, because the human has no posture. A row's label is the commander's flag and name, as on the stance strip. Each cell is one recorded turn, the same turns the other strips show, and shows the posture saved in that turn's `side_statistics` event (`PostureReport` in `src/shared/matchStatistics.ts`). A cell holds no text. The rules live in `src/shared/postureStrip.ts`, and `src/renderer/charts/postureTimeline.ts` draws them.
+
+| Cell | Drawing |
+| --- | --- |
+| Declared posture, lead activity ran | A full-color fill: `--posture-overland`, `--posture-maritime`, `--posture-strangle`, or `--posture-blitz` |
+| Declared posture, lead activity did not run | The same fill at 45% opacity, the stance strip's carried-over opacity |
+| Default posture, never declared | A 2 px outline in `--posture-overland`, with no fill, whether or not its activity ran |
+| Not recorded, no report, or out of the match | A 1 px outline in `--chrome-muted`, as the stance strip draws "no report" |
+
+**Lead activity.** The activity that makes a posture's cell full, read when the turn's statistics are written (`postureActing` in `src/main/matchStatistics/postureReportsRead.ts`):
+
+- overland: the commander has a stored campaign objective in its assault phase with the land approach;
+- maritime: the commander has a stored sea operation in transit or assault, a raid or a campaign lift;
+- strangle: a missile of the commander was spent since the previous strategic step;
+- blitz: the commander has a stored air operation in any phase.
+
+**Not recorded.** A turn recorded before 3.4.0 has no `postures` list, and a list that is not an array reads the same way. Every cell of that turn is not recorded. An entry with an unknown posture or a missing flag is dropped, so that commander's cell for the turn reads "no report". A bad list never hides the turn's other statistics.
+
+**Tooltip.** Hovering a turn shows "Turn {n}" and one line per commander: "{name}: not recorded", "{name}: out of the match" (the turn is the commander's out turn or later), "{name}: no report", "{name}: overland by default, acting" or "idle", or "{name}: {posture}, acting" or "idle" (`postureCellTooltipText`).
+
+A text legend under the strip names the four posture colors, then says: "Full color: the posture's lead activity ran that turn. Light: declared, but that activity did not run. Colored outline: overland by default, never declared. Gray outline: not recorded, or out of the match. Lead activity: overland, the land campaign assaulting; maritime, a sea operation at sea or landed; strangle, a missile launched; blitz, an air operation."
+
 ## Inputs and Responses
 
 ### Mouse
 
 - Clicking the close control, or the backdrop outside the dialog, closes the dialog. A backdrop click closes it only when the press also started on the backdrop, so a text selection dragged out of the dialog leaves it open.
 - Hovering a line chart shows a tooltip: "Turn {n}", one line per side with a color swatch and that side's value at the nearest turn, "no data" for a gap, and a "Total" over the values that exist. Model cost prints two decimals. Every other chart prints whole numbers.
-- The wheel over a line chart or either strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than three turns (`MIN_ZOOM_SPAN_TURNS` in `src/renderer/charts/chartZoom.ts` is the last turn shown minus the first). Scrolling down zooms out, to every recorded turn, or to the 12-turn opening window when fewer than 12 turns are recorded. Each wheel step scales the span by `WHEEL_ZOOM_IN_FACTOR` or its reciprocal. A strip always shows whole turns, so its cells fill its width and its turn labels stay under their cells after a zoom or a pan (`wholeTurnRange`). The wheel does not scroll the dialog while the pointer is over one of them. The agreement strip zooms and pans on its own, so zooming one strip leaves the other where it was.
-- Dragging a zoomed line chart or either strip left or right pans it. Dragging does not select a region.
-- A double-click on a line chart or either strip zooms all the way out: every recorded turn, or the 12-turn opening window when fewer than 12 turns are recorded. A chart zoomed all the way out past the opening window, by a double-click or by the wheel, keeps showing every recorded turn as turns arrive (`refreshedTurnView` in `src/shared/chartTurnWindow.ts`). A series of 12 turns or fewer already fills that opening window, so the same zoom-out keeps following the newest turns. A narrower zoom or a pan stays where the player left it.
+- The wheel over a line chart or any strip zooms the X axis around the pointer. Scrolling up zooms in, to no fewer than three turns (`MIN_ZOOM_SPAN_TURNS` in `src/renderer/charts/chartZoom.ts` is the last turn shown minus the first). Scrolling down zooms out, to every recorded turn, or to the 12-turn opening window when fewer than 12 turns are recorded. Each wheel step scales the span by `WHEEL_ZOOM_IN_FACTOR` or its reciprocal. A strip always shows whole turns, so its cells fill its width and its turn labels stay under their cells after a zoom or a pan (`wholeTurnRange`). The wheel does not scroll the dialog while the pointer is over one of them. Each strip zooms and pans on its own, so zooming one strip leaves the others where they were.
+- Dragging a zoomed line chart or any strip left or right pans it. Dragging does not select a region.
+- A double-click on a line chart or any strip zooms all the way out: every recorded turn, or the 12-turn opening window when fewer than 12 turns are recorded. A chart zoomed all the way out past the opening window, by a double-click or by the wheel, keeps showing every recorded turn as turns arrive (`refreshedTurnView` in `src/shared/chartTurnWindow.ts`). A series of 12 turns or fewer already fills that opening window, so the same zoom-out keeps following the newest turns. A narrower zoom or a pan stays where the player left it.
 - Changing a dropdown redraws that chart, or that strip, and keeps its zoom. Changing `Kind` or `With` redraws the agreement strip.
 - Hovering an agreement cell shows the tooltip for that cell, not for the whole turn.
-- Every chart with turns on its X axis (the nine line charts and both strips) opens on a window of 12 turns (`INITIAL_VISIBLE_TURNS` and `initialTurnWindow` in `src/shared/chartTurnWindow.ts`), and every time the dialog opens it starts from that window again, whatever the player did before. Points fill in from the left edge, the first recorded turn. With fewer than 12 turns, blank space stays to the right of the last point, and it shrinks as turns arrive, until turn 12 fills the axis. With more than 12 turns, the window ends on the newest turn. Both strips open on the same window, so they line up until the player zooms one. While the player has not zoomed or panned, a refresh keeps following that window. A tooltip appears only over a recorded turn, not over the blank space.
+- Every chart with turns on its X axis (the nine line charts and the three strips) opens on a window of 12 turns (`INITIAL_VISIBLE_TURNS` and `initialTurnWindow` in `src/shared/chartTurnWindow.ts`), and every time the dialog opens it starts from that window again, whatever the player did before. Points fill in from the left edge, the first recorded turn. With fewer than 12 turns, blank space stays to the right of the last point, and it shrinks as turns arrive, until turn 12 fills the axis. With more than 12 turns, the window ends on the newest turn. The three strips open on the same window, so they line up until the player zooms one. While the player has not zoomed or panned, a refresh keeps following that window. A tooltip appears only over a recorded turn, not over the blank space.
 - A click, wheel, or drag on the dialog or its backdrop never reaches the map.
 
 ### Keyboard
@@ -113,16 +138,17 @@ A text legend under the strip says: "Number: active agreements. +N: proposed agr
 
 - Closed: the start state. The overlay is hidden and the body is empty.
 - Open, empty: the one-sentence message.
-- Open: the stacks, the stance strip, the agreement strip, the legend, and the nine charts.
+- Open: the stacks, the stance strip, the agreement strip, the posture strip, the legend, and the nine charts.
+- Open, no AI commander: the posture strip shows `No AI commander has a posture.` in place of its cells.
 - Open, no agreement rows: the agreement strip shows `No AI commander to show.` in place of its cells. This happens when the match has no AI commander, or when **With** names the only one.
 
 ## Invariants
 
 - The charts show every side and every turn whatever fog of war is set to. No AI commander is told any chart value.
 - Match text reaches the page as text, never as markup.
-- Color is never the only signal. The row card prints the stance word, a spoke is labelled, a stance cell carries a letter and a tooltip, and an agreement cell carries a number, a `!`, hatching, a legend, and a tooltip.
+- Color is never the only signal. The row card prints the stance word, a spoke is labelled, a stance cell carries a letter and a tooltip, an agreement cell carries a number, a `!`, hatching, a legend, and a tooltip, and a posture cell carries a legend and a tooltip, with no letter in the cell.
 - A missing report and an old report each look different from a fresh one. A proposal and a breach each look different from a plain active agreement.
-- No line chart block, not the stance strip, and not the agreement strip's block is taller than a quarter of the dialog.
+- No line chart block, not the stance strip, not the agreement strip's block, and not the posture strip's block is taller than a quarter of the dialog.
 - The dialog does not change the application mode or the match.
 
 ## Strategic and Tactical Differences
@@ -154,9 +180,11 @@ None.
 - `src/renderer/charts/lineChart.ts`
 - `src/renderer/charts/relationshipStack.ts`
 - `src/renderer/charts/relationshipTimeline.ts`
-- `src/renderer/charts/stripTimelineCore.ts` and `src/renderer/charts/stripTimelineTypes.ts` (the label column, canvas, axis, zoom, pan, and tooltip both strips share)
+- `src/renderer/charts/stripTimelineCore.ts` and `src/renderer/charts/stripTimelineTypes.ts` (the label column, canvas, axis, zoom, pan, and tooltip the three strips share)
 - `src/renderer/charts/agreementTimeline.ts`
 - `src/renderer/charts/agreementStripBlock.ts`
+- `src/renderer/charts/postureTimeline.ts`
+- `src/renderer/charts/postureStripBlock.ts`
 - `src/renderer/charts/chartZoom.ts` (`MIN_ZOOM_SPAN_TURNS`, `WHEEL_ZOOM_IN_FACTOR`, `wholeTurnRange`)
 - `src/renderer/chrome/blockingDialogGuards.ts`
 - `src/renderer/map/initCore.ts` (the window `keydown` handler)
@@ -165,6 +193,8 @@ None.
 - `src/shared/matchChartSeries.ts` (`relationshipSubjectSeatIds`, `relationshipRows`, `relationshipStrip`)
 - `src/shared/chartsDialogState.ts`
 - `src/shared/agreementStrip.ts` (`agreementStrip`)
+- `src/shared/postureStrip.ts` (`postureReportsOf`, `postureStrip`, `postureCellTooltipText`)
+- `src/main/matchStatistics/postureReportsRead.ts` (`readPostureReports`, `postureActing`)
 - `src/shared/agreementStripText.ts` (`agreementCellLabel`, `agreementCellTooltip`)
 - `src/shared/agreementHistoryTypes.ts`
 - `src/shared/sideAgreements.ts` (`SIDE_AGREEMENT_KIND_LABELS`, `SIDE_AGREEMENT_INTENT_LABELS`)

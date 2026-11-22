@@ -23669,7 +23669,7 @@ ${bonuses}`;
   }
 
   // src/shared/mapViewMode.ts
-  var DEFAULT_WEATHER_ICONS_SHOWN = true;
+  var DEFAULT_WEATHER_ICONS_SHOWN = false;
   var DEFAULT_TECH_VIEW_CHOSEN = false;
   var DEFAULT_CONTROL_BORDERS_SHOWN = true;
   var DEFAULT_PRODUCTION_DETAIL_CHOSEN = false;
@@ -48134,6 +48134,155 @@ ${bonuses}`;
     };
   }
 
+  // src/shared/postureTypes.ts
+  var POSTURES = ["overland", "maritime", "strangle", "blitz"];
+
+  // src/shared/postureStrip.ts
+  var NOT_RECORDED_CELL = { recorded: false, posture: null, declared: false, acting: false };
+  var NO_REPORT_CELL = { recorded: true, posture: null, declared: false, acting: false };
+  function isPostureReport(value) {
+    if (typeof value !== "object" || value === null) {
+      return false;
+    }
+    const entry = value;
+    return typeof entry.seatId === "string" && typeof entry.posture === "string" && POSTURES.includes(entry.posture) && typeof entry.declared === "boolean" && typeof entry.acting === "boolean";
+  }
+  function postureReportsOf(turn) {
+    const stored = turn.postures;
+    return Array.isArray(stored) ? stored.filter(isPostureReport) : null;
+  }
+  function postureStrip(snapshot3) {
+    const reportsByTurn = snapshot3.turns.map(postureReportsOf);
+    return {
+      turns: snapshot3.turns.map((turn) => turn.turnNumber),
+      rows: snapshot3.seats.filter((seat) => seat.kind === "ai").sort((a, b) => a.seatOrder - b.seatOrder).map((seat) => ({
+        seatId: seat.seatId,
+        cells: reportsByTurn.map((reports) => {
+          if (reports === null) {
+            return NOT_RECORDED_CELL;
+          }
+          const report = reports.find((entry) => entry.seatId === seat.seatId);
+          return report === void 0 ? NO_REPORT_CELL : { recorded: true, posture: report.posture, declared: report.declared, acting: report.acting };
+        })
+      }))
+    };
+  }
+  function postureCellTooltipText(args) {
+    const { name, cell, outTurn, turnNumber } = args;
+    if (!cell.recorded) {
+      return `${name}: not recorded`;
+    }
+    if (cell.posture === null) {
+      return outTurn != null && turnNumber >= outTurn ? `${name}: out of the match` : `${name}: no report`;
+    }
+    const activity = cell.acting ? "acting" : "idle";
+    return cell.declared ? `${name}: ${cell.posture}, ${activity}` : `${name}: overland by default, ${activity}`;
+  }
+
+  // src/renderer/charts/postureTimeline.ts
+  var POSTURE_FALLBACK_COLORS = {
+    overland: "#C08A4E",
+    maritime: "#4BA3E3",
+    strangle: "#B07CD8",
+    blitz: "#F2C14E"
+  };
+  var IDLE_ALPHA = 0.45;
+  function paintPostureCell(context, cell, rect2) {
+    const { x, y, width, height } = rect2;
+    if (cell.posture === null) {
+      context.strokeStyle = stripCssColor("--chrome-muted", "#b7c4d4");
+      context.lineWidth = 1;
+      context.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), height - 1);
+      return;
+    }
+    if (!cell.declared) {
+      context.strokeStyle = stripCssColor("--posture-overland", POSTURE_FALLBACK_COLORS.overland);
+      context.lineWidth = 2;
+      context.strokeRect(x + 1, y + 1, Math.max(0, width - 2), Math.max(0, height - 3));
+      return;
+    }
+    context.globalAlpha = cell.acting ? 1 : IDLE_ALPHA;
+    context.fillStyle = stripCssColor(`--posture-${cell.posture}`, POSTURE_FALLBACK_COLORS[cell.posture]);
+    context.fillRect(x, y, width, height - 1);
+    context.globalAlpha = 1;
+  }
+  function createPostureTimeline(args) {
+    let strip = { turns: [], rows: [] };
+    const core = createStripTimeline({
+      host: args.host,
+      width: args.width,
+      height: args.height,
+      nameOf: args.nameOf,
+      flagOf: args.flagOf,
+      emptyText: "No AI commander has a posture.",
+      paintCell: paintPostureCell,
+      tooltipAt: (turnIndex) => ({
+        heading: `Turn ${strip.turns[turnIndex]}`,
+        lines: strip.rows.map((row) => ({
+          text: postureCellTooltipText({
+            name: args.nameOf(row.seatId),
+            cell: row.cells[turnIndex],
+            outTurn: args.outTurnOf(row.seatId),
+            turnNumber: strip.turns[turnIndex]
+          }),
+          emphasis: false
+        }))
+      })
+    });
+    return {
+      update(next) {
+        strip = next;
+        core.update({ turns: next.turns, rows: next.rows });
+      },
+      resize: (width, height) => core.resize(width, height),
+      destroy: () => core.destroy()
+    };
+  }
+
+  // src/renderer/charts/postureStripBlock.ts
+  var POSTURE_LEGEND_TEXT = "Full color: the posture's lead activity ran that turn. Light: declared, but that activity did not run. Colored outline: overland by default, never declared. Gray outline: not recorded, or out of the match. Lead activity: overland, the land campaign assaulting; maritime, a sea operation at sea or landed; strangle, a missile launched; blitz, an air operation.";
+  function buildLegend2() {
+    const legend = document.createElement("p");
+    legend.className = "charts-posture-legend";
+    for (const posture of POSTURES) {
+      const swatch = document.createElement("span");
+      swatch.className = "charts-posture-swatch";
+      swatch.style.background = `var(--posture-${posture})`;
+      legend.append(swatch, `${posture} `);
+    }
+    legend.append(POSTURE_LEGEND_TEXT);
+    return legend;
+  }
+  function createPostureStripBlock(args) {
+    const { titleRow, plotHost } = args;
+    let snapshot3 = args.snapshot;
+    const legend = buildLegend2();
+    plotHost.after(legend);
+    const legendSpace = () => legend.offsetHeight + (Number.parseFloat(getComputedStyle(legend).marginTop) || 0);
+    const strip = createPostureTimeline({
+      host: plotHost,
+      width: args.width,
+      height: Math.max(0, args.plotHeightFor(titleRow.offsetHeight) - legendSpace()),
+      nameOf: args.nameOf,
+      flagOf: args.flagOf,
+      outTurnOf: (seatId) => snapshot3.seats.find((seat) => seat.seatId === seatId)?.outTurn
+    });
+    strip.update(postureStrip(snapshot3));
+    return {
+      titleRow,
+      update(next) {
+        snapshot3 = next;
+        strip.update(postureStrip(snapshot3));
+      },
+      resize(width, height) {
+        strip.resize(width, Math.max(0, height - legendSpace()));
+      },
+      destroy() {
+        strip.destroy();
+      }
+    };
+  }
+
   // src/renderer/charts/relationshipTimeline.ts
   var LETTER_MIN_CELL_WIDTH = 14;
   function paintStanceCell(context, cell, rect2) {
@@ -48245,6 +48394,15 @@ ${bonuses}`;
       flagOf: lookups.flagOf,
       snapshot: snapshot3
     });
+    const postureBlock = appendBlock(body, "Posture over time");
+    const postures = createPostureStripBlock({
+      ...postureBlock,
+      width: innerBodyWidth(body),
+      plotHeightFor: (titleRowHeight) => chartPlotHeight(dialogHeight(), titleRowHeight),
+      nameOf: lookups.nameOf,
+      flagOf: lookups.flagOf,
+      snapshot: snapshot3
+    });
     body.appendChild(buildLegend(snapshot3, lookups));
     const lines = LINE_CHART_DEFINITIONS.map((definition) => buildLineChartBlock(body, definition, snapshot3, lookups));
     latestSnapshot = snapshot3;
@@ -48256,12 +48414,13 @@ ${bonuses}`;
         if (latestSnapshot !== null) updateLineChart(entry, latestSnapshot);
       });
     }
-    view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, agreements, lines };
+    view = { stackHost: relationships.plotHost, strip, subjectSelect, stripTitleRow: stripBlock.titleRow, agreements, postures, lines };
   }
   function destroyView() {
     if (view === null) return;
     view.strip.destroy();
     view.agreements.destroy();
+    view.postures.destroy();
     for (const entry of view.lines) entry.handle.destroy();
     view = null;
     latestSnapshot = null;
@@ -48280,6 +48439,7 @@ ${bonuses}`;
     const height = dialogHeight();
     view.strip.resize(width, chartPlotHeight(height, view.stripTitleRow.offsetHeight));
     view.agreements.resize(width, chartPlotHeight(height, view.agreements.titleRow.offsetHeight));
+    view.postures.resize(width, chartPlotHeight(height, view.postures.titleRow.offsetHeight));
     for (const entry of view.lines) {
       entry.handle.resize(width, chartPlotHeight(height, entry.titleRow.offsetHeight));
     }
@@ -48302,6 +48462,7 @@ ${bonuses}`;
     fillStacks(view.stackHost, snapshot3, lookups);
     view.strip.update(relationshipStrip(snapshot3, view.subjectSelect.value));
     view.agreements.update(snapshot3);
+    view.postures.update(snapshot3);
     for (const entry of view.lines) updateLineChart(entry, snapshot3);
     body.scrollTop = scrollTop;
   }

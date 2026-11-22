@@ -83,12 +83,12 @@ export function listKnownEnemyCities(state: GameStateSnapshot, seatId: string): 
 /**
  * One port's force after the cap and the ship count have been applied.
  *
- * Purpose: The port choice compares these rows.
- * When to use: Inside `listSeaOperationCandidates` only.
+ * Purpose: The port choice compares these rows, and a raid or a campaign lift launches from the best one.
+ * When to use: The result of `buildSeaLiftForce`.
  * Expected outcome: Units and ships that can meet at `port`.
  * Exceptions: None.
  */
-interface PortForce {
+export interface SeaLiftForce {
   /**
    * Muster port hex.
    *
@@ -152,7 +152,7 @@ function forceAtPort(args: {
   readonly hexSet: ReadonlySet<string>;
   readonly landMass: LandMassByH3;
   readonly terrain: LiftTerrain;
-}): PortForce | null {
+}): SeaLiftForce | null {
   const steps = getLandStepDistances({
     originH3s: [args.port],
     hexSet: args.hexSet,
@@ -195,46 +195,145 @@ function forceAtPort(args: {
 }
 
 /**
- * Lists the sea landings this seat could launch.
+ * Logs why no sea force could be built and returns null.
  *
- * Purpose: One search produces the engine's launch and, later, the commander's menu.
- * When to use: When the seat has a free slot. Pass the terrain built from the full unit list so a hidden defender still blocks a city. Ids in `protectedUnitIds`, ground units and ships, are not chosen.
- * Expected outcome: Clear cities first, then the rest, each in rank order. Empty when there is no free ship, fewer than two available units, or no reachable city. At most `OPERATION_MENU_SIZE` rows, after testing at most `OPERATION_OBJECTIVE_TEST_LIMIT` cities. `onlyObjectiveH3` tests that one city, clear or not, and skips both caps.
+ * Purpose: Each early exit of `buildSeaLiftForce` leaves one debug line with its reason.
+ * When to use: Only at those exits.
+ * Expected outcome: Always null.
  * Exceptions: None.
  */
-export function listSeaOperationCandidates(args: {
-  readonly state: GameStateSnapshot;
-  readonly seatId: string;
-  readonly landMass: LandMassByH3;
-  readonly terrain: LiftTerrain;
-  readonly active: readonly Operation[];
-  readonly protectedUnitIds: ReadonlySet<string>;
-  readonly hasCampaignPlan: boolean;
-  readonly onlyObjectiveH3?: string;
+function noForce(seatId: string, reason: string): null {
+  logDebug('seaOperationCandidates buildSeaLiftForce: no force', { seatId, reason });
+  return null;
+}
+
+/**
+ * The share of the seat's ground units a sea force may use.
+ *
+ * Purpose: Raids and campaign lifts draw on the same cap, which `liftGroundCap` computes from these two values.
+ * When to use: As `groundShare` of `buildSeaLiftForce`.
+ * Expected outcome: Plain values only.
+ * Exceptions: None.
+ */
+export interface SeaLiftGroundShare {
   /**
-   * The seat's posture settings.
+   * Whether the seat has a campaign plan.
    *
-   * Contract: Absent leaves the lift cap on the two constants. Present passes `liftGroundShare`.
-   * When to use: `operationCandidatesForSeat` passes the seat's row. Tests omit it.
-   * Expected outcome: A maritime seat may lift half its ground units during a campaign. Other callers are unchanged.
+   * Contract: True lowers the default share so the campaign keeps most ground units.
+   * When to use: Passed straight to `liftGroundCap`.
+   * Expected outcome: True or false.
    * Exceptions: None.
    */
-  readonly settings?: PostureSettings;
-}): OperationCandidate[] {
-  const finish = (candidates: readonly OperationCandidate[]): OperationCandidate[] => {
-    logDebug('seaOperationCandidates listSeaOperationCandidates', {
-      seatId: args.seatId,
-      candidateCount: candidates.length,
-      routeChecks: args.terrain.routeChecks(),
-    });
-    return [...candidates];
-  };
+  readonly hasCampaignPlan: boolean;
+  /**
+   * The posture's lift share while a campaign plan exists.
+   *
+   * Contract: Absent leaves the default campaign share. Present is the posture's `liftGroundShare`.
+   * When to use: Passed straight to `liftGroundCap`.
+   * Expected outcome: A fraction between 0 and 1, or absent.
+   * Exceptions: None.
+   */
+  readonly campaignShare?: number;
+}
+
+/**
+ * Inputs for building one sea force.
+ *
+ * Purpose: Raids and campaign lifts build their force from the same inputs.
+ * When to use: As the argument of `buildSeaLiftForce`.
+ * Expected outcome: Plain values and read-only collections.
+ * Exceptions: None.
+ */
+export interface SeaLiftForceArgs {
+  /**
+   * The match snapshot with the full unit list.
+   *
+   * Contract: Includes units the seat has not seen, so a hidden defender still counts.
+   * When to use: Reading the seat's units, control, and ports.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly state: GameStateSnapshot;
+  /**
+   * The seat that would sail.
+   *
+   * Contract: An AI seat id.
+   * When to use: Selecting the seat's own units.
+   * Expected outcome: A non-empty string.
+   * Exceptions: None.
+   */
+  readonly seatId: string;
+  /**
+   * Land mass data for the strategic grid.
+   *
+   * Contract: The cached campaign land mass.
+   * When to use: Measuring land steps to a port.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly landMass: LandMassByH3;
+  /**
+   * Terrain checks built from the full unit list.
+   *
+   * Contract: Answers port, sailing, and enemy-nearby questions.
+   * When to use: Choosing ships and ports.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly terrain: LiftTerrain;
+  /**
+   * The seat's stored operations.
+   *
+   * Contract: Units and ships in them are busy and are not chosen.
+   * When to use: Finding free units and ships.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly active: readonly Operation[];
+  /**
+   * Ground units and ships that must not be chosen.
+   *
+   * Contract: Defenders, withheld units, and units in contact with an enemy.
+   * When to use: Finding free units and ships.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly protectedUnitIds: ReadonlySet<string>;
+  /**
+   * The share of ground units a force may use.
+   *
+   * Contract: Every operation already stored counts against the same cap.
+   * When to use: Computing the cap.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly groundShare: SeaLiftGroundShare;
+  /**
+   * When present, the only ground units that may board.
+   *
+   * Contract: The cap and the committed count are still computed over all of the seat's ground units.
+   * When to use: A campaign lift, which takes only units that cannot walk to the campaign.
+   * Expected outcome: Absent leaves every free ground unit eligible.
+   * Exceptions: None.
+   */
+  readonly eligibleUnitIds?: ReadonlySet<string>;
+}
+
+/**
+ * Builds the best sea force this seat could send right now.
+ *
+ * Purpose: Raids and campaign lifts choose their ports, units, and ships with one search.
+ * When to use: When the seat has a free slot and needs to know what it could sail. Pass the terrain built from the full unit list so a hidden defender still blocks a ship. Pass `eligibleUnitIds` to limit which ground units may board.
+ * Expected outcome: The force at the port that carries the most units, ties by fewer steps, then lower port id. Null, after a debug log of the reason, when there is no free ship, fewer than two eligible units, no room under the cap, or no port that can muster a force.
+ * Exceptions: None.
+ */
+export function buildSeaLiftForce(args: SeaLiftForceArgs): SeaLiftForce | null {
+  const own = args.state.units.filter((unit) => unit.player === args.seatId);
   const busy = new Set<string>();
   for (const operation of args.active) {
     for (const unitId of operation.unitIds) busy.add(unitId);
     for (const carrierId of operation.carrierIds) busy.add(carrierId);
   }
-  const own = args.state.units.filter((unit) => unit.player === args.seatId);
   const freeShips = own
     .filter(
       (unit) =>
@@ -245,20 +344,25 @@ export function listSeaOperationCandidates(args: {
         args.terrain.enemyUnitsWithin(unit.h3Index, getRange('naval')) === 0
     )
     .sort((left, right) => compareCodeUnits(left.id, right.id));
-  if (freeShips.length === 0) return finish([]);
+  if (freeShips.length === 0) return noForce(args.seatId, 'no free ship');
   const available = own.filter(
-    (unit) => isGroundUnit(unit) && !unit.embarkedOnCarrierUnitId && !busy.has(unit.id) && !args.protectedUnitIds.has(unit.id)
+    (unit) =>
+      isGroundUnit(unit) &&
+      !unit.embarkedOnCarrierUnitId &&
+      !busy.has(unit.id) &&
+      !args.protectedUnitIds.has(unit.id) &&
+      (args.eligibleUnitIds === undefined || args.eligibleUnitIds.has(unit.id))
   );
-  if (available.length < OPERATION_MIN_GROUND_UNITS) return finish([]);
+  if (available.length < OPERATION_MIN_GROUND_UNITS) return noForce(args.seatId, 'too few ground units');
   const groundUnits = own.filter(isGroundUnit);
   const committedCount = groundUnits.filter((unit) => unit.embarkedOnCarrierUnitId != null || busy.has(unit.id)).length;
   const cap = liftGroundCap({
     groundUnitCount: groundUnits.length,
     committedCount,
-    hasCampaignPlan: args.hasCampaignPlan,
-    campaignShare: args.settings?.liftGroundShare,
+    hasCampaignPlan: args.groundShare.hasCampaignPlan,
+    campaignShare: args.groundShare.campaignShare,
   });
-  if (cap < OPERATION_MIN_GROUND_UNITS) return finish([]);
+  if (cap < OPERATION_MIN_GROUND_UNITS) return noForce(args.seatId, 'lift cap');
   const hexSet = new Set(args.state.hexes.map((hex) => hex.h3Index));
   const controlByHex = new Map((args.state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   const seaportByHex = new Map((args.state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row.seaportCount]));
@@ -296,14 +400,69 @@ export function listSeaOperationCandidates(args: {
         terrain: args.terrain,
       })
     )
-    .filter((force): force is PortForce => force !== null)
+    .filter((force): force is SeaLiftForce => force !== null)
     .sort((left, right) => {
       if (left.units.length !== right.units.length) return right.units.length - left.units.length;
       if (left.totalSteps !== right.totalSteps) return left.totalSteps - right.totalSteps;
       return compareCodeUnits(left.port, right.port);
     });
   const force = forces[0];
-  if (!force) return finish([]);
+  if (!force) return noForce(args.seatId, 'no port force');
+  logDebug('seaOperationCandidates buildSeaLiftForce', {
+    seatId: args.seatId,
+    port: force.port,
+    unitCount: force.units.length,
+    shipCount: force.ships.length,
+    limitedToEligible: args.eligibleUnitIds !== undefined,
+  });
+  return force;
+}
+
+/**
+ * Lists the sea landings this seat could launch.
+ *
+ * Purpose: One search produces the engine's launch and, later, the commander's menu.
+ * When to use: When the seat has a free slot. Pass the terrain built from the full unit list so a hidden defender still blocks a city. Ids in `protectedUnitIds`, ground units and ships, are not chosen.
+ * Expected outcome: Clear cities first, then the rest, each in rank order. Empty when there is no free ship, fewer than two available units, or no reachable city. At most `OPERATION_MENU_SIZE` rows, after testing at most `OPERATION_OBJECTIVE_TEST_LIMIT` cities. `onlyObjectiveH3` tests that one city, clear or not, and skips both caps.
+ * Exceptions: None.
+ */
+export function listSeaOperationCandidates(args: {
+  readonly state: GameStateSnapshot;
+  readonly seatId: string;
+  readonly landMass: LandMassByH3;
+  readonly terrain: LiftTerrain;
+  readonly active: readonly Operation[];
+  readonly protectedUnitIds: ReadonlySet<string>;
+  readonly hasCampaignPlan: boolean;
+  readonly onlyObjectiveH3?: string;
+  /**
+   * The seat's posture settings.
+   *
+   * Contract: Absent leaves the lift cap on the two constants. Present passes `liftGroundShare`.
+   * When to use: `operationCandidatesForSeat` passes the seat's row. Tests omit it.
+   * Expected outcome: A maritime seat may lift half its ground units during a campaign. Other callers are unchanged.
+   * Exceptions: None.
+   */
+  readonly settings?: PostureSettings;
+}): OperationCandidate[] {
+  const finish = (candidates: readonly OperationCandidate[]): OperationCandidate[] => {
+    logDebug('seaOperationCandidates listSeaOperationCandidates', {
+      seatId: args.seatId,
+      candidateCount: candidates.length,
+      routeChecks: args.terrain.routeChecks(),
+    });
+    return [...candidates];
+  };
+  const force = buildSeaLiftForce({
+    state: args.state,
+    seatId: args.seatId,
+    landMass: args.landMass,
+    terrain: args.terrain,
+    active: args.active,
+    protectedUnitIds: args.protectedUnitIds,
+    groundShare: { hasCampaignPlan: args.hasCampaignPlan, campaignShare: args.settings?.liftGroundShare },
+  });
+  if (force === null) return finish([]);
   const ranked = rankLiftCities(listKnownEnemyCities(args.state, args.seatId));
   const named = args.onlyObjectiveH3;
   const pool = named === undefined ? ranked : ranked.filter((city) => city.h3Index === named);

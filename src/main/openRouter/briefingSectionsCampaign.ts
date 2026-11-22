@@ -9,6 +9,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
+import { campaignApproachOf } from '../../shared/campaignTypes';
 import { CAMPAIGN_HOME_DEFENSE_RADIUS, CAMPAIGN_MASS_RADIUS, type CampaignPlan } from './campaignRules';
 import { SECTION_TITLE_CAMPAIGN_OBJECTIVE, topLevelHeading } from './promptSpec/sectionHeadings';
 import { logTrace } from '../logger';
@@ -65,7 +66,7 @@ function fortificationPhrase(state: GameStateSnapshot, targetH3: string): string
  *
  * Purpose: The situation message names the city, the staging hex, and why the phase is what it is.
  * When to use: When a campaign plan exists. Omit the section when it does not.
- * Expected outcome: An H1 heading and one bullet per fact. A null staging hex says the assault has already started. The defender bullet names the enemy ground units near home and says when the half-force cap held units back.
+ * Expected outcome: An H1 heading and one bullet per fact. A sea objective prints one Approach bullet in place of the staging hex and phase bullets. A null staging hex says the assault has already started. The defender bullet names the enemy ground units near home and says when the half-force cap held units back.
  * Exceptions: None.
  */
 export function buildCampaignObjectiveSection(args: {
@@ -86,7 +87,11 @@ export function buildCampaignObjectiveSection(args: {
     '',
     `- Target: ${target}, ${cityNoun} with ${urban} ${cellNoun} and ${fortificationPhrase(state, objective.targetH3)}. ${chooser} it on turn ${objective.chosenTurn}.`,
   ];
-  if (objective.stagingH3 === null) {
+  if (campaignApproachOf(objective) === 'sea') {
+    lines.push(
+      `- Approach: by sea. No ground unit of yours can reach ${target} by land, so the engine sails the campaign there in campaign lifts. Active Operations shows the lift.`
+    );
+  } else if (objective.stagingH3 === null) {
     lines.push(`- Staging hex: none. No hex you control is far enough from ${target}, so campaign units march on it directly.`);
     lines.push(`- Phase: assault. There is no staging hex, so the assault continues until ${target} is taken.`);
   } else {

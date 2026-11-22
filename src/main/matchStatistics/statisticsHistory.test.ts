@@ -113,3 +113,11 @@ test('a payload that cannot be decoded and a row of another format version are s
     assert.deepEqual(readStatisticsHistory(gameDbOps).map((turn) => turn.turnNumber), [1, 4]);
   });
 });
+
+test('a turn whose posture list is malformed is still returned', () => {
+  withTempGameDb('aw-statistics-history-postures-', () => {
+    insertStatistics(1, { turnNumber: 1, sides: [], relationships: [], hexesTaken: null, postures: 'bad' });
+    insertStatistics(2, { turnNumber: 2, sides: [], relationships: [], hexesTaken: null, postures: [{ seatId: 7 }] });
+    assert.deepEqual(readStatisticsHistory(gameDbOps).map((turn) => turn.turnNumber), [1, 2]);
+  });
+});

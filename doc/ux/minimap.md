@@ -19,7 +19,7 @@ Shown with the map in every mode where the map container is visible, except New 
 - A 2 px border in the expand control's background (`--chrome-bg`) on the overview's inside edge, over the map and the tabs toggle. It does not take the pointer (`.minimap-overview::after` in `static/shellChrome.css`).
 - A rectangle for the main view when the main view covers less of the world than the overview: a 2 px opaque line in `--chrome-border` (`#5a7090` when that token cannot be read), the lighter slate the overview frame used before it moved to `--chrome-bg`. `syncMinimapViewportRect` reads the token. When the main view is wide enough, the rectangle is removed.
 - The map-mode tabs, left to right:
-  - Weather: shows or hides each hex's weather icon on the world map, in either view, as described in [map-surface.md](map-surface.md). On when the app opens.
+  - Weather: shows or hides each hex's weather icon on the world map, in either view, as described in [map-surface.md](map-surface.md). Off when the app opens.
   - Tech: shows or hides each hex's tech tier icon on the world map while the tech bonus is Default or High, as described in [map-surface.md](map-surface.md). Off when the app opens. It does not hide terrain fill or show hex codes or production. A battle and the new-game or game-over overlay keep their normal view; Tech applies again when they close.
   - Control: shows or hides the borders that mark who controls each world hex, and the home-region outlines at battle-detail zoom (`drawTerrainHexes` and `drawScenarioHomeRegionOutlines` in `src/renderer/rendering/terrainRendering.ts`). On when the app opens. With it off, every hex keeps the normal grid stroke. It does not change the new-game preview's home-region rings.
   - Production: shows or hides production labels on every world hex, the way holding T does. Off when the app opens. On, opponent and neutral hexes show labels too, unexplored hexes as plain `⚒N` (`PRODUCTION_CAPACITY_SYMBOL`), and, with fog of war off, every seat's queue timing. A queued type that seat has already fielded up to its deployment cap shows ∞t. A fortification queue shows ∞t when every intact city cell is already fortified. A queue that is paused because the seat cannot build on that hex also shows ∞t. A label stays in its default place, and moves to the lower band only while T is held or when its hex has infrastructure or units. Production applies only on the world map.
@@ -51,7 +51,7 @@ The rectangle tracks pan and zoom of the main map.
 
 - No rectangle: the main view is not zoomed in enough relative to the overview.
 - Rectangle shown: the main view is zoomed in. The rectangle follows the main bounds.
-- Weather, Tech, Control, and Production each on or off: each set with its own tab. All last until the app closes, across turns, battles, and new matches. None is saved. Weather and Control are on when the app opens; Tech and Production are off.
+- Weather, Tech, Control, and Production each on or off: each set with its own tab. All last until the app closes, across turns, battles, and new matches. None is saved. Control is on when the app opens; Weather, Tech, and Production are off.
 - Tabs hidden: the start state. The panel is the overview and its toggle.
 - Tabs shown: the row of map-mode tabs sits under the overview. Whether the tabs show lasts until the app closes, including while the panel is hidden for New game and Game over. It is not saved.
 

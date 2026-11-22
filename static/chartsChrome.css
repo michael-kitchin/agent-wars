@@ -103,6 +103,8 @@
 .charts-tooltip-line:has(> .charts-tooltip-lead) { display: block; }
 .charts-tooltip-list { margin: 0; padding-left: 1.1rem; list-style: disc; }
 .charts-agreement-legend { margin: 0.25rem 0 0; color: var(--chrome-muted); font-size: 11px; }
+.charts-posture-legend { margin: 0.25rem 0 0; color: var(--chrome-muted); font-size: 11px; }
+.charts-posture-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 0.25rem 0 0.5rem; vertical-align: -1px; }
 .charts-block-controls { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 /* One content-width column per stack, spread across the row and centered. A narrow dialog wraps them. */
 .charts-stack-grid { display: flex; flex-wrap: wrap; justify-content: space-evenly; align-items: flex-start; gap: 0.75rem; }

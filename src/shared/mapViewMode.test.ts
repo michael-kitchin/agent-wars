@@ -23,8 +23,8 @@ const WORLD_MAP: Parameters<typeof isMapLayerShown>[0] = {
   newGameOverlayOpen: false,
 };
 
-test('a session starts with weather icons and control borders on, and tech icons and production detail off', () => {
-  assert.equal(DEFAULT_WEATHER_ICONS_SHOWN, true);
+test('a session starts with control borders on, and weather icons, tech icons, and production detail off', () => {
+  assert.equal(DEFAULT_WEATHER_ICONS_SHOWN, false);
   assert.equal(DEFAULT_TECH_VIEW_CHOSEN, false);
   assert.equal(DEFAULT_CONTROL_BORDERS_SHOWN, true);
   assert.equal(DEFAULT_PRODUCTION_DETAIL_CHOSEN, false);

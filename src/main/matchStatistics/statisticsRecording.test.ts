@@ -14,12 +14,14 @@ import type { TurnStatistics } from '../../shared/matchStatistics';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
+import { writePosture } from '../gameDb/postureMemory';
 import { readSeatRoster } from '../gameDb/seatRosterStore';
 import { upsertSideStance } from '../gameDb/sideMessageStore';
 import { listMatchRecords } from '../recorder/matchRecordStore';
 import { recordMatchEvent } from '../recorder/matchRecorder';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
-import { recordTurnStatistics } from './statisticsRecording';
+import { noteSpentMissile, takeSpentMissileIds } from './spentMissiles';
+import { recordTurnStatistics, refreshedTurnStatistics } from './statisticsRecording';
 import { forgetTurnOwnershipForTests } from './turnDifferences';
 
 /**
@@ -82,6 +84,7 @@ test('statistics follow the turns, and a tactical step writes nothing', () => {
     const seat = AI_SEAT_IDS[0];
     const first = recordAt(1);
     assert.equal(first.sides.length, 3);
+    assert.deepEqual(first.postures?.map((report) => report.seatId), [AI_SEAT_IDS[0], AI_SEAT_IDS[1]]);
     assert.deepEqual(first.sides.map((side) => side.unitsLost), [null, null, null]);
     assert.equal(first.hexesTaken, null);
 
@@ -126,5 +129,32 @@ test('a stored stance appears in the relationships with its reported turn', () =
     assert.deepEqual(recordAt(5).relationships, [
       { seatId: AI_SEAT_IDS[0], towardSeatId: HUMAN_SEAT_ID, stance: 'wary', trust: 1, threat: 3, reportedTurn: 4 },
     ]);
+  });
+});
+
+test('a refresh keeps the recorded strangle acting and leaves noted launches for the next turn', () => {
+  const regions = largestHomeRegions(2);
+  withSeatedTempGameDb('aw-statistics-refresh-', {
+    gameMapId: 'global',
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    const seat = AI_SEAT_IDS[0];
+    writePosture(gameDbOps, seat, { posture: 'strangle', sinceTurn: 1 });
+    const recorded = recordAt(8);
+    const acting: TurnStatistics = {
+      ...recorded,
+      turnNumber: 9,
+      postures: (recorded.postures ?? []).map((report) => (report.seatId === seat ? { ...report, acting: true } : report)),
+    };
+    noteSpentMissile('refresh-missile', seat);
+
+    const refreshed = refreshedTurnStatistics(acting, readSeatRoster(gameDbOps));
+
+    assert.deepEqual(refreshed.postures, [{ seatId: seat, posture: 'strangle', declared: true, acting: true }]);
+    assert.equal(refreshedTurnStatistics(recorded, readSeatRoster(gameDbOps)).postures?.[0]?.acting, false);
+    assert.equal(takeSpentMissileIds(10).has('refresh-missile'), true);
   });
 });

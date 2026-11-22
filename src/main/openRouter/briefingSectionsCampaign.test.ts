@@ -158,3 +158,19 @@ test('the campaign attention bullet counts units that need a new order', () => {
     'Campaign: 3 units need a new standing order. Copy each Campaign Orders row into an assign_order entry.'
   );
 });
+
+test('a sea objective prints the approach line and no staging or phase line', () => {
+  const plan = planFor({ stagingH3: null, phase: 'assault', source: 'engine', massedCount: 0 });
+  const text = buildCampaignObjectiveSection({
+    state: cityState(false, false),
+    plan: { ...plan, objective: { ...plan.objective, approach: 'sea' } },
+    format,
+  });
+  assert.ok(
+    text.includes(
+      '- Approach: by sea. No ground unit of yours can reach T1 by land, so the engine sails the campaign there in campaign lifts. Active Operations shows the lift.'
+    )
+  );
+  assert.equal(text.includes('Staging hex'), false);
+  assert.equal(text.includes('- Phase:'), false);
+});

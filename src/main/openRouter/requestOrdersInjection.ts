@@ -21,6 +21,7 @@ import { buildProductionBriefing } from './briefingSections';
 import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
 import { buildPostureSection } from './briefingSectionsPosture';
+import { buildPostureFitLines } from './postureFit';
 import { operationCandidatesForSeat } from '../operations/operationCandidates';
 import { operationForceIds } from '../operations/operationForce';
 import type { OperationCandidate } from '../../shared/operationTypes';
@@ -330,6 +331,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         stored: readPosture({ getOne: dbGetOne }, seatId),
         turnNumber: args.state.turnNumber,
         campaignEnabled: args.state.scenarioId === 'region_vs_region',
+        fitLines: buildPostureFitLines(args.state),
       })
     : '';
   const operationsText = postureText.length === 0

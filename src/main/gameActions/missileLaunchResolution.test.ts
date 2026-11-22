@@ -18,6 +18,7 @@ import { dbGetAll, dbGetOne, dbRun, getMapHexSet, listTacticalFeatureOverridesFo
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 import { resolveMissileLaunchPhase } from './missileLaunchResolution';
 import { insertMissileHoldOrder } from '../tools/missileHoldOrder';
+import { spentMissileSeatIds } from '../matchStatistics/spentMissiles';
 
 /**
  * An urban airport hex and a neighboring launch hex on the loaded map.
@@ -109,12 +110,14 @@ test('a launch that rolls 1 clears every flag and the based air', () => {
   });
 });
 
-test('a launch that rolls 20 spends the missile and leaves the target intact', () => {
+test('a launch that rolls 20 spends the missile, leaves the target intact, and counts its seat as a launcher', () => {
   withSeatedTempGameDb('aw-missile-launch-miss-', { fogOfWarEnabled: false }, () => {
     const { target, launch } = urbanAirportTarget();
     placeMissileAndAir(launch, target);
     const before = listTacticalFeatureOverridesForGame().filter((row) => row.parentH3Index === target);
+    spentMissileSeatIds(1000);
     const result = resolveMissileLaunchPhase([{ unitId: 'h1-m1', targetH3Index: target }], () => 0.999);
+    assert.equal(spentMissileSeatIds(1001).has(HUMAN_SEAT_ID), true);
     const after = listTacticalFeatureOverridesForGame().filter((row) => row.parentH3Index === target);
     assert.deepEqual(after, before);
     assert.ok(dbGetOne('SELECT id FROM units WHERE id = ?', ['a2-a1']));

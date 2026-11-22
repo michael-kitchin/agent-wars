@@ -18,6 +18,16 @@
 export const OPERATION_MAX_SEA_PER_SIZE = 1;
 
 /**
+ * Active campaign lifts one seat may have on a small map.
+ *
+ * Purpose: A campaign lift has its own slot, so it neither takes a raid's place nor waits behind one. Larger matches multiply this by `GAME_SIZE_MULTIPLIER`.
+ * When to use: The campaign lift check, once per seat per turn.
+ * Expected outcome: 1, before the size multiplier.
+ * Exceptions: None.
+ */
+export const CAMPAIGN_LIFT_MAX_PER_SIZE = 1;
+
+/**
  * Active air operations one seat may have on a small map.
  *
  * Purpose: Larger matches multiply this by `GAME_SIZE_MULTIPLIER`, separately from the sea cap.

@@ -10,10 +10,12 @@
 import {
   OPERATION_METHODS,
   OPERATION_PHASES,
+  OPERATION_PURPOSES,
   OPERATION_SOURCES,
   type Operation,
   type OperationMethod,
   type OperationPhase,
+  type OperationPurpose,
   type OperationSource,
 } from '../../shared/operationTypes';
 import { EMPTY_OPERATION_OFFER, type OperationOfferState } from '../operations/operationOffer';
@@ -119,7 +121,7 @@ function isIdList(value: unknown): value is string[] {
  *
  * Purpose: A bad operation is dropped without dropping the seat's other operations.
  * When to use: While reading the operations row.
- * Expected outcome: The operation, or null when a field is missing or the wrong type.
+ * Expected outcome: The operation, or null when a field is missing or the wrong type. The optional purpose and troop minimum are copied only when stored, so an older row reads back unchanged. A purpose outside the list, or a minimum that is not a positive integer, drops the operation.
  * Exceptions: None.
  */
 function parseOperation(value: unknown): Operation | null {
@@ -136,6 +138,9 @@ function parseOperation(value: unknown): Operation | null {
   if (!isListed<OperationSource>(source, OPERATION_SOURCES)) return null;
   if (typeof launchedTurn !== 'number' || !Number.isInteger(launchedTurn)) return null;
   if (typeof phaseTurn !== 'number' || !Number.isInteger(phaseTurn)) return null;
+  const { purpose, minGroundUnits } = row;
+  if (purpose !== undefined && !isListed<OperationPurpose>(purpose, OPERATION_PURPOSES)) return null;
+  if (minGroundUnits !== undefined && (typeof minGroundUnits !== 'number' || !Number.isInteger(minGroundUnits) || minGroundUnits <= 0)) return null;
   return {
     id,
     method,
@@ -148,6 +153,8 @@ function parseOperation(value: unknown): Operation | null {
     source,
     launchedTurn,
     phaseTurn,
+    ...(purpose === undefined ? {} : { purpose }),
+    ...(minGroundUnits === undefined ? {} : { minGroundUnits }),
   };
 }
 

@@ -5,20 +5,31 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalStrategic';
+import { gridDisk } from 'h3-js';
+import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import {
+  canLandUnitTraverseEdge,
+  getLandStepDistances,
+  landUnitCanOccupyHex,
+  STRATEGIC_LAND_MAX_WATER_PCT,
+  type LandMassByH3,
+} from '../../shared/landTraversalStrategic';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { codeToH3, h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from '../briefing/map/hexCoordinates';
-import { dbGetOne, dbRun, getGameStateForPlayer, type GameStateSnapshot } from '../gameDb';
+import { dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot, type GameStateSnapshot } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
+import { writePosture } from '../gameDb/postureMemory';
+import { buildLiftTerrain } from '../operations/liftTerrain';
 import { ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { applyCampaignTargetH3, applyCampaignTargetOverride } from './campaignTargetOverride';
 import { campaignInputsFromState, campaignLandSteps, loadCampaignLandMass } from './campaignObjectiveFlow';
 import { CAMPAIGN_REACH_LIMIT_STEPS } from './campaignRules';
-import type { CampaignCity } from './campaignTargetSelection';
+import { CAMPAIGN_MAX_LAND_STEPS, type CampaignCity } from './campaignTargetSelection';
 
 const STRATEGIC = { mode: 'strategic' } as const;
+const SEAT = AI_SEAT_IDS[0];
 
 /**
  * Database ops the campaign row uses.
@@ -156,11 +167,140 @@ test('a known reachable city hex is stored as a commander target', () => {
       state: reached.state,
       targetH3: reached.city.h3Index,
       label: h3ToCode(reached.city.h3Index, STRATEGIC),
+      allowSea: false,
     });
     assert.deepEqual(applied.dropReasons, []);
     assert.equal(applied.applied, true);
     const stored = readCampaignObjectives(ops()).get(seat);
     assert.equal(stored?.targetH3, reached.city.h3Index);
     assert.equal(stored?.source, 'commander');
+  });
+});
+
+test('a commander target keeps an active skip, and naming the skipped city clears it', () => {
+  ensureTerrainClassificationCacheLoaded();
+  withTempGameDb('aw-campaign-target-skip-', () => {
+    ensureStrategicCoordinateRegistryInitialized();
+    const seat = AI_SEAT_IDS[0];
+    const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const landMass = loadCampaignLandMass(seat);
+    assert.ok(landMass);
+    const reached = stateThatReachesACity(state, landMass, seat);
+    const label = h3ToCode(reached.city.h3Index, STRATEGIC);
+    const previous = {
+      targetH3: 'previous-target',
+      stagingH3: null,
+      phase: 'assault',
+      source: 'engine',
+      chosenTurn: state.turnNumber,
+    } as const;
+
+    writeCampaignObjectiveForSeat(ops(), seat, { ...previous, skippedTargetH3: 'skipped-city', skippedTurn: state.turnNumber });
+    applyCampaignTargetH3({ state: reached.state, targetH3: reached.city.h3Index, label, allowSea: false });
+    const kept = readCampaignObjectives(ops()).get(seat);
+    assert.equal(kept?.targetH3, reached.city.h3Index);
+    assert.equal(kept?.skippedTargetH3, 'skipped-city');
+    assert.equal(kept?.skippedTurn, state.turnNumber);
+
+    writeCampaignObjectiveForSeat(ops(), seat, { ...previous, skippedTargetH3: reached.city.h3Index, skippedTurn: state.turnNumber });
+    applyCampaignTargetH3({ state: reached.state, targetH3: reached.city.h3Index, label, allowSea: false });
+    const named = readCampaignObjectives(ops()).get(seat);
+    assert.equal(named?.targetH3, reached.city.h3Index);
+    assert.equal(named?.skippedTargetH3, undefined);
+    assert.equal(named?.skippedTurn, undefined);
+  });
+});
+
+/**
+ * Places eight infantry, two ships, and a port, and picks an enemy city the infantry cannot walk to.
+ *
+ * Purpose: The routes need one force, one port, and one city that only a ship can reach, with no other city left in the match.
+ * When to use: The sea case below.
+ * Expected outcome: The city hex. The seat holds the maritime posture, so two ships carry four of the eight infantry.
+ * Exceptions: Fails an assertion when the seeded map has no such city.
+ */
+function arrangeSeaOnlyCity(landMass: LandMassByH3): string {
+  dbRun('DELETE FROM standing_orders');
+  dbRun('DELETE FROM unit_transport_assignments');
+  dbRun('DELETE FROM units');
+  dbRun('UPDATE res_s_infrastructure SET urban_hex_count = 0');
+  const state = getGameState();
+  const hexById = new Map(state.hexes.map((hex) => [hex.h3Index, hex]));
+  const hexSet = new Set(hexById.keys());
+  const aiHome = state.homeRegionHexesBySeat?.opponent ?? [];
+  const humanHome = new Set(state.homeRegionHexesBySeat?.human ?? []);
+  const origin = aiHome.find((hex) => {
+    const record = landMass.get(hex);
+    return record !== undefined && record.waterPct < STRATEGIC_LAND_MAX_WATER_PCT;
+  });
+  assert.ok(origin, 'expected walkable land in the AI home');
+  const steps = getLandStepDistances({ originH3s: [origin], hexSet, data: landMass, maxDepth: 8 });
+  const port = [...steps.keys()].find((hex) => {
+    const row = hexById.get(hex);
+    return hex !== origin && (row?.terrain === 'coastal' || row?.terrainKind === 'coastal');
+  });
+  assert.ok(port, 'expected a coastal hex the infantry can reach');
+  const infantryHex = gridDisk(port, 1).find(
+    (hex) => hex !== port && hexById.get(hex)?.terrain !== 'water' && canLandUnitTraverseEdge(hex, port, landMass),
+  );
+  assert.ok(infantryHex, 'expected land beside the port the infantry can enter from');
+  const shipHex = gridDisk(port, 1).find((hex) => hexById.get(hex)?.terrain === 'water');
+  assert.ok(shipHex, 'expected water beside the port');
+  dbRun(
+    `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+     VALUES (?, 0, 0, 1)
+     ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 1`,
+    [port],
+  );
+  dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [port, SEAT]);
+  for (let index = 0; index < 8; index += 1) {
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [`inf-${index}`, SEAT, 'infantry', infantryHex]);
+  }
+  for (const id of ['ship-1', 'ship-2']) {
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, SEAT, 'naval', shipHex]);
+  }
+  writePosture({ getOne: dbGetOne, run: dbRun }, SEAT, { posture: 'maritime', sinceTurn: 1 });
+  const walkable = getLandStepDistances({ originH3s: [infantryHex], hexSet, data: landMass, maxDepth: CAMPAIGN_MAX_LAND_STEPS });
+  const terrain = buildLiftTerrain({
+    state: { ...getGameStateForPlayer(SEAT, { maskUnexploredTerrain: false }), units: listUnitsForSnapshot() },
+    seatId: SEAT,
+    landMass,
+  });
+  const city = [...humanHome].find((hex) => {
+    const row = hexById.get(hex);
+    if (row?.terrain !== 'coastal' && row?.terrainKind !== 'coastal') return false;
+    if (walkable.has(hex) || isWithinGridRangePure(shipHex, hex, 7)) return false;
+    return terrain.landingHexes(hex).some((landing) => terrain.sailTurns(port, landing) !== null);
+  });
+  assert.ok(city, 'expected an enemy coastal city the infantry cannot walk to');
+  dbRun(
+    `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+     VALUES (?, 4, 0, 0)
+     ON CONFLICT(h3_index) DO UPDATE SET urban_hex_count = 4`,
+    [city],
+  );
+  dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [city, 'human']);
+  return city;
+}
+
+test('a commander may name a city only a campaign lift can reach, and a land launch may not', () => {
+  ensureTerrainClassificationCacheLoaded();
+  withTempGameDb('aw-campaign-target-sea-', () => {
+    ensureStrategicCoordinateRegistryInitialized();
+    const seat = AI_SEAT_IDS[0];
+    const landMass = loadCampaignLandMass(seat);
+    assert.ok(landMass);
+    const city = arrangeSeaOnlyCity(landMass);
+    const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const refused = applyCampaignTargetH3({ state, targetH3: city, label: 'the city', allowSea: false });
+    assert.deepEqual(refused.dropReasons, ['campaignTarget dropped: no ground unit of yours can reach the city by land.']);
+    assert.equal(readCampaignObjectives(ops()).has(seat), false);
+    const applied = applyCampaignTargetH3({ state, targetH3: city, label: 'the city', allowSea: true });
+    assert.deepEqual(applied.dropReasons, []);
+    const stored = readCampaignObjectives(ops()).get(seat);
+    assert.equal(stored?.targetH3, city);
+    assert.equal(stored?.approach, 'sea');
+    assert.equal(stored?.source, 'commander');
+    assert.equal(stored?.phase, 'assault');
   });
 });

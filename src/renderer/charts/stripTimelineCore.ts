@@ -1,7 +1,7 @@
 /**
  * The shared machinery of a strip timeline: one row of cells per commander, one cell per turn.
  *
- * Purpose: The stance strip and the agreements strip lay out labels, a canvas, an axis, zoom, pan, and a tooltip the same way. Only the cell painting and the tooltip text differ, so they are callbacks.
+ * Purpose: The stance strip, the agreements strip, and the posture strip lay out labels, a canvas, an axis, zoom, pan, and a tooltip the same way. Only the cell painting and the tooltip text differ, so they are callbacks.
  * When to use: A strip module calls `createStripTimeline` with its cell type, a painter, and a tooltip callback.
  * Expected outcome: A canvas with DOM labels beside it. It opens on a window of at most 12 turns (`initialTurnWindow`). Wheel zooms, drag pans, double-click zooms all the way out, and a tooltip follows the pointer.
  * Exceptions: None.

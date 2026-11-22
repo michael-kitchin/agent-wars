@@ -143,6 +143,32 @@ test('a complete muster loads two infantry and sails', () => {
   assert.equal(step.outcome, 'running');
 });
 
+test('a muster waits while a needed ship is still at sea', () => {
+  const ids = ['inf-a', 'inf-b', 'inf-c', 'inf-d'];
+  const { unitHexById, unitTypeById } = placed(ids, PORT, ['ship-1']);
+  unitHexById.set('ship-2', 'sea');
+  const step = advanceSeaOperation(
+    operation({ phase: 'muster', unitIds: ids, carrierIds: ['ship-1', 'ship-2'] }),
+    facts({ unitHexById, unitTypeById }),
+  );
+  assert.equal(step.next?.phase, 'muster');
+  assert.equal(step.outcome, 'running');
+  assert.ok(step.actions.some((action) => action.kind === 'march' && action.unitId === 'ship-2' && action.toH3 === PORT));
+  assert.ok(step.actions.every((action) => action.kind !== 'embark'));
+});
+
+test('a muster sails once every needed ship is at the port', () => {
+  const ids = ['inf-a', 'inf-b', 'inf-c', 'inf-d'];
+  const { unitHexById, unitTypeById } = placed(ids, PORT, ['ship-1', 'ship-2']);
+  const step = advanceSeaOperation(
+    operation({ phase: 'muster', unitIds: ids, carrierIds: ['ship-1', 'ship-2'] }),
+    facts({ unitHexById, unitTypeById }),
+  );
+  assert.equal(step.next?.phase, 'transit');
+  assert.deepEqual(step.next?.unitIds, ids);
+  assert.deepEqual(step.next?.carrierIds, ['ship-1', 'ship-2']);
+});
+
 test('a complete muster with no landing is abandoned and does not embark', () => {
   const { unitHexById, unitTypeById } = placed(['inf-a', 'inf-b'], PORT, ['ship-1']);
   const step = advanceSeaOperation(
@@ -181,6 +207,18 @@ test('muster timeout abandons one arrival and sails with two', () => {
   assert.equal(sailing.next?.phase, 'transit');
   assert.deepEqual(sailing.next?.unitIds, ['inf-a', 'inf-b']);
   assert.deepEqual(sailing.actions.filter((action) => action.unitId === 'inf-c'), [{ kind: 'cancelOrder', unitId: 'inf-c' }]);
+});
+
+test('a campaign lift at the muster timeout needs its minimum', () => {
+  const ids = ['inf-a', 'inf-b', 'inf-c', 'inf-d'];
+  const { unitHexById, unitTypeById } = placed(ids, PORT, ['ship-1']);
+  unitHexById.set('inf-d', 'away');
+  const step = advanceSeaOperation(
+    operation({ phase: 'muster', purpose: 'campaign', minGroundUnits: 4, unitIds: ids, carrierIds: ['ship-1'] }),
+    facts({ turnNumber: 11, unitHexById, unitTypeById }),
+  );
+  assert.equal(step.next, null);
+  assert.equal(step.outcome, 'abandoned');
 });
 
 test('a launch tick replaces an order the unit already had', () => {

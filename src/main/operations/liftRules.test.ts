@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import { gridDisk, latLngToCell } from 'h3-js';
 import { carrierAcceptsLandUnit } from '../../shared/carrierCargoRules';
 import type { GameStateSnapshot } from '../gameDb';
-import { countObjectiveReinforcers, fillShip, liftGroundCap, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
+import { countObjectiveReinforcers, fillShip, liftGroundCap, liftProtectedUnitIds, rankLiftCities, shipsNeeded, type LiftCity } from './liftRules';
 
 /**
  * Checks that boarding the returned ids one at a time is legal for a ship.
@@ -123,4 +123,28 @@ test('countObjectiveReinforcers counts one enemy land unit inside eta and outsid
     ],
   } as unknown as GameStateSnapshot;
   assert.equal(countObjectiveReinforcers({ state, seatId: 'ai1', cityH3: city, etaTurns: 3 }), 1);
+});
+
+test('liftProtectedUnitIds protects units beside an enemy, withheld units, and defenders', () => {
+  const enemyHex = latLngToCell(0, 0, 1);
+  const used = new Set<string>([enemyHex]);
+  const state = {
+    units: [
+      { id: 'inf-beside', player: 'ai1', unitType: 'infantry', h3Index: hexAtDistance(enemyHex, 1, used) },
+      { id: 'inf-two-away', player: 'ai1', unitType: 'infantry', h3Index: hexAtDistance(enemyHex, 2, used) },
+      { id: 'inf-withheld', player: 'ai1', unitType: 'infantry', h3Index: hexAtDistance(enemyHex, 3, used) },
+      { id: 'inf-defender', player: 'ai1', unitType: 'infantry', h3Index: hexAtDistance(enemyHex, 4, used) },
+      { id: 'enemy', player: 'ai2', unitType: 'infantry', h3Index: enemyHex },
+    ],
+  } as unknown as GameStateSnapshot;
+  const enemyUnitsWithin = (h3Index: string, radius: number): number =>
+    state.units.filter((unit) => unit.player === 'ai2' && gridDisk(h3Index, radius).includes(unit.h3Index)).length;
+  const protectedIds = liftProtectedUnitIds({
+    state,
+    seatId: 'ai1',
+    terrain: { enemyUnitsWithin },
+    defenderUnitIds: ['inf-defender'],
+    withheldIds: new Set(['inf-withheld']),
+  });
+  assert.deepEqual([...protectedIds].sort(), ['inf-beside', 'inf-defender', 'inf-withheld']);
 });

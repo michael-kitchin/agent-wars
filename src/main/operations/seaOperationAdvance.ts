@@ -11,6 +11,8 @@ import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import type { Operation, OperationPhase } from '../../shared/operationTypes';
 import { logDebug } from '../logger';
 import { fillShip } from './liftRules';
+import { seaMusterReady } from './seaMusterRules';
+import { isCampaignLift } from '../../shared/operationPurpose';
 import {
   OPERATION_ASSAULT_TIMEOUT_TURNS,
   OPERATION_MIN_GROUND_UNITS,
@@ -356,7 +358,7 @@ function continueOperation(operation: Operation, patch: {
  * Loads the units waiting at the port and sails the ships that took them.
  *
  * Purpose: Ready muster returns only these actions, not the gather marches.
- * When to use: When the muster is ready and a landing exists.
+ * When to use: When the muster is ready (the ships its troops need are at the port, or the timeout has come) and a landing exists.
  * Expected outcome: Cancel and embark for each loaded unit, a march for each loaded ship, and cancels for everyone else.
  * Exceptions: None.
  */
@@ -409,7 +411,7 @@ function loadAndSail(args: {
 /**
  * Advances a muster: gather, load, or give up.
  *
- * Purpose: The force marches to the port and boards only when enough of it, and a ship, are there.
+ * Purpose: The force marches to the port and boards when every troop and the ships those troops need are there, or at the timeout with the minimum troops and a ship. The minimum is `OPERATION_MIN_GROUND_UNITS`, or for a campaign lift its own `minGroundUnits`, counted as the troops the ships at the port can carry.
  * When to use: `operation.phase` is `muster`.
  * Expected outcome: `transit` when the force loads. `abandoned` when it cannot, or `lost` when it emptied because a unit or ship is gone from the map. Otherwise the same phase.
  * Exceptions: None. A null landing abandons without embarking.
@@ -423,8 +425,15 @@ function advanceMuster(operation: Operation, facts: OperationFacts, unitIds: rea
   const presentIds = unitIds.filter((unitId) => facts.unitHexById.get(unitId) === operation.musterH3);
   const shipsPresent = carrierIds.filter((shipId) => facts.unitHexById.get(shipId) === operation.musterH3);
   const timedOut = elapsedTurns(operation, facts) >= OPERATION_MUSTER_TIMEOUT_TURNS;
-  const everyonePresent = presentIds.length === unitIds.length;
-  const ready = shipsPresent.length > 0 && (everyonePresent || (timedOut && presentIds.length >= OPERATION_MIN_GROUND_UNITS));
+  const ready = seaMusterReady({
+    presentUnitTypes: presentIds.map((unitId) => facts.unitTypeById.get(unitId) ?? ''),
+    remainingUnitCount: unitIds.length,
+    shipsPresentCount: shipsPresent.length,
+    remainingShipCount: carrierIds.length,
+    timedOut,
+    minUnitsAtTimeout: operation.minGroundUnits ?? OPERATION_MIN_GROUND_UNITS,
+    campaignLift: isCampaignLift(operation),
+  });
   if (timedOut && !ready) return ended('abandoned', 'muster-timeout', cancelAll(remaining), releasedIds);
   if (ready) {
     const landing = facts.chooseLanding(operation.musterH3);

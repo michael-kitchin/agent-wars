@@ -9,14 +9,26 @@
 
 import { logTrace } from '../../logger';
 import { OPERATION_MENU_SIZE } from '../../operations/operationRules';
+import { CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS } from '../campaignSeaConstants';
 import { SECTION_TITLE_OPERATION_RULES, subHeading } from './sectionHeadings';
+
+/**
+ * The paragraph that explains a campaign lift among the operations.
+ *
+ * Purpose: A campaign lift appears in the operations list, and the model should know it has its own slot, should be left alone, and that a cancel holds off the next lift for `CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS` turns.
+ * When to use: As the last paragraph of the operation rules, when the campaign is on.
+ * Expected outcome: One paragraph of plain text.
+ * Exceptions: None.
+ */
+const CAMPAIGN_LIFT_PARAGRAPH =
+  `A campaign lift is the campaign's own sea operation. It is listed with your operations and can be cancelled like one, but it uses a slot of its own and does not count against your sea operations. Give its units and ships no orders unless you mean to take them out. After you cancel one, the engine launches no new campaign lift for ${CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS} turns.`;
 
 /**
  * Writes the operation rules for the system prompt.
  *
  * Purpose: The model needs to leave an operation alone, and to know that a standing order takes out a unit that is not aboard, or a ship.
  * When to use: After the campaign block when `operationsEnabled` is true, and after the context block when the campaign block is absent.
- * Expected outcome: The heading, then one paragraph per idea: what an operation is, the sea steps, the air steps, where the briefing lists them, the land paragraph when `campaignEnabled` is true, the menu, the launch, the engine's own launch, and the cancel when `commandsEnabled` is true, then the paragraph about leaving an operation alone, including that an order on a unit aboard is refused, and the paragraph that, outside an operation, a standing order does not move a unit while it is aboard a ship.
+ * Expected outcome: The heading, then one paragraph per idea: what an operation is, the sea steps, the air steps, where the briefing lists them, the land paragraph when `campaignEnabled` is true, the menu, the launch, the engine's own launch, and the cancel when `commandsEnabled` is true, then the paragraph about leaving an operation alone, including that an order on a unit aboard is refused, and the paragraph that, outside an operation, a standing order does not move a unit while it is aboard a ship. When `campaignEnabled` is true, the paragraph on the campaign lift comes last.
  * Exceptions: None.
  */
 export function buildOperationRuleBlock(commandsEnabled: boolean, campaignEnabled = false): string {
@@ -31,6 +43,9 @@ export function buildOperationRuleBlock(commandsEnabled: boolean, campaignEnable
   ];
   if (campaignEnabled) {
     paragraphs.splice(4, 0, 'Your land campaign is listed there too, as "campaign". It is described under Campaign. Operation Options may list land rows: other cities the campaign could turn to. Launching one gives the campaign that target.');
+  }
+  if (campaignEnabled) {
+    paragraphs.push(CAMPAIGN_LIFT_PARAGRAPH);
   }
   if (commandsEnabled) {
     const commandParagraphs = [

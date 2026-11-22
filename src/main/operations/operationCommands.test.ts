@@ -654,6 +654,21 @@ test('a named launch is dropped when that method already fills its slots', () =>
   });
 });
 
+test('a named sea launch is not refused for slots when the only stored operation is a campaign lift', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['defender', 'human', 'infantry', city]);
+    const lift = storedOperation({ id: 'opponent-op1', phase: 'transit', purpose: 'campaign', unitIds: ['lift-inf'], carrierIds: ['lift-ship'] });
+    writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, SEAT, [lift]);
+    const result = namedLaunch(codeFor(city), 'sea');
+    assert.deepEqual(result.dropReasons, []);
+    const stored = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(stored.length, 2);
+  });
+});
+
 test('a named air launch against an occupied city is dropped before the search', () => {
   withTempGameDb('aw-operation-command-', () => {
     const landMass = loadCampaignLandMass(SEAT);

@@ -18,18 +18,21 @@ import {
   writeOperationOffer,
   writeOperationsForSeat,
 } from '../gameDb/operationMemory';
+import { writeCampaignLiftCancelledTurn } from '../gameDb/campaignObjectiveMemory';
 import { codeToH3, h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { logDebug, logError, logTrace } from '../logger';
 import { applyCampaignTargetH3 } from '../openRouter/campaignTargetOverride';
 import type { OperationCommand } from '../openRouter/operationCommandParsing';
-import { CAMPAIGN_OPERATION_ID, type Operation, type OperationCandidate, type OperationChoiceMethod } from '../../shared/operationTypes';
+import { isCampaignLift } from '../../shared/operationPurpose';
+import { type Operation, type OperationCandidate, type OperationChoiceMethod } from '../../shared/operationTypes';
 import { applyOperationActions } from './operationActions';
 import { postureSettingsForSeat } from '../gameDb/postureMemory';
 import { operationCandidatesForSeat, operationSlotsForState } from './operationCandidates';
 import { OPERATION_OPTION_LETTERS } from './operationRules';
 import { listKnownEnemyCities } from './seaOperationCandidates';
 import { buildOperationFacts } from './operationTurnFlow';
-import { advanceOperation, cancelOperation } from './operationAdvance';
+import { advanceOperation } from './operationAdvance';
+import { resolveCancelCommand } from './operationCancelCommand';
 import { type OperationAction, type OperationStep } from './seaOperationAdvance';
 
 /**
@@ -106,6 +109,15 @@ interface ResolvedCommands {
    * Exceptions: None.
    */
   readonly launched: boolean;
+  /**
+   * Targets of the campaign lifts this reply cancelled.
+   *
+   * Contract: The `objectiveH3` of each cancelled operation for which `isCampaignLift` is true, in command order. Empty when no campaign lift was cancelled.
+   * When to use: Recording the cancel turn on the stored campaign objective after the operations are written.
+   * Expected outcome: Zero or more H3 indexes.
+   * Exceptions: None.
+   */
+  readonly cancelledLiftTargets: readonly string[];
 }
 
 /**
@@ -113,8 +125,8 @@ interface ResolvedCommands {
  *
  * Purpose: Letters resolve against the briefing's rows, and the writes happen only after every command has been resolved.
  * When to use: Once per consult that included an `operations` array, before standing-order expansion.
- * Expected outcome: `appliedCount` is how many commands were stored. `dropReasons` names the rest. A throw while resolving writes nothing.
- * Exceptions: None. The catch logs the error and returns `appliedCount` 0.
+ * Expected outcome: `appliedCount` is how many commands were stored. `dropReasons` names the rest. A cancelled campaign lift records the turn as `liftCancelledTurn` on the seat's campaign objective for that target, which holds off the next campaign lift for `CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS` turns. A throw while resolving writes nothing.
+ * Exceptions: None. The catch logs the error and returns `appliedCount` 0 with the apply-failed reason. A throw from `writeCampaignLiftCancelledTurn`, the event-turn write, or the offer clear comes after `writeOperationsForSeat` has stored the new operation list, so the cancel or launch stands although the reply reports it as failed, and the cooldown stamp may be missing.
  */
 export function applyOperationCommands(args: {
   readonly state: GameStateSnapshot;
@@ -149,6 +161,9 @@ export function applyOperationCommands(args: {
         coordinates: args.coordinates,
       });
       writeOperationsForSeat(configOps, args.seatId, resolved.operations);
+      for (const targetH3 of resolved.cancelledLiftTargets) {
+        writeCampaignLiftCancelledTurn(configOps, args.seatId, args.state.turnNumber, targetH3);
+      }
       if (resolved.launched) clearLaunchOffer(args.seatId);
       writeOperationEventTurn(configOps, args.seatId, args.state.turnNumber);
     }
@@ -187,13 +202,15 @@ function resolveCommands(args: {
   const replacements = new Map<string, Operation | null>();
   const actions: OperationAction[] = [];
   const dropReasons: string[] = [];
+  const cancelledLiftTargets: string[] = [];
   let appliedCount = 0;
   for (const command of args.commands) {
     if (command.action !== 'cancel') continue;
-    const outcome = resolveCancel({ ...args, command, stored, replacements });
+    const outcome = resolveCancelCommand({ ...args, command, stored, replacements });
     dropReasons.push(...outcome.dropReasons);
     if (!outcome.applied || outcome.step === undefined) continue;
     replacements.set(command.id, outcome.step.next);
+    if (outcome.campaignLiftTargetH3 !== undefined) cancelledLiftTargets.push(outcome.campaignLiftTargetH3);
     actions.push(...withoutKeptOrders(outcome.step.actions, args.keepOrderIds));
     appliedCount += 1;
     logDebug('operationCommands cancelled', { seatId: args.seatId, id: command.id, phase: outcome.phase });
@@ -201,14 +218,14 @@ function resolveCommands(args: {
   const operations = mergeOperations(stored, replacements);
   const launch = args.commands.find((command) => command.action === 'launch');
   if (launch === undefined || launch.action !== 'launch') {
-    return { operations, actions, appliedCount, dropReasons, launched: false };
+    return { operations, actions, appliedCount, dropReasons, launched: false, cancelledLiftTargets };
   }
   const launched = 'option' in launch
     ? resolveLaunch({ ...args, option: launch.option, operations, stored })
     : resolveNamedLaunch({ ...args, objective: launch.objective, method: launch.method, operations, stored });
   dropReasons.push(...launched.dropReasons);
   if (launched.operation === null || launched.step === undefined) {
-    return { operations, actions, appliedCount, dropReasons, launched: false };
+    return { operations, actions, appliedCount, dropReasons, launched: false, cancelledLiftTargets };
   }
   actions.push(...launched.step.actions);
   const next = launched.step.next === null ? operations : [...operations, launched.step.next];
@@ -225,6 +242,7 @@ function resolveCommands(args: {
     appliedCount: appliedCount + 1,
     dropReasons,
     launched: true,
+    cancelledLiftTargets,
   };
 }
 
@@ -242,47 +260,6 @@ function withoutKeptOrders(actions: readonly OperationAction[], keepOrderIds: Re
     if (action.kind !== 'cancelOrder' && action.kind !== 'march' && action.kind !== 'defend') return true;
     return !keepOrderIds.has(action.unitId);
   });
-}
-
-/**
- * Decides one cancel against the operation stored at the start of the reply.
- *
- * Purpose: A cancel names an id from Active Operations. A return is already doing the only thing a cancel would do.
- * When to use: Each cancel, before the launch.
- * Expected outcome: A step to keep, or one drop reason.
- * Exceptions: Propagates from `buildOperationFacts` or `cancelOperation`.
- */
-function resolveCancel(args: {
-  readonly state: GameStateSnapshot;
-  readonly seatId: string;
-  readonly command: Extract<OperationCommand, { action: 'cancel' }>;
-  readonly coordinates: KnockoutCoordinates;
-  readonly stored: readonly Operation[];
-  readonly replacements: ReadonlyMap<string, Operation | null>;
-}): { readonly applied: boolean; readonly phase?: string; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
-  if (args.command.id === CAMPAIGN_OPERATION_ID) {
-    return {
-      applied: false,
-      dropReasons: ['operations cancel dropped: the land campaign cannot be cancelled; launch a land option to give it a new target.'],
-    };
-  }
-  const operation = args.stored.find((row) => row.id === args.command.id);
-  if (operation === undefined || args.replacements.has(operation.id)) {
-    return { applied: false, dropReasons: [`operations cancel dropped: ${args.command.id} is not one of your operations.`] };
-  }
-  if (operation.phase === 'return') {
-    return { applied: false, dropReasons: [`operations cancel dropped: ${args.command.id} is already returning.`] };
-  }
-  const facts = buildOperationFacts({
-    state: args.state,
-    seatId: args.seatId,
-    operation,
-    coordinates: args.coordinates,
-  });
-  if (facts === null) {
-    return { applied: false, dropReasons: [`operations cancel dropped: ${args.command.id} could not be read.`] };
-  }
-  return { applied: true, phase: operation.phase, step: cancelOperation(operation, facts), dropReasons: [] };
 }
 
 /**
@@ -335,7 +312,7 @@ function resolveLaunch(args: {
  *
  * Purpose: The commander can start a sea or air operation the menu did not list, or turn the campaign to a named city.
  * When to use: A launch command that carries `objective` and `method`.
- * Expected outcome: A land launch stores the campaign target and returns no operation. A sea or air launch returns the operation and its first step, or one drop reason.
+ * Expected outcome: A land launch stores the campaign target and returns no operation. A sea or air launch returns the operation and its first step, or one drop reason. The slot check counts raids and air operations only, because a campaign lift has a slot of its own.
  * Exceptions: `codeToH3` throws on an unknown code and logs that throw. This function catches it and returns a drop reason.
  */
 function resolveNamedLaunch(args: {
@@ -369,7 +346,7 @@ function resolveNamedLaunch(args: {
   if (city === undefined) {
     return { operation: null, dropReasons: [`operations launch dropped: ${args.objective} is not a known enemy city.`] };
   }
-  const running = args.operations.filter((operation) => operation.method === args.method).length;
+  const running = args.operations.filter((operation) => operation.method === args.method && !isCampaignLift(operation)).length;
   if (running >= operationSlotsForState(args.state, args.method, postureSettingsForSeat(args.seatId))) {
     return { operation: null, dropReasons: [`operations launch dropped: you already have as many ${args.method} operations as you can run.`] };
   }
@@ -485,7 +462,7 @@ function applyLandLaunch(args: {
   readonly targetH3: string;
   readonly label: string;
 }): { readonly operation: null; readonly dropReasons: readonly string[] } {
-  const applied = applyCampaignTargetH3({ state: args.state, targetH3: args.targetH3, label: args.label });
+  const applied = applyCampaignTargetH3({ state: args.state, targetH3: args.targetH3, label: args.label, allowSea: false });
   const prefix = 'campaignTarget dropped: ';
   const dropReasons = applied.dropReasons.map((reason) =>
     reason.startsWith(prefix) ? `operations launch dropped: ${reason.slice(prefix.length)}` : reason,

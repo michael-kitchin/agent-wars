@@ -9,7 +9,6 @@
 
 import type { CampaignObjective, CampaignPhase } from '../../shared/campaignTypes';
 import { logDebug, logTrace } from '../logger';
-import { chooseCampaignTarget, chooseStagingHex, type CampaignCity } from './campaignTargetSelection';
 
 /**
  * Farthest a kept or commander target may be, in land steps.
@@ -381,84 +380,6 @@ export function chooseHomeDefenders(args: {
     homeDefenseCapped,
   });
   return { defenderUnitIds, threatCount: threatHexes.length, homeDefenseCapped };
-}
-
-/**
- * The objective to store for this consult.
- *
- * Purpose: Keeps a valid target, refreshes a lost staging hex, and retargets when the city is gone or out of land reach.
- * When to use: Once per strategic consult, before the briefing.
- * Expected outcome: Null with no ground units or no candidate. Otherwise the kept objective, with its staging hex refreshed only when it was lost, and the phase from `nextCampaignPhase`. A stored target is out of reach when its land steps are missing or greater than `CAMPAIGN_REACH_LIMIT_STEPS`. When the stored target is not a candidate or is out of reach, a new engine objective in assemble, or in assault without a staging hex.
- * Exceptions: None.
- */
-export function resolveCampaignObjective(args: {
-  readonly stored: CampaignObjective | null;
-  readonly turnNumber: number;
-  readonly cities: readonly CampaignCity[];
-  readonly landStepsFromForce: ReadonlyMap<string, number>;
-  readonly ownControlledLandHexes: readonly string[];
-  readonly landStepsFromTarget: (targetH3: string) => ReadonlyMap<string, number>;
-  readonly groundUnitHexes: readonly string[];
-  readonly hopDistance: HopDistance;
-  readonly assaultMinUnits?: number;
-}): CampaignObjective | null {
-  if (args.groundUnitHexes.length === 0) {
-    logDebug('campaignRules resolveCampaignObjective', { storedTarget: args.stored?.targetH3 ?? null, target: null, steps: null, phase: null });
-    return null;
-  }
-  const candidateH3s = new Set(args.cities.map((city) => city.h3Index));
-  const stored = args.stored;
-  const storedSteps = stored === null ? undefined : args.landStepsFromForce.get(stored.targetH3);
-  let objective: CampaignObjective;
-  if (
-    stored === null ||
-    !candidateH3s.has(stored.targetH3) ||
-    storedSteps === undefined ||
-    storedSteps > CAMPAIGN_REACH_LIMIT_STEPS
-  ) {
-    const targetH3 = chooseCampaignTarget(args.cities, args.landStepsFromForce);
-    if (targetH3 === null) {
-      logDebug('campaignRules resolveCampaignObjective', { storedTarget: stored?.targetH3 ?? null, target: null, steps: null, phase: null });
-      return null;
-    }
-    const stagingH3 = chooseStagingHex({
-      ownControlledLandHexes: args.ownControlledLandHexes,
-      landStepsFromTarget: args.landStepsFromTarget(targetH3),
-      landStepsFromForce: args.landStepsFromForce,
-    });
-    objective = {
-      targetH3,
-      stagingH3,
-      phase: stagingH3 === null ? 'assault' : 'assemble',
-      source: 'engine',
-      chosenTurn: args.turnNumber,
-    };
-  } else {
-    const stagingStillHeld = stored.stagingH3 !== null && args.ownControlledLandHexes.includes(stored.stagingH3);
-    const stagingH3 =
-      stored.stagingH3 === null || stagingStillHeld
-        ? stored.stagingH3
-        : chooseStagingHex({
-            ownControlledLandHexes: args.ownControlledLandHexes,
-            landStepsFromTarget: args.landStepsFromTarget(stored.targetH3),
-            landStepsFromForce: args.landStepsFromForce,
-          });
-    const withStaging: CampaignObjective = { ...stored, stagingH3 };
-    const phase = nextCampaignPhase({
-      phase: stored.phase,
-      stagingH3,
-      massedCount: countMassedUnits(args.groundUnitHexes, campaignMassCenters(withStaging), args.hopDistance),
-      threshold: campaignAssaultThreshold(args.groundUnitHexes.length, args.assaultMinUnits),
-    });
-    objective = { ...withStaging, phase };
-  }
-  logDebug('campaignRules resolveCampaignObjective', {
-    storedTarget: stored?.targetH3 ?? null,
-    target: objective.targetH3,
-    steps: args.landStepsFromForce.get(objective.targetH3) ?? null,
-    phase: objective.phase,
-  });
-  return objective;
 }
 
 /**

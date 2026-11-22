@@ -69,7 +69,7 @@ const SCENES = Object.freeze({
   replayOpen: 'replay-open',
   replayClosed: 'replay-closed',
   mapTech: 'map-tech',
-  mapWeatherOff: 'map-weather-off',
+  mapWeatherOn: 'map-weather-on',
   mapLayersSwapped: 'map-layers-swapped',
   legendOpen: 'legend-open',
   readyTip: 'ready-tip',

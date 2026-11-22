@@ -255,8 +255,8 @@ async function runFirstSession(app, page, report, outDir) {
   await clearSelection(page);
 
   // Show the map-mode tabs from the toggle on the overview's corner; they start hidden and stay shown until the toggle
-  // hides them in the small window below. Turn Tech on and record it with the weather icons still on, then turn it
-  // off. Turn Weather off and record the map without weather icons, then turn it back on. Turn Control off and
+  // hides them in the small window below. Turn Tech on and record it with the weather icons off, then turn it
+  // off. Turn Weather on and record the map with weather icons, then turn it back off. Turn Control off and
   // Production on and record that, then put both back.
   await page.click('#map-mode-tabs-toggle');
   await page.click('#map-mode-tech');
@@ -267,7 +267,7 @@ async function runFirstSession(app, page, report, outDir) {
   await page.click('#map-mode-weather');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
-  await recordScene(page, report, outDir, SCENES.mapWeatherOff);
+  await recordScene(page, report, outDir, SCENES.mapWeatherOn);
   await page.click('#map-mode-weather');
   await page.click('#map-mode-control');
   await page.click('#map-mode-production');

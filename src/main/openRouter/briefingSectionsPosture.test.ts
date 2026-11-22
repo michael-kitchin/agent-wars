@@ -27,3 +27,12 @@ test('the blitz effect line uses the present assault constants', () => {
   const global = buildPostureSection({ stored: { posture: 'blitz', sinceTurn: 1 }, turnNumber: 1, campaignEnabled: false });
   assert.equal(global.includes('campaign assaults'), false);
 });
+
+test('fit lines follow the effect line, and none leaves the section as it was', () => {
+  const fitLines = ['- Ships: 2 of your naval cap of 8. On maritime a campaign lift could carry up to 4 ground units.', '- Fit, Western Europe: home not reachable by land or sea. Fits: strangle.'];
+  const text = buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true, fitLines });
+  const lines = text.split('\n');
+  const effect = lines.findIndex((line) => line.startsWith('- Effect:'));
+  assert.deepEqual(lines.slice(effect + 1), fitLines);
+  assert.equal(buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true }), buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true, fitLines: [] }));
+});

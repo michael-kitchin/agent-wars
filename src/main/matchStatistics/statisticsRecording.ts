@@ -14,8 +14,10 @@ import { getMatchGeneration } from '../matchGeneration';
 import type { MatchEventRequest } from '../recorder/matchRecorder';
 import type { StepKey } from '../../shared/matchRecording';
 import type { RelationshipReport, SeatForStatistics, TurnStatistics } from '../../shared/matchStatistics';
+import { readPostureReports } from './postureReportsRead';
+import { postureReportsOf } from '../../shared/postureStrip';
 import { readSideStatistics } from './sideStatisticsRead';
-import { takeSpentMissileIds } from './spentMissiles';
+import { spentMissileSeatIds, takeSpentMissileIds } from './spentMissiles';
 import {
   hexesTakenBetween,
   readTurnOwnership,
@@ -41,6 +43,19 @@ function readRelationships(): RelationshipReport[] {
     threat: row.threat,
     reportedTurn: row.updatedTurn,
   }));
+}
+
+/**
+ * The seats whose recorded posture report was strangle and acting.
+ *
+ * Purpose: A refresh must not take the noted missile launches, which belong to the next turn, so it keeps the strangle answer the step recorded.
+ * When to use: From `refreshedTurnStatistics`, as the launching seats passed to `readPostureReports`.
+ * Expected outcome: The seat ids of the valid recorded reports with posture `strangle` and `acting` true. Empty when the turn has no valid `postures` list.
+ * Exceptions: None.
+ */
+function recordedStrangleActing(recorded: TurnStatistics): ReadonlySet<string> {
+  const reports = postureReportsOf(recorded) ?? [];
+  return new Set(reports.filter((report) => report.posture === 'strangle' && report.acting).map((report) => report.seatId));
 }
 
 /**
@@ -73,6 +88,7 @@ export function recordTurnStatistics(
       sides,
       relationships: readRelationships(),
       hexesTaken: hexesTakenBetween(previous, current, seatIds),
+      postures: readPostureReports({ ops: gameDbOps, seats, launchedSeatIds: spentMissileSeatIds(step.turnNumber) }),
     };
     record({ type: 'side_statistics', step, visibility: 'engine', payload });
     rememberTurnOwnership(current);
@@ -86,7 +102,7 @@ export function recordTurnStatistics(
  *
  * Purpose: A consult that finishes after the match's last boundary changes the seat costs and the stances, and the finished recording must show them. The losses and hexes taken compare against the turn before, which cannot be read again, so they are kept as recorded.
  * When to use: Immediately before a finished match's recording is written, on the statistics event of the current step.
- * Expected outcome: The same turn with `sides` read again (each keeping its recorded `unitsLost`, or null for a seat that was not recorded) and `relationships` read again. `turnNumber` and `hexesTaken` are unchanged. Nothing is remembered or consumed.
+ * Expected outcome: The same turn with `sides` read again (each keeping its recorded `unitsLost`, or null for a seat that was not recorded), and `relationships` and `postures` read again, since a consult may have changed a posture. A seat whose recorded report was strangle and acting stays acting while it is still on strangle, because the launches belong to the recorded step and are not read again. `turnNumber` and `hexesTaken` are unchanged. Nothing is remembered or consumed: the noted missile launches stay for the next turn.
  * Exceptions: Propagates a SQLite error.
  */
 export function refreshedTurnStatistics(recorded: TurnStatistics, seats: readonly SeatForStatistics[]): TurnStatistics {
@@ -96,5 +112,6 @@ export function refreshedTurnStatistics(recorded: TurnStatistics, seats: readonl
     ...recorded,
     sides: readSideStatistics(gameDbOps, seats).map((side) => ({ ...side, unitsLost: recordedLosses.get(side.seatId) ?? null })),
     relationships: readRelationships(),
+    postures: readPostureReports({ ops: gameDbOps, seats, launchedSeatIds: recordedStrangleActing(recorded) }),
   };
 }

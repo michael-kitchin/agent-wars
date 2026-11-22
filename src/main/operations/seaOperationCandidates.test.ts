@@ -14,7 +14,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3, type StrategicLandMassRecord } from '../../shared/landTraversalStrategic';
 import type { Operation } from '../../shared/operationTypes';
 import { buildLiftTerrain } from './liftTerrain';
-import { listSeaOperationCandidates } from './seaOperationCandidates';
+import { buildSeaLiftForce, listSeaOperationCandidates } from './seaOperationCandidates';
 
 const SEAT = 'opponent';
 
@@ -181,6 +181,26 @@ function search(
   });
   return { candidates, routeChecks: terrain.routeChecks() };
 }
+
+test('buildSeaLiftForce takes only the eligible ground units and still needs two of them', () => {
+  const built = coast({ radius: 3, infantry: ['inf-a', 'inf-b', 'inf-c', 'inf-d'], cities: [] });
+  const terrain = buildLiftTerrain({ state: built.state, seatId: SEAT, landMass: built.landMass });
+  const base = {
+    state: built.state,
+    seatId: SEAT,
+    landMass: built.landMass,
+    terrain,
+    active: [] as readonly Operation[],
+    protectedUnitIds: new Set<string>(),
+    groundShare: { hasCampaignPlan: false },
+  };
+  assert.equal(buildSeaLiftForce({ ...base, eligibleUnitIds: new Set(['inf-d']) }), null);
+  const force = buildSeaLiftForce({ ...base, eligibleUnitIds: new Set(['inf-c', 'inf-d']) });
+  assert.ok(force);
+  assert.deepEqual(force.units.map((unit) => unit.id).sort(), ['inf-c', 'inf-d']);
+  assert.deepEqual(force.ships.map((ship) => ship.id), ['ship-1']);
+  assert.equal(force.port, built.port);
+});
 
 test('a clear coastal city across water is one candidate', () => {
   const port = latLngToCell(0, 0, 1);
