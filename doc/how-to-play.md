@@ -408,9 +408,9 @@ After Ready, the map toast and the Reports tab give each side a section when it 
 
 Press **C**, or check **Charts…** in the game menu, to see how the match is going. Press **C** again, press Escape, or click outside to close it. The charts show every side and every turn, whatever fog of war is set to, and no AI commander ever sees them.
 
-*The Charts in a four-side agent-only game: relationships at the top, then stance, agreements, and posture over time, then the line charts.*
+*The Charts in a four-side agent-only game: relationships at the top, then the stance, agreement, and posture strips, then the line charts.*
 
-![The Charts in a four-side agent-only game: relationships at the top, then stance, agreements, and posture over time, then the line charts.](media/charts-whole-screen.png)
+![The Charts in a four-side agent-only game: relationships at the top, then the stance, agreement, and posture strips, then the line charts.](media/charts-whole-screen.png)
 
 - **Relationships:** a card for each side the commanders report on, headed "How they see you" for yours. Each line is one commander's view: its color is the stance, its width is trust, and a dashed line is a report more than three turns old. The table under it adds threat, the hexes that commander took from that side in the last five turns, and when it last reported. Use it to see who's turning on whom.
 
@@ -418,13 +418,13 @@ Press **C**, or check **Charts…** in the game menu, to see how the match is go
 
   ![How the other three commanders see the Netherlands. All three are neutral, and every report is old.](media/charts-relationship.png)
 
-- **Stance over time:** pick a side from **How they see** to see each commander's stance toward it, turn by turn. A solid cell was reported that turn, and a faded one carries an earlier report forward.
+- **Stance:** pick a side from **How they see** to see each commander's stance toward it, turn by turn. A solid cell was reported that turn, and a faded one carries an earlier report forward.
 
   *Hovering a turn lists each commander's stance, and whether it was reported that turn.*
 
   ![Hovering a turn lists each commander's stance, and whether it was reported that turn.](media/charts-stance-strip-w-popup.png)
 
-- **Agreements over time:** a row for each AI commander, and a cell for each turn with the number of active [agreements](#agreements) it held. **Kind** narrows it to one kind of deal, and **With** to deals with one side. The legend under the strip explains the marks:
+- **Agreements:** a row for each AI commander, and a cell for each turn with the number of active [agreements](#agreements) it held. **Kind** narrows it to one kind of deal, and **With** to deals with one side. The legend under the strip explains the marks:
   - **+N** counts proposals, and a dashed edge means there's at least one.
   - **Red hatching and !** mean a breach that turn: the commander destroyed the other side's units on the world map with ranged fire, air strikes, or missiles, or decided to break the deal. Melee and battle losses don't count, because the game can't tell who started them.
   - **An amber corner** means another AI commander doesn't record a matching deal, proposed or active, of the same kind. Only an active deal is marked. Deals with you never get one, since you don't keep a record.
@@ -434,7 +434,7 @@ Press **C**, or check **Charts…** in the game menu, to see how the match is go
 
   ![Hovering S. France's turn 18: an active non-aggression deal with SEGAS, which SEGAS records too, and a proposed one with N. France, which N. France doesn't.](media/charts-agreements-strip-w-popup.png)
 
-- **Posture over time:** a row for each AI commander, and a cell for each turn, colored by the posture the commander held: overland, maritime, strangle, or blitz. A full color means the posture's lead activity ran that turn: the land campaign assaulting for overland, a sea operation at sea or landed for maritime, a missile launched for strangle, an air operation for blitz. A lighter color means the commander declared the posture but that activity did not run. A colored outline means the commander never declared a posture and is on the default, overland. A gray outline means the turn is not recorded, which is true of every turn played before 3.4.0, or the commander is out of the match. Hovering a turn names each commander's posture.
+- **Posture:** a row for each AI commander, and a cell for each turn, colored by the posture the commander held: overland, maritime, strangle, or blitz. A solid color (acting) means the posture's lead activity ran that turn: the land campaign assaulting for overland, a sea operation at sea or landed for maritime, a missile launched for strangle, an air operation for blitz. A light color (idle) means the commander declared the posture but that activity did not run. A colored outline means the commander never declared a posture and is on the default, overland. A gray outline means the turn is not recorded, which is true of every turn played before 3.4.0, or the commander is out of the match. Hovering a turn names each commander's posture.
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep, units lost per turn, and model cost so far. Built and mercenary units can show one unit type.
 
   *Line charts showing every turn. The list beside Built units is open, to show one unit type.*

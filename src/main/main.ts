@@ -155,7 +155,7 @@ function applyVersionedAppName(): void {
  *
  * Purpose: The player gets one window, sized to the work area and not smaller than the minimums.
  * When to use: When the app is ready, and again if every window has closed on macOS activate.
- * Expected outcome: A window about three quarters of the work area, centered, at least 800 by 600, loading `static/index.html`. Closing it clears `mainWindow`. A load failure and a renderer crash are logged.
+ * Expected outcome: A window about three quarters of the work area, centered, at least 800 by 600, loading `static/index.html`. Background throttling is off, so a minimized or hidden window keeps advancing a match at full speed. Closing it clears `mainWindow`. A load failure and a renderer crash are logged.
  * Exceptions: Logs and does not throw when the renderer file fails to load.
  */
 function createWindow(): void {
@@ -183,6 +183,8 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       preload: preloadPath,
+      // Auto-advance presses Ready from renderer timers. Chromium's background throttling would slow a minimized match to a crawl.
+      backgroundThrottling: false,
     },
   });
 

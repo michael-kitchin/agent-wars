@@ -167,7 +167,7 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
   relationships.plotHost.className = 'charts-stack-grid';
   fillStacks(relationships.plotHost, snapshot, lookups);
 
-  const stripBlock = appendBlock(body, 'Stance over time');
+  const stripBlock = appendBlock(body, 'Stance');
   const subjectSelect = document.createElement('select');
   subjectSelect.className = 'charts-select';
   subjectSelect.setAttribute('aria-label', 'How they see');
@@ -191,7 +191,7 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
   });
   strip.update(relationshipStrip(snapshot, subjectSelect.value));
 
-  const agreementBlock = appendBlock(body, 'Agreements over time');
+  const agreementBlock = appendBlock(body, 'Agreements');
   const agreements = createAgreementStripBlock({
     ...agreementBlock,
     width: innerBodyWidth(body),
@@ -201,7 +201,7 @@ function buildBody(body: HTMLElement, snapshot: MatchChartsSnapshot): void {
     snapshot,
   });
 
-  const postureBlock = appendBlock(body, 'Posture over time');
+  const postureBlock = appendBlock(body, 'Posture');
   const postures = createPostureStripBlock({
     ...postureBlock,
     width: innerBodyWidth(body),

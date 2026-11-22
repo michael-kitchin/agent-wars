@@ -21,7 +21,7 @@ import { createPostureTimeline } from './postureTimeline';
  * Exceptions: None.
  */
 const POSTURE_LEGEND_TEXT =
-  "Full color: the posture's lead activity ran that turn. Light: declared, but that activity did not run. Colored outline: overland by default, never declared. Gray outline: not recorded, or out of the match. Lead activity: overland, the land campaign assaulting; maritime, a sea operation at sea or landed; strangle, a missile launched; blitz, an air operation.";
+  '· Solid: acting · Light: idle · Colored outline: never declared · Gray outline: not recorded';
 
 /**
  * What a caller controls about the block.

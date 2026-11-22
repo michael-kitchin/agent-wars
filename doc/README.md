@@ -34,7 +34,7 @@ Release **2.16.0** shortens commander prompts, lists the odds of each fight the 
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
 
-Release **3.4.0** lets a campaign cross the sea: the engine sails ground units that cannot march to the campaign in campaign lifts, lift by lift. A sea operation now waits for the ships its troops need before it sails. The Posture section tells each commander which postures fit each enemy. The world map starts with weather icons off, and the charts gain a Posture over time strip.
+Release **3.4.0** lets a campaign cross the sea: the engine sails ground units that cannot march to the campaign in campaign lifts, lift by lift. A sea operation now waits for the ships its troops need before it sails. The Posture section tells each commander which postures fit each enemy. The world map starts with weather icons off, and the charts gain a Posture strip.
 
 Release **3.3.0** knocks a side out when other sides and Neutral hold 90% of its home's original city cells, on every map. It shows each commander how close every side is to being knocked out, and lists the city hexes of a side with five or fewer. It makes campaigns favor finishing nearly beaten sides, except a commander's pact partners.
 

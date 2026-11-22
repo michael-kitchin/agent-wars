@@ -1,7 +1,7 @@
 /**
  * The rules that turn a match statistics snapshot into the posture strip.
  *
- * Purpose: Rows, cells, and tooltip lines for the "Posture over time" strip are decided here, with no DOM, so tests can check them.
+ * Purpose: Rows, cells, and tooltip lines for the posture strip are decided here, with no DOM, so tests can check them.
  * When to use: The charts dialog's posture strip.
  * Expected outcome: Pure functions over `MatchChartsSnapshot` and `TurnStatistics`. This module does not read the database or log.
  * Exceptions: None.

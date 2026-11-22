@@ -48048,7 +48048,7 @@ ${bonuses}`;
   }
 
   // src/renderer/charts/agreementStripBlock.ts
-  var AGREEMENT_LEGEND_TEXT = "Number: active agreements. +N: proposed agreements. Dashed edge: at least one proposal. Red hatching and !: a breach that turn, an attack on the other side or a decision to break. Amber corner: the other side does not record a matching proposed or active agreement.";
+  var AGREEMENT_LEGEND_TEXT = "N: active \xB7 +N: proposed \xB7 Dashed edge: a proposal \xB7 Red hatching, !: a breach \xB7 Amber corner: the other side does not record it";
   var KIND_CONTROL_TOOLTIP = "Choose which kind of agreement the agreement strip counts.";
   var WITH_CONTROL_TOOLTIP = "Choose the side whose agreements with each commander the strip counts, or all sides.";
   function buildDropdown(caption, ariaLabel, tooltip) {
@@ -48240,7 +48240,7 @@ ${bonuses}`;
   }
 
   // src/renderer/charts/postureStripBlock.ts
-  var POSTURE_LEGEND_TEXT = "Full color: the posture's lead activity ran that turn. Light: declared, but that activity did not run. Colored outline: overland by default, never declared. Gray outline: not recorded, or out of the match. Lead activity: overland, the land campaign assaulting; maritime, a sea operation at sea or landed; strangle, a missile launched; blitz, an air operation.";
+  var POSTURE_LEGEND_TEXT = "\xB7 Solid: acting \xB7 Light: idle \xB7 Colored outline: never declared \xB7 Gray outline: not recorded";
   function buildLegend2() {
     const legend = document.createElement("p");
     legend.className = "charts-posture-legend";
@@ -48362,7 +48362,7 @@ ${bonuses}`;
     const relationships = appendBlock(body, "Relationships");
     relationships.plotHost.className = "charts-stack-grid";
     fillStacks(relationships.plotHost, snapshot3, lookups);
-    const stripBlock = appendBlock(body, "Stance over time");
+    const stripBlock = appendBlock(body, "Stance");
     const subjectSelect = document.createElement("select");
     subjectSelect.className = "charts-select";
     subjectSelect.setAttribute("aria-label", "How they see");
@@ -48385,7 +48385,7 @@ ${bonuses}`;
       flagOf: lookups.flagOf
     });
     strip.update(relationshipStrip(snapshot3, subjectSelect.value));
-    const agreementBlock = appendBlock(body, "Agreements over time");
+    const agreementBlock = appendBlock(body, "Agreements");
     const agreements = createAgreementStripBlock({
       ...agreementBlock,
       width: innerBodyWidth(body),
@@ -48394,7 +48394,7 @@ ${bonuses}`;
       flagOf: lookups.flagOf,
       snapshot: snapshot3
     });
-    const postureBlock = appendBlock(body, "Posture over time");
+    const postureBlock = appendBlock(body, "Posture");
     const postures = createPostureStripBlock({
       ...postureBlock,
       width: innerBodyWidth(body),
