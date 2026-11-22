@@ -12,6 +12,7 @@ import { logDebug } from '../../logger';
 import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../productionRules';
 import { HIREABLE_UNIT_TYPES } from '../../../shared/mercenaryRules';
 import { AIR_STRIKE_TARGET_TYPES } from '../../../shared/airStrikeTarget';
+import { POSTURES } from '../../../shared/postureTypes';
 import { SIDE_AGREEMENT_DECISIONS } from '../../../shared/sideAgreements';
 import { STANDING_ORDER_TYPES } from '../../tools/standingOrdersShared';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
@@ -445,7 +446,8 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
     case 'campaignTarget':
       return { ...STRING_SCHEMA };
     case 'posture':
-      return { ...STRING_SCHEMA };
+      // A required enum when offered, so a model that follows the schema always names a posture. `strict` stays false, so a provider that ignores the enum still reaches the parser, where a bad name is a drop reason.
+      return enumSchema([...POSTURES]);
     case 'agreementDecisions':
       return arraySchema(
         closedObjectSchema(
@@ -478,7 +480,7 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
  *
  * Purpose: Constrains the final reply to the envelope the system prompt teaches.
  * When to use: Once per consultation for models that support structured outputs.
- * Expected outcome: Fields in `envelopeFieldsForGates` order; `strategy` and `orders` required.
+ * Expected outcome: Fields in `envelopeFieldsForGates` order; `strategy` and `orders` required, plus `exitBattle` when offered and `posture` when offered.
  * Exceptions: Throws only if the envelope field list contains a field with no schema.
  */
 export function buildOrdersEnvelopeResponseFormat(gates: EnvelopeGates): Record<string, unknown> {
@@ -487,6 +489,7 @@ export function buildOrdersEnvelopeResponseFormat(gates: EnvelopeGates): Record<
   const properties = Object.fromEntries(fields.map((field) => [field, envelopeFieldSchema(field, gates)]));
   const required = ['strategy', 'orders'];
   if (gates.includeExitBattle === true) required.push('exitBattle');
+  if (fields.includes('posture')) required.push('posture');
   return {
     type: 'json_schema',
     json_schema: {

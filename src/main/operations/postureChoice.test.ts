@@ -49,3 +49,27 @@ test('a seat with no row may set one on the first consult', () => {
     assert.deepEqual(readPosture({ getOne: dbGetOne }, SEAT), { posture: 'strangle', sinceTurn: 1 });
   });
 });
+
+test('an explicit overland with no stored row is stored and starts the hold', () => {
+  withTempGameDb('aw-posture-choice-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    const chosen = applyPostureChoice({ seatId: SEAT, posture: 'overland', turnNumber: 10 });
+    assert.deepEqual(chosen, { applied: true, dropReasons: [] });
+    assert.deepEqual(readPosture(ops, SEAT), { posture: 'overland', sinceTurn: 10 });
+    const early = applyPostureChoice({ seatId: SEAT, posture: 'maritime', turnNumber: 12 });
+    assert.equal(early.applied, false);
+    assert.deepEqual(early.dropReasons, [
+      'posture dropped: you set overland on turn 10 and may change it from turn 16.',
+    ]);
+  });
+});
+
+test('repeating the stored posture keeps its turn', () => {
+  withTempGameDb('aw-posture-choice-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    applyPostureChoice({ seatId: SEAT, posture: 'maritime', turnNumber: 3 });
+    const again = applyPostureChoice({ seatId: SEAT, posture: 'maritime', turnNumber: 5 });
+    assert.deepEqual(again, { applied: true, dropReasons: [] });
+    assert.deepEqual(readPosture(ops, SEAT), { posture: 'maritime', sinceTurn: 3 });
+  });
+});

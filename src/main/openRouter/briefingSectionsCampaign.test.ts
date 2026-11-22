@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { GameStateSnapshot } from '../gameDb';
 import type { CampaignPlan } from './campaignRules';
-import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
+import { buildCampaignObjectiveSection, campaignTargetHolderSeatId } from './briefingSectionsCampaign';
 import { formatCampaignAttentionBullet } from './requestOrdersInjection';
 
 /**
@@ -173,4 +173,10 @@ test('a sea objective prints the approach line and no staging or phase line', ()
   );
   assert.equal(text.includes('Staging hex'), false);
   assert.equal(text.includes('- Phase:'), false);
+});
+
+test('the target holder is the explored controller, the single home seat, or nobody', () => {
+  assert.equal(campaignTargetHolderSeatId(cityState(true, true), 't1'), 'a3');
+  assert.equal(campaignTargetHolderSeatId(cityState(false, false), 't1'), 'a3');
+  assert.equal(campaignTargetHolderSeatId(cityState(false, true), 't1'), null);
 });

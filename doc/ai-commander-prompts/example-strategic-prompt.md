@@ -199,14 +199,14 @@ A campaign lift is the campaign's own sea operation. It is listed with your oper
 
 ## Postures
 
-Your posture is what you put your effort into. The engine remembers it and leans production, operations, and the campaign the same way until you change it. Set it with "posture" in your reply. It holds for 6 turns before it can change. If you never set one you are on overland.
+Your posture is what you put your effort into. The engine remembers it and leans production, operations, and the campaign the same way until you change it. Name it with "posture" in every reply. It holds for 6 turns before it can change. Until you name one you are on overland by default.
 
 - overland: mass your ground units and march. Land options come first. Like the Soviet summer offensive of 1944: mass, then break through.
 - maritime: build ships to your full cap and lift up to half your ground units. Sea and air options come first. Like the Pacific island-hopping campaign: land where the enemy is weak and bypass where it is strong.
 - strangle: keep queuing a missile in a city that reaches an enemy city until you are at the missile cap, bank more credits, and strike city, airport, and seaport cells before units. Like the Combined Bomber Offensive and the Battle of the Atlantic: destroy what builds and moves the enemy's force.
 - blitz: assault with half the usual mass, run twice the air operations, and let the engine launch against a lightly held objective. Like the 1940 campaign in France: strike before the enemy has massed, and accept thin odds for speed.
 
-Which posture fits depends on how you can reach the enemy you mean to beat. Overland fits an enemy whose home your ground units can reach by land. Blitz fits one of those whose home is lightly held. Maritime fits an enemy you can reach only by sea: its full naval cap and larger lift share are what a campaign lift needs. Strangle fits an enemy you cannot reach, or one whose home holds more ground units than you could land. The Posture section lists each enemy and the postures that fit it.
+Which posture fits depends on how you can reach the enemy you mean to beat. Overland fits an enemy whose home a real force of your ground units can reach by land within 12 land steps, or one you can reach only by a longer march. Blitz fits one of those whose home is lightly held. Maritime fits an enemy you can reach only by sea: its full naval cap and larger lift share are what a campaign lift needs. Strangle fits an enemy you cannot reach, or one whose home holds more ground units than you could land. The Posture section lists each enemy and the postures that fit it. When your posture does not fit the side that holds your campaign target, Attention Flags says so.
 
 The historical names are illustrations of an idea. Decide from the map and the tables in front of you, not from how those campaigns went.
 
@@ -378,7 +378,7 @@ Optional "campaignTarget": the hex code of an enemy city for your ground campaig
 
 Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"`<letter>`"}. To launch against a city that is not listed, add {"action":"launch","objective":"`<hex code>`","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"`<operation id>`"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".
 
-Optional "posture": one of overland, maritime, strangle, blitz. Omit it to keep your posture. A posture holds for 6 turns before it can change; the Posture section of the briefing says when.
+Required "posture": one of overland, maritime, strangle, blitz. Send your current posture to keep it. A new posture holds for 6 turns before it can change; the Posture section of the briefing says when.
 
 Optional "agreementDecisions": for an agreement listed as active in the Messages section, add {"id":`<agreement id>`,"decision":"keep" or "break","reason":"`<one sentence>`"} to record whether you keep or break it this turn. Your next diplomacy step shows your decision. A decision does not change the agreement itself: to end it, change its status in your next diplomacy step. Omit the array to record nothing.
 
@@ -544,10 +544,10 @@ Units at featured hexes: NA(u), PZ(A), Q6(U), RE(a), SG(B), SK(B)
 
 ## Posture
 
-- Posture: overland, the default. You may set another at any time.
+- Posture: overland, the default. You have not declared one. Name one with "posture" in your reply.
 - Effect: Land options are listed first, and the engine launches only against undefended objectives.
 - Ships: 1 of your naval cap of 8. On maritime a campaign lift could carry up to 1 ground unit.
-- Fit, Eastern Africa: home reachable by land, 2 ground units at home. Fits: overland, or blitz while its home is this lightly held.
+- Fit, Eastern Africa: 6 of your ground units are 4 land steps from its home. Its home holds 2 ground units. Fits: overland, or blitz while its home is this lightly held.
 
 ## Active Operations
 

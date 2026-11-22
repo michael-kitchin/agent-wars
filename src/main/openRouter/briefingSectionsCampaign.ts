@@ -15,14 +15,14 @@ import { SECTION_TITLE_CAMPAIGN_OBJECTIVE, topLevelHeading } from './promptSpec/
 import { logTrace } from '../logger';
 
 /**
- * Home name of the side that holds the target, when that side is known.
+ * Seat that holds the target, when that side is known.
  *
- * Purpose: The target line must match the fog rule used to pick the city.
- * When to use: `buildCampaignObjectiveSection`.
- * Expected outcome: The controller's home when the hex is explored. The single enemy home that contains an unexplored hex. Null when the owner is not known.
+ * Purpose: The target line and the posture attention flag must agree with the fog rule used to pick the city.
+ * When to use: `buildCampaignObjectiveSection`, and the posture attention flag.
+ * Expected outcome: The controller's seat when the hex is explored (any seat, or null for none). The single active enemy seat whose home contains an unexplored hex. Null when the owner is not known.
  * Exceptions: None.
  */
-function targetOwnerName(state: GameStateSnapshot, targetH3: string): string | null {
+export function campaignTargetHolderSeatId(state: GameStateSnapshot, targetH3: string): string | null {
   const explored = new Set(state.exploredHexes ?? []);
   const activeEnemySeatIds = new Set<string>(
     (state.seats ?? [])
@@ -38,6 +38,20 @@ function targetOwnerName(state: GameStateSnapshot, targetH3: string): string | n
     );
     ownerSeatId = homes.length === 1 ? homes[0]! : null;
   }
+  logTrace('briefingSectionsCampaign campaignTargetHolderSeatId', { targetH3, ownerSeatId });
+  return ownerSeatId;
+}
+
+/**
+ * Home name of the side that holds the target, when that side is known.
+ *
+ * Purpose: The target line must match the fog rule used to pick the city.
+ * When to use: `buildCampaignObjectiveSection`.
+ * Expected outcome: The home region of `campaignTargetHolderSeatId`, or null when the owner or its home is not known.
+ * Exceptions: None.
+ */
+function targetOwnerName(state: GameStateSnapshot, targetH3: string): string | null {
+  const ownerSeatId = campaignTargetHolderSeatId(state, targetH3);
   const seat = (state.seats ?? []).find((row) => row.seatId === ownerSeatId);
   logTrace('briefingSectionsCampaign targetOwnerName', { targetH3, ownerSeatId, homeRegion: seat?.homeRegion ?? null });
   return seat?.homeRegion ?? null;

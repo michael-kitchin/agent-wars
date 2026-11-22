@@ -93,6 +93,8 @@ Each row is an AI commander, in side order. The human seat never has a row, beca
 | Default posture, never declared | A 2 px outline in `--posture-overland`, with no fill, whether or not its activity ran |
 | Not recorded, no report, or out of the match | A 1 px outline in `--chrome-muted`, as the stance strip draws "no report" |
 
+A posture is declared once the commander names one, `overland` included, so the outline means the commander has not named a posture yet.
+
 **Lead activity.** The activity that makes a posture's cell full, read when the turn's statistics are written (`postureActing` in `src/main/matchStatistics/postureReportsRead.ts`):
 
 - overland: the commander has a stored campaign objective in its assault phase with the land approach;

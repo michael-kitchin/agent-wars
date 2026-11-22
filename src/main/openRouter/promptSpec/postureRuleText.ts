@@ -9,6 +9,7 @@
 
 import { logTrace } from '../../logger';
 import { POSTURE_MIN_HOLD_TURNS } from '../../../shared/postureTypes';
+import { CAMPAIGN_MAX_LAND_STEPS } from '../campaignTargetSelection';
 import { SECTION_TITLE_POSTURE_RULES, subHeading } from './sectionHeadings';
 
 /**
@@ -20,7 +21,7 @@ import { SECTION_TITLE_POSTURE_RULES, subHeading } from './sectionHeadings';
  * Exceptions: None.
  */
 const POSTURE_FIT_PARAGRAPH =
-  'Which posture fits depends on how you can reach the enemy you mean to beat. Overland fits an enemy whose home your ground units can reach by land. Blitz fits one of those whose home is lightly held. Maritime fits an enemy you can reach only by sea: its full naval cap and larger lift share are what a campaign lift needs. Strangle fits an enemy you cannot reach, or one whose home holds more ground units than you could land. The Posture section lists each enemy and the postures that fit it.';
+  `Which posture fits depends on how you can reach the enemy you mean to beat. Overland fits an enemy whose home a real force of your ground units can reach by land within ${CAMPAIGN_MAX_LAND_STEPS} land steps, or one you can reach only by a longer march. Blitz fits one of those whose home is lightly held. Maritime fits an enemy you can reach only by sea: its full naval cap and larger lift share are what a campaign lift needs. Strangle fits an enemy you cannot reach, or one whose home holds more ground units than you could land. The Posture section lists each enemy and the postures that fit it. When your posture does not fit the side that holds your campaign target, Attention Flags says so.`;
 
 /**
  * The Postures block of the system prompt.
@@ -46,7 +47,7 @@ export function buildPostureRuleBlock(campaignEnabled: boolean): string {
     : '';
   return `${subHeading(SECTION_TITLE_POSTURE_RULES)}
 
-Your posture is what you put your effort into. The engine remembers it and ${effort} until you change it. Set it with "posture" in your reply. It holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change. If you never set one you are on overland.
+Your posture is what you put your effort into. The engine remembers it and ${effort} until you change it. Name it with "posture" in every reply. It holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change. Until you name one you are on overland by default.
 
 ${overland}
 - maritime: build ships to your full cap and lift up to half your ground units. Sea and air options come first. Like the Pacific island-hopping campaign: land where the enemy is weak and bypass where it is strong.

@@ -758,13 +758,13 @@ function testPostureParagraphFollowsTheGate(): void {
     productionSubmitClause: '',
   };
   const enabled = buildFinalJsonContractInstruction({ ...shared, includePosture: true });
-  assert.ok(enabled.includes('Optional "posture": one of overland, maritime, strangle, blitz.'));
-  assert.ok(enabled.includes('A posture holds for 6 turns'));
-  assert.ok(enabled.includes('"posture": "<optional posture>"'));
+  assert.ok(enabled.includes('Required "posture": one of overland, maritime, strangle, blitz.'));
+  assert.ok(enabled.includes('A new posture holds for 6 turns'));
+  assert.ok(enabled.includes('"posture": "<posture>"'));
   const disabled = buildFinalJsonContractInstruction(shared);
-  assert.ok(!disabled.includes('Optional "posture"'));
+  assert.ok(!disabled.includes('Required "posture"'));
   const tactical = buildFinalJsonContractInstruction({ ...shared, includePosture: true, coordinateMode: 'tactical' });
-  assert.ok(!tactical.includes('Optional "posture"'));
+  assert.ok(!tactical.includes('Required "posture"'));
 }
 
 /**

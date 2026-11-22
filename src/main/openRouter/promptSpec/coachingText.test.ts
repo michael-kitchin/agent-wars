@@ -394,6 +394,9 @@ test('posture rules follow the operation rules only when the gate is on', () => 
   assert.ok(buildPostureRuleBlock(true).includes('half your ground units'));
   assert.ok(buildPostureRuleBlock(true).includes('twice the air operations'));
   assert.ok(buildPostureRuleBlock(true).includes('half the usual mass'));
+  assert.ok(buildPostureRuleBlock(true).includes('Name it with "posture" in every reply.'));
+  assert.ok(buildPostureRuleBlock(true).includes('within 12 land steps'));
+  assert.ok(buildPostureRuleBlock(true).includes('Attention Flags says so.'));
   const globalPosture = buildPostureRuleBlock(false);
   assert.equal(globalPosture.includes('half the usual mass'), false);
   assert.equal(globalPosture.includes('Land options come first'), false);

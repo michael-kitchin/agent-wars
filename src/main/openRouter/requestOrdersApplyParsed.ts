@@ -312,6 +312,12 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       turnNumber: planState.turnNumber,
     });
     dropReasons.push(...postureResult.dropReasons);
+  } else if (
+    !tacticalBattle &&
+    ordersEnabled &&
+    !dropReasons.some((reason) => reason.startsWith('posture dropped:'))
+  ) {
+    logDebug('requestOrdersApplyParsed posture omitted', { seatId, turnNumber: planState.turnNumber });
   }
   if (!tacticalBattle && ordersEnabled) {
     writeOperationRefusal({ getOne: dbGetOne, run: dbRun }, seatId, planState.turnNumber, dropReasons);

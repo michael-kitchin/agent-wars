@@ -8,6 +8,7 @@ import { buildOrdersEnvelopeResponseFormat } from './envelopeJsonSchema';
 import { buildRepairSchemaText, envelopeFieldsForGates, type EnvelopeGates } from './envelopeContract';
 import { getFinalJsonOrdersExampleBlock } from '../promptContracts';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
+import { POSTURES } from '../../../shared/postureTypes';
 
 /**
  * Strategic gates with every optional envelope field enabled.
@@ -605,25 +606,26 @@ function testOperationsSchemaFollowsTheGate(): void {
 }
 
 /**
- * Verifies `posture` is an optional string only when the strategic gate is on.
+ * Verifies `posture` is a required enum only when the strategic gate is on.
  *
- * Purpose: A bad name must reach the parser as a drop reason, so the schema must not reject it.
+ * Purpose: A model that follows the schema always names a posture from the list.
  * When to use: After the envelope field list changes.
- * Expected outcome: The property is a string, not required, and has no enum. It is absent when the gate is off or the mode is tactical.
+ * Expected outcome: The property is an enum of `POSTURES` and is required. It is absent, and not required, when the gate is off or the mode is tactical.
  * Exceptions: None.
  */
 function testPostureSchemaFollowsTheGate(): void {
   const onSchema = envelopeSchema({ ...STRATEGIC_ALL_ON, includeOperations: true, includePosture: true });
   const on = asRecord(onSchema.properties, 'properties');
   const posture = asRecord(on.posture, 'posture');
-  assert.equal(posture.type, 'string');
-  assert.ok(!('enum' in posture));
-  assert.ok(!(onSchema.required as string[]).includes('posture'));
+  assert.deepEqual(posture.enum, [...POSTURES]);
+  assert.ok((onSchema.required as string[]).includes('posture'));
   assert.equal(Object.keys(on)[Object.keys(on).length - 1], 'posture');
   const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
   assert.ok(!('posture' in off));
   const tactical = asRecord(envelopeSchema({ ...TACTICAL, includePosture: true }).properties, 'properties');
   assert.ok(!('posture' in tactical));
+  const tacticalSchema = envelopeSchema({ ...TACTICAL, includePosture: true });
+  assert.ok(!(tacticalSchema.required as string[]).includes('posture'));
 }
 
 /**

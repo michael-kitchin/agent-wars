@@ -5,12 +5,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildPostureSection } from './briefingSectionsPosture';
+import { buildPostureSection, postureHoldUntilTurn } from './briefingSectionsPosture';
 
 test('a seat with no posture is told it is on the default', () => {
   const text = buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true });
   assert.ok(text.startsWith('# Posture\n\n'));
-  assert.ok(text.includes('- Posture: overland, the default. You may set another at any time.'));
+  assert.ok(text.includes('- Posture: overland, the default. You have not declared one. Name one with "posture" in your reply.'));
   assert.ok(text.includes('- Effect: Land options are listed first, and the engine launches only against undefended objectives.'));
 });
 
@@ -29,10 +29,17 @@ test('the blitz effect line uses the present assault constants', () => {
 });
 
 test('fit lines follow the effect line, and none leaves the section as it was', () => {
-  const fitLines = ['- Ships: 2 of your naval cap of 8. On maritime a campaign lift could carry up to 4 ground units.', '- Fit, Western Europe: home not reachable by land or sea. Fits: strangle.'];
+  const fitLines = ['- Ships: 2 of your naval cap of 8. On maritime a campaign lift could carry up to 4 ground units.', '- Fit, Western Europe: it cannot be reached by land or sea. Its home holds 0 ground units. Fits: strangle.'];
   const text = buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true, fitLines });
   const lines = text.split('\n');
   const effect = lines.findIndex((line) => line.startsWith('- Effect:'));
   assert.deepEqual(lines.slice(effect + 1), fitLines);
   assert.equal(buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true }), buildPostureSection({ stored: null, turnNumber: 4, campaignEnabled: true, fitLines: [] }));
+});
+
+test('the hold turn is named only while a stored posture still holds', () => {
+  assert.equal(postureHoldUntilTurn(null, 4), null);
+  assert.equal(postureHoldUntilTurn({ posture: 'overland', sinceTurn: 10 }, 12), 16);
+  assert.equal(postureHoldUntilTurn({ posture: 'overland', sinceTurn: 10 }, 15), 16);
+  assert.equal(postureHoldUntilTurn({ posture: 'overland', sinceTurn: 10 }, 16), null);
 });

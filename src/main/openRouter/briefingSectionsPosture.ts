@@ -84,7 +84,7 @@ export function buildPostureSection(args: {
 }): string {
   const posture = args.stored?.posture ?? DEFAULT_POSTURE;
   const status = args.stored === null
-    ? `- Posture: ${DEFAULT_POSTURE}, the default. You may set another at any time.`
+    ? `- Posture: ${DEFAULT_POSTURE}, the default. You have not declared one. Name one with "posture" in your reply.`
     : postureStatus(args.stored, args.turnNumber);
   logTrace('briefingSectionsPosture buildPostureSection', {
     posture,
@@ -97,6 +97,20 @@ export function buildPostureSection(args: {
 }
 
 /**
+ * The turn a stored posture's hold ends, while it still holds.
+ *
+ * Purpose: The Posture section and the posture attention flag name the same turn.
+ * When to use: Whenever a briefing line says until when a posture holds.
+ * Expected outcome: `sinceTurn + POSTURE_MIN_HOLD_TURNS` when a row is stored and that turn is later than `turnNumber`. Otherwise null.
+ * Exceptions: None.
+ */
+export function postureHoldUntilTurn(stored: StoredPosture | null, turnNumber: number): number | null {
+  if (stored === null) return null;
+  const nextTurn = stored.sinceTurn + POSTURE_MIN_HOLD_TURNS;
+  return nextTurn > turnNumber ? nextTurn : null;
+}
+
+/**
  * The posture line for a stored row.
  *
  * Purpose: The second sentence depends on whether the hold has elapsed.
@@ -105,7 +119,7 @@ export function buildPostureSection(args: {
  * Exceptions: None.
  */
 function postureStatus(stored: StoredPosture, turnNumber: number): string {
-  const nextTurn = stored.sinceTurn + POSTURE_MIN_HOLD_TURNS;
-  const when = nextTurn > turnNumber ? `You may change it from turn ${nextTurn}.` : 'You may change it now.';
+  const nextTurn = postureHoldUntilTurn(stored, turnNumber);
+  const when = nextTurn !== null ? `You may change it from turn ${nextTurn}.` : 'You may change it now.';
   return `- Posture: ${stored.posture}, set on turn ${stored.sinceTurn}. ${when}`;
 }

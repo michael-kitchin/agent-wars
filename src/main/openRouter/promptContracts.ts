@@ -139,7 +139,7 @@ export function buildFinalJsonContractInstruction(args: {
    */
   includeOperations?: boolean;
   /**
-   * When true, the contract names optional `posture` after `operations`.
+   * When true, the contract names required `posture` after `operations`.
    *
    * Contract: Omitted means false. True on the same consults that include operations.
    * When to use: Pass from `buildConsultPromptParts` beside `includeOperations`.
@@ -239,7 +239,7 @@ export function buildFinalJsonContractInstruction(args: {
     productionOrders: '"productionOrders": [...]',
     campaignTarget: '"campaignTarget": "<optional hex code>"',
     operations: '"operations": [...]',
-    posture: '"posture": "<optional posture>"',
+    posture: '"posture": "<posture>"',
     agreementDecisions: '"agreementDecisions": [...]',
   };
   const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
@@ -285,7 +285,7 @@ export function buildFinalJsonContractInstruction(args: {
       : '';
   const postureParagraph =
     gates.includePosture === true
-      ? `Optional "posture": one of ${POSTURES.join(', ')}. Omit it to keep your posture. A posture holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change; the Posture section of the briefing says when.`
+      ? `Required "posture": one of ${POSTURES.join(', ')}. Send your current posture to keep it. A new posture holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change; the Posture section of the briefing says when.`
       : '';
   const agreementDecisionsParagraph = gates.includeAgreementDecisions === true ? SIDE_AGREEMENT_DECISIONS_PARAGRAPH : '';
   const paragraphs = [

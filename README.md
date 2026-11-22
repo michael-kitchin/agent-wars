@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v3.4.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v3.4.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v3.4.1.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v3.4.1.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -144,7 +144,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, air drops, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, an import-cycle check (`npm run check:circular`), the main-process and tool tests (2696 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, an import-cycle check (`npm run check:circular`), the main-process and tool tests (2705 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -290,7 +290,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ## Status
 
-- **Version:** 3.4.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 3.4.1, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -298,8 +298,9 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ### Releases After 2.5.0
 
-Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
+Release summaries, newest first. Only the newest build of each major version stays on the Releases page. Every other version is kept here and in `doc/release-notes/`. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **3.4.1** makes every commander name a posture each turn and records it, including overland. Posture advice now measures whether a real force can march on an enemy's home, and Attention Flags point out a posture that doesn't fit the campaign's target.
 - **3.4.0** lets a campaign cross the sea: the engine sails ground units that cannot march to the campaign in campaign lifts, lift by lift. A sea operation now waits for the ships its troops need before it sails. The Posture section tells each commander which postures fit each enemy. The world map starts with weather icons off, and the charts gain a Posture strip.
 - **3.3.0** knocks a side out when other sides and Neutral hold 90% of its home's original city cells, on every map. It shows each commander how close every side is to being knocked out, and lists the city hexes of a side with five or fewer. It makes campaigns favor finishing nearly beaten sides, except a commander's pact partners.
 - **3.2.1** makes small fixes to replay and the charts. The replay panel gains Rewind and Fast forward buttons, a grip in its upper-right corner to move it, and a place above the charts. Dragging the slider closes the open dialogs, and the charts follow the replay turn. An agreement's hover line now reads "intent: keep" and the like.

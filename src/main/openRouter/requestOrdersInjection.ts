@@ -11,6 +11,7 @@
 import { dbGetOne, type GameStateSnapshot } from '../gameDb';
 import { operationNoteTextForTurn, readOperationNote, readOperations } from '../gameDb/operationMemory';
 import { readPosture } from '../gameDb/postureMemory';
+import { DEFAULT_POSTURE } from '../../shared/postureTypes';
 import { logDebug, logTrace } from '../logger';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -18,10 +19,10 @@ import type { AiSeatId } from '../../shared/seatIds';
 import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefing } from './briefingSections';
-import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
+import { buildCampaignObjectiveSection, campaignTargetHolderSeatId } from './briefingSectionsCampaign';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
-import { buildPostureSection } from './briefingSectionsPosture';
-import { buildPostureFitLines } from './postureFit';
+import { buildPostureSection, postureHoldUntilTurn } from './briefingSectionsPosture';
+import { buildPostureFitReport, postureAttentionBullet, postureFitLinesFrom } from './postureFit';
 import { operationCandidatesForSeat } from '../operations/operationCandidates';
 import { operationForceIds } from '../operations/operationForce';
 import type { OperationCandidate } from '../../shared/operationTypes';
@@ -326,14 +327,23 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         campaignPlan,
       })
     : '';
+  const postureFitReport = showOperations ? buildPostureFitReport(args.state) : null;
+  const storedPosture = showOperations ? readPosture({ getOne: dbGetOne }, seatId) : null;
   const postureText = showOperations
     ? buildPostureSection({
-        stored: readPosture({ getOne: dbGetOne }, seatId),
+        stored: storedPosture,
         turnNumber: args.state.turnNumber,
         campaignEnabled: args.state.scenarioId === 'region_vs_region',
-        fitLines: buildPostureFitLines(args.state),
+        fitLines: postureFitLinesFrom(postureFitReport),
       })
     : '';
+  const postureAttention = postureAttentionBullet({
+    report: postureFitReport,
+    targetHolderSeatId: campaignPlan ? campaignTargetHolderSeatId(args.state, campaignPlan.objective.targetH3) : null,
+    current: storedPosture?.posture ?? DEFAULT_POSTURE,
+    declared: storedPosture !== null,
+    holdUntilTurn: postureHoldUntilTurn(storedPosture, args.state.turnNumber),
+  });
   const operationsText = postureText.length === 0
     ? operationsBody
     : operationsBody.length === 0
@@ -375,6 +385,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
       args.coordinateContext.mode === 'tactical'
         ? []
         : [
+            postureAttention,
             formatMissileLaunchAttention(args.state, formatCampaignHex),
             args.productionEnabled
               ? formatMercenaryRaiseAttention({
