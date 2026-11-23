@@ -13,7 +13,7 @@ import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID, type OwnerId } from '../../shared/seatIds';
 import { sortSeatsByOrder } from '../../shared/seatRoster';
 import { getSeatRoster } from '../gameDb';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 
 /**
  * Movement, fire, ferry, and embark orders for one non-human owner.
@@ -165,6 +165,34 @@ export function keepOrdersOfOwnedUnits(
     missileLaunchOrders: keep(orders.missileLaunchOrders, 'missile'),
     airDropOrders: keep(orders.airDropOrders ?? [], 'drop'),
   };
+}
+
+/**
+ * Keeps only the rows whose units are in an owned-unit set.
+ *
+ * Purpose: A seat can fire a unit after it planned, and an order for a unit it gave up must not run. Unlike `keepOrdersOfOwnedUnits`, this works from one owner's id set and does not log a missing unit as an error.
+ * When to use: At Ready, per commander, after all of that seat's orders are merged.
+ * Expected outcome: A new order set. An embark row also needs its ship owned. An absent `airDropOrders` stays absent. The input is not changed.
+ * Exceptions: None.
+ */
+export function keepOrdersForOwnedUnits(orders: OwnerTurnOrders, ownedUnitIds: ReadonlySet<string>): OwnerTurnOrders {
+  let dropped = 0;
+  const keep = <T extends { readonly unitId: string }>(list: readonly T[], extra?: (row: T) => boolean): T[] => {
+    const kept = list.filter((row) => ownedUnitIds.has(row.unitId) && (extra?.(row) ?? true));
+    dropped += list.length - kept.length;
+    return kept;
+  };
+  const kept: OwnerTurnOrders = {
+    movementOrders: keep(orders.movementOrders),
+    rangedOrders: keep(orders.rangedOrders),
+    airStrikeOrders: keep(orders.airStrikeOrders),
+    ferryOrders: keep(orders.ferryOrders),
+    embarkOrders: keep(orders.embarkOrders, (row) => ownedUnitIds.has(row.navalUnitId)),
+    missileLaunchOrders: keep(orders.missileLaunchOrders),
+    ...(orders.airDropOrders ? { airDropOrders: keep(orders.airDropOrders) } : {}),
+  };
+  logTrace('keepOrdersForOwnedUnits', { dropped });
+  return kept;
 }
 
 /**

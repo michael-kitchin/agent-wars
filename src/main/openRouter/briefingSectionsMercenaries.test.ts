@@ -267,11 +267,11 @@ function homeCreditsCity(seat: SeatId): { readonly city: string; readonly urban:
  *
  * Purpose: The forecast counts a city once its queue totals say credits come next.
  * When to use: Cases that need credits income.
- * Expected outcome: One row for the given hex.
+ * Expected outcome: One row for the given hex, with `items` items left.
  * Exceptions: None.
  */
-function creditsQueue(city: string): GameStateSnapshot['strategicBuildQueueTotals'] {
-  return [{ h3Index: city, queuedUnits: 1, nextUnitType: 'credits', nextRemainingCount: 1, storedPoints: 0 }];
+function creditsQueue(city: string, items = 1): GameStateSnapshot['strategicBuildQueueTotals'] {
+  return [{ h3Index: city, queuedUnits: 1, nextUnitType: 'credits', nextRemainingCount: items, storedPoints: 0 }];
 }
 
 test('the treasury line forecasts upkeep from the credits queues', () => {
@@ -285,16 +285,16 @@ test('the treasury line forecasts upkeep from the credits queues', () => {
     const fundsLineOf = (block: string): string => block.split('\n').find((line) => line.startsWith('Treasury: 40 credits.')) ?? '';
 
     const dry = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: [] }, (hex) => hex, 'strategic', { productionEnabled: true });
-    assert.ok(dry.includes(`With no city producing credits, the treasury covers upkeep for ${Math.floor(40 / upkeep)} more turns.`), dry);
+    assert.ok(dry.includes(`No credits are queued, so the treasury covers upkeep for ${Math.floor(40 / upkeep)} more turns.`), dry);
     assert.ok(dry.includes(`${fundsLineOf(dry)}\n\n`));
     assert.equal(dry.includes('\n\n\n'), false);
 
     const expectedIncome = Math.floor((urban * CREDITS_PER_ITEM) / creditsItemCost());
     assert.ok(expectedIncome >= upkeep, 'fixture needs a home city that pays the upkeep');
-    const paid = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: creditsQueue(city) }, (hex) => hex, 'strategic', {
+    const paid = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: creditsQueue(city, 99) }, (hex) => hex, 'strategic', {
       productionEnabled: true,
     });
-    assert.ok(paid.includes(`\n\nAt about ${expectedIncome} credits a turn from your credits queues, upkeep is covered.\n\n`), paid);
+    assert.ok(paid.includes(`\n\nYour credits queues hold ${99 * CREDITS_PER_ITEM} more credits. With them, the treasury covers upkeep for `), paid);
     assert.ok(paid.includes(`${fundsLineOf(paid)}\n\n`));
     assert.equal(paid.includes('\n\n\n'), false);
   });
@@ -307,17 +307,18 @@ test('the funds warning is its own paragraph and follows the forecast', () => {
     setTreasuryCredits(seat, 0);
     const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
     const dryState = { ...state, strategicBuildQueueTotals: [] };
-    const forecast = "With no city producing credits, the treasury cannot cover this turn's upkeep.";
+    const forecast = "No credits are queued, and the treasury cannot cover this turn's upkeep.";
     const warning = 'Warning: unless more credits come in this turn, random mercenaries desert to Neutral at the end of it.';
-    const action = 'Queue credits in more cities, and do not raise or rehire mercenaries this turn.';
+    const action = 'Queue more credits, and do not raise or rehire mercenaries this turn. Firing a mercenary you can spare also stops its upkeep.';
     const on = buildMercenariesBriefingBlock(dryState, (hex) => hex, 'strategic', { productionEnabled: true });
     assert.ok(on.includes(`${forecast}\n\n${warning} ${action}\n\n## Your Mercenaries`), on);
 
     const off = buildMercenariesBriefingBlock(dryState, (hex) => hex, 'strategic', { productionEnabled: false });
     assert.ok(off.includes(`\n\n${warning}\n\n## Your Mercenaries`), off);
-    assert.equal(off.includes('Queue credits in more cities'), false);
+    assert.equal(off.includes('Queue more credits'), false);
 
-    const covered = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: creditsQueue(city) }, (hex) => hex, 'strategic', {
+    const banked = (creditsQueue(city) ?? []).map((row) => ({ ...row, storedPoints: creditsItemCost() }));
+    const covered = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: banked }, (hex) => hex, 'strategic', {
       productionEnabled: true,
     });
     assert.equal(covered.includes('Warning:'), false);

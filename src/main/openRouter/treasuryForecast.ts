@@ -1,10 +1,10 @@
 /**
  * How long a seat's treasury pays its mercenary upkeep, and the prompt text built from that.
  *
- * Purpose: A commander sees the runway before mercenaries desert, and sees an idle treasury while its forces sit far below their caps.
+ * Purpose: A commander sees the runway before mercenaries desert, and sees an idle treasury while its forces sit far below their caps. The forecast steps through each credits queue's remaining items and banked points.
  * When to use: The Mercenaries briefing section and the strategic Attention Flags.
  * Expected outcome: One forecast per seat per briefing, from `buildTreasuryForecast`. The sentence and both bullets are built from it.
- * Exceptions: The forecast is an estimate. It ignores hire orders that have not filled, Keep building on an empty queue, and a credits entry that runs out of count.
+ * Exceptions: The forecast is an estimate. It ignores hire orders that have not filled, Keep building on an empty queue, and credits produced by anything but the queues' remaining items.
  */
 
 import { CREDITS_PER_ITEM, CREDITS_QUEUE_ITEM } from '../../shared/creditsRules';
@@ -68,6 +68,63 @@ export const TREASURY_HOARD_BUILT_CAP_SHARE = 0.5;
 export const TREASURY_HOARD_UNIT_TYPES: readonly BuildUnitType[] = ['infantry', 'armor', 'naval', 'air'];
 
 /**
+ * Turns the forecast steps through before it reports a queue that still pays.
+ *
+ * Purpose: A credits queue with a large count can outlast any planning horizon, so the projection stops and reports null.
+ * When to use: `buildTreasuryForecast`.
+ * Expected outcome: One hundred.
+ * Exceptions: None.
+ */
+export const TREASURY_FORECAST_HORIZON_TURNS = 100;
+
+/**
+ * One credits queue the forecast steps through.
+ *
+ * Purpose: A queue buys items until its count runs out, so the forecast needs each queue's items and banked points.
+ * When to use: The rows `creditsQueueRowsForSeat` returns and `projectCreditsQueues` reads.
+ * Expected outcome: Plain numbers taken from the snapshot at one moment.
+ * Exceptions: None.
+ */
+export interface CreditsQueueRow {
+  /**
+   * The city hex that owns the queue.
+   *
+   * Contract: A hex the seat controls.
+   * When to use: Logs and tests.
+   * Expected outcome: An H3 index.
+   * Exceptions: None.
+   */
+  readonly h3Index: string;
+  /**
+   * Credits items the queue still buys.
+   *
+   * Contract: `nextRemainingCount`, at least 1.
+   * When to use: The projection's item cap.
+   * Expected outcome: A positive whole number.
+   * Exceptions: None.
+   */
+  readonly remainingItems: number;
+  /**
+   * Production points banked toward the next item.
+   *
+   * Contract: `storedPoints`, at least 0.
+   * When to use: The projection's starting points.
+   * Expected outcome: A whole number of zero or more.
+   * Exceptions: None.
+   */
+  readonly storedPoints: number;
+  /**
+   * Points the city adds each turn.
+   *
+   * Contract: Urban cells. Zero on a neutral border.
+   * When to use: The projection's per-turn gain.
+   * Expected outcome: A whole number of zero or more.
+   * Exceptions: None.
+   */
+  readonly pointsPerTurn: number;
+}
+
+/**
  * One seat's treasury runway.
  *
  * Purpose: The Mercenaries section and the attention bullets read the same numbers.
@@ -95,18 +152,18 @@ export interface TreasuryForecast {
    */
   readonly upkeepPerTurn: number;
   /**
-   * Estimated credits the seat's credits queues add each turn.
+   * Credits the seat's credits queues can still add.
    *
-   * Contract: The value from `estimateCreditsIncomePerTurn`.
+   * Contract: Remaining items times `CREDITS_PER_ITEM`, summed over the queue rows.
    * When to use: The bullets and the sentence.
-   * Expected outcome: A whole number, zero when no city produces credits.
+   * Expected outcome: A whole number, zero when no queue is left.
    * Exceptions: None.
    */
-  readonly incomePerTurn: number;
+  readonly queuedCredits: number;
   /**
-   * Payrolls the treasury and income cover, starting with this turn's.
+   * Payrolls the treasury and the queues cover, starting with this turn's.
    *
-   * Contract: The value from `treasuryCoverTurns`. Null means income covers upkeep.
+   * Contract: The value from `projectCreditsQueues`. Null means upkeep is covered through the horizon.
    * When to use: Deciding which sentence and bullets apply.
    * Expected outcome: Null, or a whole number of zero or more.
    * Exceptions: None.
@@ -115,48 +172,78 @@ export interface TreasuryForecast {
 }
 
 /**
- * Payrolls that credits and income cover.
+ * The seat's credits queues, one row each.
  *
- * Purpose: The one place cover turns are computed. Credits produced in a turn arrive before that turn's upkeep is paid.
+ * Purpose: Lists the cities that are controlled, unpaused, outside occupation pauses, and queued on credits next.
  * When to use: Building a forecast.
- * Expected outcome: Null when income covers upkeep. Otherwise the whole number of payrolls, zero when credits plus income fall short of this turn's upkeep.
+ * Expected outcome: Rows with a positive remaining count. Empty when the snapshot carries no queue totals.
  * Exceptions: None.
  */
-export function treasuryCoverTurns(args: {
+export function creditsQueueRowsForSeat(state: GameStateSnapshot, seatId: string): readonly CreditsQueueRow[] {
+  const controlled = new Set((state.strategicControl ?? []).filter((row) => row.controllerPlayerId === seatId).map((row) => row.h3Index));
+  const paused = listOccupationPausedHexes(state, seatId);
+  const urbanByHex = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row.urbanHexCount]));
+  const rows: CreditsQueueRow[] = [];
+  for (const row of state.strategicBuildQueueTotals ?? []) {
+    if (!controlled.has(row.h3Index) || row.nextUnitType !== CREDITS_QUEUE_ITEM) continue;
+    if (row.buildPaused === true || paused.has(row.h3Index)) continue;
+    const remainingItems = Math.trunc(row.nextRemainingCount ?? 0);
+    if (remainingItems < 1) continue;
+    rows.push({
+      h3Index: row.h3Index,
+      remainingItems,
+      storedPoints: Math.max(0, Math.trunc(row.storedPoints)),
+      pointsPerTurn: isNeutralBorderHex(row.h3Index) ? 0 : Math.max(0, Math.trunc(urbanByHex.get(row.h3Index) ?? 0)),
+    });
+  }
+  logTrace('treasuryForecast creditsQueueRowsForSeat', { seatId, rowCount: rows.length });
+  return rows;
+}
+
+/**
+ * Steps the treasury through the credits queues, turn by turn.
+ *
+ * Purpose: Each turn the queues add their urban cells to banked points, buy whole items, and credit the treasury, then upkeep is paid.
+ * When to use: Building a forecast.
+ * Expected outcome: A queue that earns no points each turn counts only the items its banked points already pay for, so a neutral-border queue never inflates the total or keeps the projection running. `coverTurns` is the number of payrolls paid before the treasury falls short. After every queue is empty it adds the payrolls the remaining treasury covers. Null when upkeep is 0 or the horizon is reached while still paying. `queuedCredits` is the credits the queues can still add.
+ * Exceptions: None.
+ */
+export function projectCreditsQueues(args: {
   /** Contract: Credits now. Negative values count as zero. */
   readonly credits: number;
   /** Contract: Upkeep due each turn. */
   readonly upkeepPerTurn: number;
-  /** Contract: Estimated credits income each turn. */
-  readonly incomePerTurn: number;
-}): number | null {
-  const drain = args.upkeepPerTurn - args.incomePerTurn;
-  const turns = drain <= 0 ? null : Math.floor(Math.max(0, args.credits) / drain);
-  logTrace('treasuryForecast treasuryCoverTurns', { ...args, drain, turns });
-  return turns;
-}
-
-/**
- * Estimated credits a seat's credits queues add each turn.
- *
- * Purpose: Counts the urban cells of cities that are controlled, unpaused, outside neutral borders, and queued on credits next.
- * When to use: Building a forecast.
- * Expected outcome: A whole number of credits. Zero when the snapshot carries no queue totals.
- * Exceptions: None.
- */
-export function estimateCreditsIncomePerTurn(state: GameStateSnapshot, seatId: string): number {
-  const controlled = new Set((state.strategicControl ?? []).filter((row) => row.controllerPlayerId === seatId).map((row) => row.h3Index));
-  const paused = listOccupationPausedHexes(state, seatId);
-  const urbanByHex = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row.urbanHexCount]));
-  let points = 0;
-  for (const row of state.strategicBuildQueueTotals ?? []) {
-    if (!controlled.has(row.h3Index) || row.nextUnitType !== CREDITS_QUEUE_ITEM) continue;
-    if (row.buildPaused === true || paused.has(row.h3Index) || isNeutralBorderHex(row.h3Index)) continue;
-    points += Math.max(0, Math.trunc(urbanByHex.get(row.h3Index) ?? 0));
+  /** Contract: The seat's credits queues. */
+  readonly rows: readonly CreditsQueueRow[];
+  /** Contract: Production points one item costs. */
+  readonly itemCost: number;
+  /** Contract: Credits one item adds. */
+  readonly creditsPerItem: number;
+  /** Contract: Turns to step through. */
+  readonly horizonTurns: number;
+}): { readonly coverTurns: number | null; readonly queuedCredits: number } {
+  const { upkeepPerTurn, itemCost, creditsPerItem } = args;
+  const live = args.rows.map((row) => ({
+    points: row.storedPoints,
+    left: row.pointsPerTurn > 0 ? row.remainingItems : Math.min(row.remainingItems, Math.floor(row.storedPoints / itemCost)),
+    perTurn: row.pointsPerTurn,
+  }));
+  const queuedCredits = live.reduce((sum, row) => sum + row.left * creditsPerItem, 0);
+  if (upkeepPerTurn <= 0) return { coverTurns: null, queuedCredits };
+  let treasury = Math.max(0, args.credits);
+  for (let turn = 1; turn <= args.horizonTurns; turn += 1) {
+    for (const row of live) {
+      row.points += row.perTurn;
+      const bought = Math.min(row.left, Math.floor(row.points / itemCost));
+      row.points -= bought * itemCost;
+      row.left -= bought;
+      treasury += bought * creditsPerItem;
+    }
+    if (treasury < upkeepPerTurn) return { coverTurns: turn - 1, queuedCredits };
+    treasury -= upkeepPerTurn;
+    if (live.every((row) => row.left === 0)) return { coverTurns: turn + Math.floor(treasury / upkeepPerTurn), queuedCredits };
   }
-  const income = Math.floor((points * CREDITS_PER_ITEM) / creditsItemCost());
-  logTrace('treasuryForecast estimateCreditsIncomePerTurn', { seatId, points, income });
-  return income;
+  return { coverTurns: null, queuedCredits };
 }
 
 /**
@@ -170,10 +257,16 @@ export function estimateCreditsIncomePerTurn(state: GameStateSnapshot, seatId: s
 export function buildTreasuryForecast(state: GameStateSnapshot, seatId: string): TreasuryForecast | null {
   const economy = state.mercenaryEconomy;
   if (!economy) return null;
-  const incomePerTurn = estimateCreditsIncomePerTurn(state, seatId);
-  const coverTurns = treasuryCoverTurns({ credits: economy.credits, upkeepPerTurn: economy.upkeepPerTurn, incomePerTurn });
-  logTrace('treasuryForecast buildTreasuryForecast', { seatId, credits: economy.credits, upkeepPerTurn: economy.upkeepPerTurn, incomePerTurn, coverTurns });
-  return { credits: economy.credits, upkeepPerTurn: economy.upkeepPerTurn, incomePerTurn, coverTurns };
+  const projection = projectCreditsQueues({
+    credits: economy.credits,
+    upkeepPerTurn: economy.upkeepPerTurn,
+    rows: creditsQueueRowsForSeat(state, seatId),
+    itemCost: creditsItemCost(),
+    creditsPerItem: CREDITS_PER_ITEM,
+    horizonTurns: TREASURY_FORECAST_HORIZON_TURNS,
+  });
+  logTrace('treasuryForecast buildTreasuryForecast', { seatId, credits: economy.credits, upkeepPerTurn: economy.upkeepPerTurn, ...projection });
+  return { credits: economy.credits, upkeepPerTurn: economy.upkeepPerTurn, ...projection };
 }
 
 /**
@@ -191,18 +284,23 @@ function moreTurnsText(turns: number): string {
 /**
  * The forecast sentence for the Mercenaries section.
  *
- * Purpose: Tells the commander how many turns the treasury and credits queues pay upkeep.
- * When to use: Right after the treasury line when upkeep is above 0.
- * Expected outcome: One sentence, or an empty string when upkeep is 0.
+ * Purpose: Tells the commander what the credits queues still hold and how many turns the treasury pays upkeep.
+ * When to use: Right after the treasury line.
+ * Expected outcome: One sentence, or an empty string when upkeep and queued credits are both 0.
  * Exceptions: None.
  */
 export function formatTreasuryForecastSentence(forecast: TreasuryForecast): string {
   logTrace('treasuryForecast formatTreasuryForecastSentence', { ...forecast });
-  if (forecast.upkeepPerTurn === 0) return '';
-  const lead = forecast.incomePerTurn > 0 ? `At about ${forecast.incomePerTurn} credits a turn from your credits queues, ` : 'With no city producing credits, ';
-  if (forecast.coverTurns === null) return `${lead}upkeep is covered.`;
-  if (forecast.coverTurns === 0) return `${lead}the treasury cannot cover this turn's upkeep.`;
-  return `${lead}the treasury covers upkeep for ${moreTurnsText(forecast.coverTurns)}.`;
+  const { queuedCredits: q, upkeepPerTurn: u, coverTurns: n } = forecast;
+  if (u === 0) return q === 0 ? '' : `Your credits queues hold ${q} more credits.`;
+  if (q === 0) {
+    return n !== null && n >= 1
+      ? `No credits are queued, so the treasury covers upkeep for ${moreTurnsText(n)}.`
+      : "No credits are queued, and the treasury cannot cover this turn's upkeep.";
+  }
+  if (n === null) return `Your credits queues hold ${q} more credits. With them, the treasury covers upkeep for at least ${TREASURY_FORECAST_HORIZON_TURNS} more turns.`;
+  if (n === 0) return `Your credits queues hold ${q} more credits, but the treasury cannot cover this turn's upkeep.`;
+  return `Your credits queues hold ${q} more credits. With them, the treasury covers upkeep for ${moreTurnsText(n)}.`;
 }
 
 /**
@@ -215,14 +313,13 @@ export function formatTreasuryForecastSentence(forecast: TreasuryForecast): stri
  */
 export function formatTreasuryRunOutAttention(forecast: TreasuryForecast | null): string | null {
   if (forecast === null || forecast.coverTurns === null || forecast.coverTurns > TREASURY_RUN_OUT_WARNING_TURNS) return null;
-  const { credits, incomePerTurn, upkeepPerTurn, coverTurns } = forecast;
-  const tail = 'Queue credits in more cities or raise no more mercenaries, or random mercenaries desert to Neutral.';
-  const head = `Treasury: your ${credits} credits and about ${incomePerTurn} credits a turn from credits queues`;
+  const { credits, queuedCredits, upkeepPerTurn, coverTurns } = forecast;
+  const tail = 'Queue more credits, with a larger count or in more cities, raise no more mercenaries, or fire the ones you can spare. Otherwise random mercenaries desert to Neutral.';
   logTrace('treasuryForecast formatTreasuryRunOutAttention', { ...forecast });
   if (coverTurns === 0) {
-    return `${head} cannot pay this turn's ${upkeepPerTurn} credits of mercenary upkeep. ${tail}`;
+    return `Treasury: your ${credits} credits and this turn's credits cannot pay this turn's ${upkeepPerTurn} credits of mercenary upkeep. ${tail}`;
   }
-  return `${head} pay your ${upkeepPerTurn} credits of mercenary upkeep for only ${moreTurnsText(coverTurns)}. ${tail}`;
+  return `Treasury: your ${credits} credits and the ${queuedCredits} credits still queued pay your ${upkeepPerTurn} credits of mercenary upkeep for only ${moreTurnsText(coverTurns)}. ${tail}`;
 }
 
 /**
@@ -279,7 +376,7 @@ export function treasuryAttention(
     seatId,
     credits: forecast?.credits ?? null,
     upkeepPerTurn: forecast?.upkeepPerTurn ?? null,
-    incomePerTurn: forecast?.incomePerTurn ?? null,
+    queuedCredits: forecast?.queuedCredits ?? null,
     coverTurns: forecast?.coverTurns ?? null,
     runOut: runOut !== null,
     hoard: hoard !== null,

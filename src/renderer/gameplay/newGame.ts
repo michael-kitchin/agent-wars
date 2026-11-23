@@ -8,6 +8,7 @@ import { clearConsoleReports } from '../chrome/consoleReports';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from './newGameRegionUi';
+import { registerFogSightCuesLink } from './newGameSightCuesUi';
 import { readSelectedGameSizeFromDocument, registerGameSizeSelect, syncGameSizeCapPreview } from './newGameSizeUi';
 import {
   randomizeNewGameStartMonth,
@@ -314,6 +315,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   registerNewGameMapControls();
   bindNewGameSides();
   registerGameSizeSelect();
+  registerFogSightCuesLink();
   wireNewGameOptionsPopover();
   wireHumanNicknameField();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {

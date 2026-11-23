@@ -12,6 +12,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const h3 = require('h3-js');
 const { SCENES, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
 const { aiContestedHexStatements, battleStatusPattern, missingBattleMessage } = require('./ui-smoke-beat-limit.cjs');
 const { attemptUnitMarch } = require('./ui-smoke-march-attempt.cjs');
@@ -162,24 +163,39 @@ test('a beat wait accepts the beats-left count and rejects a longer beat number'
   assert.equal(new RegExp(battleStatusPattern(3, '')).test('Beat 30 · Tactical planning'), false);
 });
 
-test('the battle hex is one the first side holds alone, and ships keep their cargo out of it', () => {
+test('the battle hex is one the first side holds alone, with infantry only and no shooter in reach', () => {
+  const alone = h3.latLngToCell(0, 0, 1);
+  const near = h3.gridDisk(alone, 1).find((cell) => cell !== alone);
+  const far = h3.latLngToCell(40, 100, 1);
+  const shared = h3.latLngToCell(-40, -60, 1);
   const state = {
     seats: [{ seatId: 'ai-1', outTurn: null }, { seatId: 'ai-2', outTurn: null }, { seatId: 'ai-3', outTurn: 2 }],
     units: [
-      { id: 'a1', player: 'ai-1', unitType: 'infantry', h3Index: 'shared', embarkedOnCarrierUnitId: null },
-      { id: 'x1', player: 'ai-3', unitType: 'armor', h3Index: 'shared' },
-      { id: 'a2', player: 'ai-1', unitType: 'armor', h3Index: 'sea', embarkedOnCarrierUnitId: 'n1' },
-      { id: 'a3', player: 'ai-1', unitType: 'infantry', h3Index: 'alone' },
-      { id: 'b1', player: 'ai-2', unitType: 'infantry', h3Index: 'home' },
-      { id: 'b2', player: 'ai-2', unitType: 'armor', h3Index: 'sea2', embarkedOnCarrierUnitId: 'n2' },
-      { id: 'b3', player: 'ai-2', unitType: 'naval', h3Index: 'home' },
+      { id: 'a1', player: 'ai-1', unitType: 'infantry', h3Index: shared, embarkedOnCarrierUnitId: null },
+      { id: 'x1', player: 'ai-3', unitType: 'armor', h3Index: shared },
+      { id: 'a2', player: 'ai-1', unitType: 'infantry', h3Index: far, embarkedOnCarrierUnitId: 'n1' },
+      { id: 'a3', player: 'ai-1', unitType: 'infantry', h3Index: alone },
+      { id: 'a4', player: 'ai-1', unitType: 'armor', h3Index: alone },
+      { id: 'b1', player: 'ai-2', unitType: 'infantry', h3Index: far },
+      { id: 'b2', player: 'ai-2', unitType: 'armor', h3Index: far },
+      { id: 'b3', player: 'ai-2', unitType: 'naval', h3Index: near },
+      { id: 'm1', player: 'ai-2', unitType: 'missile', h3Index: far },
     ],
   };
   const edit = aiContestedHexStatements(state);
-  assert.equal(edit.h3Index, 'alone');
-  assert.deepEqual(edit.statements, [{ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: ['alone', 'b1'] }]);
-  const onlyShips = { ...state, units: state.units.filter((unit) => unit.id !== 'b1') };
-  assert.throws(() => aiContestedHexStatements(onlyShips), /land units by side: ai-1 2, ai-2 0/);
+  assert.equal(edit.h3Index, alone);
+  const removal = (id) => [
+    { sql: 'DELETE FROM unit_transport_assignments WHERE land_unit_id = ? OR naval_unit_id = ?', params: [id, id] },
+    { sql: 'DELETE FROM units WHERE id = ?', params: [id] },
+  ];
+  assert.deepEqual(edit.statements, [
+    { sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [alone, 'b1'] },
+    ...removal('a4'),
+    ...removal('b3'),
+    ...removal('m1'),
+  ]);
+  const noInfantry = { ...state, units: state.units.filter((unit) => unit.id !== 'b1') };
+  assert.throws(() => aiContestedHexStatements(noInfantry), /infantry by side: ai-1 2, ai-2 0/);
 });
 
 test('a battle that was not offered names the turns and the hex', () => {

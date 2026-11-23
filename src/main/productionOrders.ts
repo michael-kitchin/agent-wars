@@ -13,7 +13,7 @@ import { isHexCodeValidForContext } from './briefing/map/hexCoordinates';
 /**
  * One production row the envelope may store.
  *
- * Purpose: A queue replacement, a raise, and a rehire are different shapes.
+ * Purpose: A queue replacement, a raise, a rehire, and a fire are different shapes.
  * When to use: After `normalizeProductionOrders` accepts a row.
  * Expected outcome: The action names which fields are present.
  * Exceptions: None.
@@ -21,14 +21,15 @@ import { isHexCodeValidForContext } from './briefing/map/hexCoordinates';
 export type ProductionOrder =
   | { readonly action: 'set_build_queue'; readonly hex: string; readonly unitType: BuildQueueItemType; readonly count: number }
   | { readonly action: 'raise_mercenaries'; readonly hex: string; readonly unitType: HireableUnitType; readonly count: number }
-  | { readonly action: 'rehire_mercenary'; readonly unitId: string };
+  | { readonly action: 'rehire_mercenary'; readonly unitId: string }
+  | { readonly action: 'dismiss_mercenary'; readonly unitId: string };
 
 /**
  * The action names a production row may use.
  *
  * Purpose: Callers that only need the name stay in step with the row union.
  * When to use: Logging and drop reasons.
- * Expected outcome: One of the three actions.
+ * Expected outcome: One of the four actions.
  * Exceptions: None.
  */
 export type ProductionOrderAction = ProductionOrder['action'];
@@ -87,9 +88,9 @@ function parseBuildCount(value: unknown): number | undefined {
 /**
  * Defines the `normalizeProductionOrders` function shape (export function normalizeProductionOrders(raw: unknown, context: CoordinateContext): NormalizeProductionOrdersResult).
 
- * Purpose: Supports maintainability by documenting why `normalizeProductionOrders` exists.
+ * Purpose: Supports maintainability by documenting why `normalizeProductionOrders` exists. It accepts set_build_queue, raise_mercenaries, rehire_mercenary, and dismiss_mercenary rows.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation. A rehire or fire row needs a unit id.
  * Exceptions: None.
  */
 export function normalizeProductionOrders(raw: unknown, context: CoordinateContext): NormalizeProductionOrdersResult {
@@ -122,10 +123,10 @@ export function normalizeProductionOrders(raw: unknown, context: CoordinateConte
       unitId?: unknown;
     };
     const action = row.action;
-    if (action === 'rehire_mercenary') {
+    if (action === 'rehire_mercenary' || action === 'dismiss_mercenary') {
       const unitId = typeof row.unitId === 'string' ? row.unitId.trim() : '';
       if (!unitId) {
-        droppedReasons.push(`${prefix}: rehire_mercenary requires unitId.`);
+        droppedReasons.push(`${prefix}: ${action} requires unitId.`);
         continue;
       }
       validOrders.push({ action, unitId });

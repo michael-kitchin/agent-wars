@@ -139,7 +139,7 @@ export function getGameSeedWithOps(ops: GameConfigKvDbOps): number {
  *
  * Purpose: The snapshot and the end-of-turn check need the settings written at the start of the match.
  * When to use: `getGameStateSnapshot` and any later reader of `victory_rule`.
- * Expected outcome: The stored rule. An unknown or missing rule is last-side-standing with no turn limit.
+ * Expected outcome: The stored rule. An unknown or missing rule is last-side-standing with no turn limit. A missing row is logged at debug level, because no match has started yet. A stored value that is not a known rule is logged as an error.
  * Exceptions: None.
  */
 export function readVictorySettings(ops: GameConfigKvDbOps): VictorySettings {
@@ -148,7 +148,9 @@ export function readVictorySettings(ops: GameConfigKvDbOps): VictorySettings {
   const ruleRaw = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'victory_rule'")?.value;
   const rule = VICTORY_RULES.find((item) => item === ruleRaw);
   if (!rule) {
-    logError('readVictorySettings found no known win rule', { ruleRaw: ruleRaw ?? null });
+    // No row is normal before the first match starts, when the snapshot is read at startup.
+    if (ruleRaw === undefined) logDebug('readVictorySettings found no stored win rule');
+    else logError('readVictorySettings found no known win rule', { ruleRaw });
     return { rule: 'last_side_standing', turnLimit: null };
   }
   if (rule === 'last_side_standing') return { rule, turnLimit: null };

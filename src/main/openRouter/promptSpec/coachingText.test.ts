@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { buildCreditsCountGuidance } from './gameRuleMercenaryText';
 import { buildCoachingBullets, buildContextCoaching, type CoachingGates } from './coachingText';
 import { SIDE_AGREEMENT_ORDERS_BULLETS } from './diplomacyRuleText';
 import { buildOperationRuleBlock } from './operationRuleText';
@@ -118,6 +119,16 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /Omit the array or send \[\]/i);
   assert.match(text, /consulted when a subscribed event fires/i);
   assert.match(text, /tools are withdrawn and you get one reply/i);
+});
+
+test('the production rules teach a larger credits count right after the credits paragraph', () => {
+  const on = joined(strategicGates({ productionEnabled: true }));
+  assert.ok(on.includes('For steady income, give it a larger count.'));
+  const guidance = buildCreditsCountGuidance();
+  const at = on.indexOf(guidance);
+  assert.ok(at > 0);
+  assert.ok(on.slice(0, at).endsWith('and mercenaries are the only units you can place away from your own cities.\n\n  ' ));
+  assert.equal(joined(strategicGates({ productionEnabled: false })).includes('For steady income'), false);
 });
 
 test('strategic conditional items disappear when their gate is off', () => {

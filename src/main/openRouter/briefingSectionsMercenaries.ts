@@ -21,6 +21,7 @@ import { logDebug, logTrace } from '../logger';
 import { CHOKEPOINT_MAX_PASSABLE_NEIGHBORS, countNeighborTerrain } from '../tools/hexNeighborTerrain';
 import { buildHireContext, evaluateHexHire, listHireEntryHexes } from '../mercenaryHireRules';
 import { buildPromptTableLines } from '../promptTableHelpers';
+import { buildMercenaryFiringRiskBlock } from './briefingSectionsMercenaryFiring';
 import { buildTreasuryForecast, formatTreasuryForecastSentence } from './treasuryForecast';
 import {
   MERCENARY_BRIEFING_MAX_ROWS,
@@ -44,7 +45,7 @@ import {
  *
  * Purpose: Production-off seats still see their treasury and their mercenaries. They are not shown hire tables.
  * When to use: While assembling the situation message, with the seat's own snapshot.
- * Expected outcome: The heading, the treasury line, a forecast paragraph when upkeep is above 0, a warning paragraph when credits plus the credits income cannot pay this turn's upkeep, and the tables that apply. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
+ * Expected outcome: The heading, the treasury line, a forecast paragraph when upkeep is above 0, a warning paragraph when credits plus the credits income cannot pay this turn's upkeep, and the tables that apply. Firing Risk follows Your Mercenaries when production is on and a mercenary stands in an at-risk home hex. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
  * Exceptions: None.
  */
 export function buildMercenariesBriefingBlock(
@@ -95,6 +96,10 @@ export function buildMercenariesBriefingBlock(
   }
   if (mercenaries.length > 0) {
     lines.push('', subHeading(SECTION_TITLE_YOUR_MERCENARIES), '', mercenaryTable(mercenaries, format));
+  }
+  if (options.productionEnabled && mercenaries.length > 0) {
+    const firing = buildMercenaryFiringRiskBlock({ state, ownSeat, format });
+    if (firing.length > 0) lines.push('', firing);
   }
   if (!options.productionEnabled) return lines.join('\n');
   const orders = listHireOrdersForSeat(ownSeat);

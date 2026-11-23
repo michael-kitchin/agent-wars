@@ -20,6 +20,7 @@ import { DEFAULT_VICTORY_RULE } from '../../shared/victoryRules';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { readNewGameAiOnlyBeatLimit } from './newGameBeatLimitUi';
 import { readNewGameOptionChoices } from './newGameOptionsUi';
+import { lockSightCuesWhenFogOff } from './newGameSightCuesUi';
 import { readNewGameAiOnlyBattles, readNewGameSightCues, readNewGameVictory, renderNewGameVictory } from './newGameVictoryUi';
 
 /**
@@ -307,7 +308,7 @@ export function fillOptionControlsFromMatch(live: GameStateSnapshot, runButtonOn
  *
  * Purpose: Nickname, Fog of war, and Auto-start AI never change mid-match, and a turn limit cannot be earlier than the current turn (a limit equal to it ends the match after this turn).
  * When to use: After filling the controls, and again after the victory rule or AI-only battles changes, since their own listeners rebuild the limit options.
- * Expected outcome: The three locked controls are disabled, and Auto-start AI's tip points at the Commanders button. Read-only disables every control. Editable enables the others, and applies `matchTurnLimitChoice`: each turn limit before `currentTurn` is disabled, the city-hexes rule is disabled when no limit is left, and a passed limit choice moves to the first open one. The turn limit stays off for Deathmatch and the beat limit off for None.
+ * Expected outcome: The three locked controls are disabled, and Auto-start AI's tip points at the Commanders button. With Fog of war off, Sight cues are unchecked, disabled, and tipped with the Fog-off sentence, on both paths. Read-only disables every control. Editable enables the others, and applies `matchTurnLimitChoice`: each turn limit before `currentTurn` is disabled, the city-hexes rule is disabled when no limit is left, and a passed limit choice moves to the first open one. The turn limit stays off for Deathmatch and the beat limit off for None.
  * Exceptions: None.
  */
 export function lockOptionControls(editable: boolean, currentTurn: number): void {
@@ -318,6 +319,7 @@ export function lockOptionControls(editable: boolean, currentTurn: number): void
   inputById('new-game-auto-start-checkbox')?.setAttribute('data-control-tooltip', AUTO_START_MATCH_TOOLTIP);
   if (!editable) {
     for (const control of popoverControls()) control.disabled = true;
+    lockSightCuesWhenFogOff();
     return;
   }
   for (const id of EDITABLE_CONTROL_IDS) {
@@ -333,6 +335,7 @@ export function lockOptionControls(editable: boolean, currentTurn: number): void
   if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, choice);
   const beatLimit = selectById(BEAT_LIMIT_SELECT_ID);
   if (beatLimit) beatLimit.disabled = selectById(AI_ONLY_SELECT_ID)?.value === 'none';
+  lockSightCuesWhenFogOff();
 }
 
 /**

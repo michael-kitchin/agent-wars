@@ -42,7 +42,7 @@ export const MERCENARY_FUNDS_WARNING =
  * Exceptions: None.
  */
 export const MERCENARY_FUNDS_WARNING_ACTION =
-  'Queue credits in more cities, and do not raise or rehire mercenaries this turn.';
+  'Queue more credits, and do not raise or rehire mercenaries this turn. Firing a mercenary you can spare also stops its upkeep.';
 
 /** Shown when the seat can see no Neutral unit it may rehire. */
 export const NO_REHIRE_CANDIDATES_LINE = 'No Neutral unit you can see can be rehired.';
@@ -56,7 +56,7 @@ export const MERCENARY_ID_PREFIX_NOTE =
 
 /** Envelope rows that hire, appended when production orders are available. */
 export const MERCENARY_ENVELOPE_ROWS_SENTENCE =
-  'To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.';
+  'To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders. To fire a mercenary, add {"action":"dismiss_mercenary","unitId":"<id>"}.';
 
 /**
  * How a Credits queue item is priced and what it adds.
@@ -68,6 +68,19 @@ export const MERCENARY_ENVELOPE_ROWS_SENTENCE =
  */
 export function buildCreditsProductionRulePart(): string {
   return `a credits item costs ${creditsItemCost()} production points and adds ${CREDITS_PER_ITEM} credits to your treasury (queue unitType "credits")`;
+}
+
+/**
+ * Advice to give a credits row a larger count.
+ *
+ * Purpose: A credits row stops when its count runs out, so a count of 1 pays once.
+ * When to use: The production coaching bullet, built with the active map's item cost.
+ * Expected outcome: One line naming what a credits row adds and why to give it a larger count.
+ * Exceptions: None.
+ */
+export function buildCreditsCountGuidance(): string {
+  const cost = creditsItemCost();
+  return `A credits row adds ${CREDITS_PER_ITEM} credits for each ${cost} production points it spends, and it stops when its count runs out. For steady income, give it a larger count. A city makes one production point per city cell each turn, so a count of 10 in a city with ${cost} city cells lasts about 10 turns.`;
 }
 
 /**
@@ -91,7 +104,7 @@ export function buildBuildabilityRule(): string {
  *
  * Purpose: A seat that can produce is also told how hiring works.
  * When to use: The cached `## Mercenaries` rules subsection when production tools are on.
- * Expected outcome: Three paragraphs. The first ends at the rehire sentence, the second at the unfilled-count sentence, and the third is upkeep through unit caps. Upkeep lists the basic and Advanced figures.
+ * Expected outcome: Five paragraphs. The first ends at the rehire sentence, the second at the unfilled-count sentence, and the third is upkeep through unit caps. The fourth says how to fire a mercenary and what it does, and the fifth says what a fired unit does to a cell and to the knockout rule. Upkeep lists the basic and Advanced figures.
  * Exceptions: None.
  */
 export function buildMercenaryRule(): string {
@@ -99,6 +112,8 @@ export function buildMercenaryRule(): string {
     'Credits hire mercenaries. Raise new units in an explored cell outside other sides\' home regions that holds no units but yours and no fortifications but yours, up to twice the cell\'s production in unit cost each turn, or rehire a Neutral unit you can see.',
     'Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill.',
     `After that each mercenary costs its upkeep every turn: ${upkeepList()} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.`,
+    'To fire a mercenary, add a dismiss_mercenary row to productionOrders. It turns Neutral at once, in its cell, with a defend order. Its upkeep stops, and any order you gave it this turn is dropped. You cannot fire a mercenary aboard a ship, or a ship with units aboard. While you can see a fired unit, you can rehire it for two turns of its upkeep.',
+    'A fired unit left alone in a cell takes the cell for Neutral at the end of the turn unless the cell is fortified. One that shares a cell with your units fights them at the next resolution. Neutral-held home hexes count toward your knockout, and a city Neutral takes no longer counts as yours. A fire that would knock you out is refused. When a Firing Risk table appears under Mercenaries in your briefing, it names the home hexes where firing is dangerous.',
   ].join('\n\n');
 }
 

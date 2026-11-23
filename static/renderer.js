@@ -20163,6 +20163,8 @@ ${bonuses}`;
   var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
   var mapModeTabsShowTooltipText = "Show the map-mode buttons under the overview.";
   var mapModeTabsHideTooltipText = "Hide the map-mode buttons. Hiding them also closes the terrain legend.";
+  var minimapCollapseTooltipText = "Hide the minimap to see more of the map.";
+  var minimapExpandTooltipText = "Show the minimap.";
 
   // src/renderer/chrome/consoleReports.ts
   var reportSenderFilter = "";
@@ -20498,7 +20500,8 @@ ${bonuses}`;
     const panelRight = panelBox.right - mapBox.left;
     let leftObstacleRight = panelRight;
     const legend = document.getElementById("terrain-legend");
-    if (legend && !legend.hidden) {
+    const minimapCollapsed = panel.dataset.state === "compact" || panel.dataset.state === "collapsing";
+    if (legend && !legend.hidden && !minimapCollapsed) {
       const place = legendPopoverPosition({
         mapWidth: mapBox.width,
         panelRight,
@@ -24578,6 +24581,7 @@ ${bonuses}`;
 
   // src/renderer/chrome/controlTooltipText.ts
   var humanNicknameFieldTooltipText = "The name shown for you during a match. Saved on this computer, and used the next time a game starts.";
+  var sightCuesCheckboxTooltipText = "Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing.";
   var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
   var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
   function newGameButtonTooltipText(startGame) {
@@ -26703,6 +26707,19 @@ ${bonuses}`;
     running.onfinish = () => onFinish(running);
     return running;
   }
+  function startPanelSizeSlide(panel, from, to, onFinish) {
+    const unchanged = Math.abs(from.width - to.width) < 1 && Math.abs(from.height - to.height) < 1;
+    if (reducedMotionRequested() || unchanged || typeof panel.animate !== "function") return null;
+    const running = panel.animate(
+      [
+        { width: `${from.width}px`, height: `${from.height}px` },
+        { width: `${to.width}px`, height: `${to.height}px` }
+      ],
+      { duration: PANEL_SLIDE_MS, easing: "ease-out" }
+    );
+    running.onfinish = () => onFinish(running);
+    return running;
+  }
 
   // src/renderer/gameplay/newGameDialogMove.ts
   var dragStart2 = null;
@@ -26979,6 +26996,9 @@ ${bonuses}`;
       apiKey: remembered.apiKey,
       nickname: remembered.nickname
     };
+  }
+  function copiedCommanderKeepingNickname(copied, current) {
+    return { ...copied, nickname: current?.nickname ?? "" };
   }
   function previousAiRowIndex(state, index) {
     if (index < 0 || index >= state.rows.length) return null;
@@ -28920,6 +28940,60 @@ ${bonuses}`;
     return unitType ? UNIT_TYPE_LABELS[unitType] ?? "?" : "?";
   }
 
+  // src/shared/sightCuesFogRule.ts
+  var SIGHT_CUES_FOG_OFF_TOOLTIP = "Sight cues need Fog of war. Check Fog of war to use them.";
+  function sightCuesAfterFogChange(args) {
+    const { fogOn, current } = args;
+    if (!fogOn) {
+      if (current.rememberedChecked !== null) return current;
+      return { checked: false, disabled: true, rememberedChecked: current.checked };
+    }
+    if (current.rememberedChecked === null) return current;
+    return { checked: current.rememberedChecked, disabled: false, rememberedChecked: null };
+  }
+
+  // src/renderer/gameplay/newGameSightCuesUi.ts
+  var FOG_ID = "new-game-fog-checkbox";
+  var SIGHT_CUES_ID = "new-game-sight-cues-checkbox";
+  var rememberedChecked = null;
+  function checkbox(id) {
+    const element = document.getElementById(id);
+    return element instanceof HTMLInputElement ? element : null;
+  }
+  function syncNewGameSightCuesWithFog() {
+    const fog = checkbox(FOG_ID);
+    const cues = checkbox(SIGHT_CUES_ID);
+    if (!fog || !cues) return;
+    const next = sightCuesAfterFogChange({
+      fogOn: fog.checked,
+      current: { checked: cues.checked, disabled: cues.disabled, rememberedChecked }
+    });
+    rememberedChecked = next.rememberedChecked;
+    cues.checked = next.checked;
+    cues.disabled = next.disabled;
+    cues.setAttribute("data-control-tooltip", next.disabled ? SIGHT_CUES_FOG_OFF_TOOLTIP : sightCuesCheckboxTooltipText);
+  }
+  function resetNewGameSightCues(checked) {
+    const cues = checkbox(SIGHT_CUES_ID);
+    if (!cues) return;
+    rememberedChecked = null;
+    cues.checked = checked;
+    cues.disabled = false;
+    cues.setAttribute("data-control-tooltip", sightCuesCheckboxTooltipText);
+    syncNewGameSightCuesWithFog();
+  }
+  function lockSightCuesWhenFogOff() {
+    const fog = checkbox(FOG_ID);
+    const cues = checkbox(SIGHT_CUES_ID);
+    if (!fog || !cues || fog.checked) return;
+    cues.checked = false;
+    cues.disabled = true;
+    cues.setAttribute("data-control-tooltip", SIGHT_CUES_FOG_OFF_TOOLTIP);
+  }
+  function registerFogSightCuesLink() {
+    checkbox(FOG_ID)?.addEventListener("change", syncNewGameSightCuesWithFog);
+  }
+
   // src/renderer/gameplay/newGameOptionsUi.ts
   var NEW_GAME_FOG_CHECKBOX_ID = "new-game-fog-checkbox";
   var NEW_GAME_AUTO_START_CHECKBOX_ID = "new-game-auto-start-checkbox";
@@ -28966,6 +29040,7 @@ ${bonuses}`;
       const select = optionSelect(id);
       if (select) select.value = DEFAULT_BONUS_LEVEL;
     }
+    syncNewGameSightCuesWithFog();
   }
 
   // src/renderer/gameplay/newGameRegionUi.ts
@@ -30273,8 +30348,7 @@ ${bonuses}`;
     if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
     const aiOnly = document.getElementById("new-game-ai-only-battles-select");
     if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
-    const sightCues = document.getElementById("new-game-sight-cues-checkbox");
-    if (sightCues instanceof HTMLInputElement) sightCues.checked = DEFAULT_SIGHT_CUES;
+    resetNewGameSightCues(DEFAULT_SIGHT_CUES);
     resetNewGameBeatLimit();
     renderNewGameVictory();
   }
@@ -30436,9 +30510,7 @@ ${bonuses}`;
     if (!sidesState) return;
     const copied = source === "previous-match" ? commanderFromLastGame() : commanderFromPreviousRow(index);
     if (!copied || !sidesState) return;
-    const kept = sidesState.rows[index]?.commander?.nickname ?? "";
-    const nickname = normalizeSideNickname(copied.nickname) || kept;
-    const next = { ...copied, nickname };
+    const next = copiedCommanderKeepingNickname(copied, sidesState.rows[index]?.commander);
     sidesState = setRowCommander(sidesState, index, next);
     replaceOpenCommanderDraft(next);
     renderNewGameSides();
@@ -31393,9 +31465,9 @@ ${bonuses}`;
     const select = document.getElementById("topbar-view-as-select");
     const dot = document.getElementById("topbar-view-as-dot");
     if (host) host.hidden = !observing;
-    const checkbox = document.getElementById("observe-auto-advance");
+    const checkbox2 = document.getElementById("observe-auto-advance");
     const input = document.getElementById("observe-auto-advance-input");
-    if (checkbox) checkbox.hidden = !observing;
+    if (checkbox2) checkbox2.hidden = !observing;
     if (input instanceof HTMLInputElement && document.activeElement !== input) input.checked = rendererSharedState.autoAdvance;
     if (!(select instanceof HTMLSelectElement)) return;
     if (!observing) return;
@@ -38913,9 +38985,9 @@ ${bonuses}`;
   var AUTO_START_CHECKBOX_ID = "new-game-auto-start-checkbox";
   var RUN_BUTTON_ID = "openrouter-run-btn";
   function readStartMatchAiInput() {
-    const checkbox = document.getElementById(AUTO_START_CHECKBOX_ID);
+    const checkbox2 = document.getElementById(AUTO_START_CHECKBOX_ID);
     const input = {
-      autoStartChecked: checkbox?.checked === true,
+      autoStartChecked: checkbox2?.checked === true,
       runEnabled: newGameHasRunnableCommander()
     };
     console.debug("[agent-wars] readStartMatchAiInput", input);
@@ -40580,6 +40652,7 @@ ${bonuses}`;
     registerNewGameMapControls();
     bindNewGameSides();
     registerGameSizeSelect();
+    registerFogSightCuesLink();
     wireNewGameOptionsPopover();
     wireHumanNicknameField();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
@@ -41112,17 +41185,17 @@ ${bonuses}`;
     const label = document.createElement("label");
     label.className = "build-keep-building-label";
     label.setAttribute("data-control-tooltip", args.tooltipText);
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "build-keep-building-checkbox";
-    checkbox.checked = args.checked;
-    checkbox.disabled = args.disabled;
-    checkbox.addEventListener("change", () => {
-      void args.onChange(checkbox.checked);
+    const checkbox2 = document.createElement("input");
+    checkbox2.type = "checkbox";
+    checkbox2.className = "build-keep-building-checkbox";
+    checkbox2.checked = args.checked;
+    checkbox2.disabled = args.disabled;
+    checkbox2.addEventListener("change", () => {
+      void args.onChange(checkbox2.checked);
     });
     const text = document.createElement("span");
     text.textContent = "Keep building";
-    label.appendChild(checkbox);
+    label.appendChild(checkbox2);
     label.appendChild(text);
     row.appendChild(label);
     args.section.appendChild(row);
@@ -50956,6 +51029,7 @@ ${bonuses}`;
     inputById("new-game-auto-start-checkbox")?.setAttribute("data-control-tooltip", AUTO_START_MATCH_TOOLTIP);
     if (!editable2) {
       for (const control of popoverControls()) control.disabled = true;
+      lockSightCuesWhenFogOff();
       return;
     }
     for (const id of EDITABLE_CONTROL_IDS) {
@@ -50971,6 +51045,7 @@ ${bonuses}`;
     if (limit) lockTurnLimit(limit, victory?.value === CITY_HEXES_RULE, choice);
     const beatLimit = selectById(BEAT_LIMIT_SELECT_ID);
     if (beatLimit) beatLimit.disabled = selectById(AI_ONLY_SELECT_ID)?.value === "none";
+    lockSightCuesWhenFogOff();
   }
   function lockTurnLimit(limit, cityHexes3, choice) {
     limit.disabled = !cityHexes3;
@@ -52329,6 +52404,60 @@ ${bonuses}`;
     syncMapModeTabs();
   }
 
+  // src/renderer/map/minimapCollapse.ts
+  var COMPACT_SIZE = Object.freeze({ width: 34, height: 34 });
+  var expanded4 = true;
+  var slide4 = null;
+  function panelSize(panel) {
+    return { width: panel.offsetWidth, height: panel.offsetHeight };
+  }
+  function syncControl(button) {
+    button.setAttribute("aria-expanded", String(expanded4));
+    button.setAttribute("aria-label", expanded4 ? "Hide the minimap" : "Show the minimap");
+    button.setAttribute("data-control-tooltip", expanded4 ? minimapCollapseTooltipText : minimapExpandTooltipText);
+  }
+  function setPanelState2(panel, state) {
+    panel.dataset.state = state;
+    const blocked = state === "compact" || state === "collapsing";
+    for (const id of ["map-mode-tabs-toggle", "map-mode-tabs", "terrain-legend"]) {
+      const element = document.getElementById(id);
+      if (element) element.inert = blocked;
+    }
+  }
+  function settle3(panel) {
+    slide4?.cancel();
+    slide4 = null;
+    setPanelState2(panel, expanded4 ? "expanded" : "compact");
+    layoutMapChrome();
+  }
+  function slideTo2(panel, from, to) {
+    slide4 = startPanelSizeSlide(panel, from, to, (finished) => {
+      if (slide4 === finished) settle3(panel);
+    });
+    if (!slide4) settle3(panel);
+  }
+  function toggleMinimapCollapsed() {
+    const panel = document.getElementById("minimap-panel");
+    const button = document.getElementById("minimap-collapse-toggle");
+    if (!panel || !button) return;
+    const from = panelSize(panel);
+    slide4?.cancel();
+    slide4 = null;
+    expanded4 = !expanded4;
+    syncControl(button);
+    if (!expanded4) {
+      setPanelState2(panel, "collapsing");
+      slideTo2(panel, from, COMPACT_SIZE);
+      return;
+    }
+    setPanelState2(panel, "expanding");
+    layoutMapChrome();
+    slideTo2(panel, from, panelSize(panel));
+  }
+  function wireMinimapCollapse() {
+    document.getElementById("minimap-collapse-toggle")?.addEventListener("click", toggleMinimapCollapsed);
+  }
+
   // src/renderer/map/initCore.ts
   function beginHoverSupportTargetingMode(deps, mode) {
     hidePlanningChromeToasts();
@@ -52378,6 +52507,7 @@ ${bonuses}`;
         });
       }
       wireMapModeTabs(() => deps.requestRedraw());
+      wireMinimapCollapse();
       layoutMapChrome();
     } catch (err) {
       console.error("Map init failed:", err);
@@ -52813,8 +52943,8 @@ ${bonuses}`;
       console.error("replay slider preview failed", error);
     }
   }
-  async function showReleasedReplayStep(index, settle3) {
-    await settle3();
+  async function showReleasedReplayStep(index, settle4) {
+    await settle4();
     await waitForStepToSettle();
     if (!sliderMayShowStep()) return;
     try {
@@ -52999,35 +53129,35 @@ ${bonuses}`;
   var PAUSE_GLYPH_PATH = "M4 3h3v10H4zM9 3h3v10H9z";
   var TURN_NOUN = "Turn";
   var BEAT_NOUN = "Beat";
-  var expanded4 = false;
-  var slide4 = null;
+  var expanded5 = false;
+  var slide5 = null;
   function byId(id) {
     return document.getElementById(id);
   }
   function syncExpandControl3(button) {
-    button.setAttribute("aria-expanded", String(expanded4));
-    button.setAttribute("aria-label", expanded4 ? HIDE_SEEK_LABEL : SHOW_SEEK_LABEL);
-    button.setAttribute("data-control-tooltip", expanded4 ? HIDE_SEEK_TIP : SHOW_SEEK_TIP);
+    button.setAttribute("aria-expanded", String(expanded5));
+    button.setAttribute("aria-label", expanded5 ? HIDE_SEEK_LABEL : SHOW_SEEK_LABEL);
+    button.setAttribute("data-control-tooltip", expanded5 ? HIDE_SEEK_TIP : SHOW_SEEK_TIP);
   }
   function settlePanel(panel) {
-    slide4?.cancel();
-    slide4 = null;
-    panel.dataset.state = expanded4 ? "expanded" : "compact";
+    slide5?.cancel();
+    slide5 = null;
+    panel.dataset.state = expanded5 ? "expanded" : "compact";
     keepReplayPanelInArea(panel);
   }
   function slidePanel2(panel, from, to) {
-    slide4 = startPanelHeightSlide(panel, from, to, (finished) => {
-      if (slide4 === finished) settlePanel(panel);
+    slide5 = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide5 === finished) settlePanel(panel);
     });
-    if (!slide4) settlePanel(panel);
+    if (!slide5) settlePanel(panel);
   }
   function toggleExpanded(panel, bar, button) {
     const from = panel.getBoundingClientRect().height;
-    slide4?.cancel();
-    slide4 = null;
-    expanded4 = !expanded4;
+    slide5?.cancel();
+    slide5 = null;
+    expanded5 = !expanded5;
     syncExpandControl3(button);
-    if (expanded4) {
+    if (expanded5) {
       panel.dataset.state = "expanding";
       slidePanel2(panel, from, panel.getBoundingClientRect().height);
       return;
@@ -53049,7 +53179,7 @@ ${bonuses}`;
   }
   function keepFocusInPanel(focused, buttons) {
     if (!(focused instanceof HTMLButtonElement) || !focused.disabled || !buttons.includes(focused)) return;
-    const slider = expanded4 ? byId("replay-slider") : null;
+    const slider = expanded5 ? byId("replay-slider") : null;
     const candidates = [slider, ...buttons, byId("replay-panel-expand")];
     candidates.find((control) => control !== null && !control.disabled)?.focus({ preventScroll: true });
   }

@@ -8,7 +8,11 @@
  */
 'use strict';
 
-const { LAND_UNIT_TYPES, readGameState } = require('./ui-smoke-map.cjs');
+const h3 = require('h3-js');
+const { readGameState } = require('./ui-smoke-map.cjs');
+
+/** Rings around the battle hex cleared of units that fire on the world map: air reaches 3, naval 2, armor 1. */
+const FIRE_CLEAR_RINGS = 3;
 
 const OPTION_TEXTS = ['20 beats', '30 beats', '40 beats', '50 beats', 'Unlimited'];
 
@@ -79,40 +83,82 @@ async function checkBeatLimitControl(page) {
 }
 
 /**
- * True when the unit is a land unit that fights on the world map.
+ * True when the unit is infantry that fights on the world map.
  *
- * Purpose: A land unit still assigned to a ship sits out strategic combat, and moving it does not stick, because its position follows the ship again.
+ * Purpose: Infantry cannot fire on the world map, so a hex of infantry alone reaches melee and offers its battle. A land unit still assigned to a ship sits out strategic combat, and moving it does not stick, because its position follows the ship again.
  * When to use: Choosing which units make the battle hex.
- * Expected outcome: True for an armor or infantry unit with no carrier.
+ * Expected outcome: True for an infantry unit with no carrier.
  * Exceptions: None.
  */
-function isFightingLandUnit(unit) {
-  return LAND_UNIT_TYPES.includes(unit.unitType) && !unit.embarkedOnCarrierUnitId;
+function isFightingInfantry(unit) {
+  return unit.unitType === 'infantry' && !unit.embarkedOnCarrierUnitId;
 }
 
 /**
- * Moves one side's land units onto a hex that only another side holds.
+ * True when the unit can fire on the world map, or is a missile.
  *
- * Purpose: An observed match offers a battle only where exactly two AI sides share a hex after movement and fire, and a fresh match has none. The smoke sides have no model, so they give no orders, and the hex keeps both sides unless a Neutral unit moves or fires there. A side with no land unit off a ship cannot be one of the two, and a hex with a third side's unit offers nothing.
+ * Purpose: A side with no model still fires on its own each turn. Ranged fire and strikes resolve before melee, so a shooter in reach of the battle hex can wipe one side out before the battle is offered.
+ * When to use: Clearing units around the battle hex.
+ * Expected outcome: True for armor, naval, air, and missile units.
+ * Exceptions: None.
+ */
+function firesOnWorldMap(unit) {
+  return unit.unitType !== 'infantry';
+}
+
+/**
+ * Records, in the page, when the battle result overlay opens and closes.
+ *
+ * Purpose: The renderer starts the next turn as the notice closes, so Playwright's own polling can see the close seconds late. The page's clock times the notice itself.
+ * When to use: Through `page.evaluate`, before the action that opens the timed notice.
+ * Expected outcome: `window.__beatLimitNoticeTimes` holds `shownAt`, the first time the overlay loses `hidden`, and `hiddenAt`, the first time it regains it after that, both from `performance.now()`.
+ * Exceptions: Throws in the page when the overlay is missing.
+ */
+function watchNoticeTimes() {
+  const overlay = document.getElementById('tactical-annihilation-overlay');
+  if (!overlay) throw new Error('#tactical-annihilation-overlay is missing');
+  const times = { shownAt: null, hiddenAt: null };
+  window.__beatLimitNoticeTimes = times;
+  const observer = new MutationObserver(() => {
+    const hidden = overlay.classList.contains('hidden');
+    if (times.shownAt == null && !hidden) times.shownAt = performance.now();
+    else if (times.shownAt != null && times.hiddenAt == null && hidden) {
+      times.hiddenAt = performance.now();
+      observer.disconnect();
+    }
+  });
+  observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+}
+
+/**
+ * Moves one side's infantry onto a hex that only another side holds.
+ *
+ * Purpose: An observed match offers a battle only where exactly two AI sides share a hex after movement and fire, and a fresh match has none. The smoke sides have no model, but each still fires on its own at an enemy in reach, and fire resolves before melee. So the hex gets infantry only, and every unit that fires on the world map within `FIRE_CLEAR_RINGS` of it, plus every missile, is removed. A side with no infantry off a ship cannot be one of the two, and a hex with a third side's unit offers nothing.
  * When to use: With the game state read just before the app closes.
- * Expected outcome: `{ h3Index, statements }`: one update per land unit off a ship of the second qualifying side, onto the first hex where the first qualifying side has such a unit and no other side has any unit.
- * Exceptions: Throws when fewer than two active sides have a land unit off a ship, or when no hex is held by the first side alone. The first message lists each active side's count.
+ * Expected outcome: `{ h3Index, statements }`: one update per infantry off a ship of the second qualifying side, onto the first hex where the first qualifying side has such a unit and no other side has any unit, then the removals and their transport rows.
+ * Exceptions: Throws when fewer than two active sides have infantry off a ship, or when no hex is held by the first side alone. The first message lists each active side's count.
  */
 function aiContestedHexStatements(state) {
   const units = state.units || [];
   const active = (state.seats || []).filter((seat) => seat.outTurn == null);
-  const landOf = (seatId) => units.filter((unit) => unit.player === seatId && isFightingLandUnit(unit));
+  const landOf = (seatId) => units.filter((unit) => unit.player === seatId && isFightingInfantry(unit));
   const counts = active.map((seat) => `${seat.seatId} ${landOf(seat.seatId).length}`).join(', ');
   const qualified = active.filter((seat) => landOf(seat.seatId).length > 0);
-  if (qualified.length < 2) throw new Error(`a battle needs a land unit on each side (land units by side: ${counts})`);
+  if (qualified.length < 2) throw new Error(`a battle needs infantry on each side (infantry by side: ${counts})`);
   const first = qualified[0].seatId;
   const second = qualified[1].seatId;
   const heldAlone = (h3Index) => units.every((unit) => unit.h3Index !== h3Index || unit.player === first);
   const anchor = landOf(first).find((unit) => heldAlone(unit.h3Index));
   if (!anchor) throw new Error(`no hex holds only ${first}'s units`);
   const h3Index = anchor.h3Index;
-  const statements = landOf(second).map((unit) => ({ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [h3Index, unit.id] }));
-  return { h3Index, statements };
+  const moves = landOf(second).map((unit) => ({ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [h3Index, unit.id] }));
+  const near = new Set(h3.gridDisk(h3Index, FIRE_CLEAR_RINGS));
+  const removed = units.filter((unit) => firesOnWorldMap(unit) && (unit.unitType === 'missile' || near.has(unit.h3Index)));
+  const removals = removed.flatMap((unit) => [
+    { sql: 'DELETE FROM unit_transport_assignments WHERE land_unit_id = ? OR naval_unit_id = ?', params: [unit.id, unit.id] },
+    { sql: 'DELETE FROM units WHERE id = ?', params: [unit.id] },
+  ]);
+  return { h3Index, statements: [...moves, ...removals] };
 }
 
 /**
@@ -236,13 +282,15 @@ async function runBeatLimitBattleScenes(args) {
   }]));
   await waitForBattleStatus(page, 30);
   const turnBefore = (await readGameState(page)).turnNumber;
+  await page.evaluate(watchNoticeTimes);
   await page.click('#observe-auto-advance-input');
   const timedOverlay = page.locator('#tactical-annihilation-overlay');
   await timedOverlay.waitFor({ state: 'visible', timeout: 60000 });
-  const visibleAt = Date.now();
   await expectBeatLimitNotice(page);
   await timedOverlay.waitFor({ state: 'hidden', timeout: 15000 });
-  const elapsed = Date.now() - visibleAt;
+  const times = await page.evaluate(() => window.__beatLimitNoticeTimes);
+  if (times?.shownAt == null || times.hiddenAt == null) throw new Error('the beat-limit notice open and close times were not recorded');
+  const elapsed = Math.round(times.hiddenAt - times.shownAt);
   if (elapsed < 2500 || elapsed > 6000) throw new Error(`the beat-limit notice stayed open ${elapsed} ms`);
   await page.locator('#tactical-exit-btn').waitFor({ state: 'hidden', timeout: 60000 });
   const deadline = Date.now() + 120000;

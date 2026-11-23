@@ -24,7 +24,7 @@ In the Rules section the player picks:
 
 In Other, inside Game Options, the player picks:
 
-- Fog of war, Sight cues, and Auto-start AI, in that order, in three equal columns. All three are checked when the dialog opens. Sight cues applies only while observing. What Auto-start AI does when the match starts is in [new-game-dialog.md](ux/new-game-dialog.md). The engine does not store Auto-start AI.
+- Fog of war, Sight cues, and Auto-start AI, in that order, in three equal columns. All three are checked when the dialog opens. Sight cues applies only while observing, and it is unchecked and disabled while Fog of war is unchecked. What Auto-start AI does when the match starts is in [new-game-dialog.md](ux/new-game-dialog.md). The engine does not store Auto-start AI.
 
 A global match stores one home-region name on each `seats` row. A regional match stores that side group's display name on the row. A display name whose short name is a letter form ends with that letter form in parentheses, such as `South & east China, Taiwan (SECT)`. `East` does not. The short-name rule is in [ux/top-bar.md](ux/top-bar.md). Win evaluation, forced visibility, and the home outlines use the hexes of the stored home. The strategic hexes are the loaded map's resolution: 1 on the global map, and 2 or 3 on a regional map.
 

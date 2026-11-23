@@ -188,6 +188,26 @@ export const DISMISS_REASON_NOT_MERCENARY = 'Only a mercenary can be dismissed.'
 export const DISMISS_REASON_EMBARKED = 'A mercenary aboard a ship cannot be dismissed.';
 
 /**
+ * Refusal when the fire would by itself knock the side out.
+ *
+ * Purpose: A fired mercenary is a Neutral unit that can take an unfortified home hex or a city, so the engine will not let a fire complete the side's knockout.
+ * When to use: The dismiss action, for every seat, after the embarked check.
+ * Expected outcome: The knockout sentence, shown to the human as a toast and to a commander as a drop reason.
+ * Exceptions: None.
+ */
+export const DISMISS_REASON_KNOCKOUT = 'Firing this mercenary would let Neutral take enough of your home or cities to knock you out.';
+
+/**
+ * Refusal when a commander tries to fire a ship that still carries units.
+ *
+ * Purpose: A fired ship takes its cargo with it, and a commander is not given that as a side effect of one row.
+ * When to use: `executeCommanderDismissMercenary`, before the shared dismiss.
+ * Expected outcome: The unload sentence.
+ * Exceptions: None.
+ */
+export const DISMISS_REASON_SHIP_CARGO = 'A ship with units aboard cannot be fired. Unload it first.';
+
+/**
  * Toast when the dismiss IPC call itself throws.
  *
  * Purpose: A broken bridge is not one of the refusal sentences.

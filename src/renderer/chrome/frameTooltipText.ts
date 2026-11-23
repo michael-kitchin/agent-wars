@@ -193,6 +193,26 @@ export const mapModeTabsHideTooltipText =
   'Hide the map-mode buttons. Hiding them also closes the terrain legend.';
 
 /**
+ * The tip of the control on the minimap's upper-left corner while the minimap shows.
+ *
+ * Purpose: Says what the control hides and why the player would.
+ * When to use: `#minimap-collapse-toggle` while the minimap is expanded. The static markup starts with this sentence.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const minimapCollapseTooltipText = 'Hide the minimap to see more of the map.';
+
+/**
+ * The tip of the control on the minimap's upper-left corner while the minimap is collapsed.
+ *
+ * Purpose: Says what the control brings back.
+ * When to use: `#minimap-collapse-toggle` while the minimap is collapsed.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const minimapExpandTooltipText = 'Show the minimap.';
+
+/**
  * The Weather map mode's tip.
  *
  * Purpose: Says Weather is a toggle for the weather icons, and when they can show.

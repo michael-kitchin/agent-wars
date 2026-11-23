@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **3.4.2** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **3.5.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -34,7 +34,7 @@ Release **2.16.0** shortens commander prompts, lists the odds of each fight the 
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
 
-Release **3.4.2** adds a treasury forecast to each commander's Mercenaries section, Attention Flags for an upkeep shortfall or an idle treasury, and a credits priority only for cities at their unit caps. The Medium game size is renamed Default and is now the new-game default.
+Release **3.5.0** lets commanders fire mercenaries, with a Firing Risk table and a guard against firing themselves out of the match, forecasts the treasury from what is actually queued, and adds a toggle that collapses the minimap. It also includes the unpublished 3.4.2 changes: treasury attention flags, credits advice only for capped cities, and the Default game size.
 
 Release **3.4.1** makes every commander name a posture each turn and records it, including overland. Posture advice now measures whether a real force can march on an enemy's home, and Attention Flags point out a posture that doesn't fit the campaign's target.
 

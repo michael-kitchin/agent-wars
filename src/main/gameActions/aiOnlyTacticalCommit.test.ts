@@ -36,8 +36,13 @@ test('an AI-only beat plays both seats\' marches as opponent moves, lead first',
     assert.deepEqual(moves.map((move) => move.unitId), [leadStep.unitId, opposingStep.unitId]);
     assert.equal(moves[0]?.fromH3Index, preBattle.subUnits.find((unit) => unit.id === leadStep.unitId)?.h3Index);
     assert.equal(moves[1]?.fromH3Index, preBattle.subUnits.find((unit) => unit.id === opposingStep.unitId)?.h3Index);
-    assert.equal(moves[0]?.toH3Index, storedUnit(leadStep.unitId)?.h3Index);
-    assert.equal(moves[1]?.toH3Index, storedUnit(opposingStep.unitId)?.h3Index);
+    // Each move ends on its one-cell step. The beat's combat can remove the unit afterward, so only a surviving unit is checked in storage.
+    assert.equal(moves[0]?.toH3Index, leadStep.toH3Index);
+    assert.equal(moves[1]?.toH3Index, opposingStep.toH3Index);
+    for (const step of [leadStep, opposingStep]) {
+      const stored = storedUnit(step.unitId);
+      if (stored) assert.equal(stored.h3Index, step.toH3Index);
+    }
     assert.notEqual(moves[0]?.fromH3Index, moves[0]?.toH3Index);
     assert.notEqual(moves[1]?.fromH3Index, moves[1]?.toH3Index);
   });

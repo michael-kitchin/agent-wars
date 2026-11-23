@@ -34,6 +34,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - AI-only battles: Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.
 - Beat limit: The most beats an AI-only battle can run. When it reaches them, the battle ends as if Exit Battle had been pressed. This applies only while you are observing. Choosing None under AI-only battles turns this off.
 - Sight cues: Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing.
+- Sight cues while Fog of war is off (`SIGHT_CUES_FOG_OFF_TOOLTIP`): Sight cues need Fog of war. Check Fog of war to use them.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Default doubles the Small caps, and Large triples them, without changing the map or the starting forces.
 - "Game Options": Nickname, victory rule, turn limit, AI-only battles, beat limit, bonuses, fog of war, Sight cues, and Auto-start AI.
@@ -100,6 +101,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Dismiss, on a mercenary in the selection panel: `DISMISS_MERCENARY_TOOLTIP`. Fire this mercenary. It becomes Neutral now.
 - Cancel, on that armed row: `DISMISS_MERCENARY_CANCEL_TOOLTIP`. Keep this mercenary.
 - Confirm, on that armed row: `DISMISS_MERCENARY_CONFIRM_TOOLTIP`. Fire this mercenary now. You can rehire it for the next turn.
+- Minimap collapse control, while the minimap shows: Hide the minimap to see more of the map. (`minimapCollapseTooltipText`, and the same sentence on `#minimap-collapse-toggle` in `static/index.html`)
+- Minimap collapse control, while the minimap is collapsed: Show the minimap. (`minimapExpandTooltipText`)
 - Map-mode tabs toggle, while the tabs are hidden: Show the map-mode buttons under the overview.
 - Map-mode tabs toggle, while the tabs show: Hide the map-mode buttons. Hiding them also closes the terrain legend.
 - Weather map mode: Show or hide each hex's weather icon on the world map, while the weather bonus is on.
@@ -238,6 +241,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
 - `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`, `aiOnlyTimedResultOkTooltipText`, `mapThemeTooltipText`, `chatStagedEditTooltipText`, `chatStagedCancelTooltipText`)
+- `src/shared/sightCuesFogRule.ts` (`SIGHT_CUES_FOG_OFF_TOOLTIP`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
@@ -247,7 +251,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/shared/mercenaryDismiss.ts` (`DISMISS_MERCENARY_TOOLTIP`, `DISMISS_MERCENARY_CANCEL_TOOLTIP`, `DISMISS_MERCENARY_CONFIRM_TOOLTIP`)
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
-- `src/renderer/chrome/frameTooltipText.ts` (`allSidesProductionStatTooltipText`, `allSidesForcesStatTooltipLead`)
+- `src/renderer/chrome/frameTooltipText.ts` (`allSidesProductionStatTooltipText`, `allSidesForcesStatTooltipLead`, `minimapCollapseTooltipText`, `minimapExpandTooltipText`)
 - `src/renderer/chrome/sideUnitCountsTooltip.ts` (`buildSideUnitCountsTooltip`)
 - `src/shared/sideUnitCounts.ts` (`countSideUnitsByType`, `formatSideUnitCountsText`)
 - `src/shared/saveLoadAvailability.ts`

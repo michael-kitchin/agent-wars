@@ -132,6 +132,10 @@ Hired units arrive at the end of the turn and take orders the next turn. A raise
 
 After that each mercenary costs its upkeep every turn: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.
 
+To fire a mercenary, add a dismiss_mercenary row to productionOrders. It turns Neutral at once, in its cell, with a defend order. Its upkeep stops, and any order you gave it this turn is dropped. You cannot fire a mercenary aboard a ship, or a ship with units aboard. While you can see a fired unit, you can rehire it for two turns of its upkeep.
+
+A fired unit left alone in a cell takes the cell for Neutral at the end of the turn unless the cell is fortified. One that shares a cell with your units fights them at the next resolution. Neutral-held home hexes count toward your knockout, and a city Neutral takes no longer counts as yours. A fire that would knock you out is refused. When a Firing Risk table appears under Mercenaries in your briefing, it names the home hexes where firing is dangerous.
+
 ## Rule Lookup
 
 Call rules(topic) for a rule that is not printed above. Topics: weather, movement, line-of-sight, casualties, stacking, naval, air, fortifications, missiles, mercenaries, resolution, combat-stats.
@@ -322,6 +326,8 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
   Keep enough credits coming in to pay your mercenaries; the Mercenaries section says how long your treasury lasts. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.
 
+  A credits row adds 20 credits for each 20 production points it spends, and it stops when its count runs out. For steady income, give it a larger count. A city makes one production point per city cell each turn, so a count of 10 in a city with 20 city cells lasts about 10 turns.
+
   Production Priorities, under Production Status, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.
 
   Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. When every unit type a hex can build is at cap, queue credits and spend them on mercenaries. Queue fortification only in a city whose Exposed column says yes, and replace a fortification queue in a city that is not exposed with credits.
@@ -388,7 +394,7 @@ Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; 
 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. When every unit type a hex can build is at cap, queue credits and spend them on mercenaries. Queue fortification only in a city whose Exposed column says yes, and replace a fortification queue in a city that is not exposed with credits.
 
-A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"`<code>`","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"`<id>`"} rows to productionOrders.
+A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"`<code>`","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"`<id>`"} rows to productionOrders. To fire a mercenary, add {"action":"dismiss_mercenary","unitId":"`<id>`"}.
 
 ## Example Response
 

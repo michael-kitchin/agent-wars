@@ -71,7 +71,7 @@ export interface RememberedCommander {
    * The name shown for that opponent in the last match.
    *
    * Contract: Cleaned by `normalizeSideNickname`. Empty means the snapshot had no nickname, including an older snapshot written before this field existed.
-   * When to use: Copy from last game. A blank value must not replace the target row's current nickname.
+   * When to use: The remembered commander's display. Copy from last game does not take it; the target row keeps its own nickname.
    * Expected outcome: Copied onto the row when it is non-empty.
    * Exceptions: None.
    */
@@ -218,6 +218,21 @@ export function commanderFromRemembered(remembered: RememberedCommander): NewGam
     apiKey: remembered.apiKey,
     nickname: remembered.nickname,
   };
+}
+
+/**
+ * Puts a copied commander on a row without its nickname.
+ *
+ * Purpose: Copying another commander takes its model, effort, provider, doctrine, and key. The row keeps its own name, which comes from its home.
+ * When to use: The popover's copy button, for Copy from Last Game and for copying the row above.
+ * Expected outcome: A new commander with the copied fields and the target row's current nickname, or `''` when the row has no commander yet.
+ * Exceptions: None.
+ */
+export function copiedCommanderKeepingNickname(
+  copied: NewGameCommanderInput,
+  current: NewGameCommanderInput | null | undefined
+): NewGameCommanderInput {
+  return { ...copied, nickname: current?.nickname ?? '' };
 }
 
 /**

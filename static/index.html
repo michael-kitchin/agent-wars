@@ -177,9 +177,10 @@
     <div id="main-map" aria-label="World map"></div>
     <canvas id="map-overlay" aria-hidden="true"></canvas>
     <canvas id="map-label-overlay" aria-hidden="true"></canvas>
-    <div id="minimap-panel" class="minimap-panel">
+    <div id="minimap-panel" class="minimap-panel" data-state="expanded">
       <div class="minimap-overview">
         <div id="minimap" aria-label="World overview"></div>
+        <button type="button" id="minimap-collapse-toggle" class="minimap-tabs-toggle minimap-collapse-toggle" aria-expanded="true" aria-controls="minimap-panel" aria-label="Hide the minimap" data-control-tooltip="Hide the minimap to see more of the map."><svg class="chrome-icon minimap-collapse-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5"></path></svg></button>
         <button type="button" id="map-mode-tabs-toggle" class="minimap-tabs-toggle" aria-expanded="false" aria-controls="map-mode-tabs" aria-label="Show the map modes" data-control-tooltip="Show the map-mode buttons under the overview."><svg class="chrome-icon minimap-tabs-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5"></path></svg></button>
       </div>
       <div id="map-mode-tabs" class="map-mode-tabs" role="group" aria-label="Map modes" hidden>

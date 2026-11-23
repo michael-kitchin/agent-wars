@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import {
   commanderApiKey,
   commanderFromRemembered,
+  copiedCommanderKeepingNickname,
   copyButtonState,
   prefillFirstAiApiKey,
   previousAiRowIndex,
@@ -96,6 +97,21 @@ test('copy from last game keeps the provider choice and the nickname', () => {
   };
   const copied = commanderFromRemembered(remembered);
   assert.equal(copied.providerSort, 'latency');
+  assert.equal(copied.nickname, 'Grok');
+});
+
+test('a copied commander keeps the target row nickname', () => {
+  const copied: NewGameCommanderInput = {
+    modelId: 'model-a',
+    reasoningEffort: 'low',
+    providerSort: 'latency',
+    doctrineChoice: 'cautious',
+    apiKey: 'test-openrouter-key',
+    nickname: 'Grok',
+  };
+  const current: NewGameCommanderInput = { ...copied, modelId: 'model-b', apiKey: '', nickname: 'Brazil' };
+  assert.deepEqual(copiedCommanderKeepingNickname(copied, current), { ...copied, nickname: 'Brazil' });
+  assert.equal(copiedCommanderKeepingNickname(copied, null).nickname, '');
   assert.equal(copied.nickname, 'Grok');
 });
 

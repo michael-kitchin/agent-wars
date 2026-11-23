@@ -18,6 +18,7 @@ import { AIR_STRIKE_RANGE_HEXES } from '../../../shared/tacticalRanges';
 import { regionalWinPathsBullet } from '../scenarioGoals';
 import { buildStrategicDoctrineBlock } from './doctrineText';
 import type { CoachingGates } from './coachingGates';
+import { buildCreditsCountGuidance } from './gameRuleMercenaryText';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 import {
   SECTION_TITLE_MERCENARIES,
@@ -109,7 +110,7 @@ export function buildStrategicCoachingSections(gates: CoachingGates): readonly {
   if (gates.hasAirUnits) airAndNaval.push(IDLE_AIR_BULLET, AIRLIFT_PREFERENCE_BULLET);
   if (gates.hasNavalUnits) airAndNaval.push(NAVAL_ROUTING_BULLET, SEALIFT_BULLET);
   if (gates.hasMissileUnits === true) airAndNaval.push(MISSILE_LAUNCH_BULLET);
-  const production = gates.productionEnabled ? [PRODUCTION_BULLET] : [];
+  const production = gates.productionEnabled ? [productionBullet()] : [];
   const memoryAndCallbacks = [
     ...(gates.memoryEnabled ? [memoryBullet(gates.campaignEnabled === true)] : []),
     CALLBACK_BULLET,
@@ -363,12 +364,14 @@ const AIRLIFT_PREFERENCE_BULLET =
  *
  * Purpose: An empty legal queue is wasted income; a capped queue should be swapped unless every type is capped.
  * When to use: When production tools are enabled.
- * Expected outcome: Queue something when empty. When every unit type is capped, queue credits and fortify only an exposed city. The last paragraph says a city is exposed within `PRODUCTION_EXPOSED_RADIUS` hexes of a seen or remembered enemy. The Production attention sentence tells the model to queue the hexes the flag names. The next paragraph tells the model to apply the fix in Paused Queues under Production Status.
+ * Expected outcome: A bullet built when the prompt is built, because the credits item cost comes from the active map. Queue something when empty. When every unit type is capped, queue credits and fortify only an exposed city. The last paragraph says a city is exposed within `PRODUCTION_EXPOSED_RADIUS` hexes of a seen or remembered enemy. The Production attention sentence tells the model to queue the hexes the flag names. The next paragraph tells the model to apply the fix in Paused Queues under Production Status.
  * Exceptions: None.
  */
-const PRODUCTION_BULLET =
+function productionBullet(): string {
+  return (
   '- When a controlled cell can build and its queue is empty, queue something.' +
   `\n\n  Keep enough credits coming in to pay your mercenaries; the ${SECTION_TITLE_MERCENARIES} section says how long your treasury lasts. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.` +
+  `\n\n  ${buildCreditsCountGuidance()}` +
   `\n\n  ${SECTION_TITLE_PRODUCTION_PRIORITIES}, under ${SECTION_TITLE_PRODUCTION_STATUS}, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.\n\n  ` +
   PRODUCTION_CAP_QUEUE_GUIDANCE.replace(
     '. A hex whose available types',
@@ -377,7 +380,9 @@ const PRODUCTION_BULLET =
   '\n\n  When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.' +
   '\n\n  When the Production attention flag is present, it names the hexes to queue and the types they can still build.' +
   `\n\n  When an attention bullet names paused queues, apply the fix in ${SECTION_TITLE_PAUSED_QUEUES} under ${SECTION_TITLE_PRODUCTION_STATUS}.` +
-  `\n\n  A city is exposed when an enemy unit you can see or remember is within ${PRODUCTION_EXPOSED_RADIUS} hexes.`;
+  `\n\n  A city is exposed when an enemy unit you can see or remember is within ${PRODUCTION_EXPOSED_RADIUS} hexes.`
+  );
+}
 
 /**
  * Shared home cells count for every home that lists them.

@@ -1,7 +1,7 @@
 /**
  * Applies a production envelope's rows.
  *
- * Purpose: A queue row and a hire row share one pass, and this module does not import the production tools at runtime.
+ * Purpose: A queue row, a hire row, and a fire row share one pass, and this module does not import the production tools at runtime. A fire row converts the unit at once.
  * When to use: `parseOrdersResponse` when production tools are enabled.
  * Expected outcome: How many rows were stored, and why the rest were dropped.
  * Exceptions: None. A tool error becomes a drop reason.
@@ -10,7 +10,8 @@
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { coordinateContextSeatId, type CoordinateContext } from '../briefing/map/coordinateContext';
 import { codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
-import { logDebug } from '../logger';
+import { logDebug, logError } from '../logger';
+import { executeCommanderDismissMercenary } from '../gameActions/dismissMercenary';
 import { normalizeProductionOrders } from '../productionOrders';
 import { executeMercenaryTools } from '../tools/mercenaryTools';
 import type { executeProductionTools } from '../tools/productionTools';
@@ -37,6 +38,17 @@ export function applyProductionOrdersFromEnvelope(
   let appliedCount = 0;
   const seatId = coordinateContextSeatId(context);
   for (const order of normalized.validOrders) {
+    if (order.action === 'dismiss_mercenary') {
+      try {
+        const result = executeCommanderDismissMercenary(seatId, order.unitId);
+        if (result.success) appliedCount += 1;
+        else droppedReasons.push(`production dismiss_mercenary @ ${order.unitId}: ${result.reason}`);
+      } catch (err) {
+        logError('openRouter applyProductionOrdersFromEnvelope dismiss failed', { seatId, unitId: order.unitId }, err);
+        droppedReasons.push(`production dismiss_mercenary @ ${order.unitId}: failed`);
+      }
+      continue;
+    }
     if (order.action === 'rehire_mercenary') {
       const result = executeMercenaryTools(
         seatId,

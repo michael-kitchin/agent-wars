@@ -10,10 +10,12 @@
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
 import type { GameStateSnapshot } from '../gameDb';
 import { commanderModelId, getAiPendingOrders, clearAiPendingOrders, getSeatRoster } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { deleteStandingOrdersForUnitsNotOwned, listUnitIdsOwnedBy } from '../gameDb/seatUnitOwnership';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { type AiSeatId } from '../../shared/seatIds';
 import { activeAiSeatIds } from '../../shared/seatRoster';
-import type { OwnerTurnOrders, TurnOrdersByOwner } from '../gameActions/ownerTurnOrders';
+import { keepOrdersForOwnedUnits, type OwnerTurnOrders, type TurnOrdersByOwner } from '../gameActions/ownerTurnOrders';
 import { generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { collectTempoRuleAttacks } from '../tools/tempoRuleAttacks';
 import { logDebug, logError } from '../logger';
@@ -111,9 +113,9 @@ export function buildUnconsultedCommanderOrders(seatId: AiSeatId, aiState: GameS
 /**
  * One order set per active AI seat for this Ready.
  *
- * Purpose: The turn resolves stored plans, plans that finish during the wait, and standing orders for the rest.
+ * Purpose: The turn resolves stored plans, plans that finish during the wait, and standing orders for the rest. A seat that fired a unit this turn must not move it.
  * When to use: `handleGameReady`.
- * Expected outcome: The map has an entry for each active AI seat. A seat that is `planning` is waited on until it leaves that status, up to the consultation wait. An air operation's ferry or drop replaces other air orders for that air unit.
+ * Expected outcome: Each seat first loses standing orders for units it no longer owns. After the operation orders are merged, every list is filtered to units the seat owns in the database, and a failed ownership read keeps that seat's orders. The map has an entry for each active AI seat. A seat that is `planning` is waited on until it leaves that status, up to the consultation wait. An air operation's ferry or drop replaces other air orders for that air unit.
  * Exceptions: A throw while building standing orders logs and omits that seat. A throw while adding operation orders logs and leaves that seat's orders unchanged.
  */
 export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherArgs): Promise<TurnOrdersByOwner> {
@@ -126,6 +128,11 @@ export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherAr
   });
   const orders = new Map<AiSeatId, OwnerTurnOrders>();
   for (const seatId of active) {
+    try {
+      deleteStandingOrdersForUnitsNotOwned(gameDbOps, seatId);
+    } catch (err) {
+      logError('commanderReadyGather could not clear stale standing orders', { seatId }, err);
+    }
     if (isPlanning(seatId)) {
       await waitForSeatsSettled([seatId], AI_CONSULTATION_WAIT_TIMEOUT_MS);
     }
@@ -157,6 +164,13 @@ export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherAr
       );
     } catch (err) {
       logError('commanderReadyGather could not add operation orders', { seatId }, err);
+    }
+  }
+  for (const [seatId, seatOrders] of orders) {
+    try {
+      orders.set(seatId, keepOrdersForOwnedUnits(seatOrders, listUnitIdsOwnedBy(gameDbOps, seatId)));
+    } catch (err) {
+      logError('commanderReadyGather could not filter orders by ownership', { seatId }, err);
     }
   }
   return orders;

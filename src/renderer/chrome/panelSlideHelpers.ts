@@ -1,9 +1,10 @@
 /**
- * The height slide that floating panels use between their compact and expanded states.
+ * The slides that floating panels use between their compact and expanded states.
  *
- * Purpose: The selection panel and the new-game setup panel slide the same way and for the same time, and both skip the
- *   slide when the player asks for reduced motion.
- * When to use: `startPanelHeightSlide` from a panel's expand or collapse handler.
+ * Purpose: The selection panel, the new-game setup panel, and the minimap slide the same way and for the same time, and
+ *   all skip the slide when the player asks for reduced motion.
+ * When to use: `startPanelHeightSlide`, or `startPanelSizeSlide` for a panel that also changes width, from a panel's
+ *   expand or collapse handler.
  * Expected outcome: One Web Animations slide per call; the caller keeps the returned handle.
  * Exceptions: None.
  */
@@ -51,6 +52,64 @@ export function startPanelHeightSlide(
     duration: PANEL_SLIDE_MS,
     easing: 'ease-out',
   });
+  running.onfinish = () => onFinish(running);
+  return running;
+}
+
+/**
+ * A panel's size, in pixels, as its CSS `width` and `height` measure it.
+ *
+ * Purpose: The two ends of a slide that changes width and height together.
+ * When to use: Arguments of `startPanelSizeSlide`.
+ * Expected outcome: Plain numbers, matched to the panel's CSS `width` and `height`.
+ * Exceptions: None.
+ */
+export interface PanelSize {
+  /**
+   * The width.
+   *
+   * Contract: Pixels, matched to the panel's `box-sizing`.
+   * When to use: Read by `startPanelSizeSlide`.
+   * Expected outcome: Zero or more.
+   * Exceptions: None.
+   */
+  readonly width: number;
+  /**
+   * The height.
+   *
+   * Contract: Pixels, matched to the panel's `box-sizing`.
+   * When to use: Read by `startPanelSizeSlide`.
+   * Expected outcome: Zero or more.
+   * Exceptions: None.
+   */
+  readonly height: number;
+}
+
+/**
+ * Slides a panel's width and height from `from` to `to`, from its top-left corner.
+ *
+ * Purpose: A panel that collapses to one corner control shrinks in both directions.
+ * When to use: From a panel's expand or collapse handler, after its target size is known.
+ * Expected outcome: The running slide, which calls `onFinish` with itself when it ends; a canceled slide does not call
+ *   it. Returns null, without calling `onFinish`, when motion is reduced, both sizes are within a pixel, or the page
+ *   cannot animate; the caller then settles the panel itself.
+ * Exceptions: None.
+ */
+export function startPanelSizeSlide(
+  panel: HTMLElement,
+  from: PanelSize,
+  to: PanelSize,
+  onFinish: (slide: Animation) => void
+): Animation | null {
+  const unchanged = Math.abs(from.width - to.width) < 1 && Math.abs(from.height - to.height) < 1;
+  if (reducedMotionRequested() || unchanged || typeof panel.animate !== 'function') return null;
+  const running = panel.animate(
+    [
+      { width: `${from.width}px`, height: `${from.height}px` },
+      { width: `${to.width}px`, height: `${to.height}px` },
+    ],
+    { duration: PANEL_SLIDE_MS, easing: 'ease-out' }
+  );
   running.onfinish = () => onFinish(running);
   return running;
 }

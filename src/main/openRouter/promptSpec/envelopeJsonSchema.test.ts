@@ -657,10 +657,13 @@ function testProductionOrderEnumIncludesFortification(): void {
   const items = asRecord(production.items, 'productionOrders.items');
   const branches = items.anyOf as unknown[];
   assert.deepEqual(Object.keys(items), ['anyOf']);
-  assert.equal(branches.length, 3);
+  assert.equal(branches.length, 4);
   assert.ok(JSON.stringify(branches[0]).includes('fortification'));
   assert.ok(JSON.stringify(production).includes('raise_mercenaries'));
   assert.ok(JSON.stringify(production).includes('rehire_mercenary'));
+  const dismiss = asRecord(branches[3], 'dismiss branch');
+  assert.ok(JSON.stringify(dismiss).includes('dismiss_mercenary'));
+  assert.deepEqual(dismiss.required, ['action', 'unitId']);
 }
 
 run();

@@ -18,12 +18,14 @@ import { chatPanelPlacement, legendPopoverPosition, messageToastBandWidth, toast
  *
  * Purpose: Keeps the legend on the map and the message band clear of the panel and the legend, with the same right inset
  *   whether the console is open or collapsed. The update toast anchors itself at the lower right and is not placed here.
- * When to use: After the maps are created, after the legend opens or closes, and whenever the map changes size.
+ * When to use: After the maps are created, after the legend opens or closes, after the minimap collapses or starts to
+ *   expand, and whenever the map changes size.
  * Expected outcome: An open legend sits beside the panel when it fits, otherwise under it. The band's width is
  *   `messageToastBandWidth`: the gap beside that chrome, or one third of the map, whichever is smaller, unless the
  *   open message toast's tab row is wider. It stays anchored on the right inset and inside the map's insets. Switching
  *   tabs does not change that width. On a narrow map, or when the tab row needs it, the band may overlap the left chrome.
- *   A closed legend is left where it was.
+ *   A closed legend, and a legend hidden with a collapsing or collapsed minimap, is left where it was, and the band then
+ *   clears only the panel.
  * Exceptions: None. Does nothing without `#canvas-container` or `#minimap-panel`.
  */
 export function layoutMapChrome(): void {
@@ -36,7 +38,8 @@ export function layoutMapChrome(): void {
   let leftObstacleRight = panelRight;
 
   const legend = document.getElementById('terrain-legend');
-  if (legend && !legend.hidden) {
+  const minimapCollapsed = panel.dataset.state === 'compact' || panel.dataset.state === 'collapsing';
+  if (legend && !legend.hidden && !minimapCollapsed) {
     const place = legendPopoverPosition({
       mapWidth: mapBox.width,
       panelRight,

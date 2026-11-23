@@ -56,7 +56,7 @@ const MEMORY_TIERS: readonly string[] = ['persistent', 'stored'];
  * Expected outcome: Same values the parser accepts.
  * Exceptions: None.
  */
-const PRODUCTION_ORDER_ACTIONS = ['set_build_queue', 'raise_mercenaries', 'rehire_mercenary'] as const;
+const PRODUCTION_ORDER_ACTIONS = ['set_build_queue', 'raise_mercenaries', 'rehire_mercenary', 'dismiss_mercenary'] as const;
 
 /**
  * Schema for a plain string value.
@@ -120,14 +120,14 @@ function arraySchema(items: Readonly<Record<string, unknown>>): Record<string, u
 /**
  * One closed production-order row for a single action.
  *
- * Purpose: Each action lists only the fields it requires, so a provider does not strip a rehire's unit id or demand a hex.
+ * Purpose: Each action lists only the fields it requires, so a provider does not strip a rehire's or a fire's unit id or demand a hex.
  * When to use: The `productionOrders` items union.
  * Expected outcome: `action` is a one-value enum and every field of that row is required.
  * Exceptions: None.
  */
 function productionOrderRowSchema(action: (typeof PRODUCTION_ORDER_ACTIONS)[number]): Record<string, unknown> {
   const actionField = enumSchema([action]);
-  if (action === 'rehire_mercenary') {
+  if (action === 'rehire_mercenary' || action === 'dismiss_mercenary') {
     return closedObjectSchema({ action: actionField, unitId: STRING_SCHEMA }, ['action', 'unitId']);
   }
   const unitType = action === 'raise_mercenaries' ? enumSchema(HIREABLE_UNIT_TYPES) : enumSchema(ALL_BUILD_QUEUE_ITEM_TYPES);

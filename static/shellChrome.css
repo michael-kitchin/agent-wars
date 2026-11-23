@@ -140,7 +140,9 @@ body {
   pointer-events: none;
 }
 /* The minimap panel at the map's top-left: the 280 x 200 overview, which sets the width, and under it a row of five
-   map-mode tabs. The tabs start hidden; the toggle on the overview's lower-left corner shows and hides them. */
+   map-mode tabs. The tabs start hidden; the toggle on the overview's lower-left corner shows and hides them. The
+   control on the upper-left corner collapses the whole panel to that 32 px control (`data-state`, set by
+   `src/renderer/map/minimapCollapse.ts`). */
 .minimap-panel {
   position: absolute;
   top: 12px;
@@ -205,6 +207,34 @@ body {
 }
 .minimap-tabs-toggle[aria-expanded="true"] .minimap-tabs-chevron {
   transform: rotate(180deg);
+}
+/* The same control on the overview's upper-left corner, with its dividers on the bottom and right edges. The chevron
+   points up while the minimap shows or is expanding, and down while it is collapsing or collapsed. */
+.minimap-collapse-toggle {
+  top: 0;
+  bottom: auto;
+  border-top: 0;
+  border-bottom: 1px solid var(--chrome-divider);
+}
+.minimap-panel[data-state="expanded"] .minimap-collapse-chevron,
+.minimap-panel[data-state="expanding"] .minimap-collapse-chevron {
+  transform: rotate(180deg);
+}
+/* Collapsed, the panel is only the control: 32 px inside the 1 px border. The overview keeps its size under the clip,
+   so Leaflet needs no resize on the way back. The rest is hidden, so it takes neither the pointer nor focus. */
+.minimap-panel[data-state="compact"] {
+  width: 34px;
+  height: 34px;
+}
+.minimap-panel[data-state="compact"] #minimap,
+.minimap-panel[data-state="compact"] #map-mode-tabs-toggle,
+.minimap-panel[data-state="compact"] .map-mode-tabs,
+.minimap-panel[data-state="compact"] .minimap-overview::after {
+  visibility: hidden;
+}
+/* The legend keeps its own open or closed state and shows again once the minimap has expanded. */
+body:has(#minimap-panel:not([data-state="expanded"])) #terrain-legend {
+  visibility: hidden;
 }
 #minimap.leaflet-container {
   font-family: system-ui, -apple-system, sans-serif;

@@ -1,5 +1,6 @@
 import { DEFAULT_BONUS_LEVEL, parseBonusLevel, type BonusLevel } from '../../shared/bonusLevel';
 import { parseStartMonth } from '../../shared/weatherBonusRules';
+import { syncNewGameSightCuesWithFog } from './newGameSightCuesUi';
 
 /**
  * Id of the Fog of war checkbox.
@@ -146,7 +147,7 @@ export function randomizeNewGameStartMonth(): void {
  * Purpose: Each refresh while the overlay is showing turns both checkboxes on and sets every bonus to the default level.
  * The starting month is drawn when the dialog opens, and a refresh leaves that draw in place.
  * When to use: Whenever the overlay is shown, including a refresh that does not reopen it.
- * Expected outcome: Fog and Auto-start AI are checked, and each present bonus dropdown shows Default. The stored value stays `low`. The month control is unchanged. Missing controls are skipped.
+ * Expected outcome: Fog and Auto-start AI are checked, and each present bonus dropdown shows Default. The stored value stays `low`. The month control is unchanged. Sight cues follow Fog, so with Fog checked the box is enabled with its remembered choice. Missing controls are skipped.
  * Exceptions: None.
  */
 export function resetNewGameOptionControls(): void {
@@ -158,4 +159,5 @@ export function resetNewGameOptionControls(): void {
     const select = optionSelect(id);
     if (select) select.value = DEFAULT_BONUS_LEVEL;
   }
+  syncNewGameSightCuesWithFog();
 }

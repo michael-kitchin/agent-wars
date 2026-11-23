@@ -46,7 +46,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
 - When the player clicks an order's cancel control, that order is cancelled exactly as its Orders tab row's cancel control does.
 - When the player clicks Dismiss, that row shows Cancel and Confirm. Several rows may show that pair at once. A later redraw keeps it for rows that are still the player's mercenaries.
 - When the player clicks Cancel, the row returns to Dismiss. The unit, its orders, and the treasury stay as they were.
-- When the player clicks Confirm, `executeDismissMercenary` runs immediately. Cancel and Confirm on that row stay disabled until the call finishes. That mercenary becomes Neutral, and every unit in a loaded mercenary ship's cargo becomes Neutral with it. Those units leave the selection. An empty selection clears the selected hex. When other units stay selected, the selected hex becomes the first remaining unit's hex, and the map follows. Their queued drafts and standing orders are dropped. Other selected units keep their queued orders. Hover preview and Ranged, Strike, and Launch targeting turn off. The hire fee is not returned. A refusal leaves the row on Cancel and Confirm and toasts the reason.
+- When the player clicks Confirm, `executeDismissMercenary` runs immediately. Cancel and Confirm on that row stay disabled until the call finishes. That mercenary becomes Neutral, and every unit in a loaded mercenary ship's cargo becomes Neutral with it. Those units leave the selection. An empty selection clears the selected hex. When other units stay selected, the selected hex becomes the first remaining unit's hex, and the map follows. Their queued drafts and standing orders are dropped. Other selected units keep their queued orders. Hover preview and Ranged, Strike, and Launch targeting turn off. The hire fee is not returned. A refusal leaves the row on Cancel and Confirm and toasts the reason. A fire that would let Neutral take enough of the player's home or cities to knock them out is refused (`DISMISS_REASON_KNOCKOUT`).
 - When the player drags the grip, which shows only while the panel is expanded, the panel resizes. Its bottom-left corner stays put. The width stays from 400 to 640 px and the height from 140 px to the map's height minus 24 px (`clampSelectionPanelSize` in `src/shared/selectionPanelSize.ts`). A dragged width applies to both states. A dragged height applies while the panel is expanded and replaces the half-the-map limit.
 - Clicks on a unit row do nothing else.
 
@@ -108,7 +108,8 @@ None.
 - `static/selectionChrome.css`
 - `src/renderer/gameplay/selectionPanel.ts`
 - `src/renderer/gameplay/selectionPanelDismiss.ts`
-- `src/shared/mercenaryDismiss.ts` (`mercenaryDismissShown`)
+- `src/shared/mercenaryDismiss.ts` (`mercenaryDismissShown`, `DISMISS_REASON_KNOCKOUT`)
+- `src/main/gameActions/mercenaryFireRisk.ts` (`fireWouldKnockOut`)
 - `src/main/gameActions/dismissMercenary.ts` (`executeDismissMercenary`)
 - `src/renderer/gameplay/selectionBar.ts`
 - `src/renderer/gameplay/selectionPanelExpand.ts`

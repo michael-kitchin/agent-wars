@@ -8,8 +8,6 @@ This guide covers a match, from the new-game screen to the end. Downloading the 
 
 **Reference:** [Units at a Glance](#units-at-a-glance) · [How a Turn Resolves](#how-a-turn-resolves) · [Winning and Losing](#winning-and-losing) · [Bonuses and Weather](#bonuses-and-weather) · [Battle Terrain and Roads](#battle-terrain-and-roads) · [Controls and Shortcuts](#controls-and-shortcuts) · [Things That May Surprise You](#things-that-may-surprise-you)
 
-
-
 ## What This Is
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning. For each turn, every side gives combat, movement, and production orders at the same time, based on partial, subjective views of the battlefield. Once everyone is ready, the game carries out those orders together and works out what happened (think: "Axis & Allies" meets "Diplomacy", with a software referee). Your opponents are AI commanders, each played by an LLM you choose (and pay for).
@@ -40,15 +38,12 @@ The new-game screen opens when you start Agent Wars. It has three sections, Map,
 | Turn length     | One month                                                | One week                                                                         |
 | Weather changes | Every turn                                               | Roughly every four turns                                                         |
 | Prices          | As in [Units at a Glance](#units-at-a-glance)            | Each map sets its own, shown in the Forces section.                              |
-| Losing a home   | Other sides and Neutral hold 90% of its original city cells. | Other sides and Neutral hold 90% of its original city cells.                 |
 
 If you're new to Agent Wars, start with a regional game. It's smaller and faster, so it's a better place to learn.
 
 ### Sides
 
 A match has two to four sides, and each side needs its own home. The first row is you. Each other row is an AI opponent, with a commander button that opens its settings:
-
-
 
 | Setting   | What it does |
 | --------- | ------------ |
@@ -61,7 +56,7 @@ A match has two to four sides, and each side needs its own home. The first row i
 
 Not sure which model to pick? My notes are under [Getting Started](../README.md#getting-started) in the README.
 
-**Copy from Last Game** fills the first opponent from the one you used last time. Each later opponent can copy the row above it, and **Add another opponent** does that for you. **Observe only** gives every side an AI commander, and is covered in [Agent-Only Games](#agent-only-games).
+In the first opponent's settings, **Copy from Last Game** fills it from the one you used last time. Each later opponent can copy the row above it, and **Add another opponent** does that for you. A copy keeps the opponent's own nickname. **Observe only** gives every side an AI commander, and is covered in [Agent-Only Games](#agent-only-games).
 
 ### Forces
 
@@ -89,25 +84,21 @@ The **Settings** button on the top bar shows the match's options. While you plan
 
 ## The Screen
 
-
-
 | # | Area | Where | What it's for |
 | --- | --- | --- | --- |
-| 1 | Top bar | Top | The game menu (top left), the sides, your production (`⚒N/turn`), credits (`¤N`), forces against caps, your home and enemy homes held, the date and turn, and Settings. Rest the pointer on a side's name to count its units. |
+| 1 | Top bar | Top | The game menu (top left), the sides, your production (`⚒N/turn`), credits (`¤N`), forces against caps, your home and enemy homes held (or, with a turn limit, your city hexes and your place), the date and turn, and Settings. Rest the pointer on your own name to count your units. |
 | 2 | Map | Center | Strategic hexes. Your units are teal. Zoom in for build markers, battle markers, and finer place names. |
-| 3 | Minimap | Top left | Where you're looking. The toggle on its lower-left corner shows the map-mode buttons (see [Reading the Game](#tooltips-map-modes-and-the-legend)). |
+| 3 | Minimap | Top left | Where you're looking. The toggle on its upper-left corner tucks the whole minimap away (and brings it back), and the one on its lower-left corner shows the map-mode buttons (see [Reading the Game](#tooltips-map-modes-and-the-legend)). |
 | 4 | AI strategy toast | Top right | What each commander said and planned this turn, one tab per commander. |
 | 5 | Selection panel | Bottom left | The selected units, a hint for your next double-click, and the reticle for attacks. The chevron shows details. |
 | 6 | Chat panel | Bottom right | Write to a commander, and read every message in the match. See [Talking to Commanders](#talking-to-commanders). |
 | 7 | Map toast | Bottom right | Turn reports and errors. The chat panel hides while it shows. |
-| 8 | Console | Right | Three tabs on its rail: **Orders** (what you've queued), **Reports** (every report and message this match), and **Command** (the commanders). Click the selected tab to fold the console away. |
+| 8 | Console | Right | Three tabs on its rail: **Orders** (what you've queued), **Reports** (every report and message this match), and **Command** (the commanders). Click the selected tab to fold the console away. (Build and Forces are greyed out. They're not in this version yet.) |
 | 9 | Ready | Bottom of the console | Ends your planning. The line above it says whether the commanders are still planning. |
 
 ## Your First Turn
 
 You can play all you want with the AI off, and it's a great way to get used to the controls without burning tokens. On the new-game screen, pick **Regional** with two sides. In Game Options, uncheck **Auto-start AI**, then click **Start game**. The opponent won't plan (or spend your money), so you can try everything for free. **Start** on the [Command tab](#managing-commanders) turns its planning on whenever you like.
-
-
 
 1. **Find your units.** Your home is outlined, and your units are the teal tokens in it. Your own home hexes are always visible through fog.
 2. **Select one.** Click a lone unit's token to select it. A stack opens a list where you pick units, or **+ All**.
@@ -144,13 +135,11 @@ Once you've got the hang of it, start a real match with a model on each opponent
 
 Click the **×** at the end of an order's row on the Orders tab. Other orders stay. A new move order for the same unit replaces its old one.
 
-
-
 ### Sealift
 
-*Select a stack including naval and ground units within a seaport hex, then load/unload units using the stack popup. Ground units can be unloaded in any coastal hex.*
+*Select a stack with naval and ground units in a coastal or seaport hex, then load and unload units from the stack popup.*
 
-![Select a stack including naval and ground units within a seaport hex, then load/unload units using the stack popup. Ground units can be unloaded in any coastal hex.](media/sealift.png)
+![Select a stack with naval and ground units in a coastal or seaport hex, then load and unload units from the stack popup.](media/sealift.png)
 
 Land units can't cross water on their own, so ships are the way between landmasses. Each naval unit carries one armor or two infantry.
 
@@ -177,7 +166,7 @@ Every attack starts the same way: select the units, click the reticle in the sel
 | --- | --- |
 | ![Step 1: Select a unit or stack, then click the reticle on the selection bar, at the map's bottom left.](media/ranged-attack-1.png) | ![Step 2: Double-click on a visible target to order the attack.](media/ranged-attack-2.png) |
 
-- **Reach** is a crimson dashed outline. It ignores line of sight, so in a battle a mountain between shooter and target can still block armor and naval. Pointing at a valid target draws a crimson line from each shooter. For ranged fire, a tip gives the odds after a second.
+- **Reach** is a crimson dashed outline. The outline ignores line of sight, so in a battle a mountain between shooter and target can still block armor and naval. Pointing at a valid target draws a crimson line from each shooter. For ranged fire, a tip gives the odds after a second.
 - **Invalid targets** get a teal X, and a tip says why.
 - **A greyed reticle** means the selection can't fire, and pointing at it says why. Mixing air with other types does that, and so does infantry on the strategic map.
 - **Return fire** is automatic. Your units fire only when you aim them.
@@ -214,7 +203,7 @@ Air units sit at an airport and don't march. Each turn an air unit does one thin
 
 ![Select only missiles, then click the reticle. Double-click an explored hex in range. The dotted line shows the launch.](media/missile-launch.png)
 
-A missile is built at an Advanced city. It never moves, sees nothing, and launches once, at any explored hex in range, including its own. Launches go first in the turn. Every city, airport, and seaport cell in the target hex is destroyed on a d20 roll of 10 or less, and a fortified cell loses only its fortification. Air units based at a destroyed airport die. Other units are unharmed. A spent missile isn't counted as a combat loss. Missiles can't launch in a battle.
+A missile is built at an Advanced city. It never moves, sees nothing, and launches once, at any explored hex in range, including its own. Every city, airport, and seaport cell in the target hex is destroyed on a d20 roll of 10 or less, and a fortified cell loses only its fortification. Air units based at a destroyed airport die. Other units are unharmed. A spent missile isn't counted as a combat loss. Missiles can't launch in a battle.
 
 ## Building and Paying
 
@@ -233,6 +222,7 @@ A missile is built at an Advanced city. It never moves, sees nothing, and launch
 - **Where you can build:** in your home, or on a hex that holds one of your units or fortifications at the end of the turn. Elsewhere the queue pauses and its points are discarded.
 - **Only legal choices:** the list offers only what that hex can build. Ships need a seaport with water beside it. Air needs an airport. Missiles need an Advanced city.
 - **Bombing hurts:** destroyed city cells lower income for the rest of the match.
+- **Neutral borders:** on a regional map, hexes on the neutral border produce nothing, and you can't fortify them or raise mercenaries there.
 
 Costs, city-cell minimums, and caps are in [Units at a Glance](#units-at-a-glance).
 
@@ -267,8 +257,8 @@ Credits (`¤`) pay for mercenaries. Your treasury starts at 0 and only you see i
 - **Never:** missiles are never hired, and there's no hiring in a battle.
 - **The fee** comes out of the treasury when you place the order. Removing the order, or a count that doesn't fill, returns it. Prices are on the mercenary row of [Units at a Glance](#units-at-a-glance).
 - **Upkeep** is charged every turn and shows in the top bar as `¤N + ¤M/turn`. The readout changes color when the balance is below this turn's upkeep.
-- **Desertion:** if upkeep at Ready is more than the treasury holds, random mercenaries desert to Neutral. A mercenary aboard a ship that isn't a mercenary doesn't desert, and its upkeep is forgiven. A mercenary ship that deserts takes its whole cargo with it.
-- **Dismiss:** Dismiss on your mercenary, in the expanded selection panel, makes it Neutral at once and drops it from this turn's upkeep. The fee isn't returned. A mercenary aboard a ship can't be dismissed. Dismissing a loaded mercenary ship takes its cargo with it, and the ship can't be rehired while it's loaded.
+- **Desertion:** if this turn's upkeep is more than the treasury holds, after production adds any Credits, random mercenaries desert to Neutral. A mercenary aboard a ship that isn't a mercenary doesn't desert, and its upkeep is forgiven. A mercenary ship that deserts takes its whole cargo with it.
+- **Dismiss:** click **Dismiss** on your mercenary, in the expanded selection panel, then **Confirm**. It becomes Neutral at once and drops out of this turn's upkeep. The fee isn't returned, but you can rehire it later. A loaded mercenary ship takes its cargo with it. Dismiss is refused for a mercenary aboard a ship, and when it would let Neutral take enough of your home or cities to knock you out.
 - **On the map:** a mercenary token shows `¤` at its center.
 
 ## Battles
@@ -279,7 +269,7 @@ Credits (`¤`) pay for mercenaries. Your treasury starts at 0 and only you see i
 
 ### Fighting or Ignoring
 
-When your units and an AI's end a turn in the same hex, the **Tactical Battles** dialog lists the battles you can fight yourself. Pick one and click **Fight**, and your units break into sub-units and the map zooms in. Click **Ignore**, and every battle is settled with dice on the world map. To stop being asked, uncheck **Offer tactical battles** in the game menu.
+When your units and an AI's end a turn in the same hex, the **Tactical Battles** dialog lists the battles you can fight yourself. Pick one and click **Fight**, and your units break into sub-units and the map zooms in. Click **Ignore** (or press Escape, or click outside the dialog), and every battle is settled with dice on the world map. A hex with three sides in it always resolves on the world map. To stop being asked, uncheck **Offer tactical battles** in the game menu.
 
 A battle you fight takes place inside one strategic turn. Every side sets the strategic game aside for that turn, and units elsewhere keep following their existing orders. So you have to choose where to focus your attention.
 
@@ -291,15 +281,13 @@ An ignored or abandoned battle can go on for more turns, marked with a magnifyin
 
 ![Beat 8 of a tactical battle in Colombia and Venezuela, during a rainy June.](media/front-page-battle-1-large.png)
 
-
-
 ### How Battles Are Different
 
 *Ukrainian 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).*
 
 ![Ukrainian 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).](media/terrain-bonus-movement.png)
 
-- **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells. Sub-units are WW2-style regiments, squadrons, and naval task groups.
+- **Scale:** the battlefield is the contested hex split into much smaller cells, plus three rings of neighboring cells. Sub-units are WW2-style regiments, squadrons, and naval task groups.
 - **Beats:** each Ready resolves one beat: air strikes, ranged fire, movement, then melee. The top bar becomes a battle header that names the hex and the beat.
 - **Deployment:** units start on the edge of the hex they entered from. Missiles take their birth cell first, then the controller's other units start on its [fortified](#fortifications) city cells, one each. Nobody starts on a cell the other side fortified.
 - **No fog and no production** while a battle runs. The date and weather stay fixed.
@@ -340,7 +328,6 @@ Each side holds one draft at a time, so writing to that side again replaces it.
 ### What a Commander Does With It
 
 - **It reads it next time it plans.** An unread message makes that commander plan on its next turn, even when it otherwise wouldn't have (see [Managing Commanders](#managing-commanders)).
-- **Replies come later.** A commander that answers does it on a later turn.
 - **It sees only its own mail.** A commander reads the messages it sent and the ones sent to it, never your messages to another side.
 - **It talks before it acts.** Before a commander plans its orders, it may write to other sides and update how it sees them. In a battle, only the two sides fighting talk.
 - **It weighs deeds over words.** Each commander keeps a private stance toward every other side (hostile, wary, neutral, cordial, or friendly), with trust and threat scores from 0 to 4. The game shows it a record of the units each side destroyed, and tells it to judge a side more by that than by what it says. A friendly message while your armor rolls over its cities won't get you far. A stance is never an alliance, and neither is an [agreement](#agreements).
@@ -358,8 +345,6 @@ Commanders can also make deals, with each other or with you. When a commander be
 - **You don't keep a record.** To make a deal with a commander, write to it. If it agrees, it records the deal with you on its side, and whether it keeps it is up to it.
 - **Watching them:** you can't open a commander's record, but the [Charts](#charts) show every commander's agreements turn by turn.
 
-
-
 ### Reading Messages
 
 | *Each commander's messages, and its strategy, appear at the top right of the map. The chat panel at the bottom right holds the history.* | *End-of-turn updates appear at the lower right of the map.* |
@@ -376,8 +361,6 @@ Commanders can also make deals, with each other or with you. When a commander be
 
 The console's **Command** tab (its header reads Commanders) is where you run the opponents during a match.
 
-
-
 ![The Command tab, with Start or Stop, the commander cards, the tool groups, and the activity log.](media/command-tab.png)
 
 - **Start or Stop** turns opponent planning on or off for every commander. With planning off, the commanders make no model calls.
@@ -385,7 +368,7 @@ The console's **Command** tab (its header reads Commanders) is where you run the
 - **Waiting:** while commanders plan, the line above Ready reads **Commanders planning**, and Ready shows **AI:**, a timer, and `(xN)` for how many are still planning. You can keep giving orders while you wait. Only Ready waits for them.
 - **Stop** during a plan stops it. If the turn hasn't resolved yet, Ready can resolve it without those orders.
 - **Not every turn:** with **Events** on (the default) in the tool groups, a commander is consulted when something it's watching happens, when it has an unread message, and at least every five turns. In between, its standing orders run. Turn Events off to consult every commander every turn, at more cost.
-- **Campaigns and postures:** with the Orders tool group on, each commander's ground units work toward one enemy city at a time, its campaign. When they can't march there, the game gathers them at a port and ships them across the sea, and later landings reinforce the first. A commander that calls a crossing off gets no new one for 10 turns. Each commander also names a posture every turn, overland, maritime, strangle, or blitz, that leans what it builds and which operations it runs, and keeps a new one for at least 6 turns. The briefing tells it which postures fit each enemy and flags a posture that does not fit the side holding its campaign target. The [Charts](#charts) show each commander's posture turn by turn.
+- **Campaigns and postures:** with the Orders tool group on, each commander's ground units work toward one enemy city at a time, its campaign. When they can't march there, the game gathers them at a port and ships them across the sea, and later landings reinforce the first. A commander that calls a crossing off gets no new crossing to that city for 10 turns. Each commander also names a posture every turn, overland, maritime, strangle, or blitz, that shapes what it builds and which operations it runs, and keeps a new one for at least 6 turns. The [Charts](#charts) show each commander's posture turn by turn.
 - **Tool groups** are the tools a commander's model may use: Precomputation, Events, Planning, Assessment, Estimation, Memory, Orders, and Production. Leave them at their defaults unless you're experimenting. [ai-tools.md](ai-tools.md) describes each.
 - **The activity log** at the bottom records each consult, retry, and error. Its filter shows one commander's lines.
 
@@ -401,8 +384,6 @@ After Ready, the map toast and the Reports tab give each side a section when it 
 - **Unit tooltips:** rest the pointer on a unit's flag, in the stack list or anywhere else it appears, for the bonuses it was born with.
 - **Hold T** to hide terrain fill and show hex codes and tech icons.
 - **Map modes:** click the toggle on the minimap's lower-left corner to show the buttons under it. **Weather** shows the weather icons (off by default), **Tech** each hex's tech tier, **Control** who holds each hex (on by default), **Production** a production label on every hex, and **Legend** the terrain key. The legend's menu sets the map colors: Standard, Topographic, Nautical, or Night.
-
-
 
 ### Charts
 
@@ -434,7 +415,7 @@ Press **C**, or check **Charts…** in the game menu, to see how the match is go
 
   ![Hovering S. France's turn 18: an active non-aggression deal with SEGAS, which SEGAS records too, and a proposed one with N. France, which N. France doesn't.](media/charts-agreements-strip-w-popup.png)
 
-- **Posture:** a row for each AI commander, and a cell for each turn, colored by the posture the commander held: overland, maritime, strangle, or blitz. A solid color (acting) means the posture's lead activity ran that turn: the land campaign assaulting for overland, a sea operation at sea or landed for maritime, a missile launched for strangle, an air operation for blitz. A light color (idle) means the commander declared the posture but that activity did not run. A colored outline means the commander never declared a posture and is on the default, overland. A gray outline means the turn is not recorded, which is true of every turn played before 3.4.0, or the commander is out of the match. Hovering a turn names each commander's posture.
+- **Posture:** a row for each AI commander, and a cell for each turn, colored by its posture. A solid color means the posture's main activity ran that turn (a land assault, a sea operation, a missile launch, or an air operation), and a light color means it didn't. A colored outline means the commander is on the default, overland, without having named a posture. A gray outline means the turn wasn't recorded, as for turns played before 3.4.0, or the commander is out. Hovering a turn names each commander's posture.
 - **Line charts:** built units, mercenary units, hexes held, production per turn, stored production points, credits, upkeep, units lost per turn, and model cost so far. Built and mercenary units can show one unit type.
 
   *Line charts showing every turn. The list beside Built units is open, to show one unit type.*
@@ -461,14 +442,12 @@ Each step shows the map as you saw it then, with that turn's messages. After the
 
 You can also sit back and let the LLMs fight it out among themselves. It's a good way to compare models, to eavesdrop on what they say to each other, and to watch them make (and break) deals.
 
-
-
 ### Setting One Up
 
 1. On the new-game screen, check **Observe only: an AI commander plays every side**. Every row becomes an AI side with its own commander.
 2. Give each side a key, a model, and a doctrine. **Add another side** copies the settings of the row above.
-3. In Game Options, set **AI-only battles**. It picks one battle between AI sides to fight out beat by beat on the battle map, while the others resolve on the world map. **Balanced** (the default) picks the one where the sides are closest in numbers, **Unbalanced** the least equal one, and **Random** any one. **None** leaves every battle on the world map. **Beat limit** (30 by default, or Unlimited) caps how long one of those battles runs.
-4. Leave **Sight cues** on to start each turn's playback with lines showing what each commander could see when it planned. They appear only while fog of war is on.
+3. In Game Options, set **AI-only battles**. It picks one battle between AI sides to fight out beat by beat on the battle map, while the others resolve on the world map. **Balanced** (the default) picks the one where the sides are closest in numbers, **Unbalanced** the least equal one, and **Random** any one. **None** leaves every battle on the world map. **Beat limit** (20, 30, 40, or 50 beats, 30 by default, or Unlimited) caps how long one of those battles runs.
+4. Leave **Sight cues** on to start each turn's playback with lines showing what each commander could see when it planned. They need fog of war, so the box is unavailable while Fog of war is off.
 
 Every side's commander makes its own model calls on its own key, so a four-way match costs four commanders' worth of tokens (and you're paying for all of them). The Command tab shows each one's cost as it goes.
 
@@ -481,7 +460,7 @@ The next turn waits until you click **Ready**, or check **Start the next turn wh
 | Look through one side's fog | Pick that side from **View as**, in the top bar. |
 | See every side, with no fog | Pick **All sides, no fog** from View as. |
 | Count a side's units | Rest the pointer on its name in the top bar. |
-| Read the diplomacy | Uncheck the auto-start box, then open the chat panel's history. It's read-only while you watch. |
+| Read the diplomacy | Uncheck **Start the next turn when every commander is ready**, then open the chat panel's history. It's read-only while you watch. |
 | See how the sides regard each other, and what they've agreed to | Open the [Charts](#charts). |
 | Look back | Use [Replay](#replay). |
 
@@ -497,9 +476,9 @@ Save game… and Load game… are in the game menu, under the button at the top 
 | --- | --- |
 | ![Save game… and Load game… are in the game menu, under the button at the top left.](media/save-load-menu.png) | ![Loading over a match in progress asks first.](media/load-confirm.png) |
 
-- **Saving:** the suggested name is "Map turn N.agentwars", or "Map turn N battle turn T.agentwars" in a battle. Saving works while you're giving orders, including in a battle. It's off when there's no match, while the new-game screen is open over a match, while a turn or beat is resolving, and once the match is over.
+- **Saving:** the suggested name is the map and turn, such as "Western Europe turn 5.agentwars", with "battle turn T" added in a battle. You can save whenever you're giving orders, including in a battle, but not while a turn or beat resolves or after the match ends.
 - **Loading:** if a match is still going, the game asks before replacing it.
-- **Autosaves:** the last five turn starts sit in an `autosaves` folder. Open one with Load game….
+- **Autosaves:** the game saves at the start of every turn, and every beat in a battle, and keeps the last five in an `autosaves` folder. Open one with Load game….
 - **Recordings:** when a match ends, its history is written as a file in a `recordings` folder beside `autosaves`.
 - **What the file leaves out:** API keys and your Nickname setting. The names the sides are using in that match are kept. A file written by another version of Agent Wars can't be opened.
 - **New game** from the menu leaves the current match running. Close the screen to go back to it.
@@ -523,8 +502,6 @@ Each piece, on the global map and across the 23 regional maps.
 - **Hit numbers:** attack and defense are d20 hit numbers. 3 hits 15% of the time, 7 hits 35%, and 10 hits 50%.
 - **Regional maps:** those ranges run from the cheapest map to the dearest. The new-game screen shows the chosen map's own prices and Advanced size.
 - **Advanced mercenaries:** with the tech bonus on, a mercenary born in an Advanced city costs about twice the upkeep: infantry ¤5, armor ¤10, air ¤15, naval ¤25.
-
-
 
 ### Units in Battles
 
@@ -555,13 +532,12 @@ Every side gives orders for the same turn, and the engine resolves them together
 8. Mercenary pay and hiring
 9. Knockouts
 
-- **Before moving:** strikes and ranged fire use positions from before anyone moves.
 - **Melee** happens wherever enemy units share a hex after movement. An air unit on that hex fights there. Infantry it carries doesn't.
 - **Ferries** come after ground movement. A drop is earlier, with the air strikes.
 - **No slipping past:** enemy units ordered into each other's hexes don't swap. A roll picks one of the two hexes. The units there stay put, the units heading in arrive, and they fight.
 - **Rolls:** each unit rolls one d20 and hits on a roll at or under its hit number. A roll of 18 to 20 always misses.
 - **Hits** remove whole units. There's no partial damage. In a fortified hex, a fortification goes first.
-- **Who's hit first:** a side loses its lowest-defense units first, then infantry, armor, naval, and air, in that order. A missile is hit last.
+- **Who's hit first:** a side loses its lowest-defense units first, so air (defense 3) goes before the rest. Ties go infantry, then armor, then naval. A missile is hit last.
 - **Attack or defense** in melee is random each turn. Moving in doesn't make you the attacker.
 - **Still together:** enemies sharing a hex after melee fight again next turn.
 
@@ -578,8 +554,6 @@ At the end of each turn, a side is knocked out when any of these is true:
 - Its own home has no cities left.
 
 A home hex counts as lost when another side or Neutral holds it. A hex nobody holds counts for no one, so two homes that share hexes don't knock each other out on turn 1. Bombing doesn't lower the 90% target. A home that started with no city cells is lost when every hex of it is held by other sides or Neutral. The notice says "Other sides and Neutral hold 90% of its home's cities", and names the side holding the most of it.
-
-Every commander is told how many city hexes each side holds and how much of its home is lost. A side with five or fewer city hexes has its city hexes listed.
 
 A knocked-out side's land and units become neutral. Losing every unit isn't a knockout by itself, and a side with no units left can still build.
 
@@ -703,7 +677,7 @@ Map keys do nothing while you're typing in a field. The full input map is in [ux
 - **Fog fades:** an enemy you lose sight of stays at its last known spot for 2 turns, then disappears.
 - **Homes show through fog:** home outlines are drawn through fog, and your own home hexes are always visible.
 - **Playback blocks orders:** while a turn plays back, you can pan, zoom, and read tooltips, but not give orders.
-- **A queue can pause:** outside your home, a queue spends only on a hex with your units or fortifications. Elsewhere it keeps its rows, discards its points, and the map label shows ∞t. A queue whose next unit is at your cap also waits, and says `Queue paused: unit cap reached.`
+- **A queue can pause:** a queue outside your home with no units or fortifications of yours keeps its rows, but its map label shows ∞t. A queue whose next unit is at your cap waits too, and says `Queue paused: unit cap reached.`
 - **A shared hex fights:** a deserter or a dismissed mercenary left beside your units, or a Neutral unit you rehire into a hex that holds another side, fights at the next resolution.
 - **Land-locked ports:** a seaport with no water or coast in or next to its hex can't build ships. Its tooltip reads Seaports (no sea access).
 - **Only one copy runs:** starting Agent Wars again brings the open window to the front.

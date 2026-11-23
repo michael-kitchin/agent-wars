@@ -158,6 +158,23 @@ function testNormalizeProductionOrdersAcceptsHireRows(): void {
   assert.strictEqual(parsed.droppedReasons.length, 1);
 }
 
+/**
+ * Accepts a fire row with a unit id and drops one without.
+ *
+ * Purpose: A commander fires a mercenary through the same envelope list.
+ * When to use: After the normalizer accepts the fire action.
+ * Expected outcome: One valid row and the exact drop reason.
+ * Exceptions: None.
+ */
+function testNormalizeProductionOrdersAcceptsDismissRows(): void {
+  const parsed = normalizeProductionOrders(
+    [{ action: 'dismiss_mercenary', unitId: 'h1-i1' }, { action: 'dismiss_mercenary' }],
+    strategicCtx
+  );
+  assert.deepStrictEqual(parsed.validOrders, [{ action: 'dismiss_mercenary', unitId: 'h1-i1' }]);
+  assert.deepStrictEqual(parsed.droppedReasons, ['productionOrders[1]: dismiss_mercenary requires unitId.']);
+}
+
 function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void {
   const parsed = normalizeProductionOrders({ action: 'set_build_queue' }, strategicCtx);
   assert.strictEqual(parsed.validOrders.length, 0);
@@ -181,6 +198,7 @@ function run(): void {
     { name: 'fortification order', fn: testNormalizeProductionOrdersAcceptsFortification },
     { name: 'credits order', fn: testNormalizeProductionOrdersAcceptsCredits },
     { name: 'hire rows', fn: testNormalizeProductionOrdersAcceptsHireRows },
+    { name: 'dismiss rows', fn: testNormalizeProductionOrdersAcceptsDismissRows },
   ];
   for (const test of tests) {
     try {

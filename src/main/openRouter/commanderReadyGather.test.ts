@@ -13,7 +13,7 @@ import { gridDisk } from 'h3-js';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
-import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
+import { AI_SEAT_IDS, NEUTRAL_OWNER_ID, type AiSeatId } from '../../shared/seatIds';
 import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer } from '../gameDb';
 import { setAiPendingOrders } from '../gameDb';
 import { writeOperationsForSeat } from '../gameDb/operationMemory';
@@ -55,6 +55,20 @@ function aiSeat(sideGroupId: string, modelId: string | null): NewGameSeatInput {
 }
 
 /**
+ * Inserts one unit row for a seat on the first hex of the map.
+ *
+ * Purpose: Ready keeps only orders for units the seat owns, so a stored plan needs real units.
+ * When to use: Before the gather, for each unit id a stored plan names.
+ * Expected outcome: An infantry unit owned by `owner`.
+ * Exceptions: None.
+ */
+function seedUnit(id: string, owner: string): void {
+  const hex = dbGetOne<{ h3Index: string }>('SELECT h3_index AS h3Index FROM hexes LIMIT 1')?.h3Index;
+  assert.ok(hex, 'the temporary match has hexes');
+  dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, owner, 'infantry', hex]);
+}
+
+/**
  * Three seats: a stored plan, a plan that arrives while Ready waits, and standing orders.
  *
  * Purpose: Ready must not start a second timeout, and a seat with no model still gets an entry.
@@ -77,6 +91,8 @@ test('ready gathers a stored plan, a late plan, and standing orders', async (t) 
     const storedSeat: AiSeatId = AI_SEAT_IDS[0];
     const lateSeat: AiSeatId = AI_SEAT_IDS[1];
     const standingSeat: AiSeatId = AI_SEAT_IDS[2];
+    seedUnit('stored-unit', storedSeat);
+    seedUnit(`late-${lateSeat}`, lateSeat);
     setAiPendingOrders(storedSeat, {
       movementOrders: [{ unitId: 'stored-unit', toH3Index: '8129fffffffffff' }],
       rangedOrders: [],
@@ -197,6 +213,8 @@ test('a state read that throws while adding operation orders keeps that seat pen
       embarkOrders: [],
       missileLaunchOrders: [],
     });
+    seedUnit('kept-unit', keptSeat);
+    seedUnit('other-unit', otherSeat);
     setAiPendingOrders(keptSeat, pending('kept-unit'));
     setAiPendingOrders(otherSeat, pending('other-unit'));
     const orders = await gatherCommanderOrdersForReady({
@@ -211,6 +229,41 @@ test('a state read that throws while adding operation orders keeps that seat pen
     });
     assert.equal(orders.get(keptSeat)?.movementOrders[0]?.unitId, 'kept-unit');
     assert.equal(orders.get(otherSeat)?.movementOrders[0]?.unitId, 'other-unit');
+    resetCommanderPool([]);
+  });
+});
+
+test('orders for a unit the seat no longer owns are dropped at Ready', async () => {
+  const map = regionalMap();
+  assert.ok(map, 'a regional map with three side groups is required');
+  const seats = [
+    aiSeat(map.sideGroupIds[0] ?? '', null),
+    aiSeat(map.sideGroupIds[1] ?? '', null),
+    { kind: 'human' as const, sideGroupId: map.sideGroupIds[2] ?? '' },
+  ];
+  await withSeatedTempGameDbAsync('aw-ready-gather-fired-', { gameMapId: map.id, fogOfWarEnabled: false, seats }, async () => {
+    const seatId: AiSeatId = AI_SEAT_IDS[0];
+    seedUnit('own-unit', seatId);
+    seedUnit('fired-unit', NEUTRAL_OWNER_ID);
+    setAiPendingOrders(seatId, {
+      movementOrders: [
+        { unitId: 'own-unit', toH3Index: '8129fffffffffff' },
+        { unitId: 'fired-unit', toH3Index: '8129fffffffffff' },
+      ],
+      rangedOrders: [],
+      airStrikeOrders: [],
+      ferryOrders: [],
+      embarkOrders: [],
+      missileLaunchOrders: [],
+    });
+    const orders = await gatherCommanderOrdersForReady({
+      useEventDriven: true,
+      turnNumber: 1,
+      aiPlanningRunEnabled: false,
+      hasKey: false,
+      getGameStateForPlayer: (id) => getGameStateForPlayer(id),
+    });
+    assert.deepEqual(orders.get(seatId)?.movementOrders.map((order) => order.unitId), ['own-unit']);
     resetCommanderPool([]);
   });
 });

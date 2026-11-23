@@ -10,6 +10,7 @@
 import { AI_ONLY_BATTLE_MODES, DEFAULT_AI_ONLY_BATTLES, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import { bindNewGameBeatLimit, renderNewGameBeatLimit, resetNewGameBeatLimit } from './newGameBeatLimitUi';
 import { DEFAULT_SIGHT_CUES } from '../../shared/sightCueSettings';
+import { resetNewGameSightCues } from './newGameSightCuesUi';
 import {
   DEFAULT_TURN_LIMIT,
   DEFAULT_VICTORY_RULE,
@@ -145,7 +146,7 @@ export function readNewGameVictory(): { readonly victoryRule: VictoryRule; reado
  *
  * Purpose: Opening the overlay starts from the default rule.
  * When to use: `refreshNewGameSides({ reset: true })` only.
- * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, AI-only battles is Balanced, Beat limit is 30, and Sight cues is checked.
+ * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, AI-only battles is Balanced, Beat limit is 30, and Sight cues is checked, or locked off while Fog of war is unchecked.
  * Exceptions: None.
  */
 export function resetNewGameVictory(): void {
@@ -154,8 +155,7 @@ export function resetNewGameVictory(): void {
   if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
   const aiOnly = document.getElementById('new-game-ai-only-battles-select');
   if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
-  const sightCues = document.getElementById('new-game-sight-cues-checkbox');
-  if (sightCues instanceof HTMLInputElement) sightCues.checked = DEFAULT_SIGHT_CUES;
+  resetNewGameSightCues(DEFAULT_SIGHT_CUES);
   resetNewGameBeatLimit();
   renderNewGameVictory();
 }

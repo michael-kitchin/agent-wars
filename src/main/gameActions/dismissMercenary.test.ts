@@ -11,23 +11,26 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   DISMISS_REASON_EMBARKED,
+  DISMISS_REASON_KNOCKOUT,
   DISMISS_REASON_MISSING,
   DISMISS_REASON_NOT_ACTIVE,
   DISMISS_REASON_NOT_MERCENARY,
   DISMISS_REASON_NOT_PLANNING,
   DISMISS_REASON_NOT_YOURS,
+  DISMISS_REASON_SHIP_CARGO,
   DISMISS_REASON_TACTICAL,
 } from '../../shared/mercenaryDismiss';
-import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { dbGetOne, dbRun } from '../gameDb';
+import { dbGetOne, dbRun, setHexController } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { readMercenaryFunds } from '../gameDb/mercenaryEconomyRead';
 import { setTreasuryCredits } from '../gameDb/mercenaryState';
 import { insertUnitRow } from '../gameDb/unitInsert';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { setActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
-import { executeDismissMercenary } from './dismissMercenary';
+import { executeCommanderDismissMercenary, executeDismissMercenary } from './dismissMercenary';
+import { fireWouldKnockOut, projectedHomeLoss, readFireRiskInputs } from './mercenaryFireRisk';
 import { transferNeutralUnitToSeat } from './unitOwnershipTransfer';
 
 test('executeDismissMercenary converts one mercenary and leaves the treasury and a sibling', () => {
@@ -42,6 +45,9 @@ test('executeDismissMercenary converts one mercenary and leaves the treasury and
       [HUMAN_SEAT_ID, h3]
     );
     const before = readMercenaryFunds(gameDbOps, HUMAN_SEAT_ID);
+    const risk = readFireRiskInputs(HUMAN_SEAT_ID);
+    assert.ok(risk);
+    assert.equal(fireWouldKnockOut(risk, h3), false);
     const result = executeDismissMercenary(HUMAN_SEAT_ID, 'h1-d1');
     assert.deepEqual(result, { success: true, unitIds: ['h1-d1'] });
     const converted = ownerOf('h1-d1');
@@ -93,6 +99,22 @@ test('executeDismissMercenary converts a loaded ship with its cargo and keeps th
     assert.ok(assignments[0]);
     assert.ok(assignments[1]);
     assert.throws(() => transferNeutralUnitToSeat('h1-d910', HUMAN_SEAT_ID));
+  });
+});
+
+test('executeCommanderDismissMercenary refuses a loaded ship and converts nothing', () => {
+  withTempGameDb('aw-dismiss-commander-ship-', () => {
+    const h3 = humanHex();
+    insertUnitRow(dbRun, unitRow('h1-c910', h3, 'naval', true));
+    insertUnitRow(dbRun, unitRow('h1-c911', h3, 'infantry', false));
+    dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['h1-c911', 'h1-c910']);
+    assert.deepEqual(executeCommanderDismissMercenary(HUMAN_SEAT_ID, 'h1-c910'), { success: false, reason: DISMISS_REASON_SHIP_CARGO });
+    assert.equal(ownerOf('h1-c910')?.player, HUMAN_SEAT_ID);
+    assert.equal(ownerOf('h1-c911')?.player, HUMAN_SEAT_ID);
+    insertUnitRow(dbRun, { ...unitRow('o1-c920', h3, 'naval', true), player: 'opponent' });
+    insertUnitRow(dbRun, { ...unitRow('o1-c921', h3, 'infantry', false), player: 'opponent' });
+    dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['o1-c921', 'o1-c920']);
+    assert.deepEqual(executeCommanderDismissMercenary(HUMAN_SEAT_ID, 'o1-c920'), { success: false, reason: DISMISS_REASON_NOT_YOURS });
   });
 });
 
@@ -160,6 +182,35 @@ test('executeDismissMercenary refuses while a tactical battle is active', () => 
     } finally {
       setActiveTacticalBattleSnapshotRef(null);
     }
+  });
+});
+
+test('executeDismissMercenary refuses a fire that would knock the side out and changes nothing', () => {
+  withTempGameDb('aw-dismiss-knockout-', () => {
+    const risk = readFireRiskInputs(HUMAN_SEAT_ID);
+    assert.ok(risk, 'the temporary match is region versus region');
+    const lender = AI_SEAT_IDS[0];
+    const homeBySize = [...risk.homeHexes].sort((a, b) => risk.baselineUrbanCellsForHex(a) - risk.baselineUrbanCellsForHex(b));
+    let tipping: string | null = null;
+    for (const hex of homeBySize) {
+      setHexController(hex, lender);
+      const now = readFireRiskInputs(HUMAN_SEAT_ID);
+      assert.ok(now);
+      if (projectedHomeLoss(now, new Set()).homeLost) {
+        setHexController(hex, HUMAN_SEAT_ID);
+        tipping = hex;
+        break;
+      }
+    }
+    assert.ok(tipping, 'handing over the home must eventually lose it');
+    dbRun('UPDATE res_s_infrastructure SET fortified_count = 0 WHERE h3_index = ?', [tipping]);
+    insertUnitRow(dbRun, unitRow('h1-k1', tipping, 'infantry', true));
+    const ready = readFireRiskInputs(HUMAN_SEAT_ID);
+    assert.ok(ready);
+    assert.equal(fireWouldKnockOut(ready, tipping), true);
+    assert.deepEqual(executeDismissMercenary(HUMAN_SEAT_ID, 'h1-k1'), { success: false, reason: DISMISS_REASON_KNOCKOUT });
+    assert.equal(ownerOf('h1-k1')?.player, HUMAN_SEAT_ID);
+    assert.equal(ownerOf('h1-k1')?.mercenary, 1);
   });
 });
 

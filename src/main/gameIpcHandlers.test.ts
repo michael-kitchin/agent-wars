@@ -170,6 +170,22 @@ async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<vo
 }
 
 /**
+ * Stores units for the first AI seat in the temporary match.
+ *
+ * Purpose: Ready keeps a commander's orders only for units the seat owns in the `units` table, so the ids a test orders must exist.
+ * When to use: Inside `withSeatedTempGameDbAsync`, before `handleGameReady`.
+ * Expected outcome: One infantry row per id, owned by `AI_SEAT_IDS[0]`, on the match's first hex.
+ * Exceptions: Throws when the match has no hexes.
+ */
+function seedOpponentUnits(unitIds: readonly string[]): void {
+  const hex = dbGetAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM hexes LIMIT 1')[0]?.h3Index;
+  assert.ok(hex, 'the temporary match has hexes');
+  for (const id of unitIds) {
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, AI_SEAT_IDS[0], 'infantry', hex]);
+  }
+}
+
+/**
  * A stored plan is the orders Ready resolves, without a second model call.
  *
  * Purpose: The gather uses pending orders and clears them. Ready must see those orders.
@@ -182,6 +198,7 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   const precomputedRanged: { unitId: string; targetH3Index: string }[] = [];
   let requestOrdersCalled = false;
   await withSeatedTempGameDbAsync('aw-ready-pending-', { fogOfWarEnabled: false }, async () => {
+  seedOpponentUnits(['opponent-1']);
   setAiPendingOrders(AI_SEAT_IDS[0], {
     movementOrders: precomputedOrders,
     rangedOrders: precomputedRanged,
@@ -244,6 +261,7 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
   const ferryOrders = [{ unitId: 'opponent-air-2', destinationH3Index: '891f1d48b9fffff' }];
   const embarkOrders = [{ unitId: 'opponent-inf-1', navalUnitId: 'opponent-naval-1' }];
   await withSeatedTempGameDbAsync('aw-ready-extra-', { fogOfWarEnabled: false }, async () => {
+  seedOpponentUnits(['opponent-air-1', 'opponent-air-2', 'opponent-inf-1', 'opponent-naval-1']);
   setAiPendingOrders(AI_SEAT_IDS[0], {
     movementOrders: [],
     rangedOrders: [],

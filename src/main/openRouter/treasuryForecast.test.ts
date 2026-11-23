@@ -6,20 +6,19 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
-import { CREDITS_PER_ITEM } from '../../shared/creditsRules';
-import { creditsItemCost } from '../../shared/gameRules';
 import { getMaxUnitsPerType } from '../../shared/gameSize';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
 import { SECTION_TITLE_MERCENARIES, SECTION_TITLE_RAISE_OPTIONS } from './promptSpec/sectionHeadings';
 import {
   buildTreasuryForecast,
-  estimateCreditsIncomePerTurn,
+  creditsQueueRowsForSeat,
+  projectCreditsQueues,
+  type CreditsQueueRow,
   formatTreasuryForecastSentence,
   formatTreasuryHoardAttention,
   formatTreasuryRunOutAttention,
   treasuryAttention,
-  treasuryCoverTurns,
 } from './treasuryForecast';
 
 /** Origin reused so `gridDisk` can supply real cells. */
@@ -66,19 +65,19 @@ function economy(credits: number, upkeepPerTurn: number): GameStateSnapshot['mer
 /**
  * A snapshot with one controlled home city that has credits next.
  *
- * Purpose: Income cases need a city the seat controls with a known number of urban cells.
+ * Purpose: Queue cases need a city the seat controls with a known number of urban cells and remaining items.
  * When to use: The run-out and sentence cases.
- * Expected outcome: Income equals `Math.floor((urban * CREDITS_PER_ITEM) / creditsItemCost())`.
+ * Expected outcome: One credits queue of `items` items, default 1.
  * Exceptions: None.
  */
-function creditsWorld(args: { readonly urban: number; readonly credits: number; readonly upkeep: number }): GameStateSnapshot {
+function creditsWorld(args: { readonly urban: number; readonly credits: number; readonly upkeep: number; readonly items?: number }): GameStateSnapshot {
   const city = ORIGIN;
   return world({
     mercenaryEconomy: economy(args.credits, args.upkeep),
     strategicControl: [{ h3Index: city, controllerPlayerId: OWN }],
     strategicInfrastructure: [{ h3Index: city, urbanHexCount: args.urban, airportCount: 0, seaportCount: 0 }],
     homeRegionHexesBySeat: { [OWN]: [city] },
-    strategicBuildQueueTotals: [{ h3Index: city, queuedUnits: 1, nextUnitType: 'credits', nextRemainingCount: 1, storedPoints: 0 }],
+    strategicBuildQueueTotals: [{ h3Index: city, queuedUnits: 1, nextUnitType: 'credits', nextRemainingCount: args.items ?? 1, storedPoints: 0 }],
   } as Partial<GameStateSnapshot>);
 }
 
@@ -100,90 +99,124 @@ function ownUnits(count: number, isMercenary = false, unitType = 'infantry'): Ga
   })) as unknown as GameStateSnapshot['units'];
 }
 
-test('cover turns count the payrolls the treasury and income pay', () => {
-  assert.equal(treasuryCoverTurns({ credits: 10, upkeepPerTurn: 15, incomePerTurn: 10 }), 2);
-  assert.equal(treasuryCoverTurns({ credits: 4, upkeepPerTurn: 15, incomePerTurn: 10 }), 0);
-  assert.equal(treasuryCoverTurns({ credits: 0, upkeepPerTurn: 15, incomePerTurn: 0 }), 0);
-  assert.equal(treasuryCoverTurns({ credits: -5, upkeepPerTurn: 15, incomePerTurn: 0 }), 0);
-  assert.equal(treasuryCoverTurns({ credits: 10, upkeepPerTurn: 10, incomePerTurn: 10 }), null);
-  assert.equal(treasuryCoverTurns({ credits: 0, upkeepPerTurn: 0, incomePerTurn: 0 }), null);
+/**
+ * Projects with one queue and the shared item economics.
+ *
+ * Purpose: The projection cases vary only the queue and the treasury.
+ * When to use: The projection cases.
+ * Expected outcome: Item cost 20, 20 credits an item, horizon 100.
+ * Exceptions: None.
+ */
+function project(args: { credits: number; upkeepPerTurn: number; rows: readonly CreditsQueueRow[] }) {
+  return projectCreditsQueues({ ...args, itemCost: 20, creditsPerItem: 20, horizonTurns: 100 });
+}
+
+/**
+ * A queue row for the projection cases.
+ *
+ * Purpose: Keeps each case to the numbers it is about.
+ * When to use: The projection cases.
+ * Expected outcome: A row on the origin hex.
+ * Exceptions: None.
+ */
+function row(remainingItems: number, storedPoints: number, pointsPerTurn: number): CreditsQueueRow {
+  return { h3Index: ORIGIN, remainingItems, storedPoints, pointsPerTurn };
+}
+
+test('one queued item pays once', () => {
+  assert.deepEqual(project({ credits: 0, upkeepPerTurn: 15, rows: [row(1, 0, 20)] }), { coverTurns: 1, queuedCredits: 20 });
 });
 
-test("income counts only the seat's own unpaused cities whose next item is credits", () => {
-  const [a, b, c, d, e] = [...gridDisk(ORIGIN, 1)].slice(0, 5);
+test('banked points buy items at once', () => {
+  assert.deepEqual(project({ credits: 0, upkeepPerTurn: 50, rows: [row(3, 60, 0)] }), { coverTurns: 1, queuedCredits: 60 });
+});
+
+test('a queue still paying at the horizon gives null, and an emptied queue gives a number', () => {
+  assert.equal(project({ credits: 2000, upkeepPerTurn: 10, rows: [row(99, 0, 1)] }).coverTurns, null);
+  const emptied = project({ credits: 2000, upkeepPerTurn: 10, rows: [row(99, 0, 40)] }).coverTurns;
+  assert.notEqual(emptied, null);
+});
+
+test('a queue that earns no points counts only what its banked points buy', () => {
+  assert.deepEqual(project({ credits: 0, upkeepPerTurn: 15, rows: [row(5, 0, 0)] }), { coverTurns: 0, queuedCredits: 0 });
+  assert.deepEqual(project({ credits: 0, upkeepPerTurn: 15, rows: [row(5, 45, 0)] }), { coverTurns: 2, queuedCredits: 40 });
+});
+
+test('upkeep 0 gives null and still counts queued credits', () => {
+  assert.deepEqual(project({ credits: 0, upkeepPerTurn: 0, rows: [row(2, 0, 20)] }), { coverTurns: null, queuedCredits: 40 });
+});
+
+test("rows follow the seat's own unpaused credits cities with a remaining count", () => {
+  const [a, b, c, d, e, f] = [...gridDisk(ORIGIN, 1)].slice(0, 6);
   const urban = 12;
-  const cells = [a, b, c, d, e];
-  const queue = (h3Index: string, nextUnitType: string, buildPaused?: boolean) => ({
+  const cells = [a, b, c, d, e, f];
+  const queue = (h3Index: string, nextUnitType: string, buildPaused?: boolean, count: number | null = 3) => ({
     h3Index,
     queuedUnits: 1,
     nextUnitType,
-    nextRemainingCount: 1,
-    storedPoints: 0,
+    nextRemainingCount: count,
+    storedPoints: 5,
     ...(buildPaused === undefined ? {} : { buildPaused }),
   });
   const state = world({
     strategicControl: cells.map((h3Index, index) => ({ h3Index, controllerPlayerId: index === 4 ? ENEMY : OWN })),
     strategicInfrastructure: cells.map((h3Index) => ({ h3Index, urbanHexCount: urban, airportCount: 0, seaportCount: 0 })),
-    homeRegionHexesBySeat: { [OWN]: [a, b, d] },
+    homeRegionHexesBySeat: { [OWN]: [a, b, d, f] },
     strategicBuildQueueTotals: [
       queue(a, 'credits'),
       queue(b, 'infantry'),
       queue(c, 'credits'),
       queue(d, 'credits', true),
       queue(e, 'credits'),
+      queue(f, 'credits', undefined, null),
     ],
   } as Partial<GameStateSnapshot>);
-  assert.equal(estimateCreditsIncomePerTurn(state, OWN), Math.floor((urban * CREDITS_PER_ITEM) / creditsItemCost()));
-  assert.equal(estimateCreditsIncomePerTurn({ ...state, strategicBuildQueueTotals: undefined }, OWN), 0);
+  const rows = creditsQueueRowsForSeat(state, OWN);
+  assert.deepEqual(rows.map((entry) => entry.h3Index), [a]);
+  assert.equal(rows[0]?.remainingItems, 3);
+  assert.equal(rows[0]?.storedPoints, 5);
+  assert.equal(creditsQueueRowsForSeat({ ...state, strategicBuildQueueTotals: undefined }, OWN).length, 0);
 });
 
 test('the forecast is null without an economy, and the sentence follows each case', () => {
   assert.equal(buildTreasuryForecast(world({}), OWN), null);
-  const sentence = (forecast: Parameters<typeof formatTreasuryForecastSentence>[0]) => formatTreasuryForecastSentence(forecast);
-  assert.equal(sentence({ credits: 50, upkeepPerTurn: 0, incomePerTurn: 0, coverTurns: null }), '');
+  const sentence = (credits: number, upkeepPerTurn: number, queuedCredits: number, coverTurns: number | null) =>
+    formatTreasuryForecastSentence({ credits, upkeepPerTurn, queuedCredits, coverTurns });
+  assert.equal(sentence(50, 0, 0, null), '');
+  assert.equal(sentence(50, 0, 40, null), 'Your credits queues hold 40 more credits.');
   assert.equal(
-    sentence({ credits: 50, upkeepPerTurn: 6, incomePerTurn: 20, coverTurns: null }),
-    'At about 20 credits a turn from your credits queues, upkeep is covered.'
+    sentence(50, 6, 40, null),
+    'Your credits queues hold 40 more credits. With them, the treasury covers upkeep for at least 100 more turns.'
   );
-  assert.equal(
-    sentence({ credits: 10, upkeepPerTurn: 15, incomePerTurn: 5, coverTurns: 1 }),
-    'At about 5 credits a turn from your credits queues, the treasury covers upkeep for 1 more turn.'
-  );
-  assert.equal(
-    sentence({ credits: 30, upkeepPerTurn: 15, incomePerTurn: 5, coverTurns: 3 }),
-    'At about 5 credits a turn from your credits queues, the treasury covers upkeep for 3 more turns.'
-  );
-  assert.equal(
-    sentence({ credits: 4, upkeepPerTurn: 15, incomePerTurn: 10, coverTurns: 0 }),
-    "At about 10 credits a turn from your credits queues, the treasury cannot cover this turn's upkeep."
-  );
-  assert.equal(
-    sentence({ credits: 30, upkeepPerTurn: 15, incomePerTurn: 0, coverTurns: 2 }),
-    'With no city producing credits, the treasury covers upkeep for 2 more turns.'
-  );
-  assert.equal(
-    sentence({ credits: 0, upkeepPerTurn: 15, incomePerTurn: 0, coverTurns: 0 }),
-    "With no city producing credits, the treasury cannot cover this turn's upkeep."
-  );
+  assert.equal(sentence(10, 15, 40, 1), 'Your credits queues hold 40 more credits. With them, the treasury covers upkeep for 1 more turn.');
+  assert.equal(sentence(10, 15, 40, 3), 'Your credits queues hold 40 more credits. With them, the treasury covers upkeep for 3 more turns.');
+  assert.equal(sentence(4, 15, 40, 0), "Your credits queues hold 40 more credits, but the treasury cannot cover this turn's upkeep.");
+  assert.equal(sentence(30, 15, 0, 1), 'No credits are queued, so the treasury covers upkeep for 1 more turn.');
+  assert.equal(sentence(30, 15, 0, 2), 'No credits are queued, so the treasury covers upkeep for 2 more turns.');
+  assert.equal(sentence(0, 15, 0, 0), "No credits are queued, and the treasury cannot cover this turn's upkeep.");
 });
 
 test('the run-out bullet appears at 5 turns or fewer', () => {
-  const tail = 'Queue credits in more cities or raise no more mercenaries, or random mercenaries desert to Neutral.';
+  const tail =
+    'Queue more credits, with a larger count or in more cities, raise no more mercenaries, or fire the ones you can spare. Otherwise random mercenaries desert to Neutral.';
   const state = (credits: number, upkeep: number) => world({ mercenaryEconomy: economy(credits, upkeep) });
   assert.equal(
     formatTreasuryRunOutAttention(buildTreasuryForecast(state(50, 10), OWN)),
-    `Treasury: your 50 credits and about 0 credits a turn from credits queues pay your 10 credits of mercenary upkeep for only 5 more turns. ${tail}`
+    `Treasury: your 50 credits and the 0 credits still queued pay your 10 credits of mercenary upkeep for only 5 more turns. ${tail}`
   );
   assert.equal(
     formatTreasuryRunOutAttention(buildTreasuryForecast(state(10, 10), OWN)),
-    `Treasury: your 10 credits and about 0 credits a turn from credits queues pay your 10 credits of mercenary upkeep for only 1 more turn. ${tail}`
+    `Treasury: your 10 credits and the 0 credits still queued pay your 10 credits of mercenary upkeep for only 1 more turn. ${tail}`
   );
   assert.equal(
     formatTreasuryRunOutAttention(buildTreasuryForecast(state(9, 10), OWN)),
-    `Treasury: your 9 credits and about 0 credits a turn from credits queues cannot pay this turn's 10 credits of mercenary upkeep. ${tail}`
+    `Treasury: your 9 credits and this turn's credits cannot pay this turn's 10 credits of mercenary upkeep. ${tail}`
   );
   assert.equal(formatTreasuryRunOutAttention(buildTreasuryForecast(state(60, 10), OWN)), null);
-  assert.equal(formatTreasuryRunOutAttention(buildTreasuryForecast(creditsWorld({ urban: 50, credits: 5, upkeep: 6 }), OWN)), null);
+  assert.equal(
+    formatTreasuryRunOutAttention(buildTreasuryForecast(creditsWorld({ urban: 50, credits: 5, upkeep: 6, items: 99 }), OWN)),
+    null
+  );
   assert.equal(formatTreasuryRunOutAttention(null), null);
 });
 

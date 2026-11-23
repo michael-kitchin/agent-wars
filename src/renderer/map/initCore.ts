@@ -30,6 +30,7 @@ import { showConsoleTab } from '../chrome/consoleFrame';
 import { consoleTabIdForLiveMatchLaunch } from '../../shared/consoleTabState';
 import { layoutMapChrome } from './mapChromeLayout';
 import { wireMapModeTabs } from './mapModeTabs';
+import { wireMinimapCollapse } from './minimapCollapse';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { tacticalBattlesDialogIsOpen } from '../chrome/blockingDialogGuards';
 import { chartsDialogIsOpen, toggleChartsDialog } from '../charts/chartsDialog';
@@ -377,6 +378,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
       });
     }
     wireMapModeTabs(() => deps.requestRedraw());
+    wireMinimapCollapse();
     layoutMapChrome();
   } catch (err) {
     console.error('Map init failed:', err);

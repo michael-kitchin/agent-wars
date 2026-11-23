@@ -3,6 +3,7 @@ import type { CommanderKeyMemoryView } from '../../shared/commanderSetupCopy';
 import {
   commanderApiKey,
   commanderFromRemembered,
+  copiedCommanderKeepingNickname,
   copyButtonState,
   prefillFirstAiApiKey,
   previousAiRowIndex,
@@ -31,7 +32,6 @@ import {
 } from '../../shared/newGameSides';
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
-import { normalizeSideNickname } from '../../shared/sideNicknames';
 import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
 import { readNewGameAiOnlyBeatLimit } from './newGameBeatLimitUi';
 import { bindNewGameVictory, readNewGameAiOnlyBattles, readNewGameSightCues, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
@@ -342,16 +342,14 @@ function renderNewGameSides(): void {
  *
  * Purpose: The copy button pulls the last game or the previous opponent, including the key.
  * When to use: The popover's copy click.
- * Expected outcome: The row and the open fields show that commander, including its nickname. A blank nickname keeps the name already on the row. A missing source does nothing.
+ * Expected outcome: The row and the open fields show that commander. The row keeps its own nickname. A missing source does nothing.
  * Exceptions: None.
  */
 function copyCommanderFrom(index: number, source: 'previous-match' | 'previous-opponent'): void {
   if (!sidesState) return;
   const copied = source === 'previous-match' ? commanderFromLastGame() : commanderFromPreviousRow(index);
   if (!copied || !sidesState) return;
-  const kept = sidesState.rows[index]?.commander?.nickname ?? '';
-  const nickname = normalizeSideNickname(copied.nickname) || kept;
-  const next = { ...copied, nickname };
+  const next = copiedCommanderKeepingNickname(copied, sidesState.rows[index]?.commander);
   sidesState = setRowCommander(sidesState, index, next);
   replaceOpenCommanderDraft(next);
   renderNewGameSides();
