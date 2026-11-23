@@ -77,7 +77,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 | --- | --- |
 | system | Omit the production section, the cap lines, the queue table, the Production attention bullet, and every production clause elsewhere. |
 | user | Do not name the production tail, the Production attention clause, or production doctrine. |
-| tools | All four production and hire tools are absent. The situation Mercenaries section stays, as the treasury and the owned-mercenary table, when the seat has mercenaries. The upkeep rule is `## Mercenaries` under `# Rules`. |
+| tools | All four production and hire tools are absent. The situation Mercenaries section stays, as the treasury line, its forecast paragraph, and the owned-mercenary table, when the seat has mercenaries. The upkeep rule is `## Mercenaries` under `# Rules`. |
 | envelope | Omit the production tail from the contract, the example, and the repair schema. |
 | coaching | Drop the keep-production-queued rule and the cap rule. |
 | empty-state | n/a. |

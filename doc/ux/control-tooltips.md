@@ -35,7 +35,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Beat limit: The most beats an AI-only battle can run. When it reaches them, the battle ends as if Exit Battle had been pressed. This applies only while you are observing. Choosing None under AI-only battles turns this off.
 - Sight cues: Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
-- Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
+- Game size: Set how many units each side may field. Default doubles the Small caps, and Large triples them, without changing the map or the starting forces.
 - "Game Options": Nickname, victory rule, turn limit, AI-only battles, beat limit, bonuses, fog of war, Sight cues, and Auto-start AI.
 - Nickname: The name shown for you during a match. Saved on this computer, and used the next time a game starts.
 - Origin bonus: Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.

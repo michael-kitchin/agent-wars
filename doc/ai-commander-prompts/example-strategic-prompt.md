@@ -320,7 +320,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 - When a controlled cell can build and its queue is empty, queue something.
 
-  Keep one city queued on credits at all times. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.
+  Keep enough credits coming in to pay your mercenaries; the Mercenaries section says how long your treasury lasts. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.
 
   Production Priorities, under Production Status, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.
 

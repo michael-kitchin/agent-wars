@@ -19,7 +19,12 @@ import { regionalWinPathsBullet } from '../scenarioGoals';
 import { buildStrategicDoctrineBlock } from './doctrineText';
 import type { CoachingGates } from './coachingGates';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
-import { SECTION_TITLE_PAUSED_QUEUES, SECTION_TITLE_PRODUCTION_PRIORITIES, SECTION_TITLE_PRODUCTION_STATUS } from './sectionHeadings';
+import {
+  SECTION_TITLE_MERCENARIES,
+  SECTION_TITLE_PAUSED_QUEUES,
+  SECTION_TITLE_PRODUCTION_PRIORITIES,
+  SECTION_TITLE_PRODUCTION_STATUS,
+} from './sectionHeadings';
 import {
   SECTION_TITLE_AIR_AND_NAVAL_UNITS,
   SECTION_TITLE_MEMORY_AND_CALLBACKS,
@@ -363,7 +368,7 @@ const AIRLIFT_PREFERENCE_BULLET =
  */
 const PRODUCTION_BULLET =
   '- When a controlled cell can build and its queue is empty, queue something.' +
-  '\n\n  Keep one city queued on credits at all times. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.' +
+  `\n\n  Keep enough credits coming in to pay your mercenaries; the ${SECTION_TITLE_MERCENARIES} section says how long your treasury lasts. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.` +
   `\n\n  ${SECTION_TITLE_PRODUCTION_PRIORITIES}, under ${SECTION_TITLE_PRODUCTION_STATUS}, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.\n\n  ` +
   PRODUCTION_CAP_QUEUE_GUIDANCE.replace(
     '. A hex whose available types',

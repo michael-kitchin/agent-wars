@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **3.4.1** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **3.4.2** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **3.4.2** adds a treasury forecast to each commander's Mercenaries section, Attention Flags for an upkeep shortfall or an idle treasury, and a credits priority only for cities at their unit caps. The Medium game size is renamed Default and is now the new-game default.
 
 Release **3.4.1** makes every commander name a posture each turn and records it, including overland. Posture advice now measures whether a real force can march on an enemy's home, and Attention Flags point out a posture that doesn't fit the campaign's target.
 
@@ -82,7 +84,7 @@ A finished match keeps a history file ([match-recording.md](match-recording.md))
 | [match-statistics.md](match-statistics.md) | The per-turn statistics every strategic turn records for each side, the relationship metrics, when a value is null, and the charts channel | **Current.** Matches `TurnStatistics`, `readSideStatistics`, `recordTurnStatistics`, `RELATIONSHIP_SCALE_MAX`, and `game:readMatchCharts`. |
 | [commander-messages.md](commander-messages.md) | Messages between sides, the chat panel, private stances, private agreements, and the talk call that runs before orders | **Current.** Matches `sideMessageVisibleTo`, `SIDE_MESSAGE_MAX_CHARS`, `AI_TALK_ROUND_TIMEOUT_MS`, `isTalkStageEnabled`, `SIDE_AGREEMENT_MAX_TURNS`, and `sideAgreementsEnabled`. |
 | [combat-rules-v3.md](combat-rules-v3.md) | Combat, movement, production, fog, sealift, and tactical battles | **Current mechanics.** Numbers are taken from engine constants. |
-| [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
+| [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Default / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
 | [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `decideEndOfTurnOutcome`. |
 | [hybrid-ai.md](hybrid-ai.md) | Hybrid opponent loop, callbacks, consult bounds | **Current engine behavior.** Prompt copy lives in the prompt package. |
 | [ai-tools.md](ai-tools.md) | The six tool groups the model (and host) can invoke | **Current.** Names from `PATHFINDING_TOOL_NAMES` and sibling `*_TOOL_NAMES` consts. |

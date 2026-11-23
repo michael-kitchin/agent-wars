@@ -65,7 +65,7 @@ Not sure which model to pick? My notes are under [Getting Started](../README.md#
 
 ### Forces
 
-- **Game size:** Small, Medium, or Large. Medium doubles each side's unit caps, and Large triples them. The map and the starting forces stay the same.
+- **Game size:** Small, Default, or Large. The new-game dialog starts on Default. Default doubles each side's unit caps, and Large triples them. The map and the starting forces stay the same.
 - **Starting month:** the month the match starts in, which sets the first turn's weather.
 - **Unit row:** each unit type's cap and price on the chosen map. The `Advanced tech: ⚒N+ hexes` line is the city size that builds Advanced units (see [Bonuses and Weather](#bonuses-and-weather)).
 
@@ -519,7 +519,7 @@ Each piece, on the global map and across the 23 regional maps.
 | ![Fortification token](media/token-fortification.png) | **Fortification** Soaks one hit on the holder's units No cap | ⚒︎20 per city cell Needs an intact city cell                                                                                                                                  | ⚒︎8–60 per city cell                                                                                                                             |
 | **¤**                                                 | **Credits** Pays mercenaries No cap                          | ⚒︎20 buys ¤20                                                                                                                                                                 | ⚒︎8–60 buys ¤20                                                                                                                                  |
 
-- **Caps:** the caps above are per side in a Small game. Medium doubles them, and Large triples them. Mercenaries, fortifications, and Credits don't count. See [game-size-unit-caps.md](game-size-unit-caps.md).
+- **Caps:** the caps above are per side in a Small game. Default doubles them, and Large triples them. Mercenaries, fortifications, and Credits don't count. See [game-size-unit-caps.md](game-size-unit-caps.md).
 - **Hit numbers:** attack and defense are d20 hit numbers. 3 hits 15% of the time, 7 hits 35%, and 10 hits 50%.
 - **Regional maps:** those ranges run from the cheapest map to the dearest. The new-game screen shows the chosen map's own prices and Advanced size.
 - **Advanced mercenaries:** with the tech bonus on, a mercenary born in an Advanced city costs about twice the upkeep: infantry ¤5, armor ¤10, air ¤15, naval ¤25.

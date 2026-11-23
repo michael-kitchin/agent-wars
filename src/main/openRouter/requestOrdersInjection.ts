@@ -31,6 +31,7 @@ import { formatProductionAttentionBullet } from './productionAttention';
 import { formatPausedProductionPointer } from './pausedProductionAttention';
 import { formatMissileLaunchAttention } from './briefingSectionsMissiles';
 import { formatMercenaryRaiseAttention } from './mercenaryRaiseAttention';
+import { treasuryAttention } from './treasuryForecast';
 import type { CampaignPlan } from './campaignRules';
 
 /**
@@ -243,11 +244,11 @@ export interface StatusInjectionTexts {
    */
   readonly campaignAttention: string | null;
   /**
-   * Launch and raise bullets that are not part of the five-flag cap.
+   * Posture, launch, raise, and treasury bullets that are not part of the five-flag cap.
    *
-   * Contract: The missile sentence when a target exists, then the mercenary sentence when production is on and a raise is affordable. Empty in a battle.
+   * Contract: In order: the posture bullet, the missile sentence when a target exists, the mercenary raise sentence when production is on, an affordable raise exists, and the run-out bullet is not shown, then the treasury run-out bullet, then the treasury hoard bullet. At most one treasury bullet appears. Empty in a battle.
    * When to use: `formatBriefing` appends each one after the production and campaign bullets. Tactical injection leaves the list empty.
-   * Expected outcome: Neither bullet counts against the five unit-flag cap.
+   * Expected outcome: None of these bullets counts against the five unit-flag cap.
    * Exceptions: None.
    */
   readonly additionalAttention: readonly string[];
@@ -369,6 +370,10 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         formatHexLabel: args.formatHexLabel,
       })
     : { text: '', idleHexes: [], pausedHexes: [] };
+  const treasury =
+    args.productionEnabled && args.coordinateContext.mode !== 'tactical'
+      ? treasuryAttention(args.state, seatId)
+      : { runOut: null, hoard: null };
   return {
     memoryText,
     standingOrderText,
@@ -387,7 +392,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         : [
             postureAttention,
             formatMissileLaunchAttention(args.state, formatCampaignHex),
-            args.productionEnabled
+            args.productionEnabled && treasury.runOut === null
               ? formatMercenaryRaiseAttention({
                   state: args.state,
                   ownSeat: seatId,
@@ -395,6 +400,8 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
                   campaignTargetH3: campaignPlan?.objective.targetH3 ?? null,
                 })
               : null,
+            treasury.runOut,
+            treasury.hoard,
           ].filter((bullet): bullet is string => bullet != null),
   };
 }

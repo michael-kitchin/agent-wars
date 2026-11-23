@@ -3,7 +3,7 @@
  *
  * Purpose: The seat sees its treasury, its mercenaries, and what it can still hire.
  * When to use: Strategic prompts. A battle, a snapshot with no economy, or a seat that cannot produce and has no mercenaries gets nothing.
- * Expected outcome: A heading and the sections that apply. Tables stop at the row limit.
+ * Expected outcome: A heading and the sections that apply. After the treasury line comes a forecast paragraph when upkeep is above 0, then a warning paragraph when credits plus the credits income cannot pay this turn's upkeep. Tables stop at the row limit.
  * Exceptions: None.
  */
 
@@ -21,9 +21,11 @@ import { logDebug, logTrace } from '../logger';
 import { CHOKEPOINT_MAX_PASSABLE_NEIGHBORS, countNeighborTerrain } from '../tools/hexNeighborTerrain';
 import { buildHireContext, evaluateHexHire, listHireEntryHexes } from '../mercenaryHireRules';
 import { buildPromptTableLines } from '../promptTableHelpers';
+import { buildTreasuryForecast, formatTreasuryForecastSentence } from './treasuryForecast';
 import {
   MERCENARY_BRIEFING_MAX_ROWS,
   MERCENARY_FUNDS_WARNING,
+  MERCENARY_FUNDS_WARNING_ACTION,
   NO_RAISE_OPTIONS_LINE,
   NO_REHIRE_CANDIDATES_LINE,
   formatMercenaryFundsLine,
@@ -42,7 +44,7 @@ import {
  *
  * Purpose: Production-off seats still see their treasury and their mercenaries. They are not shown hire tables.
  * When to use: While assembling the situation message, with the seat's own snapshot.
- * Expected outcome: The heading, the treasury line, and the tables that apply. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
+ * Expected outcome: The heading, the treasury line, a forecast paragraph when upkeep is above 0, a warning paragraph when credits plus the credits income cannot pay this turn's upkeep, and the tables that apply. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
  * Exceptions: None.
  */
 export function buildMercenariesBriefingBlock(
@@ -83,8 +85,14 @@ export function buildMercenariesBriefingBlock(
       return `${topLevelHeading(SECTION_TITLE_MERCENARIES)}\n\nTreasury: 0 credits. No one to rehire.`;
     }
   }
+  const forecast = buildTreasuryForecast(state, ownSeat);
+  const forecastSentence = forecast ? formatTreasuryForecastSentence(forecast) : '';
   const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', formatMercenaryFundsLine(economy)];
-  if (economy.credits < economy.upkeepPerTurn) lines.push(MERCENARY_FUNDS_WARNING);
+  if (forecastSentence.length > 0) lines.push('', forecastSentence);
+  const cannotPay = forecast ? forecast.coverTurns === 0 : economy.credits < economy.upkeepPerTurn;
+  if (cannotPay) {
+    lines.push('', options.productionEnabled ? `${MERCENARY_FUNDS_WARNING} ${MERCENARY_FUNDS_WARNING_ACTION}` : MERCENARY_FUNDS_WARNING);
+  }
   if (mercenaries.length > 0) {
     lines.push('', subHeading(SECTION_TITLE_YOUR_MERCENARIES), '', mercenaryTable(mercenaries, format));
   }

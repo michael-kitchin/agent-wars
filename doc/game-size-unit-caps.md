@@ -1,25 +1,25 @@
 # Game size and unit caps
 
-Matches can be Small, Medium, or Large. The only gameplay difference among these sizes is per-side unit caps. Map, starting armies, unit costs, fog, and tactical sub-unit counts do not change with size.
+Matches can be Small, Default, or Large. Default is stored as `medium`. The only gameplay difference among these sizes is per-side unit caps. Map, starting armies, unit costs, fog, and tactical sub-unit counts do not change with size.
 
 Live values come from `MAX_UNITS_PER_TYPE` (Small) and `GAME_SIZE_MULTIPLIER` in `src/shared/gameSize.ts`. The strategic production briefing uses that same multiplier for the credits-city urban floor (`CREDITS_CITY_MIN_URBAN_PER_SIZE` in `src/main/openRouter/productionPriorities.ts`). Costs and starting armies stay unscaled. Combat and production rules: [combat-rules-v3.md](combat-rules-v3.md) §2.
 
 ## Caps
 
-Caps are per side and per type. Small is the current baseline. Medium is twice Small. Large is three times Small.
+Caps are per side and per type. Small is the current baseline. Default is twice Small. Large is three times Small.
 
 - Small: infantry 12, armor 8, naval 8, air 6, missile 2
-- Medium: infantry 24, armor 16, naval 16, air 12, missile 4
+- Default (`medium`): infantry 24, armor 16, naval 16, air 12, missile 4
 - Large: infantry 36, armor 24, naval 24, air 18, missile 6
 
 A fortification is not one of these types. It has no cap (`FORTIFICATION_QUEUE_ITEM`). A credits item is not a unit either (`CREDITS_QUEUE_ITEM`). A mercenary is a unit, and it does not count toward these caps: the unit-count query excludes `is_mercenary`.
 
 ## Selection
 
-The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large), in the Forces section, on the same line as Starting month. The two dropdowns are the same width. Under them, one row of the five unit types shows each type's map glyph drawn dark on a gray disk, the selected size's cap in bold, and that map's price. The layout is in [new-game-dialog.md](ux/new-game-dialog.md).
+The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Default / Large), in the Forces section, on the same line as Starting month. The two dropdowns are the same width. Under them, one row of the five unit types shows each type's map glyph drawn dark on a gray disk, the selected size's cap in bold, and that map's price. The layout is in [new-game-dialog.md](ux/new-game-dialog.md).
 
-The dropdown keeps its last value for the session. A process restart returns to Small.
+The dropdown keeps its last value for the session. A process restart returns to Default, which is selected when the page loads.
 
 ## Persistence
 
-Size is stored with the match. Existing saves that have no stored size behave as Small. A new match always records a size, including Small, so it does not inherit the previous match.
+Size is stored with the match. Existing saves that have no stored size behave as Small (`parseGameSize` falls back to `small`). A new match always records a size, including Small, so it does not inherit the previous match.

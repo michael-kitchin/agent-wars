@@ -137,9 +137,9 @@
         </div>
         <div class="new-game-size-row">
           <label for="new-game-size-select">Game size</label>
-          <select id="new-game-size-select" data-control-tooltip="Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.">
-            <option value="small" selected>Small</option>
-            <option value="medium">Medium</option>
+          <select id="new-game-size-select" data-control-tooltip="Set how many units each side may field. Default doubles the Small caps, and Large triples them, without changing the map or the starting forces.">
+            <option value="small">Small</option>
+            <option value="medium" selected>Default</option>
             <option value="large">Large</option>
           </select>
           <label for="new-game-start-month">Starting month</label>
@@ -160,11 +160,11 @@
           <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
         </div>
         <ul class="new-game-units" aria-live="polite">
-          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/infantry.svg" alt="Infantry" /></span><span id="new-game-size-cap-infantry" class="new-game-unit-cap">12</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-infantry" class="new-game-unit-cost">$20</span></li>
-          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/armor.svg" alt="Armor" /></span><span id="new-game-size-cap-armor" class="new-game-unit-cap">8</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-armor" class="new-game-unit-cost">$40</span></li>
-          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/naval.svg" alt="Naval" /></span><span id="new-game-size-cap-naval" class="new-game-unit-cap">8</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-naval" class="new-game-unit-cost">$100</span></li>
-          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/air.svg" alt="Air" /></span><span id="new-game-size-cap-air" class="new-game-unit-cap">6</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-air" class="new-game-unit-cost">$60</span></li>
-          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/missile.svg" alt="Missile" /></span><span id="new-game-size-cap-missile" class="new-game-unit-cap">2</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-missile" class="new-game-unit-cost">$200</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/infantry.svg" alt="Infantry" /></span><span id="new-game-size-cap-infantry" class="new-game-unit-cap">24</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-infantry" class="new-game-unit-cost">$20</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/armor.svg" alt="Armor" /></span><span id="new-game-size-cap-armor" class="new-game-unit-cap">16</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-armor" class="new-game-unit-cost">$40</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/naval.svg" alt="Naval" /></span><span id="new-game-size-cap-naval" class="new-game-unit-cap">16</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-naval" class="new-game-unit-cost">$100</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/air.svg" alt="Air" /></span><span id="new-game-size-cap-air" class="new-game-unit-cap">12</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-air" class="new-game-unit-cost">$60</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/missile.svg" alt="Missile" /></span><span id="new-game-size-cap-missile" class="new-game-unit-cap">4</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-missile" class="new-game-unit-cost">$200</span></li>
         </ul>
         <button type="button" id="new-game-options-btn" class="new-game-options-btn" data-control-tooltip="Nickname, victory rule, turn limit, AI-only battles, beat limit, bonuses, fog of war, Sight cues, and Auto-start AI.">Game Options</button>
       </section>

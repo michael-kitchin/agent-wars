@@ -1,7 +1,7 @@
 /**
  * One suggested city each for a missile, a naval unit, and credits.
  *
- * Purpose: The production briefing names a city and a reason instead of telling the commander only to queue something.
+ * Purpose: The production briefing names a city and a reason instead of telling the commander only to queue something. A credits city must also be at cap for every unit type it can build.
  * When to use: From `buildProductionBriefing`, after paused queues.
  * Expected outcome: Zero to three lines, in the order missile, naval, credits. A line is absent when its condition fails.
  * Exceptions: None. A missing hex resolution skips that builder.
@@ -12,15 +12,28 @@ import { CREDITS_QUEUE_ITEM } from '../../shared/creditsRules';
 import type { PostureSettings } from '../../shared/postureTypes';
 import { buildQueueItemCostFor } from '../../shared/gameRules';
 import { GAME_SIZE_MULTIPLIER, getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
-import type { BuildQueueItemType } from '../productionRules';
+import { isBuildUnitType, type BuildQueueItemType } from '../productionRules';
 import type { GameStateSnapshot } from '../gameDb';
 import { missileReachSet } from '../gameActions/missileReach';
 import { logDebug } from '../logger';
-import { getPlayerUnitCountsByType } from '../productionCaps';
+import { getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from '../productionCaps';
 import { countNeighborTerrain } from '../tools/hexNeighborTerrain';
 import { enemyInfrastructureHexes } from './briefingSectionsMissiles';
 import { selectNextQueueEntry } from './productionAttention';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
+
+/**
+ * True when every unit type the row can build is at its cap.
+ *
+ * Purpose: A city that can still build a unit the side is short of should build it, so only capped cities are told to queue credits.
+ * When to use: The credits block of `buildProductionPriorityLines`, with the set from `getMaxedUnitTypesForPlayer`.
+ * Expected outcome: True when each build unit type in `availableUnitTypes`, missile included, is in `maxed`. True when the row lists no build unit type.
+ * Exceptions: None.
+ */
+function rowUnitTypesAllAtCap(row: ControlledHexQueueSnapshot, maxed: ReadonlySet<string>): boolean {
+  const available = Array.isArray(row.availableUnitTypes) ? row.availableUnitTypes.map((value) => String(value)) : [];
+  return available.filter((item) => isBuildUnitType(item)).every((unitType) => maxed.has(unitType));
+}
 
 /**
  * Naval count at or above this share of the cap no longer needs a priority line.
@@ -35,9 +48,9 @@ export const NAVAL_PRIORITY_CAP_SHARE = 0.5;
 /**
  * Smallest city, in urban cells on the Small map, that should queue credits.
  *
- * Purpose: Twelve credits a turn sustains about four infantry mercenaries on the Small size.
+ * Purpose: Twelve credits a turn sustains about four infantry mercenaries on the Small size. A city this large is named for credits only when every unit type it can build is at its cap.
  * When to use: Multiply by `GAME_SIZE_MULTIPLIER` for the match size.
- * Expected outcome: 12 on Small, 24 on Medium, 36 on Large.
+ * Expected outcome: 12 on Small, 24 on Default (`medium`), 36 on Large.
  * Exceptions: None.
  */
 export const CREDITS_CITY_MIN_URBAN_PER_SIZE = 12;
@@ -183,7 +196,7 @@ function ownerName(state: GameStateSnapshot, h3Index: string): string {
  *
  * Purpose: The commander is told which city should build a missile, a ship, or credits, and why.
  * When to use: Once per production briefing, with the same queues the table will show.
- * Expected outcome: Missile, then naval, then credits. Each line is omitted when its condition fails. A paused queue does not count as producing or as already queued. Labels come from `formatHexLabel`. Absent `settings` uses the same shares and floors as before.
+ * Expected outcome: Missile, then naval, then credits. Each line is omitted when its condition fails. A paused queue does not count as producing or as already queued. Labels come from `formatHexLabel`. The credits line names a city only when every unit type it can build is at its cap. Absent `settings` uses the same shares and floors as before.
  * Exceptions: None.
  */
 export function buildProductionPriorityLines(args: {
@@ -293,10 +306,11 @@ export function buildProductionPriorityLines(args: {
     return next != null && String(next.unitType ?? '') === CREDITS_QUEUE_ITEM;
   });
   if (economy != null && !creditsNext && economy.credits < minUrban * CREDITS_TREASURY_CEILING_TURNS) {
+    const maxed = new Set<string>(getMaxedUnitTypesForPlayer(args.state.units, args.ownSeat, parseGameSize(args.state.gameSize)));
     let bestCredits: { readonly urban: number; readonly h3: string; readonly label: string } | null = null;
     for (const row of args.queues) {
       const builder = builderFor(row, CREDITS_QUEUE_ITEM, args.resolveToH3);
-      if (!builder || builder.urban < minUrban) continue;
+      if (!builder || builder.urban < minUrban || !rowUnitTypesAllAtCap(row, maxed)) continue;
       const candidate = { urban: builder.urban, h3: builder.h3, label: args.formatHexLabel(builder.ll) };
       if (
         bestCredits == null ||
@@ -306,7 +320,9 @@ export function buildProductionPriorityLines(args: {
         bestCredits = candidate;
       }
     }
-    if (bestCredits) lines.push(`- Credits: no city is producing credits. Queue credits in ${bestCredits.label}.`);
+    if (bestCredits) {
+      lines.push(`- Credits: no city is producing credits. Queue credits in ${bestCredits.label}, where every unit type it can build is at its cap.`);
+    }
   }
   logDebug('productionPriorities buildProductionPriorityLines', { ownSeat: args.ownSeat, lineCount: lines.length });
   return lines;

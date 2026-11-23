@@ -4,6 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { getMaxUnitsPerType } from '../../shared/gameSize';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import {
@@ -94,6 +95,21 @@ function testProductionSectionGateIsTheToolFlag(): void {
  * Expected outcome: A match with one paused queue and one city large enough for credits prints the three headings in that order.
  * Exceptions: Throws when the seeded map has no home hex or no hex outside that home.
  */
+/**
+ * Units that fill every build type of one seat to its Small cap.
+ *
+ * Purpose: The credits priority line names a city only when every type it can build is at cap.
+ * When to use: Cases that need the Production Priorities section to appear without a missile or naval target.
+ * Expected outcome: One unit per cap slot, all at `h3Index`.
+ * Exceptions: None.
+ */
+function cappedUnitsFor(seat: string, h3Index: string): GameStateSnapshot['units'] {
+  const caps = getMaxUnitsPerType('small');
+  return Object.entries(caps).flatMap(([unitType, cap]) =>
+    Array.from({ length: cap }, (_, index) => ({ id: `cap-${unitType}-${index}`, player: seat, unitType, h3Index }))
+  ) as unknown as GameStateSnapshot['units'];
+}
+
 function testProductionPrioritiesSitBetweenPausedAndControlledQueues(): void {
   withTempGameDb('aw-brief-priorities-', () => {
     const ownSeat = AI_SEAT_IDS[0];
@@ -118,6 +134,8 @@ function testProductionPrioritiesSitBetweenPausedAndControlledQueues(): void {
       productionEnabled: true,
       state: {
         ...state,
+        // Every unit type at its cap, so the home city qualifies for the credits priority line.
+        units: [...state.units.filter((unit) => unit.player !== ownSeat), ...cappedUnitsFor(ownSeat, builder)],
         mercenaryEconomy: { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 },
       },
       latLngByH3: coords.latLngByH3,

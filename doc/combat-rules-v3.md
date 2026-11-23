@@ -31,12 +31,12 @@ Rules are divided into two layers: **strategic** (the primary game) and **tactic
 
 ## 2. Unit roster (strategic level)
 
-The game has five unit types. A match has two to four sides, and each side is seeded the same way in its own home (`trySeedScenarioRegionVsRegion` in `src/main/gameDb/seeding/regionScenarioSeeding.ts`). Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. A mercenary does not count toward those caps (`is_mercenary` is excluded from the unit-count query). See [game-size-unit-caps.md](game-size-unit-caps.md).
+The game has five unit types. A match has two to four sides, and each side is seeded the same way in its own home (`trySeedScenarioRegionVsRegion` in `src/main/gameDb/seeding/regionScenarioSeeding.ts`). Per-side caps scale with match size (`getMaxUnitsPerType`); the middle size is Default, stored as `medium`. Small is the baseline; Default is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. A mercenary does not count toward those caps (`is_mercenary` is excluded from the unit-count query). See [game-size-unit-caps.md](game-size-unit-caps.md).
 
 | Size | Infantry | Armor | Naval | Air | Missile |
 |------|---------|-------|-------|-----|---------|
 | Small | 12 | 8 | 8 | 6 | 2 |
-| Medium | 24 | 16 | 16 | 12 | 4 |
+| Default (`medium`) | 24 | 16 | 16 | 12 | 4 |
 | Large | 36 | 24 | 24 | 18 | 6 |
 
 | Unit type | Move | Attack | Defense | Strategic range | Domain | Cost | Build prerequisites |

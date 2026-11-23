@@ -108,7 +108,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /cannot enter land cells/i);
   assert.match(text, /embark at a legal cell/i);
   assert.match(text, /queue is empty, queue something/i);
-  assert.match(text, /Keep one city queued on credits at all times/);
+  assert.match(text, /Keep enough credits coming in to pay your mercenaries; the Mercenaries section says how long your treasury lasts/);
   assert.match(text, /Production Priorities, under Production Status, names a city for a missile, a naval unit, or credits/);
   assert.match(text, /replace blocked queues/i);
   assert.match(text, /more than one home region/i);
@@ -124,7 +124,7 @@ test('strategic conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(strategicGates({ ordersEnabled: false })), /suppresses automatic engagement/i);
   assert.doesNotMatch(joined(strategicGates({ ordersEnabled: false })), /Units Without Standing Orders/i);
   assert.doesNotMatch(joined(strategicGates({ productionEnabled: false })), /queue is empty, queue something/i);
-  assert.doesNotMatch(joined(strategicGates({ productionEnabled: false })), /Keep one city queued on credits at all times/);
+  assert.doesNotMatch(joined(strategicGates({ productionEnabled: false })), /Keep enough credits coming in to pay your mercenaries; the Mercenaries section says how long your treasury lasts/);
   assert.doesNotMatch(joined(strategicGates({ memoryEnabled: false })), /Do not persist enemy positions/i);
   assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /toward the fighting/i);
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /cannot enter land cells/i);

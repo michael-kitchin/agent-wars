@@ -10,12 +10,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
-import { AI_SEAT_IDS, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
+import { AI_SEAT_IDS, NEUTRAL_OWNER_ID, type SeatId } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { SECTION_TITLE_MERCENARIES } from './promptSpec/sectionHeadings';
 import { buildMercenaryRule } from './promptSpec/gameRuleMercenaryText';
 import { getGameStateForPlayer, getScenarioHomeRegionHexes, getSeatRoster, setTreasuryCredits, dbGetAll, dbRun, setHexController } from '../gameDb';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
+import { CREDITS_PER_ITEM } from '../../shared/creditsRules';
+import { creditsItemCost } from '../../shared/gameRules';
 import { createStrategicUnit } from '../gameActions/strategicUnitSpawn';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { CHOKEPOINT_MAX_PASSABLE_NEIGHBORS, countNeighborTerrain } from '../tools/hexNeighborTerrain';
@@ -235,4 +237,104 @@ test('raise options sort the nearer cell first, treat a null target as a tie, an
   assert.ok(compareByCampaignTarget('1:0', '4:0', '0:0', hop) < 0);
   assert.equal(compareByCampaignTarget('1:0', '4:0', null, hop), 0);
   assert.ok(compareByCampaignTarget('missing', '1:0', '0:0', hop) > 0);
+});
+
+/**
+ * The seat's most urban home city, controlled by the seat, plus a seat mercenary at a home cell.
+ *
+ * Purpose: Forecast cases need a mercenary with upkeep and a city that can produce credits.
+ * When to use: Tests that read the forecast paragraph on a temporary match.
+ * Expected outcome: The city's hex and its urban cell count.
+ * Exceptions: Assertion failure when the fixture map has no home city with infrastructure.
+ */
+function homeCreditsCity(seat: SeatId): { readonly city: string; readonly urban: number } {
+  const roster = getSeatRoster().find((row) => row.seatId === seat);
+  assert.ok(roster);
+  const homes = new Set(getScenarioHomeRegionHexes(roster.homeRegion));
+  const [first] = homes;
+  assert.ok(first);
+  createStrategicUnit({ owner: seat, unitType: 'infantry', h3Index: first, turnNumber: 1, isMercenary: true });
+  const best = dbGetAll<{ h3Index: string; urban: number }>('SELECT h3_index AS h3Index, urban_hex_count AS urban FROM res_s_infrastructure')
+    .filter((row) => homes.has(row.h3Index))
+    .sort((a, b) => b.urban - a.urban)[0];
+  assert.ok(best, 'fixture needs a home city');
+  setHexController(best.h3Index, seat);
+  return { city: best.h3Index, urban: best.urban };
+}
+
+/**
+ * A queue-totals row with credits next.
+ *
+ * Purpose: The forecast counts a city once its queue totals say credits come next.
+ * When to use: Cases that need credits income.
+ * Expected outcome: One row for the given hex.
+ * Exceptions: None.
+ */
+function creditsQueue(city: string): GameStateSnapshot['strategicBuildQueueTotals'] {
+  return [{ h3Index: city, queuedUnits: 1, nextUnitType: 'credits', nextRemainingCount: 1, storedPoints: 0 }];
+}
+
+test('the treasury line forecasts upkeep from the credits queues', () => {
+  withTempGameDb('aw-brief-merc-forecast-', () => {
+    const seat = AI_SEAT_IDS[0];
+    const { city, urban } = homeCreditsCity(seat);
+    setTreasuryCredits(seat, 40);
+    const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const upkeep = state.mercenaryEconomy!.upkeepPerTurn;
+    assert.ok(upkeep > 0);
+    const fundsLineOf = (block: string): string => block.split('\n').find((line) => line.startsWith('Treasury: 40 credits.')) ?? '';
+
+    const dry = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: [] }, (hex) => hex, 'strategic', { productionEnabled: true });
+    assert.ok(dry.includes(`With no city producing credits, the treasury covers upkeep for ${Math.floor(40 / upkeep)} more turns.`), dry);
+    assert.ok(dry.includes(`${fundsLineOf(dry)}\n\n`));
+    assert.equal(dry.includes('\n\n\n'), false);
+
+    const expectedIncome = Math.floor((urban * CREDITS_PER_ITEM) / creditsItemCost());
+    assert.ok(expectedIncome >= upkeep, 'fixture needs a home city that pays the upkeep');
+    const paid = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: creditsQueue(city) }, (hex) => hex, 'strategic', {
+      productionEnabled: true,
+    });
+    assert.ok(paid.includes(`\n\nAt about ${expectedIncome} credits a turn from your credits queues, upkeep is covered.\n\n`), paid);
+    assert.ok(paid.includes(`${fundsLineOf(paid)}\n\n`));
+    assert.equal(paid.includes('\n\n\n'), false);
+  });
+});
+
+test('the funds warning is its own paragraph and follows the forecast', () => {
+  withTempGameDb('aw-brief-merc-warning-', () => {
+    const seat = AI_SEAT_IDS[0];
+    const { city } = homeCreditsCity(seat);
+    setTreasuryCredits(seat, 0);
+    const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const dryState = { ...state, strategicBuildQueueTotals: [] };
+    const forecast = "With no city producing credits, the treasury cannot cover this turn's upkeep.";
+    const warning = 'Warning: unless more credits come in this turn, random mercenaries desert to Neutral at the end of it.';
+    const action = 'Queue credits in more cities, and do not raise or rehire mercenaries this turn.';
+    const on = buildMercenariesBriefingBlock(dryState, (hex) => hex, 'strategic', { productionEnabled: true });
+    assert.ok(on.includes(`${forecast}\n\n${warning} ${action}\n\n## Your Mercenaries`), on);
+
+    const off = buildMercenariesBriefingBlock(dryState, (hex) => hex, 'strategic', { productionEnabled: false });
+    assert.ok(off.includes(`\n\n${warning}\n\n## Your Mercenaries`), off);
+    assert.equal(off.includes('Queue credits in more cities'), false);
+
+    const covered = buildMercenariesBriefingBlock({ ...state, strategicBuildQueueTotals: creditsQueue(city) }, (hex) => hex, 'strategic', {
+      productionEnabled: true,
+    });
+    assert.equal(covered.includes('Warning:'), false);
+  });
+});
+
+test('a seat with no mercenary gets no forecast paragraph', () => {
+  withTempGameDb('aw-brief-merc-noforecast-', () => {
+    const seat = AI_SEAT_IDS[0];
+    setTreasuryCredits(seat, 40);
+    const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const state = { ...loaded, units: loaded.units.filter((unit) => unit.player === seat && unit.isMercenary !== true) };
+    const block = buildMercenariesBriefingBlock(state, (hex) => hex, 'strategic', { productionEnabled: true });
+    const lines = block.split('\n');
+    const fundsIndex = lines.findIndex((line) => line.startsWith('Treasury: 40 credits.'));
+    assert.ok(fundsIndex >= 0, block);
+    assert.equal(lines[fundsIndex + 1], '');
+    assert.ok((lines[fundsIndex + 2] ?? '').startsWith('## '), block);
+  });
 });

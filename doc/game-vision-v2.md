@@ -67,7 +67,7 @@ At ~610,000 km² per hex, individual divisions don't exist. Units at this scale 
 | **Naval** | 2 | 2 | 2 | 2 hexes | Water | 100 |
 | **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 60 |
 
-Per-side caps scale with match size (Small 12/8/8/6 infantry/armor/naval/air; Medium ×2; Large ×4). See [game-size-unit-caps.md](game-size-unit-caps.md). Build prerequisites on the global map: infantry 1 urban hex; armor 2 urban; naval 10 urban + seaport; air 5 urban + airport. A regional map uses the gates stored in its manifest.
+Per-side caps scale with match size (Small 12/8/8/6 infantry/armor/naval/air; Default ×2; Large ×3). See [game-size-unit-caps.md](game-size-unit-caps.md). Build prerequisites on the global map: infantry 1 urban hex; armor 2 urban; naval 10 urban + seaport; air 5 urban + airport. A regional map uses the gates stored in its manifest.
 
 The global roster is validated when: the LLM reasons clearly about force allocation, production decisions feel meaningful, and games at this level alone produce interesting strategic tension for 15–30 turns.
 

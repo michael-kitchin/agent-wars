@@ -12,7 +12,7 @@
  * Exceptions: None.
  */
 export const gameSizeSelectTooltipText =
-  'Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.';
+  'Set how many units each side may field. Default doubles the Small caps, and Large triples them, without changing the map or the starting forces.';
 
 /**
  * Purpose: Names Off, Default, and High and what Default and High add.

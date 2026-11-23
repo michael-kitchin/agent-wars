@@ -155,6 +155,18 @@ function linesFor(args: {
   });
 }
 
+/**
+ * The credits priority line for one city label.
+ *
+ * Purpose: Every credits expectation shares one spelling of the line, including the at-cap reason.
+ * When to use: The credits assertions below.
+ * Expected outcome: The `- Credits:` line naming the label.
+ * Exceptions: None.
+ */
+function creditsLine(label: string): string {
+  return `- Credits: no city is producing credits. Queue credits in ${label}, where every unit type it can build is at its cap.`;
+}
+
 test('the missile line names the enemy city with the most urban cells', () => {
   const ring = neighbors();
   const slow = ring[0]!;
@@ -287,8 +299,12 @@ test('the credits line names the smallest city that meets the size floor', () =>
     queues: [queueRow({ h3: tiny, urban: 5, types: ['credits'], center: labels.center })],
     state: world({ mercenaryEconomy: economy }),
   });
-  assert.deepEqual(smallLines, [`- Credits: no city is producing credits. Queue credits in ${floor}.`]);
-  assert.deepEqual(largeLines, [`- Credits: no city is producing credits. Queue credits in ${huge}.`]);
+  assert.deepEqual(smallLines, [creditsLine(floor)]);
+  assert.deepEqual(largeLines, [creditsLine(huge)]);
+  assert.equal(
+    smallLines[0],
+    `- Credits: no city is producing credits. Queue credits in ${floor}, where every unit type it can build is at its cap.`
+  );
   assert.deepEqual(tooSmall, []);
 });
 
@@ -325,10 +341,14 @@ test('priority lines stay in missile, naval, then credits order', () => {
   const target = ring[1]!;
   const water = [...gridDisk(target, 1)].find((hex) => hex !== target && hex !== builder);
   assert.ok(water);
-  const labels = labelsFor([builder, target, water]);
+  const creditsCity = ring.find((hex) => hex !== builder && hex !== target && hex !== water)!;
+  const labels = labelsFor([builder, target, water, creditsCity]);
   const lines = linesFor({
-    hexes: [builder, target, water],
-    queues: [queueRow({ h3: builder, urban: 20, types: ['missile', 'naval', 'credits'], center: labels.center })],
+    hexes: [builder, target, water, creditsCity],
+    queues: [
+      queueRow({ h3: builder, urban: 20, types: ['missile', 'naval', 'credits'], center: labels.center }),
+      queueRow({ h3: creditsCity, urban: 12, types: ['credits'], center: labels.center }),
+    ],
     state: world({
       ...enemies([{ h3: target, urban: 9 }]),
       hexes: [
@@ -342,7 +362,7 @@ test('priority lines stay in missile, naval, then credits order', () => {
   assert.match(lines[0]!, /^- Missile: /);
   assert.match(lines[1]!, /^- Naval: /);
   assert.match(lines[1]!, /1 enemy city is on the coast/);
-  assert.match(lines[2]!, /^- Credits: /);
+  assert.equal(lines[2], creditsLine(creditsCity));
 });
 
 test('maritime still asks for a ship at half the naval cap and stops at the full cap', () => {
@@ -384,7 +404,7 @@ test('maritime still asks for a ship at half the naval cap and stops at the full
   assert.equal(atFull.some((line) => line.startsWith('- Naval:')), false);
 });
 
-test('strangle names the next missile city and a larger credits city', () => {
+test('strangle names the next missile city, and a city that can still build a missile gets no credits line', () => {
   const ring = neighbors();
   const queuedCity = ring[0]!;
   const openCity = ring[1]!;
@@ -422,14 +442,8 @@ test('strangle names the next missile city and a larger credits city', () => {
   assert.doesNotMatch(missile, new RegExp(`Missile: ${queuedCity}`));
   assert.equal(leaned.filter((line) => line.startsWith('- Missile:')).length, 1);
   assert.equal(plain.some((line) => line.startsWith('- Missile:')), false);
-  assert.deepEqual(
-    leaned.filter((line) => line.startsWith('- Credits:')),
-    [`- Credits: no city is producing credits. Queue credits in ${openCity}.`],
-  );
-  assert.deepEqual(
-    plain.filter((line) => line.startsWith('- Credits:')),
-    [`- Credits: no city is producing credits. Queue credits in ${queuedCity}.`],
-  );
+  assert.deepEqual(leaned.filter((line) => line.startsWith('- Credits:')), []);
+  assert.deepEqual(plain.filter((line) => line.startsWith('- Credits:')), []);
   const cap = getMaxUnitsPerType(parseGameSize('small')).missile;
   const atCap = linesFor({
     ...base,
@@ -459,7 +473,7 @@ test('strangle names the next missile city and a larger credits city', () => {
     state: world({ mercenaryEconomy: { ...economy, credits: defaultCeiling } }),
   });
   assert.deepEqual(bankedDefault, []);
-  assert.deepEqual(banked, [`- Credits: no city is producing credits. Queue credits in ${openCity}.`]);
+  assert.deepEqual(banked, []);
 });
 
 test('strangle omits the missile line when owned and queued missiles fill the cap', () => {
@@ -547,6 +561,6 @@ test('a paused queue does not count as producing credits or as a queued missile'
     ],
     state: world({ ...enemies([{ h3: target, urban: 20 }]), mercenaryEconomy: economy }),
   });
-  assert.deepEqual(credits, [`- Credits: no city is producing credits. Queue credits in ${openCity}.`]);
+  assert.deepEqual(credits, [creditsLine(openCity)]);
   assert.equal(missile.some((line) => line.startsWith('- Missile:')), true);
 });

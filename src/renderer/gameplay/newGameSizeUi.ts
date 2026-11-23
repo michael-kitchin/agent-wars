@@ -13,7 +13,7 @@ export const NEW_GAME_SIZE_SELECT_ID = 'new-game-size-select';
 /**
  * Reads the Game size dropdown and coerces it to a `GameSize`.
  *
- * Purpose: Start-game IPC and cap preview share one parse path (`parseGameSize`).
+ * Purpose: Start-game IPC and cap preview share one parse path (`parseGameSize`). The `medium` option is labeled Default and is selected when the page loads.
  * When to use: `newGame` payload assembly and preview refresh.
  * Expected outcome: `'small'` when the select is missing or empty.
  * Exceptions: None.

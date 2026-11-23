@@ -22,9 +22,27 @@ export const BUILD_STATUS_COLUMN_HEADER = 'Building';
 /** How many rehire or raise rows a briefing shows. */
 export const MERCENARY_BRIEFING_MAX_ROWS = 10;
 
-/** Warning when credits do not cover mercenary upkeep. */
+/**
+ * Warning when the treasury and this turn's credits income cannot pay mercenary upkeep.
+ *
+ * Purpose: Tells the commander desertion follows unless more credits come in.
+ * When to use: Its own paragraph in the Mercenaries section, when the forecast's cover turns are 0.
+ * Expected outcome: One sentence. Seats that can queue production add `MERCENARY_FUNDS_WARNING_ACTION`.
+ * Exceptions: None.
+ */
 export const MERCENARY_FUNDS_WARNING =
-  'Warning: your treasury does not cover this turn\'s mercenary upkeep. Credits produced this turn arrive before upkeep is paid. Random mercenaries desert only if upkeep cannot be paid. Hire-order fees have already been taken from the balance.';
+  'Warning: unless more credits come in this turn, random mercenaries desert to Neutral at the end of it.';
+
+/**
+ * What a seat can do about the funds warning.
+ *
+ * Purpose: Names the two levers a commander still has, credits queues and hiring.
+ * When to use: After `MERCENARY_FUNDS_WARNING`, for a seat with production on.
+ * Expected outcome: One sentence.
+ * Exceptions: None.
+ */
+export const MERCENARY_FUNDS_WARNING_ACTION =
+  'Queue credits in more cities, and do not raise or rehire mercenaries this turn.';
 
 /** Shown when the seat can see no Neutral unit it may rehire. */
 export const NO_REHIRE_CANDIDATES_LINE = 'No Neutral unit you can see can be rehired.';
