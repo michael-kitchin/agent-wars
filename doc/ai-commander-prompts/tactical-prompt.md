@@ -152,7 +152,7 @@ Tactical variant, bullets in this order:
 ### 2.9 `# Air Operations Status`
 
 - **Include:** when the opponent has at least one air sub-unit in this battle. **Omit** the section otherwise, along with the strike list and every air clause.
-- **Content:** own and enemy air counts and a per-unit table. The tactical air-rules sentence is `## Air Operations Table`. Columns are `Unit ID`, `Hex`, `Aboard`, `Enemy Unit Targets`. `Aboard` is the infantry sub-unit id, or `none`.
+- **Content:** own and enemy air counts and a per-unit table. The tactical air-rules sentence is `## Air Operations Table`. Columns are `Unit ID`, `Hex`, `Aboard`, `Enemy Unit Targets`. `Aboard` lists every infantry sub-unit id aboard, up to `AIRLIFT_INFANTRY_CAPACITY` (2), sorted and joined with commas (`infantryAboardLabel`), or `none`.
 - **Omitted columns relative to strategic:** base intact, base controlled, and the strikeable-infrastructure columns. Infrastructure is not a strike target class inside a beat. Ferry dests appear on Best Options, not as extra Air Operations columns.
 
 ### 2.10 `# Naval Transport Status`

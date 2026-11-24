@@ -313,7 +313,7 @@ Explored land progress, controlled land progress, and the home-control bullets a
 ### 1.9 `# Air Operations Status`
 
 - **Include:** when the opponent has at least one air unit. **Omit** the whole section otherwise, along with the air JSON fields and every air clause.
-- **Content:** own and enemy air counts, the per-unit table, then the strike-envelope summary of enemy infrastructure currently reachable. The air-rules sentence and the callback-support sentence are `## Air Operations Table`. `Aboard` is the infantry id on that air unit, or `none`.
+- **Content:** own and enemy air counts, the per-unit table, then the strike-envelope summary of enemy infrastructure currently reachable. The air-rules sentence and the callback-support sentence are `## Air Operations Table`. `Aboard` lists every infantry id on that air unit, up to `AIRLIFT_INFANTRY_CAPACITY` (2), sorted and joined with commas (`infantryAboardLabel`), or `none`.
 - **Items:** `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 - **Model use:** for each air unit, pick one of strike, drop, and ferry. When `Aboard` lists fewer than 2 infantry, the same orders list can embark infantry units from that hex, one embark row each; strategic embark runs before the drop.
 
