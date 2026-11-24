@@ -123,7 +123,7 @@ test('strategic coaching includes every required item when its gate is on', () =
 
 test('the production rules teach a larger credits count right after the credits paragraph', () => {
   const on = joined(strategicGates({ productionEnabled: true }));
-  assert.ok(on.includes('For steady income, give it a larger count.'));
+  assert.ok(on.includes('For steady income, give it a larger count, unless the Mercenaries section says your credits are more than you need.'));
   const guidance = buildCreditsCountGuidance();
   const at = on.indexOf(guidance);
   assert.ok(at > 0);

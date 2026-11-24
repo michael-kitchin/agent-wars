@@ -18,6 +18,7 @@ import {
   MERCENARY_ENVELOPE_ROWS_SENTENCE,
   MERCENARY_FUNDS_WARNING_ACTION,
 } from './gameRuleMercenaryText';
+import { SECTION_TITLE_MERCENARIES } from './sectionHeadings';
 
 test('the credits rule names the global item price and the credits it adds', () => {
   assert.ok(buildCreditsProductionRulePart().includes('costs 20 production points and adds 20 credits'));
@@ -50,6 +51,7 @@ test('the credits count guidance names the item economics and a larger count', (
   const cost = creditsItemCost();
   assert.equal(
     buildCreditsCountGuidance(),
-    `A credits row adds ${CREDITS_PER_ITEM} credits for each ${cost} production points it spends, and it stops when its count runs out. For steady income, give it a larger count. A city makes one production point per city cell each turn, so a count of 10 in a city with ${cost} city cells lasts about 10 turns.`
+    `A credits row adds ${CREDITS_PER_ITEM} credits for each ${cost} production points it spends, and it stops when its count runs out. For steady income, give it a larger count, unless the ${SECTION_TITLE_MERCENARIES} section says your credits are more than you need. A city makes one production point per city cell each turn, so a count of 10 in a city with ${cost} city cells lasts about 10 turns.`
   );
+  assert.ok(buildCreditsCountGuidance().includes('unless the Mercenaries section says your credits are more than you need'));
 });

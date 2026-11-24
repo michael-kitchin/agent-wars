@@ -325,6 +325,26 @@ test('the funds warning is its own paragraph and follows the forecast', () => {
   });
 });
 
+test('the forecast paragraph says a deep treasury is more than needed', () => {
+  withTempGameDb('aw-brief-merc-deep-', () => {
+    const seat = AI_SEAT_IDS[0];
+    const { city } = homeCreditsCity(seat);
+    setTreasuryCredits(seat, 20000);
+    const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const deepState = { ...state, strategicBuildQueueTotals: creditsQueue(city, 99) };
+    const spend =
+      'Your 20000 credits are more than you need: spend them on mercenaries before you queue more credits, and queue units instead of credits where a city can still build them.';
+    const on = buildMercenariesBriefingBlock(deepState, (hex) => hex, 'strategic', { productionEnabled: true });
+    const paragraph = on.split('\n\n').find((part) => part.startsWith('Your credits queues hold')) ?? '';
+    assert.ok(paragraph.endsWith(` ${spend}`), on);
+    assert.equal(on.includes('\n\n\n'), false);
+
+    const off = buildMercenariesBriefingBlock(deepState, (hex) => hex, 'strategic', { productionEnabled: false });
+    assert.ok(off.includes('Your credits queues hold'), off);
+    assert.equal(off.includes('more than you need'), false);
+  });
+});
+
 test('a seat with no mercenary gets no forecast paragraph', () => {
   withTempGameDb('aw-brief-merc-noforecast-', () => {
     const seat = AI_SEAT_IDS[0];

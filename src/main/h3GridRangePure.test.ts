@@ -8,7 +8,7 @@
  */
 
 import * as assert from 'assert';
-import { cellToChildren, cellToParent, getPentagons, getRes0Cells, gridDistance, gridPathCells } from 'h3-js';
+import { cellToChildren, cellToParent, getPentagons, getRes0Cells, gridDisk, gridDistance, gridPathCells } from 'h3-js';
 import {
   clearGridFallbackSearchesForTests,
   computeGridDistancePure,
@@ -163,8 +163,67 @@ function testFallbackDistanceAgreesAcrossQueryOrder(): void {
   assert.deepStrictEqual(farthestFirst, expected);
 }
 
+/**
+ * The memoized disk fallback answers the same as a fresh `gridDisk` for pairs H3 cannot measure.
+ *
+ * Purpose: `isWithinGridRangePure` caches the fallback disk per origin and range, and a cached answer must never differ.
+ * When to use: After changing the disk fallback in `isWithinGridRangePure`.
+ * Expected outcome: A near face-crossing pair and far unmeasurable pairs match fresh `gridDisk` membership, on the first and the repeated call.
+ * Exceptions: Skips a range whose fresh `gridDisk` throws.
+ */
+function testDiskFallbackMemoMatchesFreshDisk(): void {
+  const [crossFrom, crossTo] = tacticalPairWhereGridPathCellsThrows();
+  const path = computeGridPathCellsPure(crossFrom, crossTo);
+  assert.ok(path !== null);
+  const { origin, destinations } = strategicFaceCrossingSample();
+  const cases: Array<[string, string, number]> = [
+    [crossFrom, crossTo, path!.length - 1],
+    [crossFrom, crossTo, 0],
+    ...destinations.flatMap((destination): Array<[string, string, number]> => [[origin, destination, 3], [origin, destination, 4]]),
+  ];
+  for (const [from, to, range] of cases) {
+    assert.strictEqual(computeGridDistancePure(from, to), null, 'fixture must be an unmeasurable pair');
+    let fresh: boolean;
+    try {
+      fresh = gridDisk(from, range).includes(to);
+    } catch {
+      continue;
+    }
+    assert.strictEqual(isWithinGridRangePure(from, to, range), fresh);
+    assert.strictEqual(isWithinGridRangePure(from, to, range), fresh, 'second call must hit the disk memo');
+  }
+}
+
+/**
+ * Answers stay correct after the disk fallback memo evicts for its cell budget.
+ *
+ * Purpose: Large disks force eviction, and a miscounted budget could keep a stale disk or drop the one just built.
+ * When to use: After changing the fallback disk eviction in `h3GridRangePure`.
+ * Expected outcome: Every unmeasurable resolution-1 pair tested at range 25 matches fresh `gridDisk` membership, including
+ *   the earliest origins after later ones pushed the stored cells past the budget.
+ * Exceptions: Skips an origin with no unmeasurable destination among the cells tried.
+ */
+function testDiskFallbackStaysCorrectAfterEviction(): void {
+  const cells = getRes0Cells().flatMap((parent) => cellToChildren(parent, 1));
+  const range = 25;
+  const pairs: Array<[string, string]> = [];
+  for (let i = 0; i < cells.length && pairs.length < 150; i += 5) {
+    const origin = cells[i]!;
+    const destination = cells.find((cell) => computeGridDistancePure(origin, cell) === null);
+    if (destination !== undefined) pairs.push([origin, destination]);
+  }
+  assert.ok(pairs.length * gridDisk(pairs[0]![0], range).length > 200_000, 'the sample must exceed the cell budget');
+  const expected = pairs.map(([origin, destination]) => gridDisk(origin, range).includes(destination));
+  const first = pairs.map(([origin, destination]) => isWithinGridRangePure(origin, destination, range));
+  const again = pairs.map(([origin, destination]) => isWithinGridRangePure(origin, destination, range));
+  assert.deepStrictEqual(first, expected);
+  assert.deepStrictEqual(again, expected);
+}
+
 const tests = [
   { name: 'computeGridDistancePure memo matches direct H3', fn: testComputeGridDistancePureMatchesDirectH3 },
+  { name: 'the disk fallback memo matches a fresh gridDisk', fn: testDiskFallbackMemoMatchesFreshDisk },
+  { name: 'the disk fallback stays correct after eviction', fn: testDiskFallbackStaysCorrectAfterEviction },
   { name: 'computeGridPathCellsPure covers face crossings', fn: testComputeGridPathCellsPureCoversFaceCrossings },
   { name: 'face-crossing distance agrees in either query order', fn: testFallbackDistanceAgreesAcrossQueryOrder },
 ];

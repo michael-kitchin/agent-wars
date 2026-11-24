@@ -1,5 +1,5 @@
 /**
- * Contract tests for the mercenary raise attention line.
+ * Contract tests for the mercenary raise planner and the raise attention line.
  * Run: `npm run build:main` then `node dist/main/openRouter/mercenaryRaiseAttention.test.js`
  */
 
@@ -18,13 +18,18 @@ import {
   setHexController,
 } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { raiseOptionRowsForSeat } from './briefingSectionsMercenaries';
-import { formatMercenaryRaiseAttention, MERCENARY_UPKEEP_RESERVE_TURNS } from './mercenaryRaiseAttention';
+import { raiseOptionRowsForSeat, type RaiseOptionRow } from './briefingSectionsMercenaries';
+import {
+  formatMercenaryRaiseAttention,
+  MERCENARY_RAISE_ATTENTION_MAX_CELLS,
+  MERCENARY_UPKEEP_RESERVE_TURNS,
+  planMercenaryRaises,
+} from './mercenaryRaiseAttention';
 
 /**
  * A city outside every home region, controlled by the seat and cleared of units.
  *
- * Purpose: The raise line needs one hex the hire rules will offer.
+ * Purpose: The raise line needs one hex the hire rules will offer. With no unit and no fortification it is occupation-paused, so raising there resumes its queue.
  * When to use: Inside a temporary match.
  * Expected outcome: The hex index.
  * Exceptions: Assertion failure when the fixture map has no such city.
@@ -59,8 +64,93 @@ function cheapest(options: readonly HireRaiseOption[]): HireRaiseOption {
   return option;
 }
 
-test('the line fires when the option is affordable and stays quiet one credit under that price', () => {
+/** Infantry option with a fee of 5, upkeep of 5, and a unit cost of 20, as the planner cases use. */
+const INFANTRY: HireRaiseOption = { unitType: 'infantry', unitCost: 20, fee: 5, upkeep: 5 };
+
+/**
+ * A raise row for the planner cases.
+ *
+ * Purpose: Keeps each case to the hex, the capacity, and whether it resumes.
+ * When to use: The planner cases.
+ * Expected outcome: A row with the single infantry option.
+ * Exceptions: None.
+ */
+function plannerRow(h3Index: string, capacityLeft = 400, resumes = false): RaiseOptionRow {
+  return { h3Index, capacityLeft, resumes, options: [INFANTRY] } as RaiseOptionRow;
+}
+
+test('the planner keeps twenty turns of total upkeep', () => {
+  const credits = 20 * 100 + 3 * (5 + 20 * 5);
+  const rows = [plannerRow('a')];
+  const plan = (treasury: number) => planMercenaryRaises({ credits: treasury, upkeepPerTurn: 100, rows, homeHexes: new Set() });
+  assert.equal(MERCENARY_UPKEEP_RESERVE_TURNS, 20);
+  assert.equal(plan(credits)[0]?.count, 3);
+  assert.equal(plan(credits - 1)[0]?.count, 2);
+});
+
+test('the planner takes resuming cells first, then cells outside home', () => {
+  const rows = [plannerRow('a'), plannerRow('b'), plannerRow('c', 400, true)];
+  const plan = planMercenaryRaises({ credits: 1_000_000, upkeepPerTurn: 0, rows, homeHexes: new Set(['a']) });
+  assert.deepEqual(plan.map((cell) => cell.h3Index), ['c', 'b', 'a']);
+  assert.deepEqual(plan.map((cell) => cell.resumes), [true, false, false]);
+});
+
+test("the planner stops at six cells and at each cell's capacity", () => {
+  const eight = Array.from({ length: 8 }, (_, index) => plannerRow(`h${index}`, 40));
+  const plan = planMercenaryRaises({ credits: 1_000_000, upkeepPerTurn: 0, rows: eight, homeHexes: new Set() });
+  assert.equal(plan.length, MERCENARY_RAISE_ATTENTION_MAX_CELLS);
+  assert.ok(plan.every((cell) => cell.count === 2));
+});
+
+test('the planner spends the treasury across cells, not per cell', () => {
+  const rows = [plannerRow('a', 60), plannerRow('b', 400)];
+  const input = { credits: 5 * (5 + 20 * 5), upkeepPerTurn: 0, rows, homeHexes: new Set<string>() };
+  const plan = planMercenaryRaises(input);
+  assert.deepEqual(plan.map((cell) => [cell.h3Index, cell.count]), [['a', 3], ['b', 2]]);
+  assert.equal(input.credits, 525);
+  assert.equal(rows[0]?.capacityLeft, 60);
+});
+
+test('the raise bullet lists each cell, and marks one that restarts a paused queue', () => {
   withTempGameDb('aw-raise-attention-', () => {
+    const seat = AI_SEAT_IDS[0];
+    const hex = outsideCity(seat);
+    const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const probed = {
+      ...loaded,
+      units: loaded.units.filter((unit) => unit.player === seat),
+      exploredHexes: [hex],
+      mercenaryEconomy: { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 },
+    };
+    const row = raiseOptionRowsForSeat(probed, seat, null).find((candidate) => candidate.h3Index === hex);
+    assert.ok(row, 'the outside city should offer a raise');
+    assert.equal(row.resumes, true);
+    const option = cheapest(row.options);
+    const perUnit = option.fee + MERCENARY_UPKEEP_RESERVE_TURNS * option.upkeep;
+    const urbanFor = (units: number): number => (units * option.unitCost) / MERCENARY_RAISE_CAPACITY_MULTIPLIER;
+    dbRun('UPDATE res_s_infrastructure SET urban_hex_count = ? WHERE h3_index = ?', [urbanFor(5), hex]);
+    const again = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const result = formatMercenaryRaiseAttention({
+      state: {
+        ...again,
+        units: again.units.filter((unit) => unit.player === seat),
+        exploredHexes: [hex],
+        mercenaryEconomy: { credits: perUnit * 2, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 },
+      },
+      ownSeat: seat,
+      format: (h3) => h3,
+      campaignTargetH3: null,
+    });
+    assert.equal(
+      result.text,
+      `Mercenaries: your treasury of ${perUnit * 2} credits can raise 2 mercenaries this turn for ${2 * option.fee} credits and still keep 20 turns of upkeep: 2 ${option.unitType} at ${hex} (restarts its paused queue). Add one raise_mercenaries row per cell, with that count.`
+    );
+    assert.deepEqual(result.cells.map((cell) => [cell.h3Index, cell.count, cell.resumes]), [[hex, 2, true]]);
+  });
+});
+
+test('the raise bullet is quiet when no cell is affordable', () => {
+  withTempGameDb('aw-raise-attention-quiet-', () => {
     const seat = AI_SEAT_IDS[0];
     const hex = outsideCity(seat);
     const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
@@ -74,110 +164,13 @@ test('the line fires when the option is affordable and stays quiet one credit un
     assert.ok(row, 'the outside city should offer a raise');
     const option = cheapest(row.options);
     const price = option.fee + MERCENARY_UPKEEP_RESERVE_TURNS * option.upkeep;
-    const economy = {
-      credits: price,
-      upkeepPerTurn: price + 5000,
-      pendingHireFees: 0,
-      mercenaryCount: 0,
-    };
-    const affordable = formatMercenaryRaiseAttention({
-      state: { ...probed, mercenaryEconomy: economy },
-      ownSeat: seat,
-      format: (h3) => h3,
-      campaignTargetH3: null,
-    });
-    assert.equal(
-      affordable,
-      `Mercenaries: your treasury of ${price} credits can raise 1 ${option.unitType} at ${hex} for ${option.fee}, keeping ${MERCENARY_UPKEEP_RESERVE_TURNS} turns of their upkeep. Add a raise_mercenaries row with "count": 1 to productionOrders.`
-    );
     const short = formatMercenaryRaiseAttention({
-      state: { ...probed, mercenaryEconomy: { ...economy, credits: price - 1 } },
+      state: { ...probed, mercenaryEconomy: { credits: price - 1, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 } },
       ownSeat: seat,
       format: (h3) => h3,
       campaignTargetH3: null,
     });
-    assert.equal(short, null);
-  });
-});
-
-test('an affordable hex outside the home region is named ahead of one inside it', () => {
-  withTempGameDb('aw-raise-attention-home-', () => {
-    const seat = AI_SEAT_IDS[0];
-    const roster = getSeatRoster().find((row) => row.seatId === seat);
-    assert.ok(roster);
-    const homes = getScenarioHomeRegionHexes(roster.homeRegion);
-    const homeSet = new Set(homes);
-    const homeCity = dbGetAll<{ h3Index: string }>(
-      'SELECT h3_index AS h3Index FROM res_s_infrastructure WHERE urban_hex_count >= 10 AND fortified_count = 0'
-    )
-      .map((row) => row.h3Index)
-      .find((h3Index) => homeSet.has(h3Index) && !isNeutralBorderHex(h3Index));
-    assert.ok(homeCity, 'fixture needs a home city');
-    setHexController(homeCity, seat);
-    dbRun('DELETE FROM units WHERE h3_index = ?', [homeCity]);
-    const outside = outsideCity(seat);
-    const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
-    const state = {
-      ...loaded,
-      units: loaded.units.filter((unit) => unit.player === seat),
-      exploredHexes: [homeCity, outside],
-      homeRegionHexesBySeat: { ...(loaded.homeRegionHexesBySeat ?? {}), [seat]: homes },
-      mercenaryEconomy: { credits: 1_000_000, upkeepPerTurn: 2_000_000, pendingHireFees: 0, mercenaryCount: 0 },
-    };
-    const rows = raiseOptionRowsForSeat(state, seat, null);
-    assert.ok(rows.some((row) => row.h3Index === homeCity));
-    assert.ok(rows.some((row) => row.h3Index === outside));
-    const bullet = formatMercenaryRaiseAttention({
-      state,
-      ownSeat: seat,
-      format: (h3) => h3,
-      campaignTargetH3: null,
-    });
-    assert.ok(bullet?.includes(`at ${outside} for`), bullet ?? '');
-    assert.equal(bullet?.includes(`at ${homeCity} for`), false);
-  });
-});
-
-test('the count is the smaller of what the treasury can carry and what the hex can hold', () => {
-  withTempGameDb('aw-raise-attention-count-', () => {
-    const seat = AI_SEAT_IDS[0];
-    const hex = outsideCity(seat);
-    const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
-    const probed = {
-      ...loaded,
-      units: loaded.units.filter((unit) => unit.player === seat),
-      exploredHexes: [hex],
-      mercenaryEconomy: { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 },
-    };
-    const row = raiseOptionRowsForSeat(probed, seat, null).find((candidate) => candidate.h3Index === hex);
-    assert.ok(row, 'the outside city should offer a raise');
-    const option = cheapest(row.options);
-    const perUnit = option.fee + MERCENARY_UPKEEP_RESERVE_TURNS * option.upkeep;
-    const urbanFor = (units: number): number => (units * option.unitCost) / MERCENARY_RAISE_CAPACITY_MULTIPLIER;
-    const attention = (credits: number, urban: number): string | null => {
-      dbRun('UPDATE res_s_infrastructure SET urban_hex_count = ? WHERE h3_index = ?', [urban, hex]);
-      const again = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
-      return formatMercenaryRaiseAttention({
-        state: {
-          ...again,
-          units: again.units.filter((unit) => unit.player === seat),
-          exploredHexes: [hex],
-          mercenaryEconomy: { credits, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 },
-        },
-        ownSeat: seat,
-        format: (h3) => h3,
-        campaignTargetH3: null,
-      });
-    };
-    const byCapacity = attention(perUnit * 6, urbanFor(4));
-    assert.equal(
-      byCapacity,
-      `Mercenaries: your treasury of ${perUnit * 6} credits can raise 4 ${option.unitType} at ${hex} for ${4 * option.fee}, keeping ${MERCENARY_UPKEEP_RESERVE_TURNS} turns of their upkeep. Add a raise_mercenaries row with "count": 4 to productionOrders.`
-    );
-    const byCredits = attention(perUnit * 3, urbanFor(10));
-    assert.equal(
-      byCredits,
-      `Mercenaries: your treasury of ${perUnit * 3} credits can raise 3 ${option.unitType} at ${hex} for ${3 * option.fee}, keeping ${MERCENARY_UPKEEP_RESERVE_TURNS} turns of their upkeep. Add a raise_mercenaries row with "count": 3 to productionOrders.`
-    );
+    assert.equal(short.text, null);
+    assert.deepEqual(short.cells, []);
   });
 });

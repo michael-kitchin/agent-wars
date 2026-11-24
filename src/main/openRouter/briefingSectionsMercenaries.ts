@@ -22,7 +22,7 @@ import { CHOKEPOINT_MAX_PASSABLE_NEIGHBORS, countNeighborTerrain } from '../tool
 import { buildHireContext, evaluateHexHire, listHireEntryHexes } from '../mercenaryHireRules';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { buildMercenaryFiringRiskBlock } from './briefingSectionsMercenaryFiring';
-import { buildTreasuryForecast, formatTreasuryForecastSentence } from './treasuryForecast';
+import { buildTreasuryForecast, formatTreasuryForecastSentence, isTreasuryDeep } from './treasuryForecast';
 import {
   MERCENARY_BRIEFING_MAX_ROWS,
   MERCENARY_FUNDS_WARNING,
@@ -45,7 +45,7 @@ import {
  *
  * Purpose: Production-off seats still see their treasury and their mercenaries. They are not shown hire tables.
  * When to use: While assembling the situation message, with the seat's own snapshot.
- * Expected outcome: The heading, the treasury line, a forecast paragraph when upkeep is above 0, a warning paragraph when credits plus the credits income cannot pay this turn's upkeep, and the tables that apply. Firing Risk follows Your Mercenaries when production is on and a mercenary stands in an at-risk home hex. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
+ * Expected outcome: The heading, the treasury line, a forecast paragraph when upkeep or queued credits are above 0, or when production is on and the treasury is deep (then it ends with a sentence saying the credits are more than needed), a warning paragraph when credits plus the credits income cannot pay this turn's upkeep, and the tables that apply. Firing Risk follows Your Mercenaries when production is on and a mercenary stands in an at-risk home hex. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
  * Exceptions: None.
  */
 export function buildMercenariesBriefingBlock(
@@ -87,7 +87,8 @@ export function buildMercenariesBriefingBlock(
     }
   }
   const forecast = buildTreasuryForecast(state, ownSeat);
-  const forecastSentence = forecast ? formatTreasuryForecastSentence(forecast) : '';
+  const deep = forecast !== null && options.productionEnabled && isTreasuryDeep({ forecast, gameSize: state.gameSize });
+  const forecastSentence = forecast ? formatTreasuryForecastSentence({ forecast, deep }) : '';
   const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', formatMercenaryFundsLine(economy)];
   if (forecastSentence.length > 0) lines.push('', forecastSentence);
   const cannotPay = forecast ? forecast.coverTurns === 0 : economy.credits < economy.upkeepPerTurn;

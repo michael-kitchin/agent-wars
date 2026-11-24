@@ -15,6 +15,7 @@ import {
   HIREABLE_UNIT_TYPES,
   mercenaryUpkeepFor,
 } from '../../../shared/mercenaryRules';
+import { SECTION_TITLE_MERCENARIES } from './sectionHeadings';
 
 /** Column heading for whether a hex is still building. */
 export const BUILD_STATUS_COLUMN_HEADER = 'Building';
@@ -71,16 +72,16 @@ export function buildCreditsProductionRulePart(): string {
 }
 
 /**
- * Advice to give a credits row a larger count.
+ * Advice to give a credits row a larger count, unless the treasury is deep.
  *
- * Purpose: A credits row stops when its count runs out, so a count of 1 pays once.
+ * Purpose: A credits row stops when its count runs out, so a count of 1 pays once. The advice is static text, so the Mercenaries section switches it off by saying the credits are more than needed.
  * When to use: The production coaching bullet, built with the active map's item cost.
- * Expected outcome: One line naming what a credits row adds and why to give it a larger count.
+ * Expected outcome: One line naming what a credits row adds, why to give it a larger count, and the "unless the Mercenaries section says your credits are more than you need" clause. It reads only constants.
  * Exceptions: None.
  */
 export function buildCreditsCountGuidance(): string {
   const cost = creditsItemCost();
-  return `A credits row adds ${CREDITS_PER_ITEM} credits for each ${cost} production points it spends, and it stops when its count runs out. For steady income, give it a larger count. A city makes one production point per city cell each turn, so a count of 10 in a city with ${cost} city cells lasts about 10 turns.`;
+  return `A credits row adds ${CREDITS_PER_ITEM} credits for each ${cost} production points it spends, and it stops when its count runs out. For steady income, give it a larger count, unless the ${SECTION_TITLE_MERCENARIES} section says your credits are more than you need. A city makes one production point per city cell each turn, so a count of 10 in a city with ${cost} city cells lasts about 10 turns.`;
 }
 
 /**

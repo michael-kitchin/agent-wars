@@ -398,7 +398,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
                   ownSeat: seatId,
                   format: formatCampaignHex,
                   campaignTargetH3: campaignPlan?.objective.targetH3 ?? null,
-                })
+                }).text
               : null,
             treasury.runOut,
             treasury.hoard,

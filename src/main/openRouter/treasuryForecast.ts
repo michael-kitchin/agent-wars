@@ -1,7 +1,7 @@
 /**
  * How long a seat's treasury pays its mercenary upkeep, and the prompt text built from that.
  *
- * Purpose: A commander sees the runway before mercenaries desert, and sees an idle treasury while its forces sit far below their caps. The forecast steps through each credits queue's remaining items and banked points.
+ * Purpose: A commander sees the runway before mercenaries desert, and is told when its treasury holds more credits than it needs. The forecast steps through each credits queue's remaining items and banked points.
  * When to use: The Mercenaries briefing section and the strategic Attention Flags.
  * Expected outcome: One forecast per seat per briefing, from `buildTreasuryForecast`. The sentence and both bullets are built from it.
  * Exceptions: The forecast is an estimate. It ignores hire orders that have not filled, Keep building on an empty queue, and credits produced by anything but the queues' remaining items.
@@ -28,29 +28,29 @@ import { getPlayerUnitCountsByType } from '../productionCaps';
 export const TREASURY_RUN_OUT_WARNING_TURNS = 5;
 
 /**
- * Turns of mercenary upkeep a treasury must hold before it counts as idle.
+ * Turns of mercenary upkeep a treasury must hold before it counts as deep.
  *
  * Purpose: A deep treasury relative to upkeep is credits that could pay for more mercenaries.
  * When to use: `formatTreasuryHoardAttention`.
- * Expected outcome: Twenty.
+ * Expected outcome: Twenty. Read by `isTreasuryDeep`.
  * Exceptions: None.
  */
 export const TREASURY_HOARD_UPKEEP_TURNS = 20;
 
 /**
- * Credits per game-size step the treasury must hold before it counts as idle.
+ * Credits per game-size step the treasury must hold before it counts as deep.
  *
- * Purpose: A seat with no upkeep still has an idle treasury once it holds this much.
+ * Purpose: A seat with no upkeep still has a deep treasury once it holds this much.
  * When to use: `formatTreasuryHoardAttention`, multiplied by `GAME_SIZE_MULTIPLIER`.
- * Expected outcome: 500, 1,000, or 1,500 credits on Small, Default, or Large.
+ * Expected outcome: 500, 1,000, or 1,500 credits on Small, Default, or Large. Read by `isTreasuryDeep`.
  * Exceptions: None.
  */
 export const TREASURY_HOARD_FLOOR_PER_SIZE = 500;
 
 /**
- * Share of the combined unit caps below which the side's forces count as small.
+ * Share of the combined unit caps that chooses the hoard bullet's wording.
  *
- * Purpose: Idle credits matter only while the side still has room to build or hire.
+ * Purpose: Below this share the side still has room to build, so the bullet also points at unit production. At or above it, the bullet says mercenaries do not count toward caps.
  * When to use: `formatTreasuryHoardAttention`.
  * Expected outcome: One half.
  * Exceptions: None.
@@ -286,11 +286,46 @@ function moreTurnsText(turns: number): string {
  *
  * Purpose: Tells the commander what the credits queues still hold and how many turns the treasury pays upkeep.
  * When to use: Right after the treasury line.
+ * Expected outcome: One sentence, or an empty string when upkeep and queued credits are both 0. When `deep` is true, a second sentence says the credits are more than needed and points at mercenaries and unit production, or stands alone when the first is empty.
+ * Exceptions: None.
+ */
+export function formatTreasuryForecastSentence(args: {
+  /**
+   * The seat's forecast.
+   *
+   * Contract: From `buildTreasuryForecast`.
+   * When to use: The Mercenaries section's forecast paragraph.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly forecast: TreasuryForecast;
+  /**
+   * Whether to add the "more than you need" sentence.
+   *
+   * Contract: `isTreasuryDeep` for this forecast, and true only when production is on, so the seat can raise or queue.
+   * When to use: Pass false for a production-off seat.
+   * Expected outcome: True appends the spend sentence.
+   * Exceptions: None.
+   */
+  readonly deep: boolean;
+}): string {
+  const { forecast, deep } = args;
+  logTrace('treasuryForecast formatTreasuryForecastSentence', { ...forecast, deep });
+  const base = forecastBaseSentence(forecast);
+  if (!deep) return base;
+  const spend = `Your ${forecast.credits} credits are more than you need: spend them on mercenaries before you queue more credits, and queue units instead of credits where a city can still build them.`;
+  return base === '' ? spend : `${base} ${spend}`;
+}
+
+/**
+ * The forecast sentence without the deep-treasury addition.
+ *
+ * Purpose: Keeps the per-case wording apart from the optional spend sentence.
+ * When to use: Only `formatTreasuryForecastSentence`.
  * Expected outcome: One sentence, or an empty string when upkeep and queued credits are both 0.
  * Exceptions: None.
  */
-export function formatTreasuryForecastSentence(forecast: TreasuryForecast): string {
-  logTrace('treasuryForecast formatTreasuryForecastSentence', { ...forecast });
+function forecastBaseSentence(forecast: TreasuryForecast): string {
   const { queuedCredits: q, upkeepPerTurn: u, coverTurns: n } = forecast;
   if (u === 0) return q === 0 ? '' : `Your credits queues hold ${q} more credits.`;
   if (q === 0) {
@@ -323,11 +358,47 @@ export function formatTreasuryRunOutAttention(forecast: TreasuryForecast | null)
 }
 
 /**
- * The attention bullet for an idle treasury.
+ * Whether a treasury holds more credits than the seat needs.
  *
- * Purpose: Points a rich seat with small forces at mercenaries and unit production.
+ * Purpose: The one "more than you need" test, shared by the hoard bullet and the forecast sentence.
+ * When to use: Whenever a prompt line depends on the treasury being deep.
+ * Expected outcome: True when credits reach the larger of 20 turns of upkeep and the size floor (500 credits per game-size step). With upkeep 0, only the size floor applies.
+ * Exceptions: None.
+ */
+export function isTreasuryDeep(args: {
+  /**
+   * The seat's forecast.
+   *
+   * Contract: From `buildTreasuryForecast`. Only `credits` and `upkeepPerTurn` are read.
+   * When to use: Pass the forecast the bullet or sentence is built from.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly forecast: TreasuryForecast;
+  /**
+   * The snapshot's game size.
+   *
+   * Contract: `GameStateSnapshot.gameSize`, parsed here with `parseGameSize`.
+   * When to use: Scales the size floor.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly gameSize: GameStateSnapshot['gameSize'];
+}): boolean {
+  const { forecast } = args;
+  const size = parseGameSize(args.gameSize);
+  const creditsFloor = Math.max(TREASURY_HOARD_UPKEEP_TURNS * forecast.upkeepPerTurn, TREASURY_HOARD_FLOOR_PER_SIZE * GAME_SIZE_MULTIPLIER[size]);
+  const deep = forecast.credits >= creditsFloor;
+  logTrace('treasuryForecast isTreasuryDeep', { credits: forecast.credits, upkeepPerTurn: forecast.upkeepPerTurn, creditsFloor, deep });
+  return deep;
+}
+
+/**
+ * The attention bullet for a deep treasury.
+ *
+ * Purpose: Points a rich seat at mercenaries, and at unit production while its forces are small.
  * When to use: Strategic Attention Flags when production is on.
- * Expected outcome: One line when credits reach 20 turns of upkeep and the size floor while fielded units are under half the combined caps. Otherwise null.
+ * Expected outcome: One line whenever the treasury is deep. Under half the combined caps it also points at unit production. At or above half it says mercenaries do not count toward caps. Null when the treasury is not deep or there is no forecast.
  * Exceptions: None.
  */
 export function formatTreasuryHoardAttention(args: {
@@ -339,22 +410,21 @@ export function formatTreasuryHoardAttention(args: {
   readonly forecast: TreasuryForecast | null;
 }): string | null {
   const { forecast } = args;
-  if (forecast === null) return null;
+  if (forecast === null || !isTreasuryDeep({ forecast, gameSize: args.state.gameSize })) return null;
   const size = parseGameSize(args.state.gameSize);
   const counts = getPlayerUnitCountsByType(args.state.units, args.ownSeat);
   const caps = getMaxUnitsPerType(size);
   const built = TREASURY_HOARD_UNIT_TYPES.reduce((sum, type) => sum + counts[type], 0);
   const capTotal = TREASURY_HOARD_UNIT_TYPES.reduce((sum, type) => sum + caps[type], 0);
-  const creditsFloor = Math.max(TREASURY_HOARD_UPKEEP_TURNS * forecast.upkeepPerTurn, TREASURY_HOARD_FLOOR_PER_SIZE * GAME_SIZE_MULTIPLIER[size]);
-  logTrace('treasuryForecast formatTreasuryHoardAttention', { ownSeat: args.ownSeat, credits: forecast.credits, creditsFloor, built, capTotal });
-  if (forecast.credits < creditsFloor || built >= capTotal * TREASURY_HOARD_BUILT_CAP_SHARE) return null;
+  logTrace('treasuryForecast formatTreasuryHoardAttention', { ownSeat: args.ownSeat, credits: forecast.credits, built, capTotal });
   const held = forecast.upkeepPerTurn > 0
     ? `${forecast.credits} credits, ${Math.floor(forecast.credits / forecast.upkeepPerTurn)} turns of mercenary upkeep`
     : `${forecast.credits} credits and no mercenary upkeep`;
-  return (
-    `Treasury: ${held}, while you field ${built} infantry, armor, naval, and air units against a combined cap of ${capTotal}. ` +
-    'Raise mercenaries where Raise Options under Mercenaries lists a cell, and queue units instead of credits where a city can still build them.'
-  );
+  const lead = `Treasury: ${held}, while you field ${built} infantry, armor, naval, and air units against a combined cap of ${capTotal}. `;
+  if (built < capTotal * TREASURY_HOARD_BUILT_CAP_SHARE) {
+    return `${lead}Raise mercenaries where Raise Options under Mercenaries lists a cell, and queue units instead of credits where a city can still build them.`;
+  }
+  return `${lead}Mercenaries do not count toward those caps: raise them where Raise Options under Mercenaries lists a cell.`;
 }
 
 /**
@@ -362,7 +432,7 @@ export function formatTreasuryHoardAttention(args: {
  *
  * Purpose: The status injection builds the forecast once and takes at most one bullet.
  * When to use: Strategic status injection when production is on.
- * Expected outcome: `runOut` and `hoard`, never both non-null. Both null without an economy.
+ * Expected outcome: `runOut` and `hoard`, never both non-null: a deep treasury covers at least 20 turns of upkeep, so the run-out bullet is already off. Both null without an economy.
  * Exceptions: None.
  */
 export function treasuryAttention(

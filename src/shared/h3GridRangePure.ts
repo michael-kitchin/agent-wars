@@ -318,9 +318,83 @@ export function computeGridDistanceWithPathFallbackPure(
 }
 
 /**
+ * Memoizes `gridDisk(origin, maxRange)` as a set for the null-distance fallback in `isWithinGridRangePure`.
+ *
+ * Purpose: Strategic scans test many unmeasurable pairs from the same few origins, such as every airport against every
+ *   other airport in an air ferry search. Rebuilding and scanning the disk on each call dominated those scans.
+ * When to use: Only through `fallbackDiskFor`; keys are `origin|maxRange`. Insertion order is the eviction order.
+ * Expected outcome: Membership matches a fresh `gridDisk` call. Null records a disk that threw, so it is not retried.
+ * Exceptions: None.
+ */
+const gridDiskFallbackMemo = new Map<string, ReadonlySet<string> | null>();
+
+/**
+ * Entry cap for `gridDiskFallbackMemo`, below the shared default because each value is a set of cells.
+ *
+ * Purpose: The fallback runs from a bounded set of origins (airports, cities, unit hexes), so this keeps a busy turn's disks.
+ * When to use: `fallbackDiskFor` only.
+ * Expected outcome: Oldest disks evict once this many origin and range pairs are stored.
+ * Exceptions: None.
+ */
+const GRID_DISK_FALLBACK_MEMO_CAPACITY = 4_000;
+
+/**
+ * How many cells the stored fallback disks may hold before the oldest are dropped.
+ *
+ * Purpose: Disk size grows with the range: about 40 to 60 cells at the air ranges (3 and 4), and 331 at a range of 10,
+ *   which lift checks can reach. The entry cap alone would let large disks hold far more memory.
+ * When to use: `fallbackDiskFor` only.
+ * Expected outcome: Oldest disks evict until the stored cells fit, keeping at least the newest disk.
+ * Exceptions: None.
+ */
+const GRID_DISK_FALLBACK_CELL_BUDGET = 200_000;
+
+/**
+ * Cells held by every stored fallback disk.
+ *
+ * Purpose: Eviction needs the memory cost, and subtracting a removed disk's size stays correct only when each disk was counted once.
+ * When to use: `fallbackDiskFor` only.
+ * Expected outcome: Equals the summed sizes of the stored disks. A disk that threw counts 0.
+ * Exceptions: None.
+ */
+let gridDiskFallbackCellCount = 0;
+
+/**
+ * The memoized fallback disk for one origin and range.
+ *
+ * Purpose: Builds each disk once, and evicts the oldest disks by entry count and by stored cells.
+ * When to use: `isWithinGridRangePure` after `computeGridDistancePure` returns null.
+ * Expected outcome: The same cells as `gridDisk(origin, maxRange)`, or null when that call throws.
+ * Exceptions: None.
+ */
+function fallbackDiskFor(originH3Index: string, maxRange: number): ReadonlySet<string> | null {
+  const key = `${originH3Index}|${maxRange}`;
+  const known = gridDiskFallbackMemo.get(key);
+  if (known !== undefined) return known;
+  let disk: ReadonlySet<string> | null;
+  try {
+    disk = new Set(gridDisk(originH3Index, maxRange));
+  } catch {
+    disk = null;
+  }
+  gridDiskFallbackMemo.set(key, disk);
+  gridDiskFallbackCellCount += disk?.size ?? 0;
+  while (
+    gridDiskFallbackMemo.size > 1 &&
+    (gridDiskFallbackMemo.size > GRID_DISK_FALLBACK_MEMO_CAPACITY || gridDiskFallbackCellCount > GRID_DISK_FALLBACK_CELL_BUDGET)
+  ) {
+    const oldest = gridDiskFallbackMemo.keys().next().value;
+    if (oldest === undefined) break;
+    gridDiskFallbackCellCount -= gridDiskFallbackMemo.get(oldest)?.size ?? 0;
+    gridDiskFallbackMemo.delete(oldest);
+  }
+  return disk;
+}
+
+/**
  * Returns true when `destinationH3Index` lies within `maxRange` H3 grid steps of `originH3Index`.
  *
- * Contract: Uses `computeGridDistancePure` when it succeeds; otherwise `gridDisk(origin, maxRange)` membership.
+ * Contract: Uses `computeGridDistancePure` when it succeeds; otherwise membership in the memoized `gridDisk(origin, maxRange)`.
  * When to use: Tactical ranged legality and any code that must stay aligned with `isWithinGridRangeSafe` without logging.
  * Expected outcome: Matches `isWithinGridRangeSafe` for the same triple when disk fallback is not needed, and matches
  * when disk fallback is needed except disk-throw logging is omitted here.
@@ -329,10 +403,6 @@ export function computeGridDistanceWithPathFallbackPure(
 export function isWithinGridRangePure(originH3Index: string, destinationH3Index: string, maxRange: number): boolean {
   const distance = computeGridDistancePure(originH3Index, destinationH3Index);
   if (distance !== null) return distance <= maxRange;
-  try {
-    const disk = gridDisk(originH3Index, maxRange);
-    return disk.includes(destinationH3Index);
-  } catch {
-    return false;
-  }
+  const disk = fallbackDiskFor(originH3Index, maxRange);
+  return disk !== null && disk.has(destinationH3Index);
 }

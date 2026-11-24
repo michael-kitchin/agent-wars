@@ -326,7 +326,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
   Keep enough credits coming in to pay your mercenaries; the Mercenaries section says how long your treasury lasts. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.
 
-  A credits row adds 20 credits for each 20 production points it spends, and it stops when its count runs out. For steady income, give it a larger count. A city makes one production point per city cell each turn, so a count of 10 in a city with 20 city cells lasts about 10 turns.
+  A credits row adds 20 credits for each 20 production points it spends, and it stops when its count runs out. For steady income, give it a larger count, unless the Mercenaries section says your credits are more than you need. A city makes one production point per city cell each turn, so a count of 10 in a city with 20 city cells lasts about 10 turns.
 
   Production Priorities, under Production Status, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.
 

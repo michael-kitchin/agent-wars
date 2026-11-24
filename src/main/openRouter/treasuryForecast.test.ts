@@ -18,6 +18,7 @@ import {
   formatTreasuryForecastSentence,
   formatTreasuryHoardAttention,
   formatTreasuryRunOutAttention,
+  isTreasuryDeep,
   treasuryAttention,
 } from './treasuryForecast';
 
@@ -181,7 +182,7 @@ test("rows follow the seat's own unpaused credits cities with a remaining count"
 test('the forecast is null without an economy, and the sentence follows each case', () => {
   assert.equal(buildTreasuryForecast(world({}), OWN), null);
   const sentence = (credits: number, upkeepPerTurn: number, queuedCredits: number, coverTurns: number | null) =>
-    formatTreasuryForecastSentence({ credits, upkeepPerTurn, queuedCredits, coverTurns });
+    formatTreasuryForecastSentence({ forecast: { credits, upkeepPerTurn, queuedCredits, coverTurns }, deep: false });
   assert.equal(sentence(50, 0, 0, null), '');
   assert.equal(sentence(50, 0, 40, null), 'Your credits queues hold 40 more credits.');
   assert.equal(
@@ -194,6 +195,15 @@ test('the forecast is null without an economy, and the sentence follows each cas
   assert.equal(sentence(30, 15, 0, 1), 'No credits are queued, so the treasury covers upkeep for 1 more turn.');
   assert.equal(sentence(30, 15, 0, 2), 'No credits are queued, so the treasury covers upkeep for 2 more turns.');
   assert.equal(sentence(0, 15, 0, 0), "No credits are queued, and the treasury cannot cover this turn's upkeep.");
+});
+
+test('a deep treasury adds the spend sentence', () => {
+  const spend =
+    'Your 900 credits are more than you need: spend them on mercenaries before you queue more credits, and queue units instead of credits where a city can still build them.';
+  const sentence = (upkeepPerTurn: number, queuedCredits: number) =>
+    formatTreasuryForecastSentence({ forecast: { credits: 900, upkeepPerTurn, queuedCredits, coverTurns: null }, deep: true });
+  assert.equal(sentence(6, 40), `Your credits queues hold 40 more credits. With them, the treasury covers upkeep for at least 100 more turns. ${spend}`);
+  assert.equal(sentence(0, 0), spend);
 });
 
 test('the run-out bullet appears at 5 turns or fewer', () => {
@@ -220,7 +230,23 @@ test('the run-out bullet appears at 5 turns or fewer', () => {
   assert.equal(formatTreasuryRunOutAttention(null), null);
 });
 
-test('the hoard bullet needs a deep treasury and units under half their caps', () => {
+test('a deep treasury covers twenty turns of upkeep and the size floor', () => {
+  const deep = (credits: number, upkeepPerTurn: number, gameSize: GameStateSnapshot['gameSize'] = 'small') =>
+    isTreasuryDeep({ forecast: { credits, upkeepPerTurn, queuedCredits: 0, coverTurns: null }, gameSize });
+  // Upkeep-bound: 20 x 40 = 800 is above the small floor of 500.
+  assert.equal(deep(800, 40), true);
+  assert.equal(deep(799, 40), false);
+  // Size-bound: 20 x 10 = 200 is below the floor of 500.
+  assert.equal(deep(500, 10), true);
+  assert.equal(deep(499, 10), false);
+  // Upkeep 0: only the size floor applies, and it scales with the size.
+  assert.equal(deep(500, 0), true);
+  assert.equal(deep(499, 0), false);
+  assert.equal(deep(999, 0, 'medium'), false);
+  assert.equal(deep(1000, 0, 'medium'), true);
+});
+
+test('the hoard bullet needs a deep treasury, and its wording follows the caps', () => {
   const caps = getMaxUnitsPerType('small');
   const capSmall = caps.infantry + caps.armor + caps.naval + caps.air;
   assert.equal(capSmall, 34);
@@ -237,7 +263,12 @@ test('the hoard bullet needs a deep treasury and units under half their caps', (
   );
   assert.ok(hoard(small(600, 30, 16))?.includes(`${SECTION_TITLE_RAISE_OPTIONS} under ${SECTION_TITLE_MERCENARIES}`));
   assert.equal(hoard(small(599, 30, 16)), null);
-  assert.equal(hoard(small(600, 30, 17)), null);
+  const atCaps =
+    'Mercenaries do not count toward those caps: raise them where Raise Options under Mercenaries lists a cell.';
+  assert.equal(
+    hoard(small(600, 30, 17)),
+    `Treasury: 600 credits, 20 turns of mercenary upkeep, while you field 17 infantry, armor, naval, and air units against a combined cap of 34. ${atCaps}`
+  );
   assert.equal(
     hoard(small(500, 0, 16)),
     `Treasury: 500 credits and no mercenary upkeep, while you field 16 infantry, armor, naval, and air units against a combined cap of 34. ${ask}`
