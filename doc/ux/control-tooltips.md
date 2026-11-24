@@ -122,8 +122,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Cities readout: City hexes you hold, your place, and how many sides are still playing. The tip lists every active side. Shown only in a match that ends on a turn limit. While observing, the tip has no "(you)".
 - Game menu button: Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.
 - Quit: Close Agent Wars.
-- Save game, while it can be clicked: Save this match to a file.
-- Save game, while it cannot: "There is no match to save.", "The match is over, so there is nothing to save.", "Close the new-game screen to save the match under it.", or "Save game is available again once this turn or beat finishes resolving."
+- Save game, while it can be clicked: Save this match to a file. For a finished match: Save this finished match to a file, to load and replay it later.
+- Save game, while it cannot: "There is no match to save.", "Close the new-game screen to save the match under it.", or "Save game is available again once this turn or beat finishes resolving."
 - Load game, while a match is still being played: Open a saved game from a file. The match in progress is replaced.
 - Load game, while it can be clicked and no match is still being played: Open a saved game from a file.
 - Load game, while a turn or beat is resolving: Load game is available again once this turn or beat finishes resolving.

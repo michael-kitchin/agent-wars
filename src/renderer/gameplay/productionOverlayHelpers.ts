@@ -13,7 +13,7 @@ import { getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFro
 import { rendererSharedState as S } from '../core/state';
 import { isMapLayerShown } from '../../shared/mapViewMode';
 import { isProductionDetailChosen, isTechViewChosen } from '../map/mapViewModeState';
-import { isNewGameOverlayOpen } from './newGameBanner';
+import { newGamePreviewOwnsMapNow } from './newGamePreviewOwnership';
 
 /**
  * Per-type unit totals for one side; used when FoW is off and inspection mode reveals all queues.
@@ -115,8 +115,8 @@ export function isMapInspectionModeHeld(): boolean {
  *
  * Purpose: The tech icons and production detail share one rule. See `isMapLayerShown`.
  * When to use: From `areTechIconsShown` and `isProductionDetailShown`.
- * Expected outcome: True while T is held, or while the layer is chosen outside a battle and outside the new-game or
- *   game-over overlay.
+ * Expected outcome: True while T is held, or while the layer is chosen outside a battle and while the next-game preview
+ *   does not own the map. Replay under the results screen shows the chosen layer over the recorded match.
  * Exceptions: None.
  */
 function isChosenLayerShown(layerChosen: boolean): boolean {
@@ -125,7 +125,7 @@ function isChosenLayerShown(layerChosen: boolean): boolean {
     layerChosen,
     inBattle: S.tacticalBattleSnapshot != null,
     // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
-    newGameOverlayOpen: layerChosen && isNewGameOverlayOpen(),
+    newGameOverlayOpen: layerChosen && newGamePreviewOwnsMapNow(),
   });
 }
 

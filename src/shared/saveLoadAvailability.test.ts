@@ -14,7 +14,7 @@ import {
   LOAD_REPLACES_MATCH_TOOLTIP,
   LOAD_RESOLVING_MESSAGE,
   SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE,
-  SAVE_GAME_OVER_MESSAGE,
+  SAVE_FINISHED_MATCH_TOOLTIP,
   SAVE_MATCH_TOOLTIP,
   SAVE_NOTHING_TO_SAVE_MESSAGE,
   SAVE_RESOLVING_MESSAGE,
@@ -42,11 +42,7 @@ function liveMatch(patch: Partial<SaveLoadUiState> = {}): SaveLoadUiState {
   };
 }
 
-test('save is refused for a finished match, an empty launch, the new-game screen, and Ready', () => {
-  assert.deepEqual(saveGameItemState(liveMatch({ gameOver: true, newGameScreenOpen: true })), {
-    disabled: true,
-    tooltip: SAVE_GAME_OVER_MESSAGE,
-  });
+test('save is refused for an empty launch, the new-game screen over a live match, and Ready', () => {
   assert.deepEqual(saveGameItemState(liveMatch({ matchLoaded: false, newGameScreenOpen: true })), {
     disabled: true,
     tooltip: SAVE_NOTHING_TO_SAVE_MESSAGE,
@@ -59,7 +55,21 @@ test('save is refused for a finished match, an empty launch, the new-game screen
     disabled: true,
     tooltip: SAVE_RESOLVING_MESSAGE,
   });
+  assert.deepEqual(saveGameItemState(liveMatch({ gameOver: true, readyInFlight: true })), {
+    disabled: true,
+    tooltip: SAVE_RESOLVING_MESSAGE,
+  });
+  assert.deepEqual(saveGameItemState(liveMatch({ matchLoaded: false, gameOver: true })), {
+    disabled: true,
+    tooltip: SAVE_NOTHING_TO_SAVE_MESSAGE,
+  });
   assert.deepEqual(saveGameItemState(liveMatch()), { disabled: false, tooltip: SAVE_MATCH_TOOLTIP });
+});
+
+test('a finished match can be saved while the results screen is open', () => {
+  const finished = { disabled: false, tooltip: SAVE_FINISHED_MATCH_TOOLTIP };
+  assert.deepEqual(saveGameItemState(liveMatch({ gameOver: true, newGameScreenOpen: true })), finished);
+  assert.deepEqual(saveGameItemState(liveMatch({ gameOver: true, newGameScreenOpen: false })), finished);
 });
 
 test('load waits only while Ready is in flight', () => {

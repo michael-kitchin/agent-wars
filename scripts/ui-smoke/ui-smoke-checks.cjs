@@ -26,6 +26,7 @@ const { MAP_CHROME_CHECKS } = require('./ui-smoke-map-chrome-checks.cjs');
 const { CHAT_CHECKS } = require('./ui-smoke-chat-checks.cjs');
 const { BATTLE_CHECKS } = require('./ui-smoke-battle-checks.cjs');
 const { NEW_GAME_CHECKS } = require('./ui-smoke-new-game-checks.cjs');
+const { REPLAY_RESULTS_CHECKS } = require('./ui-smoke-replay-results-checks.cjs');
 
 /**
  * Collects what the checks read from the renderer page.
@@ -513,6 +514,7 @@ const CHECKS = Object.freeze([
   ...CHAT_CHECKS,
   ...BATTLE_CHECKS,
   ...NEW_GAME_CHECKS,
+  ...REPLAY_RESULTS_CHECKS,
 ]);
 
 /**

@@ -1,7 +1,7 @@
 /**
  * When Save game and Load game can be used, and the sentence each one shows.
  *
- * Purpose: The menu, the new-game bar, and a failed save share one decision and, for an empty or finished match, the same sentence.
+ * Purpose: The menu, the new-game bar, and a failed save share one decision and, for an empty launch, the same sentence.
  * When to use: Enabling the three buttons, and from the main process when a save is refused before a file is written.
  * Expected outcome: The first matching row wins. Load asks for confirmation only while a match is still being played.
  * Exceptions: None.
@@ -30,7 +30,7 @@ export interface SaveLoadUiState {
    *
    * Contract: The snapshot's `gameOver` flag.
    * When to use: The save rule and the load-confirm rule.
-   * Expected outcome: A finished match is not saved and does not ask before a load.
+   * Expected outcome: A finished match can be saved, and does not ask before a load.
    * Exceptions: None.
    */
   readonly gameOver: boolean;
@@ -86,8 +86,8 @@ export interface SaveLoadItemState {
 /** Shown when there is no match to save. */
 export const SAVE_NOTHING_TO_SAVE_MESSAGE = 'There is no match to save.';
 
-/** Shown when the match has already ended. */
-export const SAVE_GAME_OVER_MESSAGE = 'The match is over, so there is nothing to save.';
+/** Shown when Save game can write a finished match to a file. */
+export const SAVE_FINISHED_MATCH_TOOLTIP = 'Save this finished match to a file, to load and replay it later.';
 
 /** Shown when Save game is blocked by the new-game screen. */
 export const SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE = 'Close the new-game screen to save the match under it.';
@@ -110,16 +110,16 @@ export const LOAD_FILE_TOOLTIP = 'Open a saved game from a file.';
 /**
  * The Save game button's enabled state and tip.
  *
- * Purpose: Game over and an empty launch win over the new-game screen, which is open in both of those cases.
+ * Purpose: An empty launch and a turn that is still resolving come first. A finished match can be saved even though the results screen is open over it.
  * When to use: Whenever the game menu or the match controls are refreshed.
- * Expected outcome: The first matching rule: game over, no match, the new-game screen over a live match, Ready in flight, otherwise enabled.
+ * Expected outcome: The first matching rule: no match, Ready in flight, game over (enabled, with the finished-match tip), the new-game screen over a live match, otherwise enabled.
  * Exceptions: None.
  */
 export function saveGameItemState(state: SaveLoadUiState): SaveLoadItemState {
-  if (state.gameOver) return { disabled: true, tooltip: SAVE_GAME_OVER_MESSAGE };
   if (!state.matchLoaded) return { disabled: true, tooltip: SAVE_NOTHING_TO_SAVE_MESSAGE };
-  if (state.newGameScreenOpen) return { disabled: true, tooltip: SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE };
   if (state.readyInFlight) return { disabled: true, tooltip: SAVE_RESOLVING_MESSAGE };
+  if (state.gameOver) return { disabled: false, tooltip: SAVE_FINISHED_MATCH_TOOLTIP };
+  if (state.newGameScreenOpen) return { disabled: true, tooltip: SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE };
   return { disabled: false, tooltip: SAVE_MATCH_TOOLTIP };
 }
 

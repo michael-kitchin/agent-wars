@@ -1,7 +1,7 @@
 /**
  * Manual save and load through the pipeline, with fake dialogs.
  *
- * Purpose: Proves a saved match comes back, Ready in flight blocks both calls, and a text file is refused.
+ * Purpose: Proves a saved match comes back, a finished match comes back finished with its history and playthrough, Ready in flight blocks both calls, and a text file is refused.
  * When to use: `npm test`.
  * Expected outcome: The open match matches the case, and no staging file remains.
  * Exceptions: None.
@@ -14,7 +14,10 @@ import * as path from 'path';
 import { test } from 'node:test';
 import { dbGetAll, dbGetOne, dbRun, resetGameForNewMatch } from '../gameDb';
 import { gameDbOps, getDbHandle } from '../gameDb/dbConnection';
-import { readPlaythroughId } from '../gameDb/gameConfigKv';
+import { readPlaythroughId, setGameOutcomeWithOps } from '../gameDb/gameConfigKv';
+import { strategicStep } from '../../shared/matchRecording';
+import { countMatchRecords } from '../recorder/matchRecordStore';
+import { recordStepBoundary } from '../recorder/matchRecorder';
 import { withSeatedTempGameDbAsync } from '../testSupport/withSeatedTempGameDb';
 import { LOAD_BUSY_MESSAGE, SAVE_BUSY_MESSAGE, SAVE_NOT_A_SAVE_MESSAGE } from './saveFileFormat';
 import { loadStagingPath, saveStagingPath } from './saveGamePaths';
@@ -102,6 +105,37 @@ test('a saved match loads back over a new match', async () => {
       assert.deepEqual(unitIds(), savedIds);
       assert.equal(fs.existsSync(saveStagingPath(userDataDir)), false);
       assert.equal(fs.existsSync(loadStagingPath(userDataDir)), false);
+    });
+  } finally {
+    fs.rmSync(userDataDir, { recursive: true, force: true });
+  }
+});
+
+test('a finished match loads over a new match with its result, its history, and its playthrough', async () => {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-pipeline-finished-'));
+  try {
+    await withSeatedTempGameDbAsync('aw-pipeline-finished-', { gameMapId: 'global', fogOfWarEnabled: false, gameSeed: 1 }, async () => {
+      const canonicalDbPath = getDbHandle()?.name;
+      assert.ok(canonicalDbPath);
+      recordStepBoundary(strategicStep(1), 'test-version');
+      setGameOutcomeWithOps(gameDbOps, { winnerSeatId: 'human', endReason: 'last_side_standing' });
+      recordStepBoundary(strategicStep(1), 'test-version');
+      const savedPlaythrough = readPlaythroughId(gameDbOps);
+      const savedRecordCount = countMatchRecords(gameDbOps);
+      const savedWinner = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', ['winner'])?.value;
+      assert.ok(savedRecordCount >= 2, 'the match has history to save');
+      const savePath = path.join(userDataDir, 'finished.agentwars');
+      const calls = { saveCalls: { count: 0 }, openCalls: { count: 0 } };
+      const deps = depsFor({ userDataDir, canonicalDbPath, savePath, openPath: savePath, ready: false, ...calls });
+      assert.equal((await runSaveGame(deps)).status, 'saved');
+      resetGameForNewMatch({ gameMapId: 'global', fogOfWarEnabled: false, gameSeed: 2 });
+      assert.notEqual(dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', ['game_over'])?.value, '1');
+      assert.notEqual(readPlaythroughId(gameDbOps), savedPlaythrough);
+      assert.deepEqual(await runLoadGame(deps), { status: 'loaded', fileName: 'finished.agentwars' });
+      assert.equal(dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', ['game_over'])?.value, '1');
+      assert.equal(dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', ['winner'])?.value, savedWinner);
+      assert.equal(countMatchRecords(gameDbOps), savedRecordCount);
+      assert.equal(readPlaythroughId(gameDbOps), savedPlaythrough);
     });
   } finally {
     fs.rmSync(userDataDir, { recursive: true, force: true });

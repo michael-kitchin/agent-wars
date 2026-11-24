@@ -17,6 +17,7 @@ import { clearVisibleCityNames } from '../map/visibleCityNames';
 import { setTacticalTransportVectorsSuppressed, syncTacticalTransportVectorLeafletLayer } from '../map/tacticalTransportVectorLayer';
 import { hideBuildEntryLayer } from '../map/terrainView';
 import { drawNewGameMapPreview, setNewGameMapPreviewRepaint } from '../map/newGameMapPreviewRendering';
+import { newGamePreviewOwnsMapNow } from '../gameplay/newGamePreviewOwnership';
 import {
   getStrategicDominantTerrainKind,
   infraGlyphsAllowedForStrategicHex,
@@ -755,13 +756,12 @@ function redraw(): void {
  *
  * Purpose: The new-game overlay replaces the match scene. Both resize and redraw must take that path.
  * When to use: After the canvas transform is set.
- * Expected outcome: An open overlay clears the canvas, draws only the preview, and hides match markers. Otherwise the loading scene or the match is drawn. Buttons sync either way.
+ * Expected outcome: While the new-game preview owns the map (`newGamePreviewOwnsMapNow`), the canvas is cleared, only the preview is drawn, and match markers hide. Otherwise the loading scene or the match is drawn. Buttons sync either way.
  * Exceptions: None.
  */
 function paintMapFrame(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   clearVisibleCityNames();
-  const overlay = document.getElementById('game-over-overlay');
-  const overlayOpen = overlay != null && !overlay.classList.contains('hidden');
+  const overlayOpen = newGamePreviewOwnsMapNow();
   setTacticalTransportVectorsSuppressed(overlayOpen);
   if (overlayOpen) {
     ctx.clearRect(0, 0, w, h);

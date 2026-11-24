@@ -108,6 +108,9 @@ const SCENES = Object.freeze({
   gameOverReopened: 'game-over-reopened',
   gameOverHidden: 'game-over-hidden',
   gameOverSmallWindow: 'game-over-small-window',
+  gameOverReplayLast: 'game-over-replay-last',
+  gameOverReplayEarlier: 'game-over-replay-earlier',
+  gameOverReplayLeft: 'game-over-replay-left',
   newGameFourSides: 'new-game-four-sides',
   newGameThreeSides: 'new-game-three-sides',
   matchKnockoutReports: 'match-knockout-reports',
@@ -161,16 +164,28 @@ const BATTLE_SCENES = Object.freeze([
 ]);
 
 /**
+ * Scenes that show the results screen over a finished match's replay or after it.
+ *
+ * Purpose: The results screen is open and the match chrome is hidden, as in a new-game scene, but the map shows the recorded match or the preview under a replay panel. Neither the match checks nor the new-game panel checks describe them, so they have their own checks.
+ * When to use: Left out of `MATCH_SCENES`, and used by `ui-smoke-replay-results-checks.cjs`.
+ * Expected outcome: The last replay step, and the screen after replay is left.
+ * Exceptions: None.
+ */
+const REPLAY_RESULTS_SCENES = Object.freeze([SCENES.gameOverReplayLast, SCENES.gameOverReplayLeft]);
+
+/**
  * Scenes that show a match: every scene that is not a new-game scene.
  *
  * Purpose: A scene added to `SCENES` is covered by the match checks without editing them.
  * When to use: The `scenes` list of a check that applies while a match is on screen.
- * Expected outcome: Derived from `SCENES` and `NEW_GAME_SCENES`. Game Options is left out: that scene is the setup
+ * Expected outcome: Derived from `SCENES`, `NEW_GAME_SCENES`, and `REPLAY_RESULTS_SCENES`. Game Options is left out: that scene is the setup
  *   panel with the popover open, and it has its own check.
  * Exceptions: None.
  */
 const MATCH_SCENES = Object.freeze(
-  Object.values(SCENES).filter((scene) => !NEW_GAME_SCENES.includes(scene) && scene !== SCENES.newGameOptions)
+  Object.values(SCENES).filter(
+    (scene) => !NEW_GAME_SCENES.includes(scene) && !REPLAY_RESULTS_SCENES.includes(scene) && scene !== SCENES.newGameOptions
+  )
 );
 
 /**
@@ -261,6 +276,7 @@ module.exports = {
   NEW_GAME_SCENES,
   BATTLE_SCENES,
   MATCH_SCENES,
+  REPLAY_RESULTS_SCENES,
   SETTLE_MS,
   NEW_GAME_MOVE,
   SELECTION_BAR,

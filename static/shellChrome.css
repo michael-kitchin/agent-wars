@@ -317,8 +317,8 @@ body:has(#minimap-panel:not([data-state="expanded"])) #terrain-legend {
   display: none;
 }
 /* Hidden, not removed, so the panel and the legend keep their boxes while the start dialog is open. */
-body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
-body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #minimap-panel,
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #terrain-legend {
   visibility: hidden;
 }
 /* Leaflet has no bottom-center corner. The scale sits in the bottom-right corner, and this centers that corner's container. It keeps the map's 12px bottom inset. The scale is the only control there. */

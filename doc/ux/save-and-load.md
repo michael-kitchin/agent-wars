@@ -10,10 +10,11 @@ Let the player keep a match in a file and open that file later, including a matc
 
 Save game… is in the [game menu](game-menu.md). It can be used in strategic planning and in tactical planning, including while a commander is still planning. It is disabled in these cases, and the first one wins:
 
-- The match is over. The tip is "The match is over, so there is nothing to save."
 - No match is loaded. The tip is "There is no match to save."
-- The new-game screen is open over a match that is still being played, including while that screen is compact. The tip is "Close the new-game screen to save the match under it."
 - Ready or a battle beat is still resolving. The tip is "Save game is available again once this turn or beat finishes resolving."
+- The new-game screen is open over a match that is still being played, including while that screen is compact. The tip is "Close the new-game screen to save the match under it."
+
+While the match is over, Save game… is enabled, including while the results screen is open over it, and the tip is "Save this finished match to a file, to load and replay it later." During replay over a finished match it stays enabled on every step, because the live match is over (`replayIsOverFinishedMatch` in `src/renderer/replay/replayMatchOver.ts`), and a click leaves replay first.
 
 While it can be clicked, the tip is "Save this match to a file."
 
@@ -37,7 +38,7 @@ Before a load replaces a match that is still being played, including a match und
 - Body: "The match in progress will be replaced. Save it first if you want to keep it."
 - Buttons: Load… and Cancel. Cancel takes the initial focus.
 
-A load when no match is loaded, or when the match is over, does not ask. Canceling the Open dialog shows nothing. A refusal shows that sentence, such as "The saved game could not be loaded." That toast is not copied to the Reports tab. After a successful load the window reloads, and the map toast reads "Loaded {file name}." The AI activity log and the Reports tab start empty, as they do after a quit and a relaunch.
+A load when no match is loaded, or when the match is over, does not ask, also during replay over a finished match. A finished match loads onto the results screen, as it stood when the match ended, and can be replayed from there. Canceling the Open dialog shows nothing. A refusal shows that sentence, such as "The saved game could not be loaded." That toast is not copied to the Reports tab. After a successful load the window reloads, and the map toast reads "Loaded {file name}." The AI activity log and the Reports tab start empty, as they do after a quit and a relaunch.
 
 The app also keeps the last five automatic saves (`AUTOSAVE_KEEP_COUNT`) in an `autosaves` folder under that version's user-data directory. Each file is one strategic turn, or one tactical turn inside a battle, named `autosave-YYYYMMDD-HHMMSS-mmm-turn-N.agentwars`, with `-battle-turn-T` during a battle, in local time. The player does not choose these files. They can be opened with Load game…, because the Open dialog can start in that folder.
 
@@ -62,12 +63,12 @@ A file does not contain this machine's API keys, the remembered commanders, or t
 - Match in progress: Save game… writes a file. Load game… asks, then replaces that match.
 - New-game screen over a live match: Save game… is disabled until the screen closes. Load game… still asks, because the match underneath is still being played.
 - Resolving: both controls are disabled until the turn or beat finishes.
-- Game over: Save game… is disabled. Load game… opens a file without asking.
+- Game over: Save game… writes a file, with the match's result and history. Load game… opens a file without asking.
 - After load: the window reloads into the match the file holds. A battle that was open in the file is open again. In-flight commander work does not resume. The AI activity log and the Reports tab start empty. The result matches quitting and launching again with that file on disk.
 
 ## Invariants
 
-- Save game… never writes a file while it is disabled, while a turn or beat is resolving, or while the match is over.
+- Save game… never writes a file while it is disabled or while a turn or beat is resolving.
 - Load game… never replaces a match that is still being played unless the player chooses Load….
 - A canceled dialog does not show a toast and does not change the match.
 - The toast after a load uses the file name stored across the reload. If that name cannot be stored, the match still reloads and the toast is skipped.

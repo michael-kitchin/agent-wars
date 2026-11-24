@@ -23,8 +23,8 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 `npm run ui:smoke` checks the layout after a change. It builds the app, then starts it in Electron three times over one throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable):
 
 1. The first session starts one fixed global match and records its scenes, one of them at the 800 × 600 minimum window.
-2. The second reopens that match, opens a battle in it, shows that battle at the 800 × 600 minimum, and leaves it with Exit Battle. It then hides the new-game choices and starts a new regional match from the header button.
-3. The third reopens the regional match as a finished one, hides the new-game choices and shows them again, and shows its game-over screen at the 800 × 600 minimum.
+2. The second reopens that match, opens a battle in it, shows that battle at the 800 × 600 minimum, and leaves it with Exit Battle. It then hides the new-game choices, starts a new regional match from the header button, and plays its first turn.
+3. The third reopens the regional match as a finished one, hides the new-game choices and shows them again, replays it (the last step, an earlier step, and the screen after leaving replay), and shows its game-over screen at the 800 × 600 minimum.
 
 Between sessions, the run changes only its throwaway copy of the match. Before the second session, it moves the enemy's land units into the hex where the player has the most, so a battle can start there. Before the third, it marks the match as lost. Those edits are in `scripts/ui-smoke/ui-smoke-session.cjs`, which runs `scripts/ui-smoke/ui-smoke-db-edit.cjs` under Electron's own Node.
 
@@ -38,6 +38,7 @@ When a layout rule needs a machine check, add one to the matching file in `scrip
 - The minimap panel, the legend, and Leaflet's controls: `ui-smoke-map-chrome-checks.cjs`
 - The battle header: `ui-smoke-battle-checks.cjs`
 - The new-game screen: `ui-smoke-new-game-checks.cjs`
+- Replay over a finished match's results screen: `ui-smoke-replay-results-checks.cjs`
 - The new-game screen over a battle: `ui-smoke-map-label-checks.cjs`
 
 Scenes that click units find them through the game state and the main map (`ui-smoke-map.cjs`). The steps on the new-game overlay are in `ui-smoke-new-game.cjs`.
@@ -182,6 +183,8 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Tactical battles list | Hidden | Hidden | Shown | Hidden | Hidden | Hidden | Hidden |
 | Tactical battle controls | Hidden | Hidden | Hidden | Changed | Shown | Shown | Hidden |
 | Charts dialog | Changed | Shown | Hidden | Shown | Shown | Hidden | Shown |
+
+The Game over column describes the results screen. While replay is on over a finished match, every step before the last sets that screen aside, and the elements marked Hidden for it (the console, the minimap panel, the terrain legend, the map overlays, and the match's top bar) are shown as in replay over a live match. The selection and chat panels stay hidden, because replay's own panel takes their place. See [replay-panel.md](ux/replay-panel.md).
 
 ## Open Questions by Document
 

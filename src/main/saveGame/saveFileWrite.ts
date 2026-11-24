@@ -20,7 +20,6 @@ import {
   SAVE_APPLICATION_ID,
   SAVE_APP_VERSION_CONFIG_KEY,
   SAVE_BUSY_MESSAGE,
-  SAVE_GAME_OVER_MESSAGE,
   SAVE_NOTHING_TO_SAVE_MESSAGE,
   SAVE_WRITTEN_AT_CONFIG_KEY,
 } from './saveFileFormat';
@@ -75,7 +74,7 @@ export interface SaveFileWriteRequest {
 /**
  * Says why the open match cannot be saved, or null when it can.
  *
- * Purpose: Resolution and a finished match are refused before any file is written.
+ * Purpose: A turn that is still resolving, or a match with nothing in it, is refused before any file is written. A finished match is saved like any other.
  * When to use: Before `writeSaveFileFromOpenDatabase`, and from the save dialog's availability check.
  * Expected outcome: A player-facing sentence, or null. A closed database counts as nothing to save and is not queried.
  * Exceptions: None.
@@ -87,8 +86,6 @@ export function matchSaveBlocker(): string | null {
     'SELECT (SELECT COUNT(*) FROM hexes) AS hexes, (SELECT COUNT(*) FROM seats) AS seats',
   );
   if (!counts || counts.hexes < 1 || counts.seats < 1) return SAVE_NOTHING_TO_SAVE_MESSAGE;
-  const over = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', ['game_over']);
-  if (over?.value === '1') return SAVE_GAME_OVER_MESSAGE;
   const turn = readTurnStateRow(dbGetOne);
   if (!turn || turn.phase !== 'planning') return SAVE_BUSY_MESSAGE;
   return null;

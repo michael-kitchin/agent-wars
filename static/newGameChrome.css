@@ -6,20 +6,20 @@
 
 /* ---------- New-game bar ---------- */
 /* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
-   and Help. The overlay's `hidden` class switches it, so the bar follows the overlay however it opens or closes,
+   and Help. The overlay's `hidden` class switches it, so the bar follows the overlay however it opens or closes, and replay's `replay-aside` (static/replayChrome.css) brings the match bar back,
    including from a battle. */
-body:not(:has(#game-over-overlay:not(.hidden))) #app-topbar .new-game-only,
-body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-sides,
-body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-view-as,
-body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-stat,
-body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-date-block,
-body:has(#game-over-overlay:not(.hidden)) #app-topbar .battle-header-only {
+body:not(:has(#game-over-overlay:not(.hidden):not(.replay-aside))) #app-topbar .new-game-only,
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar .topbar-sides,
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar .topbar-view-as,
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar .topbar-stat,
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar .topbar-date-block,
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar .battle-header-only {
   display: none;
 }
-body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-spacer {
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar .topbar-spacer {
   display: block;
 }
-body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #app-topbar.topbar-battle {
   background: var(--chrome-bg-deep);
   border-bottom-color: var(--chrome-border);
 }

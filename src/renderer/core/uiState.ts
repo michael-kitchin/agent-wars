@@ -82,7 +82,8 @@ export function blurMapChromeIfFocused(): void {
  *   clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
  * Expected outcome: While `enabled` is false, children of the map pane ignore the pointer, except the annihilation
- *   dialog, the knocked-out dialog, and the no-models question. The console ignores the pointer too. The top bar
+ *   dialog, the knocked-out dialog, the start and load questions, and the replay panel. The replay panel shows only during replay, and
+ *   replay over a finished match opens with the results screen shown, so its controls must keep working there. The console ignores the pointer too. The top bar
  *   ignores the pointer except while the new-game overlay is open: it is the new-game bar then, and its game menu
  *   keeps working. The game menu closes whenever the top bar stops taking the pointer, and its New game item follows
  *   the overlay. The new-game overlay floats over the map pane but is not inside it, so this never turns it off.
@@ -94,7 +95,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   if (container) {
     for (const child of container.children) {
       const id = (child as HTMLElement).id;
-      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog' || id === 'start-confirm-dialog' || id === 'load-confirm-dialog') continue;
+      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog' || id === 'start-confirm-dialog' || id === 'load-confirm-dialog' || id === 'replay-panel') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }

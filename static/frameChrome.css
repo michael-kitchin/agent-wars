@@ -12,9 +12,9 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* The console leaves the window while the new-game overlay is open. The top bar becomes the new-game bar
+/* The console leaves the window while the new-game overlay is open, unless replay has set it aside. The top bar becomes the new-game bar
    (static/newGameChrome.css). */
-body:has(#game-over-overlay:not(.hidden)) #sidebar {
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #sidebar {
   display: none;
 }
 

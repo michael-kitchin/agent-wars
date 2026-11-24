@@ -136,6 +136,7 @@ function main() {
       'rebuild-native-plan.test.cjs',
       'renderer-typecheck-report.test.cjs',
       'ui-smoke/ui-smoke-checks.test.cjs',
+      'ui-smoke/ui-smoke-replay-results-checks.test.cjs',
       'doc-shots/doc-shots-capture.test.cjs',
       'doc-shots/doc-shots-edits.test.cjs',
       'check-doc-links.test.cjs',

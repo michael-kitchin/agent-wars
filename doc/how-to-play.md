@@ -436,7 +436,7 @@ Press **P**, or check **Playback…** in the game menu, to look back at turns al
 | --- | --- |
 | ![Expanded: type a turn, or drag the slider, to jump to it. The magnifying glass follows the units, and the buttons rewind, step back, step forward, play, and fast forward.](media/playback-expanded.png) | ![Collapsed, on the last turn: there's nothing ahead, so Step forward, Play, and Fast forward are off.](media/playback-last-turn.png) |
 
-Each step shows the map as you saw it then, with that turn's messages. After the match, or while you're watching, replay shows every side. Replay changes nothing, and while it's on, Ready and map clicks do nothing. Inside a battle, **P** replays that battle's beats instead. The [Charts](#charts) can stay open over replay. They show the match as it stood on the turn you are viewing, and follow the slider.
+Each step shows the map as you saw it then, with that turn's messages. After the match, or while you're watching, replay shows every side. Replay changes nothing, and while it's on, Ready and map clicks do nothing. Inside a battle, **P** replays that battle's beats instead. The [Charts](#charts) can stay open over replay. They show the match as it stood on the turn you are viewing, and follow the slider. On the result screen, **P** opens the last turn. Stepping back sets the result screen aside, and it returns on the last turn.
 
 ## Agent-Only Games
 
@@ -466,7 +466,7 @@ The next turn waits until you click **Ready**, or check **Start the next turn wh
 
 ### After the Match
 
-The result screen names the winner, such as "Japan wins.", and lists every side and what its model cost. The match's history is saved in the `recordings` folder (see [Saving and Loading](#saving-and-loading)). To share a match as a video, record the screen and condense the recording with the script in [match-video.md](match-video.md).
+The result screen names the winner, such as "Japan wins.", and lists every side and what its model cost. The match's history is saved in the `recordings` folder (see [Saving and Loading](#saving-and-loading)). Press **P** to replay it. To share a match as a video, record the screen and condense the recording with the script in [match-video.md](match-video.md).
 
 ## Saving and Loading
 
@@ -476,7 +476,7 @@ Save game… and Load game… are in the game menu, under the button at the top 
 | --- | --- |
 | ![Save game… and Load game… are in the game menu, under the button at the top left.](media/save-load-menu.png) | ![Loading over a match in progress asks first.](media/load-confirm.png) |
 
-- **Saving:** the suggested name is the map and turn, such as "Western Europe turn 5.agentwars", with "battle turn T" added in a battle. You can save whenever you're giving orders, including in a battle, but not while a turn or beat resolves or after the match ends.
+- **Saving:** the suggested name is the map and turn, such as "Western Europe turn 5.agentwars", with "battle turn T" added in a battle. You can save whenever you're giving orders, including in a battle, but not while a turn or beat resolves. A finished match can be saved too, to load and replay later.
 - **Loading:** if a match is still going, the game asks before replacing it.
 - **Autosaves:** the game saves at the start of every turn, and every beat in a battle, and keeps the last five in an `autosaves` folder. Open one with Load game….
 - **Recordings:** when a match ends, its history is written as a file in a `recordings` folder beside `autosaves`.

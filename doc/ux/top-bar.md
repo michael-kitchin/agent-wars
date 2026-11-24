@@ -37,7 +37,7 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 - Exit Battle, beside Settings. When it is shown, enabled, or hidden is in [tactical-battle-controls.md](tactical-battle-controls.md).
 - Settings and Help.
 
-While the new-game overlay is open, in New game and Game over, the bar is the new-game bar, on the usual face. The sides, the readouts, the date block, and the battle header are hidden, even when the overlay was opened from a battle. The overlay's own visibility switches the bar, so it follows every way the overlay opens or closes. From left to right:
+While the new-game overlay is open, in New game and Game over, the bar is the new-game bar, on the usual face. The sides, the readouts, the date block, and the battle header are hidden, even when the overlay was opened from a battle. The overlay's own visibility switches the bar, so it follows every way the overlay opens or closes. Replay over a finished match sets the results screen aside on every step before the last, and the bar is then the match's bar again. From left to right:
 
 - The game menu button. The menu works there, with New game… disabled. See [game-menu.md](game-menu.md).
 - The title "New game", also on the game-over screen.

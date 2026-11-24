@@ -47,7 +47,7 @@ test('Ready does nothing and its button is disabled while replay is on', () => {
 
 test('map clicks, double-clicks, right-clicks, and entry buttons do nothing in replay', () => {
   const map = readRendererSource('map', 'mainMapInteractions.ts');
-  const guard = 'if (newGameOverlayIsOpen() || replayActive()) return;';
+  const guard = 'if (newGameOverlayOnScreen() || replayActive()) return;';
   for (const opening of ["addEventListener('pointerdown', (e) => {", "addEventListener('click', async (e) => {", "addEventListener('dblclick', (e) => {"]) {
     const at = map.indexOf(opening);
     assert.ok(at >= 0, `${opening} exists`);
@@ -55,7 +55,7 @@ test('map clicks, double-clicks, right-clicks, and entry buttons do nothing in r
   }
   assertMatches(
     map,
-    /addEventListener\('contextmenu', \(e\) => \{\r?\n\s+e\.preventDefault\(\);\r?\n\s+if \(newGameOverlayIsOpen\(\) \|\| replayActive\(\)\) return;/,
+    /addEventListener\('contextmenu', \(e\) => \{\r?\n\s+e\.preventDefault\(\);\r?\n\s+if \(newGameOverlayOnScreen\(\) \|\| replayActive\(\)\) return;/,
     'contextmenu guards replay'
   );
   const doubleClick = getFunctionSource(readRendererSource('map', 'mapDoubleClickHandler.ts'), 'handleMainMapDoubleClick');
@@ -463,4 +463,26 @@ test('replay starts with the charts open, and P reaches it from the open charts'
   const keys = readRendererSource('map', 'initCore.ts');
   const charts = keys.slice(keys.indexOf('if (shouldIgnoreGlobalKeydown(e) && !(isRangeInputTarget'), keys.indexOf("if (e.key === 'Shift'"));
   assertMatches(charts, /!e\.shiftKey[^\n]*e\.key\.toLowerCase\(\) === 'p'\) \{\s+(\/\/[^\n]*\s+)?e\.preventDefault\(\);\s+void toggleReplay\(\);/, 'P toggles replay while the charts are open');
+});
+
+test('replay over a finished match keeps its panel usable and draws the recorded match under the results screen', () => {
+  const controls = getFunctionSource(readRendererSource('core', 'uiState.ts'), 'setMainUIControlsEnabled');
+  assertMatches(controls, /id === 'replay-panel'\) continue;/, 'the replay panel keeps the pointer while the results screen disables the match controls');
+  assertMatches(readRendererSource('map', 'mapAnnotationView.ts'), /overlayOpen: newGamePreviewOwnsMapNow\(\)/, 'names and borders follow the recorded match during replay');
+  assertMatches(readRendererSource('gameplay', 'productionOverlayHelpers.ts'), /layerChosen && newGamePreviewOwnsMapNow\(\)/, 'the T layers follow the recorded match during replay');
+  const hover = readRendererSource('map', 'mainMapInteractions.ts');
+  assertMatches(hover, /addEventListener\('pointermove', \(e\) => \{\s+if \(newGameOverlayOnScreen\(\)\)/, 'map hover runs on a replay step with the results screen set aside');
+  assertMatches(getFunctionSource(readRendererSource('map', 'drawInteraction.ts'), 'updateMapInteractionCursor'), /newGameOverlayOnScreen\(\)/, 'the unit cursor follows the screen the player sees');
+  assertMatches(readRepoFile('static', 'replayChrome.css'), /body\[data-replay="on"\] #game-over-overlay\.replay-aside \{\s+display: none;/, 'the set-aside results screen is hidden only during replay');
+  assertMatches(readRendererSource('replay', 'replayPanel.ts'), /wireReplayResultsScreen\(\);/, 'the replay panel wires the results screen');
+});
+
+test('a replay ended by a new match leaves the controls and the preview to the start path', () => {
+  const source = readRendererSource('replay', 'replayResultsScreen.ts');
+  const end = getFunctionSource(source, 'endReplayOverResults');
+  assertMatches(end, /rendererMatchEpochCurrent\(trackedEpoch\)/, 'the end asks whether the match is the one replay opened over');
+  assertMatches(end, /if \(!sameMatch\) \{[\s\S]*?classList\.remove\(REPLAY_ASIDE_CLASS\);[\s\S]*?return;\s*\}/, 'a new match only drops the class and returns');
+  const dropped = end.slice(end.indexOf('if (!sameMatch)'), end.indexOf('setScreenAside(false)'));
+  assert.equal(/setMainUIControlsEnabled|refreshNewGameMapPreview/.test(dropped), false, 'a new match touches neither the controls nor the preview');
+  assertMatches(end, /setScreenAside\(false\);[\s\S]*?refreshNewGameMapPreview\(\)/, 'leaving over the same match shows the screen and refreshes the preview');
 });

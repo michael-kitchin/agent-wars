@@ -385,7 +385,8 @@ async function runFirstSession(app, page, report, outDir) {
  *
  * Purpose: Checks what a player sees after restarting the app, inside a battle, and on a regional map.
  * When to use: After `runFirstSession` and the saved-match change from `contestedHexEdit`, on the same folder.
- * Expected outcome: One recorded scene per step below, in this order.
+ * Expected outcome: One recorded scene per step below, in this order. The regional match ends with one turn played, so the
+ *   last session's replay has a turn before the last.
  * Exceptions: Propagates Playwright and scenario errors.
  */
 async function runReopenedSession(app, page, report, outDir, battleHex) {
@@ -464,6 +465,8 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await selectLoneUnit(page, await readGameState(page), LAND_UNIT_TYPES);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.regionalSelection);
+  await page.click('#ready-btn');
+  await waitForWorldPlanning(page);
 }
 
 /**
@@ -472,7 +475,7 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
  * Purpose: A finished match must open on the game-over screen, with the match's chrome out of the way, and the setup
  *   panel must still fit the 800 x 600 minimum.
  * When to use: After `runReopenedSession` and `FINISHED_MATCH_EDIT`, on the same folder.
- * Expected outcome: Two recorded scenes: the game-over screen, then the same screen at the minimum window.
+ * Expected outcome: Six recorded scenes: the game-over screen, it with the choices hidden, the replay's last step, an earlier replay step, the screen after replay is left, then the same screen at the minimum window.
  * Exceptions: Propagates Playwright errors.
  */
 async function runFinishedMatchSession(app, page, report, outDir) {
@@ -488,6 +491,20 @@ async function runFinishedMatchSession(app, page, report, outDir) {
   await page.click('#new-game-dialog-collapse');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.resize);
+  // Replay over the finished match: the last step keeps the results screen, an earlier step sets it aside, and leaving
+  // brings it back.
+  await page.keyboard.press('p');
+  await page.waitForFunction(() => document.body.dataset.replay === 'on' && document.getElementById('replay-panel')?.getClientRects().length > 0, null, { timeout: SETTLE_MS.overlay * 4 });
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.gameOverReplayLast);
+  await page.click('#replay-rewind');
+  await page.waitForFunction(() => document.getElementById('game-over-overlay')?.classList.contains('replay-aside') === true, null, { timeout: SETTLE_MS.overlay * 4 });
+  await page.waitForTimeout(SETTLE_MS.overlay);
+  await recordScene(page, report, outDir, SCENES.gameOverReplayEarlier);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.body.dataset.replay === undefined && document.getElementById('game-over-overlay')?.classList.contains('replay-aside') === false, null, { timeout: SETTLE_MS.overlay * 4 });
+  await page.waitForTimeout(SETTLE_MS.overlay);
+  await recordScene(page, report, outDir, SCENES.gameOverReplayLeft);
   await setViewport(app, page, SMALL_WINDOW);
   await page.waitForTimeout(SETTLE_MS.resize);
   await recordScene(page, report, outDir, SCENES.gameOverSmallWindow);

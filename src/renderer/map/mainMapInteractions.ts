@@ -7,7 +7,7 @@ import { rendererSharedState as S } from '../core/state';
 import { isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { observeModeControls } from '../../shared/observeModeControls';
-import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
+import { newGameOverlayOnScreen } from '../gameplay/newGamePreviewOwnership';
 import { replayActive } from '../replay/replayState';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendingMarchPath';
@@ -556,7 +556,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     dwellAnchorY = clientY;
     S.terrainTooltipDelayTimer = setTimeout(() => {
       S.terrainTooltipDelayTimer = null;
-      if (newGameOverlayIsOpen()) return;
+      if (newGameOverlayOnScreen()) return;
       if (S.hoveredHexH3 !== targetHex || S.hoveredDetailHexH3 !== targetDetail || !S.gameState) return;
       if (deps.shouldSuppressTerrainTooltip()) return;
       const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
@@ -575,7 +575,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   };
 
   mainMapEl.addEventListener('pointermove', (e) => {
-    if (newGameOverlayIsOpen()) {
+    if (newGameOverlayOnScreen()) {
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
       hideOrderBlockHexTooltip();
@@ -721,7 +721,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('pointerdown', (e) => {
-    if (newGameOverlayIsOpen() || replayActive()) return;
+    if (newGameOverlayOnScreen() || replayActive()) return;
     if (e.button !== 0) return;
     const pressAtMs = Date.now();
     const press = resolveMapGesturePress({
@@ -761,7 +761,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('click', async (e) => {
-    if (newGameOverlayIsOpen() || replayActive()) return;
+    if (newGameOverlayOnScreen() || replayActive()) return;
     if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) {
       if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
         deps.updateSidebar();
@@ -925,7 +925,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('dblclick', (e) => {
-    if (newGameOverlayIsOpen() || replayActive()) return;
+    if (newGameOverlayOnScreen() || replayActive()) return;
     void handleMainMapDoubleClick(e, {
       clientXYToHit: hitTestMapHexAtClientPoint,
       pointerHitsDrawnUnitIcon,
@@ -949,7 +949,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
 
   mainMapEl.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (newGameOverlayIsOpen() || replayActive()) return;
+    if (newGameOverlayOnScreen() || replayActive()) return;
     clearSelectionLikeRightClick(deps);
   });
   document.getElementById('selection-panel-close')?.addEventListener('click', () => clearSelectionLikeRightClick(deps));

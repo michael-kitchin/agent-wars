@@ -2,6 +2,8 @@ import type { MapExtentBox } from '../../shared/mapExtent';
 import type { NewGameMapPreviewRequest } from '../../shared/newGameMapPreviewTypes';
 import { setBasemapGameMap } from '../map/basemapLayer';
 import { applyLoadedMapExtent } from '../map/mapExtent';
+import { replayActive } from '../replay/replayState';
+import { newGamePreviewOwnsMapNow } from './newGamePreviewOwnership';
 import { getMainLeafletMap, invalidateLeafletMapSizes } from '../map/worldLeafletMap';
 import {
   noteNewGameMapPreviewRequest,
@@ -149,11 +151,11 @@ export function releaseNewGameMapPreviewCamera(holdSerial: number): boolean {
  *
  * Purpose: Opening the dialog, changing a tab, or changing a home area must frame that map and paint its grid.
  * When to use: After those controls settle. Month and weather-bonus changes call `repaintNewGameMapPreview` instead.
- * Expected outcome: The hillshade switches to that preview's map. The camera fits the map under the setup panel when the extent changes or the dialog has just opened. A global fit then zooms in one level, still centered on that fit. A home change on the same extent only repaints. A regional choice with a missing id paints nothing and does not call IPC. A failure logs and leaves a same-map payload in place. A response that arrives after the dialog closes, or while Start holds the camera, does not move the match.
+ * Expected outcome: The hillshade switches to that preview's map. The camera fits the map under the setup panel when the extent changes or the dialog has just opened. A global fit then zooms in one level, still centered on that fit. A home change on the same extent only repaints. A regional choice with a missing id paints nothing and does not call IPC. A failure logs and leaves a same-map payload in place. A response that arrives after the dialog closes, or while Start holds the camera, does not move the match. It does nothing while replay is on, and a reply that arrives once replay has started is dropped, so a preview cannot move the camera or the hillshade off a recorded step.
  * Exceptions: None. IPC failures are logged.
  */
 export async function refreshNewGameMapPreview(): Promise<void> {
-  if (mapCameraHeldForStart) return;
+  if (mapCameraHeldForStart || replayActive()) return;
   const serial = ++requestSerial;
   const built = readPreviewDialogRequest();
   if (!built) {
@@ -168,7 +170,7 @@ export async function refreshNewGameMapPreview(): Promise<void> {
   }
   try {
     const preview = await load(built.request);
-    if (serial !== requestSerial || !newGameOverlayOpen() || mapCameraHeldForStart) return;
+    if (serial !== requestSerial || !newGamePreviewOwnsMapNow() || mapCameraHeldForStart) return;
     if (!storeNewGameMapPreview(preview)) return;
     setBasemapGameMap(preview.gameMapId);
     const key = extentKey(preview.extent);
@@ -232,19 +234,6 @@ function zoomGlobalPreviewInOneLevel(): void {
   const map = getMainLeafletMap();
   if (!map) return;
   map.setZoom(map.getZoom() + 1);
-}
-
-/**
- * Reports whether the new-game overlay is showing.
- *
- * Purpose: A preview that finishes after Start must not frame the map the match just took.
- * When to use: Before storing a preview or fitting its extent.
- * Expected outcome: True while `#game-over-overlay` is visible.
- * Exceptions: None.
- */
-function newGameOverlayOpen(): boolean {
-  const overlay = document.getElementById('game-over-overlay');
-  return overlay != null && !overlay.classList.contains('hidden');
 }
 
 /**

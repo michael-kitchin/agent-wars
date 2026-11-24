@@ -1,7 +1,7 @@
 /**
  * Writes a finished match to a standalone recording file.
  *
- * Purpose: A finished match cannot be saved as a match file. This file is the copy that leaves the database.
+ * Purpose: The portable copy of a finished match's history. A save of a finished match is a match file; this is the history alone.
  * When to use: After the match has ended and no deferred consult is still pending, and before a new match deletes the rows.
  * Expected outcome: One gzip file under `userData/recordings`. A second call with no new rows leaves the file untouched.
  * Exceptions: None from `exportFinishedMatchRecordingIfNeeded`. `writeMatchRecordingFile` throws on a file error.
@@ -160,7 +160,7 @@ function encodeLine(line: unknown): Buffer {
  *
  * Purpose: The file is written once the match is over and no deferred consult is still adding rows, then rewritten if more rows arrive.
  * When to use: After an automatic save, after the player ends the match, after a deferred consult, and before a new match deletes a finished one.
- * Expected outcome: Nothing while the match is running or a consult is pending. Otherwise one file per playthrough, replaced when the record count or the last record id differs. The latest frame is refreshed before a write.
+ * Expected outcome: Nothing while the match is running or a consult is pending. Otherwise one file per playthrough, replaced when the record count or the last record id differs, except that a file holding more records than the database is kept. The latest frame is refreshed before a write.
  * Exceptions: None. A failure is logged with the directory only.
  */
 export function exportFinishedMatchRecordingIfNeeded(deps: FinishedMatchExportDeps): void {
@@ -180,6 +180,10 @@ export function exportFinishedMatchRecordingIfNeeded(deps: FinishedMatchExportDe
     const lastId = lastMatchRecordId(gameDbOps);
     const tail = fs.existsSync(targetPath) ? recordingTail(targetPath) : null;
     if (tail && tail.count === count && tail.lastRecordId === lastId) return;
+    if (tail && tail.count > count) {
+      logDebug('matchRecordingExport kept a longer recording', { directory, fileCount: tail.count, count });
+      return;
+    }
     refreshCurrentFramePayload();
     writeMatchRecordingFile({
       ops: gameDbOps,

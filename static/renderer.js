@@ -23711,35 +23711,24 @@ ${bonuses}`;
     productionDetailChosen = chosen;
   }
 
-  // src/shared/newGameBannerText.ts
-  function newGameBannerText(kind, tab) {
-    if (kind === "startup") return `Start the ${tab} game when ready.`;
-    return `Start a new ${tab} game when ready.`;
+  // src/shared/replayResultsScreenRules.ts
+  function newGamePreviewOwnsMap(input) {
+    return input.overlayOpen && !input.replayOn;
+  }
+  function replayResultsScreenAside(input) {
+    return input.matchOver && input.stepCount > 0 && input.index < input.stepCount - 1;
   }
 
-  // src/renderer/gameplay/newGameBanner.ts
-  var bannerKind = null;
-  function writeNewGameBanner(text) {
-    const messageEl = document.getElementById("game-over-message");
-    if (!messageEl) return;
-    messageEl.textContent = text;
-    messageEl.style.display = "";
-  }
-  function showNewGameBanner(kind, tab) {
-    bannerKind = kind;
-    writeNewGameBanner(newGameBannerText(kind, tab));
-  }
-  function showGameOverBanner(text) {
-    bannerKind = null;
-    writeNewGameBanner(text);
-  }
-  function syncNewGameBannerToTab(tab) {
-    if (bannerKind === null) return;
-    writeNewGameBanner(newGameBannerText(bannerKind, tab));
-  }
-  function isNewGameOverlayOpen() {
+  // src/renderer/gameplay/newGamePreviewOwnership.ts
+  var REPLAY_ASIDE_CLASS = "replay-aside";
+  function newGamePreviewOwnsMapNow() {
     const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
+    const overlayOpen = overlay != null && !overlay.classList.contains("hidden");
+    return newGamePreviewOwnsMap({ overlayOpen, replayOn: replayActive() });
+  }
+  function newGameOverlayOnScreen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden") && !overlay.classList.contains(REPLAY_ASIDE_CLASS);
   }
 
   // src/renderer/gameplay/productionOverlayHelpers.ts
@@ -23759,7 +23748,7 @@ ${bonuses}`;
       layerChosen,
       inBattle: rendererSharedState.tacticalBattleSnapshot != null,
       // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
-      newGameOverlayOpen: layerChosen && isNewGameOverlayOpen()
+      newGameOverlayOpen: layerChosen && newGamePreviewOwnsMapNow()
     });
   }
   function areTechIconsShown() {
@@ -26296,6 +26285,37 @@ ${bonuses}`;
     updateOpenRouterToolCountLabels();
   }
 
+  // src/shared/newGameBannerText.ts
+  function newGameBannerText(kind, tab) {
+    if (kind === "startup") return `Start the ${tab} game when ready.`;
+    return `Start a new ${tab} game when ready.`;
+  }
+
+  // src/renderer/gameplay/newGameBanner.ts
+  var bannerKind = null;
+  function writeNewGameBanner(text) {
+    const messageEl = document.getElementById("game-over-message");
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.style.display = "";
+  }
+  function showNewGameBanner(kind, tab) {
+    bannerKind = kind;
+    writeNewGameBanner(newGameBannerText(kind, tab));
+  }
+  function showGameOverBanner(text) {
+    bannerKind = null;
+    writeNewGameBanner(text);
+  }
+  function syncNewGameBannerToTab(tab) {
+    if (bannerKind === null) return;
+    writeNewGameBanner(newGameBannerText(bannerKind, tab));
+  }
+  function isNewGameOverlayOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+
   // src/renderer/chrome/controlTooltip.ts
   var controlTooltipAttr = "data-control-tooltip";
   var controlTooltipElementId = "control-tooltip";
@@ -26646,7 +26666,7 @@ ${bonuses}`;
   }
   function syncMapExtentToSnapshot(state, options) {
     const mapId = state.gameMap?.id ?? "global";
-    if (!isNewGameOverlayOpen()) setBasemapGameMap(mapId);
+    if (!newGamePreviewOwnsMapNow()) setBasemapGameMap(mapId);
     const key = loadedMapExtentKey(
       mapId,
       state.hexes.map((hex) => hex.h3Index)
@@ -29315,7 +29335,7 @@ ${bonuses}`;
   }
   function mapAnnotationsUseDetailView() {
     return annotationViewIsDetail({
-      overlayOpen: isNewGameOverlayOpen(),
+      overlayOpen: newGamePreviewOwnsMapNow(),
       previewAtDetailZoom,
       readMatchDetailView: shouldRenderTacticalHexes
     });
@@ -30134,7 +30154,7 @@ ${bonuses}`;
     return true;
   }
   async function refreshNewGameMapPreview() {
-    if (mapCameraHeldForStart) return;
+    if (mapCameraHeldForStart || replayActive()) return;
     const serial = ++requestSerial2;
     const built = readPreviewDialogRequest();
     if (!built) {
@@ -30149,7 +30169,7 @@ ${bonuses}`;
     }
     try {
       const preview = await load(built.request);
-      if (serial !== requestSerial2 || !newGameOverlayOpen() || mapCameraHeldForStart) return;
+      if (serial !== requestSerial2 || !newGamePreviewOwnsMapNow() || mapCameraHeldForStart) return;
       if (!storeNewGameMapPreview(preview)) return;
       setBasemapGameMap(preview.gameMapId);
       const key = extentKey(preview.extent);
@@ -30184,10 +30204,6 @@ ${bonuses}`;
     const map = getMainLeafletMap();
     if (!map) return;
     map.setZoom(map.getZoom() + 1);
-  }
-  function newGameOverlayOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
   }
   function extentKey(extent) {
     if (extent === "world") return "world";
@@ -32206,7 +32222,7 @@ ${bonuses}`;
 
   // src/shared/saveLoadAvailability.ts
   var SAVE_NOTHING_TO_SAVE_MESSAGE = "There is no match to save.";
-  var SAVE_GAME_OVER_MESSAGE = "The match is over, so there is nothing to save.";
+  var SAVE_FINISHED_MATCH_TOOLTIP = "Save this finished match to a file, to load and replay it later.";
   var SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE = "Close the new-game screen to save the match under it.";
   var SAVE_RESOLVING_MESSAGE = "Save game is available again once this turn or beat finishes resolving.";
   var SAVE_MATCH_TOOLTIP = "Save this match to a file.";
@@ -32214,10 +32230,10 @@ ${bonuses}`;
   var LOAD_REPLACES_MATCH_TOOLTIP = "Open a saved game from a file. The match in progress is replaced.";
   var LOAD_FILE_TOOLTIP = "Open a saved game from a file.";
   function saveGameItemState(state) {
-    if (state.gameOver) return { disabled: true, tooltip: SAVE_GAME_OVER_MESSAGE };
     if (!state.matchLoaded) return { disabled: true, tooltip: SAVE_NOTHING_TO_SAVE_MESSAGE };
-    if (state.newGameScreenOpen) return { disabled: true, tooltip: SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE };
     if (state.readyInFlight) return { disabled: true, tooltip: SAVE_RESOLVING_MESSAGE };
+    if (state.gameOver) return { disabled: false, tooltip: SAVE_FINISHED_MATCH_TOOLTIP };
+    if (state.newGameScreenOpen) return { disabled: true, tooltip: SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE };
     return { disabled: false, tooltip: SAVE_MATCH_TOOLTIP };
   }
   function loadGameItemState(state) {
@@ -32227,6 +32243,15 @@ ${bonuses}`;
   }
   function loadNeedsConfirm(state) {
     return state.matchLoaded && !state.gameOver;
+  }
+
+  // src/renderer/replay/replayMatchOver.ts
+  var overFinishedMatch = false;
+  function setReplayOverFinishedMatch(over) {
+    overFinishedMatch = over;
+  }
+  function replayIsOverFinishedMatch() {
+    return overFinishedMatch;
   }
 
   // src/renderer/chrome/confirmDialog.ts
@@ -32303,7 +32328,7 @@ ${bonuses}`;
     const hexes = rendererSharedState.gameState?.hexes.length ?? 0;
     return {
       matchLoaded: hexes > 0,
-      gameOver: rendererSharedState.gameState?.gameOver === true,
+      gameOver: rendererSharedState.gameState?.gameOver === true || replayIsOverFinishedMatch(),
       readyInFlight: rendererSharedState.readyRequestInFlight,
       newGameScreenOpen: newGameOverlayIsOpen()
     };
@@ -33619,7 +33644,7 @@ ${bonuses}`;
     if (container) {
       for (const child of container.children) {
         const id = child.id;
-        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog" || id === "start-confirm-dialog" || id === "load-confirm-dialog") continue;
+        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog" || id === "start-confirm-dialog" || id === "load-confirm-dialog" || id === "replay-panel") continue;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
@@ -38942,8 +38967,7 @@ ${bonuses}`;
   }
   function paintMapFrame(ctx, w, h) {
     clearVisibleCityNames();
-    const overlay = document.getElementById("game-over-overlay");
-    const overlayOpen = overlay != null && !overlay.classList.contains("hidden");
+    const overlayOpen = newGamePreviewOwnsMapNow();
     setTacticalTransportVectorsSuppressed(overlayOpen);
     if (overlayOpen) {
       ctx.clearRect(0, 0, w, h);
@@ -50414,7 +50438,7 @@ ${bonuses}`;
     const map = getMainLeafletMap();
     if (!map) return;
     const container = map.getContainer();
-    if (newGameOverlayIsOpen()) {
+    if (newGameOverlayOnScreen()) {
       if (rendererSharedState.lastAppliedMapInteractionCursor !== "") {
         rendererSharedState.lastAppliedMapInteractionCursor = "";
         container.style.removeProperty("cursor");
@@ -52113,7 +52137,7 @@ ${bonuses}`;
       dwellAnchorY = clientY;
       rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
         rendererSharedState.terrainTooltipDelayTimer = null;
-        if (newGameOverlayIsOpen()) return;
+        if (newGameOverlayOnScreen()) return;
         if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
         if (deps.shouldSuppressTerrainTooltip()) return;
         const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
@@ -52130,7 +52154,7 @@ ${bonuses}`;
       scheduleHexDetailsTooltip(hit, rendererSharedState.hoveredDetailHexH3, rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
     };
     mainMapEl.addEventListener("pointermove", (e) => {
-      if (newGameOverlayIsOpen()) {
+      if (newGameOverlayOnScreen()) {
         deps.clearTerrainTooltipTimer();
         deps.hideTerrainTooltipVisual();
         hideOrderBlockHexTooltip();
@@ -52246,7 +52270,7 @@ ${bonuses}`;
       }
     });
     mainMapEl.addEventListener("pointerdown", (e) => {
-      if (newGameOverlayIsOpen() || replayActive()) return;
+      if (newGameOverlayOnScreen() || replayActive()) return;
       if (e.button !== 0) return;
       const pressAtMs = Date.now();
       const press = resolveMapGesturePress({
@@ -52281,7 +52305,7 @@ ${bonuses}`;
       hideOrderBlockHexTooltip();
     });
     mainMapEl.addEventListener("click", async (e) => {
-      if (newGameOverlayIsOpen() || replayActive()) return;
+      if (newGameOverlayOnScreen() || replayActive()) return;
       if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
         if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
           deps.updateSidebar();
@@ -52423,7 +52447,7 @@ ${bonuses}`;
       deps.redraw();
     });
     mainMapEl.addEventListener("dblclick", (e) => {
-      if (newGameOverlayIsOpen() || replayActive()) return;
+      if (newGameOverlayOnScreen() || replayActive()) return;
       void handleMainMapDoubleClick(e, {
         clientXYToHit: hitTestMapHexAtClientPoint,
         pointerHitsDrawnUnitIcon,
@@ -52446,7 +52470,7 @@ ${bonuses}`;
     });
     mainMapEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (newGameOverlayIsOpen() || replayActive()) return;
+      if (newGameOverlayOnScreen() || replayActive()) return;
       clearSelectionLikeRightClick(deps);
     });
     document.getElementById("selection-panel-close")?.addEventListener("click", () => clearSelectionLikeRightClick(deps));
@@ -53256,6 +53280,67 @@ ${bonuses}`;
     if (state?.playing) setReplay({ ...state, stopRequested: true });
   }
 
+  // src/renderer/replay/replayResultsScreen.ts
+  var trackedSession = null;
+  var trackedEpoch = 0;
+  var matchOverInReplay = false;
+  var screenAside = false;
+  function showMatchMapForReplay() {
+    const state = rendererSharedState.gameState;
+    if (!state) return;
+    setBasemapGameMap(state.gameMap?.id ?? "global");
+    syncMapExtentToSnapshot(state, { refit: true });
+    invalidateLeafletMapSizes();
+    resizeAndRedraw();
+  }
+  function setScreenAside(aside) {
+    if (aside === screenAside) return;
+    screenAside = aside;
+    document.getElementById("game-over-overlay")?.classList.toggle(REPLAY_ASIDE_CLASS, aside);
+    setMainUIControlsEnabled(aside);
+    invalidateLeafletMapSizes();
+    resizeAndRedraw();
+    console.debug("replay results screen aside", { aside });
+  }
+  function endReplayOverResults() {
+    const wasOver = matchOverInReplay;
+    const sameMatch = rendererMatchEpochCurrent(trackedEpoch);
+    trackedSession = null;
+    matchOverInReplay = false;
+    setReplayOverFinishedMatch(false);
+    if (!sameMatch) {
+      document.getElementById("game-over-overlay")?.classList.remove(REPLAY_ASIDE_CLASS);
+      screenAside = false;
+      console.debug("replay results screen dropped for a new match");
+      return;
+    }
+    setScreenAside(false);
+    if (!wasOver) return;
+    resetNewGameMapPreviewFrame();
+    void refreshNewGameMapPreview();
+    resizeAndRedraw();
+  }
+  function syncReplayResultsScreen() {
+    const state = currentReplay();
+    if (!state) {
+      if (trackedSession !== null) endReplayOverResults();
+      return;
+    }
+    if (state.session !== trackedSession) {
+      trackedSession = state.session;
+      trackedEpoch = state.matchEpoch;
+      matchOverInReplay = state.timeline.scope === "strategic" && rendererSharedState.gameState?.gameOver === true;
+      setReplayOverFinishedMatch(matchOverInReplay);
+      console.debug("replay results screen session", { session: state.session, matchOverInReplay });
+      if (matchOverInReplay) showMatchMapForReplay();
+    }
+    if (!matchOverInReplay) return;
+    setScreenAside(replayResultsScreenAside({ matchOver: true, stepCount: state.timeline.steps.length, index: state.index }));
+  }
+  function wireReplayResultsScreen() {
+    onReplayChange(syncReplayResultsScreen);
+  }
+
   // src/renderer/replay/replayPanel.ts
   var SHOW_SEEK_LABEL = "Show the turn slider";
   var HIDE_SEEK_LABEL = "Hide the turn slider";
@@ -53447,6 +53532,7 @@ ${bonuses}`;
     wireReplaySlider(slider, renderReplayPanel);
     onReplayChange(forgetSliderWhenReplayEnds);
     onReplayChange(renderReplayPanel);
+    wireReplayResultsScreen();
   }
 
   // src/renderer/renderer.ts

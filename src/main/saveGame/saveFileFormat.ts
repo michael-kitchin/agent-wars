@@ -8,9 +8,9 @@
  */
 
 import { logDebug } from '../logger';
-import { SAVE_GAME_OVER_MESSAGE, SAVE_NOTHING_TO_SAVE_MESSAGE } from '../../shared/saveLoadAvailability';
+import { SAVE_NOTHING_TO_SAVE_MESSAGE } from '../../shared/saveLoadAvailability';
 
-export { SAVE_GAME_OVER_MESSAGE, SAVE_NOTHING_TO_SAVE_MESSAGE };
+export { SAVE_NOTHING_TO_SAVE_MESSAGE };
 
 /**
  * File extension for a saved match, without the dot.
@@ -121,7 +121,6 @@ const SAVE_FILE_FORMAT_MESSAGES: readonly string[] = [
   SAVE_NO_MATCH_MESSAGE,
   SAVE_UNKNOWN_MAP_MESSAGE,
   SAVE_NOTHING_TO_SAVE_MESSAGE,
-  SAVE_GAME_OVER_MESSAGE,
   SAVE_BUSY_MESSAGE,
 ];
 

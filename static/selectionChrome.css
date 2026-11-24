@@ -22,7 +22,7 @@
   font-size: 13px;
 }
 .selection-panel[hidden],
-body:has(#game-over-overlay:not(.hidden)) #selection-panel {
+body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #selection-panel {
   display: none;
 }
 /* While the player aims a ranged attack, an air strike, or a missile launch, the border takes the planning crimson. */

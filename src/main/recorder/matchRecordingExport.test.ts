@@ -101,6 +101,33 @@ test('the export renames over the target and end match passes the pending flag',
   );
 });
 
+test('a recording with more records than the database is kept', () => {
+  withTempGameDb('aw-match-longer-', () => {
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    setGameOutcomeWithOps(gameDbOps, { winnerSeatId: 'human', endReason: 'ended_by_human' });
+    recordStepBoundary(strategicStep(1), '1.0.0');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recording-longer-'));
+    const exportDeps = {
+      userDataDir: dir,
+      appVersion: '1.0.0',
+      now: () => new Date('2026-01-02T00:00:00.000Z'),
+      deferredConsultPending: false,
+    };
+    try {
+      exportFinishedMatchRecordingIfNeeded(exportDeps);
+      const file = path.join(dir, 'recordings', recordingFileName(readMatchId(gameDbOps) ?? '', readPlaythroughId(gameDbOps) ?? ''));
+      const before = fs.readFileSync(file);
+      const recordCount = readRecordingFile(file).records.length;
+      gameDbOps.run('DELETE FROM match_records WHERE record_id = (SELECT MAX(record_id) FROM match_records)');
+      exportFinishedMatchRecordingIfNeeded({ ...exportDeps, now: () => new Date('2026-06-01T00:00:00.000Z') });
+      assert.deepEqual(fs.readFileSync(file), before);
+      assert.equal(readRecordingFile(file).records.length, recordCount);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 test('two playthroughs of one finished match leave two files', () => {
   withTempGameDb('aw-match-playthroughs-', () => {
     recordStepBoundary(strategicStep(1), '1.0.0');

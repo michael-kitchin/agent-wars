@@ -1,5 +1,5 @@
 import { cellToLatLng } from 'h3-js';
-import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
+import { newGamePreviewOwnsMapNow } from '../gameplay/newGamePreviewOwnership';
 import { setBasemapGameMap } from './basemapLayer';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
@@ -265,12 +265,12 @@ interface MapExtentSyncOptions {
  *
  * Purpose: Extent changes with the match, not on every redraw.
  * When to use: At the start of applying a strategic snapshot. Pass `{ refit: true }` only when a new match is starting.
- * Expected outcome: Global and empty snapshots use world limits. Regional snapshots use the hex footprint. A matching footprint is skipped unless `refit` is true. When the map is not created yet, nothing is stored and the next snapshot retries.
+ * Expected outcome: Global and empty snapshots use world limits. Regional snapshots use the hex footprint. A matching footprint is skipped unless `refit` is true. When the map is not created yet, nothing is stored and the next snapshot retries. The hillshade follows the snapshot's map unless the new-game preview owns the map.
  * Exceptions: None.
  */
 export function syncMapExtentToSnapshot(state: GameStateSnapshot, options?: MapExtentSyncOptions): void {
   const mapId = state.gameMap?.id ?? 'global';
-  if (!isNewGameOverlayOpen()) setBasemapGameMap(mapId);
+  if (!newGamePreviewOwnsMapNow()) setBasemapGameMap(mapId);
   const key = loadedMapExtentKey(
     mapId,
     state.hexes.map((hex) => hex.h3Index)

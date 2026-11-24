@@ -61,7 +61,7 @@ test('the zoom buttons are gone and the panel hides with the overlay', () => {
   const chatCss = readRepoFile('static', 'chatChrome.css');
   assert.equal(map.includes('control.zoom('), false);
   assert.equal(shell.includes('leaflet-control-zoom'), false);
-  assert.equal(chatCss.includes('body:has(#game-over-overlay:not(.hidden)) #chat-panel'), true);
+  assert.equal(chatCss.includes('body:has(#game-over-overlay:not(.hidden):not(.replay-aside)) #chat-panel'), true);
 });
 
 test('the panel stages on Enter, paints text as text, and slides', () => {

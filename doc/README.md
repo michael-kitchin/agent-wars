@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **3.6.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **3.6.1** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -18,7 +18,7 @@ Release **2.8.4** replaces an unreadable short home name with a letter form of t
 
 Release **2.8.5** names who holds a hex with each side's short name.
 
-Release **2.9.0** adds player-facing save and load: a match can be written to an `.agentwars` file and opened again, and the last five turn starts are kept automatically. See [save-files.md](save-files.md) and [ux/save-and-load.md](ux/save-and-load.md).
+Release **2.9.0** adds player-facing save and load: a match can be written to an `.agentwars` file and opened again, and the last five turn starts are kept automatically. A finished match can be saved too: it loads onto its results screen, and P replays it. See [save-files.md](save-files.md) and [ux/save-and-load.md](ux/save-and-load.md).
 
 Release **2.10.0** adds ballistic missiles.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **3.6.1** saves a finished match with its result and history, loads it onto its results screen, and replays it with the results shown only on the last turn, so earlier turns look as they did during the game.
 
 Release **3.6.0** knocks a side out at 80% of its home's city cells, doubles what ships and air units carry (4 cargo slots per ship, 2 infantry per air unit), and calls off a sea raid whose ships cannot carry three quarters of its troops when its muster times out, and makes commanders spend banked credits on mercenaries, whose upkeep doubles.
 

@@ -369,7 +369,7 @@ export function ensurePlaythroughId(ops: GameConfigKvDbOps): string {
  * Replaces the open playthrough's id.
  *
  * Purpose: Loading a save starts a new playthrough, so the next recording does not replace the previous file.
- * When to use: After a new match id is stored, and after a load has opened the saved database.
+ * When to use: After a new match id is stored, and after a load has opened the saved database of a match that is still being played. A loaded finished match keeps its id.
  * Expected outcome: A new UUID is stored. The id itself is not logged.
  * Exceptions: Propagates a SQLite error.
  */

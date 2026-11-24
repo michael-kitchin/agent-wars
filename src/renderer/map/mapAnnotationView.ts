@@ -3,12 +3,12 @@
  *
  * Purpose: One reader for the label pass and the border layers, so a battle under the new-game screen does not choose their view.
  * When to use: The preview module writes the latch. The label pass and the border reader call `mapAnnotationsUseDetailView`.
- * Expected outcome: An open overlay uses the preview latch. A closed overlay reads the match flag, and that read can change the flag.
+ * Expected outcome: While the preview owns the map, the preview latch is used. Otherwise, including during replay under the results screen, the match flag is read, and that read can change the flag.
  * Exceptions: None.
  */
 
 import { annotationViewIsDetail } from '../../shared/mapLabelRules';
-import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
+import { newGamePreviewOwnsMapNow } from '../gameplay/newGamePreviewOwnership';
 import { shouldRenderTacticalHexes } from './terrainView';
 
 /**
@@ -50,12 +50,12 @@ export function setNewGameMapPreviewAtDetailZoom(atDetailZoom: boolean): void {
  *
  * Purpose: The overlay follows its own preview. A closed overlay follows the match, and that read can change the match flag.
  * When to use: Once per label frame, and as the border layer's tactical reader.
- * Expected outcome: The preview latch while the new-game or game-over overlay is open. Otherwise the match's detail flag.
- * Exceptions: None. The match flag is not read while the overlay is open.
+ * Expected outcome: The preview latch while the next-game preview owns the map (`newGamePreviewOwnsMapNow`). Otherwise the match's detail flag.
+ * Exceptions: None. The match flag is not read while the preview owns the map.
  */
 export function mapAnnotationsUseDetailView(): boolean {
   return annotationViewIsDetail({
-    overlayOpen: isNewGameOverlayOpen(),
+    overlayOpen: newGamePreviewOwnsMapNow(),
     previewAtDetailZoom,
     readMatchDetailView: shouldRenderTacticalHexes,
   });

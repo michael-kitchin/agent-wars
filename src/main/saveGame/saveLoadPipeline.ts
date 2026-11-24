@@ -14,7 +14,7 @@ import type { LoadGameResult, SaveGameResult } from '../../shared/ipc/saveLoadTy
 import { replaceGameDatabaseWithStagedFile, DATABASE_REPLACE_ROLLBACK_FAILED_MESSAGE } from '../gameDb/databaseReplace';
 import { dbGetOne } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
-import { deleteGameConfigRow } from '../gameDb/gameConfigRows';
+import { deleteGameConfigRow, selectGameConfigValue } from '../gameDb/gameConfigRows';
 import { PLAYTHROUGH_ID_CONFIG_KEY, storeNewPlaythroughId } from '../gameDb/gameConfigKv';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
@@ -222,7 +222,7 @@ async function saveBody(deps: SaveLoadDeps): Promise<SaveGameResult> {
 /**
  * The load steps after the in-progress flag is held.
  *
- * Purpose: The dialog is the only await. The swap, the memory reset, and the remembered automatic-save key stay synchronous.
+ * Purpose: The dialog is the only await. The swap, the memory reset, and the remembered automatic-save key stay synchronous. A loaded match that is still being played starts a new playthrough. A loaded finished match keeps its playthrough id, because it cannot be played on and its recording already names that id.
  * When to use: `runLoadGame` only.
  * Expected outcome: A finished match is exported before its database is replaced. The result is the same result `runLoadGame` returns.
  * Exceptions: None.
@@ -254,15 +254,19 @@ async function loadBody(deps: SaveLoadDeps, stagingPath: string): Promise<LoadGa
     return failedLoad(LOAD_FAILED_MESSAGE);
   }
   resetMatchMemoryAfterDatabaseReplace();
-  try {
-    storeNewPlaythroughId(gameDbOps);
-  } catch (err) {
-    logError('saveLoadPipeline could not start a new playthrough', { err });
+  if (selectGameConfigValue(gameDbOps, 'game_over') === '1') {
+    logDebug('saveLoadPipeline kept the finished match playthrough', {});
+  } else {
     try {
-      deleteGameConfigRow(gameDbOps, PLAYTHROUGH_ID_CONFIG_KEY);
-    } catch (deleteErr) {
-      logError('saveLoadPipeline could not clear the saved playthrough', { err: deleteErr });
-      return failedLoad(LOAD_FAILED_MESSAGE);
+      storeNewPlaythroughId(gameDbOps);
+    } catch (err) {
+      logError('saveLoadPipeline could not start a new playthrough', { err });
+      try {
+        deleteGameConfigRow(gameDbOps, PLAYTHROUGH_ID_CONFIG_KEY);
+      } catch (deleteErr) {
+        logError('saveLoadPipeline could not clear the saved playthrough', { err: deleteErr });
+        return failedLoad(LOAD_FAILED_MESSAGE);
+      }
     }
   }
   rememberCurrentAutoSaveTurnKey();

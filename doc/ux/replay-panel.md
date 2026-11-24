@@ -8,7 +8,7 @@ Show the player what the map, the update dialog, and the commanders' messages lo
 
 ## Availability
 
-The P key turns replay on and off. It starts only with a match loaded, no dialog open that needs the player's choice, and the new-game overlay closed or not open over a live match. It does not start while a turn is resolving or its playback is running, and that refusal toasts one sentence (`REPLAY_BUSY_REASON` in `src/shared/replayNavigation.ts`). It does start inside a tactical battle, where it covers that battle's beats and nothing else. A match with no recorded turn toasts `REPLAY_NO_TURNS_REASON` in `src/renderer/replay/replayMode.ts`. When the last recorded turn cannot be put on screen, P toasts `REPLAY_STEP_FAILED_REASON`, logs the failure, and leaves replay again, so the present is shown (`toggleReplay`). See [modes-and-transitions.md](modes-and-transitions.md).
+The P key turns replay on and off. It starts only with a match loaded, no dialog open that needs the player's choice, and the new-game overlay closed or open over a finished match (the results screen). It starts there too, on the last turn. It does not start while a turn is resolving or its playback is running, and that refusal toasts one sentence (`REPLAY_BUSY_REASON` in `src/shared/replayNavigation.ts`). It does start inside a tactical battle, where it covers that battle's beats and nothing else. A match with no recorded turn toasts `REPLAY_NO_TURNS_REASON` in `src/renderer/replay/replayMode.ts`. When the last recorded turn cannot be put on screen, P toasts `REPLAY_STEP_FAILED_REASON`, logs the failure, and leaves replay again, so the present is shown (`toggleReplay`). See [modes-and-transitions.md](modes-and-transitions.md).
 
 The game menu's Playback… checkbox also turns replay on (`openReplay`), with the same conditions, refusals, and failure handling as P, and turns it off when unchecked (`requestReplayLeave`). It is checked while replay is on. Opening the menu does not leave replay. See [game-menu.md](game-menu.md).
 
@@ -55,6 +55,7 @@ The game menu's Playback… checkbox also turns replay on (`openReplay`), with t
 
 ### Other
 
+- Over a finished match, the results screen shows only on the last step (`replayResultsScreenAside`, `src/renderer/replay/replayResultsScreen.ts`). Opening replay lands on the last step, with the results screen shown as the player left it, expanded or collapsed and scrolled where it was, over the finished match's final map instead of the next-game preview (`newGamePreviewOwnsMapNow`). Every earlier step sets the screen aside, without closing it, so the console, the chat panel, and the top bar look as they do in replay over a live match, and the map shows that step. Returning to the last step shows the screen again. The panel takes the pointer on every step, including while the results screen is shown (`setMainUIControlsEnabled` leaves `#replay-panel` out). On an earlier step, hex tips and the unit cursor work as they do in replay over a live match (`newGameOverlayOnScreen`), and names, borders, and the Tech and Production layers follow the recorded match on every step. Leaving replay brings back the next-game preview, fitted to its map again. Save game… stays enabled on every step and Load game… asks no confirmation, because the live match is over (`replayIsOverFinishedMatch`). New game on the results screen works as before.
 - Opening the game menu does not leave replay. A menu button that changes or saves the match leaves replay first and then runs, and it also waits when a leave started by P or Escape is still putting the present back (`requestReplayLeave`, `replayLeaveRunning`). Starting a new match drops replay without applying anything. Replay can be on over a finished match's standings, so it is dropped as soon as Start game is clicked, and a start that fails leaves replay off. A replay animation that is running stops, and the Orders tab and Exit Battle are enabled again (`abandonReplayForNewMatch`).
 - Ready is disabled and does nothing. The Orders tab is disabled, and a selected Orders tab returns after replay ends. A collapsed console stays collapsed when replay starts and when it ends. Committed order lines are not drawn, and neither are the draft orders: queued battle marches, the march hover preview, and pending ranged, air strike, air drop, missile, and ferry lines (`shouldDrawPendingOrderOverlays` in `src/renderer/rendering/canvasPreviewPolicy.ts`).
 - The commander cards on the Commanders tab are inert. Their summary buttons are disabled, so no commander popover opens and no commander is saved. A seat-cost refresh leaves the past snapshot's seats alone. Leaving replay applies the live match, seats included.
@@ -79,6 +80,7 @@ The game menu's Playback… checkbox also turns replay on (`openReplay`), with t
 - Replay never changes the match, the selection that existed before it, the draft orders, or the database.
 - A step recomputes no game rule. Every picture is a recorded snapshot, and every dialog is built from a recorded result.
 - A player never sees through fog in replay unless the match is over or the player is an observer.
+- Over a finished match, the results screen shows only on the last step, and the next-game preview never replaces the recorded match on the map while replay is on.
 
 ## Strategic and Tactical Differences
 
@@ -103,7 +105,7 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#replay-panel`, `#replay-panel-seek`, `#replay-turn-input`, `#replay-slider`, `#replay-panel-bar`, `#replay-panel-expand`, `#replay-follow-units`, `#replay-panel-label`, `#replay-panel-drag`, `#replay-rewind`, `#replay-step-back`, `#replay-step-forward`, `#replay-play`, `#replay-fast-forward`)
-- `static/replayChrome.css`
+- `static/replayChrome.css` (also `#game-over-overlay.replay-aside`)
 - `src/renderer/replay/replayPanel.ts` (`renderReplayPanel`, `wireReplayPanel`, `keepFocusInPanel`)
 - `src/renderer/replay/replayPanelSlider.ts` (`wireReplaySlider`, `sliderThumbPinned`, `followThumb`, `endSliderDrag`)
 - `src/renderer/replay/replayPanelDrag.ts` (`wireReplayPanelDrag`, `keepReplayPanelInArea`)
@@ -118,6 +120,7 @@ None.
 - `src/renderer/gameplay/tacticalAnimationStart.ts` (`tacticalPlaybackNeeded`, `buildTacticalResolutionAnimation`)
 - `src/renderer/replay/replayDialogs.ts` (`showReplayStepDialogs`)
 - `src/renderer/replay/replayState.ts` (`waitForStepToSettle`, `requestReplayLeave`, `replayLeaveRunning`)
+- `src/renderer/replay/replayResultsScreen.ts` (`wireReplayResultsScreen`), `src/renderer/replay/replayMatchOver.ts` (`replayIsOverFinishedMatch`), `src/shared/replayResultsScreenRules.ts` (`replayResultsScreenAside`, `newGamePreviewOwnsMap`), and `src/renderer/gameplay/newGamePreviewOwnership.ts` (`newGamePreviewOwnsMapNow`, `newGameOverlayOnScreen`), for the results screen and the map over a finished match
 - `src/renderer/replay/replayCamera.ts` (`frameReplayStepIfFollowing`, `setReplayFollowUnits`)
 - `src/renderer/map/unitFrameCamera.ts` (`fitStrategicUnitsNow`, `fitBattleUnitsNow`)
 - `src/renderer/replay/replayBattleCopy.ts` (`copyBattleState`)

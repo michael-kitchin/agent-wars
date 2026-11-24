@@ -16,6 +16,7 @@ import {
 } from '../../shared/saveLoadAvailability';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from '../core/state';
+import { replayIsOverFinishedMatch } from '../replay/replayMatchOver';
 import { newGameOverlayIsOpen } from './newGameDialogCollapse';
 import { confirmLoadOverMatch } from './loadConfirmDialog';
 
@@ -40,14 +41,14 @@ const SETTINGS_BUTTON_ID = 'topbar-settings-btn';
  *
  * Purpose: The buttons see the same match, Ready flag, and new-game screen the rest of the renderer uses.
  * When to use: Before enabling the buttons and before a click acts.
- * Expected outcome: A match counts as loaded when the snapshot has hexes. The new-game screen counts as open while it is compact.
+ * Expected outcome: A match counts as loaded when the snapshot has hexes. The new-game screen counts as open while it is compact. During replay over a finished match, the match counts as over on every step, although the screen shows a recorded snapshot.
  * Exceptions: None.
  */
 export function readSaveLoadUiState(): SaveLoadUiState {
   const hexes = S.gameState?.hexes.length ?? 0;
   return {
     matchLoaded: hexes > 0,
-    gameOver: S.gameState?.gameOver === true,
+    gameOver: S.gameState?.gameOver === true || replayIsOverFinishedMatch(),
     readyInFlight: S.readyRequestInFlight,
     newGameScreenOpen: newGameOverlayIsOpen(),
   };

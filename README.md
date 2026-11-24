@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v3.6.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v3.6.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v3.6.1.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v3.6.1.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -144,7 +144,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, air drops, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, an import-cycle check (`npm run check:circular`), the main-process and tool tests (2813 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, an import-cycle check (`npm run check:circular`), the main-process and tool tests (2827 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -290,7 +290,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ## Status
 
-- **Version:** 3.6.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 3.6.1, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -300,6 +300,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 Release summaries, newest first. Only the newest build of each major version stays on the Releases page. Every other version is kept here and in `doc/release-notes/`. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **3.6.1** saves a finished match with its result and history, loads it onto its results screen, and replays it with the results shown only on the last turn, so earlier turns look as they did during the game.
 - **3.6.0** knocks a side out at 80% of its home's city cells, doubles what ships and air units carry (4 cargo slots per ship, 2 infantry per air unit), and calls off a sea raid whose ships cannot carry three quarters of its troops when its muster times out, and makes commanders spend banked credits on mercenaries, whose upkeep doubles.
 - **3.5.0** lets commanders fire mercenaries, with a Firing Risk table and a guard against firing themselves out of the match, forecasts the treasury from what is actually queued, and adds a toggle that collapses the minimap. It also includes the unpublished 3.4.2 changes: treasury attention flags, credits advice only for capped cities, and the Default game size.
 - **3.4.1** makes every commander name a posture each turn and records it, including overland. Posture advice now measures whether a real force can march on an enemy's home, and Attention Flags point out a posture that doesn't fit the campaign's target.

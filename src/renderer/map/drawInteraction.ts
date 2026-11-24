@@ -21,7 +21,7 @@ import {
 } from '../rendering/resolutionPlayback';
 import { hexCenterPx, hitTestMapHexAtContainerPoint } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
-import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
+import { newGameOverlayOnScreen } from '../gameplay/newGamePreviewOwnership';
 import { shouldHideStrategicMapUnitsForZoom } from './terrainView';
 
 /**
@@ -265,14 +265,14 @@ export function tryHandleBuildEntryAtClientXY(
  *
  * Purpose: A unit icon uses the default cursor. Empty map keeps Leaflet's grab cursor.
  * When to use: On pointer move over the map pane.
- * Expected outcome: While the new-game overlay is open, any unit cursor is cleared and the loaded match is not consulted. Otherwise the cursor follows build markers, tactical-entry markers, and drawn unit icons.
+ * Expected outcome: While the new-game overlay is on screen, any unit cursor is cleared and the loaded match is not consulted. Otherwise the cursor follows build markers, tactical-entry markers, and drawn unit icons.
  * Exceptions: None.
  */
 export function updateMapInteractionCursor(clientX: number, clientY: number, deps: DrawInteractionDeps): void {
   const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
   if (!map) return;
   const container = map.getContainer();
-  if (newGameOverlayIsOpen()) {
+  if (newGameOverlayOnScreen()) {
     if (S.lastAppliedMapInteractionCursor !== '') {
       S.lastAppliedMapInteractionCursor = '';
       container.style.removeProperty('cursor');

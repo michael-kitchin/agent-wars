@@ -161,3 +161,8 @@ body:has(#charts-overlay:not([hidden])) .replay-panel {
 .replay-slider:disabled {
   opacity: 0.5;
 }
+/* Replay over a finished match sets the results screen aside on every step before the last (replayResultsScreen.ts).
+   The overlay keeps its open state for the rest of the renderer; only its box is hidden. */
+body[data-replay="on"] #game-over-overlay.replay-aside {
+  display: none;
+}

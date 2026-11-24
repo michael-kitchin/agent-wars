@@ -24,6 +24,7 @@ import { keepReplayPanelInArea, wireReplayPanelDrag } from './replayPanelDrag';
 import { forgetSliderWhenReplayEnds, sliderThumbPinned, wireReplaySlider } from './replayPanelSlider';
 import { showReplayStep } from './replayMode';
 import { requestReplayPlaybackStop, startReplayPlayback } from './replayPlayback';
+import { wireReplayResultsScreen } from './replayResultsScreen';
 import { currentReplay, onReplayChange, type ReplayState } from './replayState';
 
 /**
@@ -437,7 +438,7 @@ function wireTurnField(field: HTMLInputElement): void {
  *
  * Purpose: The panel's single setup point.
  * When to use: Once during renderer startup, after the page markup exists.
- * Expected outcome: The controls act, including the follow-units toggle, and the panel redraws after every change to replay.
+ * Expected outcome: The controls act, including the follow-units toggle, and the panel redraws after every change to replay. Replay over a finished match sets the results screen aside on every step before the last.
  * Exceptions: None. Does nothing when the markup is missing.
  */
 export function wireReplayPanel(): void {
@@ -478,4 +479,5 @@ export function wireReplayPanel(): void {
   wireReplaySlider(slider, renderReplayPanel);
   onReplayChange(forgetSliderWhenReplayEnds);
   onReplayChange(renderReplayPanel);
+  wireReplayResultsScreen();
 }
