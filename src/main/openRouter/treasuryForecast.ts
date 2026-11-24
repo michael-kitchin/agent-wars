@@ -30,12 +30,12 @@ export const TREASURY_RUN_OUT_WARNING_TURNS = 5;
 /**
  * Turns of mercenary upkeep a treasury must hold before it counts as deep.
  *
- * Purpose: A deep treasury relative to upkeep is credits that could pay for more mercenaries.
+ * Purpose: A deep treasury relative to upkeep is credits that could pay for more mercenaries. The line sits above the 20-turn reserve the mercenary raise flag keeps (`MERCENARY_UPKEEP_RESERVE_TURNS` in `mercenaryRaiseAttention.ts`), so a treasury the raise flag has spent down is never called more than needed. The gap keeps the hoard bullet and the forecast's deep sentence from switching on and off at steady state.
  * When to use: `formatTreasuryHoardAttention`.
- * Expected outcome: Twenty. Read by `isTreasuryDeep`.
+ * Expected outcome: Forty, twice `MERCENARY_UPKEEP_RESERVE_TURNS`. Read by `isTreasuryDeep`.
  * Exceptions: None.
  */
-export const TREASURY_HOARD_UPKEEP_TURNS = 20;
+export const TREASURY_HOARD_UPKEEP_TURNS = 40;
 
 /**
  * Credits per game-size step the treasury must hold before it counts as deep.
@@ -362,7 +362,7 @@ export function formatTreasuryRunOutAttention(forecast: TreasuryForecast | null)
  *
  * Purpose: The one "more than you need" test, shared by the hoard bullet and the forecast sentence.
  * When to use: Whenever a prompt line depends on the treasury being deep.
- * Expected outcome: True when credits reach the larger of 20 turns of upkeep and the size floor (500 credits per game-size step). With upkeep 0, only the size floor applies.
+ * Expected outcome: True when credits reach the larger of `TREASURY_HOARD_UPKEEP_TURNS` (40) turns of upkeep and the size floor (500 credits per game-size step). With upkeep 0, only the size floor applies.
  * Exceptions: None.
  */
 export function isTreasuryDeep(args: {
@@ -432,7 +432,7 @@ export function formatTreasuryHoardAttention(args: {
  *
  * Purpose: The status injection builds the forecast once and takes at most one bullet.
  * When to use: Strategic status injection when production is on.
- * Expected outcome: `runOut` and `hoard`, never both non-null: a deep treasury covers at least 20 turns of upkeep, so the run-out bullet is already off. Both null without an economy.
+ * Expected outcome: `runOut` and `hoard`, never both non-null: a deep treasury covers at least 40 turns of upkeep, so the run-out bullet is already off. Both null without an economy.
  * Exceptions: None.
  */
 export function treasuryAttention(

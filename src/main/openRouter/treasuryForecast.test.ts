@@ -230,13 +230,13 @@ test('the run-out bullet appears at 5 turns or fewer', () => {
   assert.equal(formatTreasuryRunOutAttention(null), null);
 });
 
-test('a deep treasury covers twenty turns of upkeep and the size floor', () => {
+test('a deep treasury covers forty turns of upkeep and the size floor', () => {
   const deep = (credits: number, upkeepPerTurn: number, gameSize: GameStateSnapshot['gameSize'] = 'small') =>
     isTreasuryDeep({ forecast: { credits, upkeepPerTurn, queuedCredits: 0, coverTurns: null }, gameSize });
-  // Upkeep-bound: 20 x 40 = 800 is above the small floor of 500.
-  assert.equal(deep(800, 40), true);
-  assert.equal(deep(799, 40), false);
-  // Size-bound: 20 x 10 = 200 is below the floor of 500.
+  // Upkeep-bound: 40 x 40 = 1600 is above the small floor of 500.
+  assert.equal(deep(1600, 40), true);
+  assert.equal(deep(1599, 40), false);
+  // Size-bound: 40 x 10 = 400 is below the floor of 500.
   assert.equal(deep(500, 10), true);
   assert.equal(deep(499, 10), false);
   // Upkeep 0: only the size floor applies, and it scales with the size.
@@ -258,24 +258,24 @@ test('the hoard bullet needs a deep treasury, and its wording follows the caps',
     world({ mercenaryEconomy: economy(credits, upkeep), units: [...ownUnits(built), ...extra] });
 
   assert.equal(
-    hoard(small(600, 30, 16)),
-    `Treasury: 600 credits, 20 turns of mercenary upkeep, while you field 16 infantry, armor, naval, and air units against a combined cap of 34. ${ask}`
+    hoard(small(1200, 30, 16)),
+    `Treasury: 1200 credits, 40 turns of mercenary upkeep, while you field 16 infantry, armor, naval, and air units against a combined cap of 34. ${ask}`
   );
-  assert.ok(hoard(small(600, 30, 16))?.includes(`${SECTION_TITLE_RAISE_OPTIONS} under ${SECTION_TITLE_MERCENARIES}`));
-  assert.equal(hoard(small(599, 30, 16)), null);
+  assert.ok(hoard(small(1200, 30, 16))?.includes(`${SECTION_TITLE_RAISE_OPTIONS} under ${SECTION_TITLE_MERCENARIES}`));
+  assert.equal(hoard(small(1199, 30, 16)), null);
   const atCaps =
     'Mercenaries do not count toward those caps: raise them where Raise Options under Mercenaries lists a cell.';
   assert.equal(
-    hoard(small(600, 30, 17)),
-    `Treasury: 600 credits, 20 turns of mercenary upkeep, while you field 17 infantry, armor, naval, and air units against a combined cap of 34. ${atCaps}`
+    hoard(small(1200, 30, 17)),
+    `Treasury: 1200 credits, 40 turns of mercenary upkeep, while you field 17 infantry, armor, naval, and air units against a combined cap of 34. ${atCaps}`
   );
   assert.equal(
     hoard(small(500, 0, 16)),
     `Treasury: 500 credits and no mercenary upkeep, while you field 16 infantry, armor, naval, and air units against a combined cap of 34. ${ask}`
   );
   assert.equal(hoard(small(499, 0, 16)), null);
-  assert.notEqual(hoard(small(600, 30, 16, ownUnits(10, true))), null);
-  assert.match(hoard(small(600, 30, 16, ownUnits(10, true))) ?? '', /field 16 infantry/);
+  assert.notEqual(hoard(small(1200, 30, 16, ownUnits(10, true))), null);
+  assert.match(hoard(small(1200, 30, 16, ownUnits(10, true))) ?? '', /field 16 infantry/);
 
   const medium = (credits: number) => world({ gameSize: 'medium', mercenaryEconomy: economy(credits, 0) });
   assert.equal(hoard(medium(999)), null);

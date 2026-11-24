@@ -25,6 +25,7 @@ import {
   MERCENARY_UPKEEP_RESERVE_TURNS,
   planMercenaryRaises,
 } from './mercenaryRaiseAttention';
+import { isTreasuryDeep, TREASURY_HOARD_UPKEEP_TURNS } from './treasuryForecast';
 
 /**
  * A city outside every home region, controlled by the seat and cleared of units.
@@ -147,6 +148,15 @@ test('the raise bullet lists each cell, and marks one that restarts a paused que
     );
     assert.deepEqual(result.cells.map((cell) => [cell.h3Index, cell.count, cell.resumes]), [[hex, 2, true]]);
   });
+});
+
+test('the deep-treasury line sits above the raise reserve', () => {
+  // A treasury the raise flag leaves at its reserve must not read as more than needed.
+  const deepAt = (credits: number) =>
+    isTreasuryDeep({ forecast: { credits, upkeepPerTurn: 100, queuedCredits: 0, coverTurns: null }, gameSize: 'small' });
+  assert.ok(TREASURY_HOARD_UPKEEP_TURNS >= 2 * MERCENARY_UPKEEP_RESERVE_TURNS);
+  assert.equal(deepAt(MERCENARY_UPKEEP_RESERVE_TURNS * 100), false);
+  assert.equal(deepAt(TREASURY_HOARD_UPKEEP_TURNS * 100), true);
 });
 
 test('the raise bullet is quiet when no cell is affordable', () => {

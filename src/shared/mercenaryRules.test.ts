@@ -45,10 +45,14 @@ const regionalProfile = {
 
 test('mercenary upkeep uses the global prices on every map', () => {
   const expectUpkeep = (): void => {
-    assert.equal(mercenaryUpkeepFor('infantry', undefined), 3);
-    assert.equal(mercenaryUpkeepFor('infantry', 'advanced'), 5);
-    assert.equal(mercenaryUpkeepFor('naval', undefined), 13);
-    assert.equal(mercenaryUpkeepFor('naval', 'advanced'), 25);
+    assert.equal(mercenaryUpkeepFor('infantry', undefined), 5);
+    assert.equal(mercenaryUpkeepFor('infantry', 'advanced'), 10);
+    assert.equal(mercenaryUpkeepFor('armor', undefined), 10);
+    assert.equal(mercenaryUpkeepFor('armor', 'advanced'), 20);
+    assert.equal(mercenaryUpkeepFor('naval', undefined), 25);
+    assert.equal(mercenaryUpkeepFor('naval', 'advanced'), 50);
+    assert.equal(mercenaryUpkeepFor('air', undefined), 15);
+    assert.equal(mercenaryUpkeepFor('air', 'advanced'), 30);
   };
   expectUpkeep();
   withGameMap(regionalProfile, expectUpkeep);

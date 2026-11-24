@@ -204,7 +204,7 @@ Production is based on real-world urban land cover: the Natural Earth urban area
 | Credits | The map's infantry price | Adds 20 credits on every map. Not a unit, and not capped. |
 
 
-Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3:10 for infantry, armor, naval, air, and missiles, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)). A Credits item costs that map's infantry price and still adds 20 credits. Mercenary upkeep stays the global figures: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15).
+Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3:10 for infantry, armor, naval, air, and missiles, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)). A Credits item costs that map's infantry price and still adds 20 credits. Mercenary upkeep stays the global figures: infantry 5 (Advanced 10), armor 10 (20), naval 25 (50), air 15 (30).
 
 A queue spends in the side's home, or on a hex that holds one of its units or fortifications. Elsewhere it pauses and loses its points at the end of the turn.
 
@@ -300,7 +300,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 Release summaries, newest first. Only the newest build of each major version stays on the Releases page. Every other version is kept here and in `doc/release-notes/`. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
-- **3.6.0** knocks a side out at 80% of its home's city cells, doubles what ships and air units carry (4 cargo slots per ship, 2 infantry per air unit), and calls off a sea raid whose ships cannot carry three quarters of its troops when its muster times out, and makes commanders spend banked credits on mercenaries.
+- **3.6.0** knocks a side out at 80% of its home's city cells, doubles what ships and air units carry (4 cargo slots per ship, 2 infantry per air unit), and calls off a sea raid whose ships cannot carry three quarters of its troops when its muster times out, and makes commanders spend banked credits on mercenaries, whose upkeep doubles.
 - **3.5.0** lets commanders fire mercenaries, with a Firing Risk table and a guard against firing themselves out of the match, forecasts the treasury from what is actually queued, and adds a toggle that collapses the minimap. It also includes the unpublished 3.4.2 changes: treasury attention flags, credits advice only for capped cities, and the Default game size.
 - **3.4.1** makes every commander name a posture each turn and records it, including overland. Posture advice now measures whether a real force can march on an enemy's home, and Attention Flags point out a posture that doesn't fit the campaign's target.
 - **3.4.0** lets a campaign cross the sea: the engine sails ground units that cannot march to the campaign in campaign lifts, lift by lift. A sea operation now waits for the ships its troops need before it sails. The Posture section tells each commander which postures fit each enemy. The world map starts with weather icons off, and the charts gain a Posture strip.

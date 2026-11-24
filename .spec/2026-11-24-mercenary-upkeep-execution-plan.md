@@ -404,10 +404,10 @@ The Phase Check passes, `check-doc-links` passes, the searches in step 7 return 
 
 | Item | Value |
 | --- | --- |
-| Static check results | |
-| Pre-existing failures in named tests | |
-| Anchors confirmed | |
-| Line counts | |
+| Static check results | build, lint, check:circular, check:renderer-types all pass; renderer-types prints its 5 baseline entries only |
+| Pre-existing failures in named tests | None: all 35 named test files passed before any edit |
+| Anchors confirmed | All 17 anchors appear exactly once; `MERCENARY_UPKEEP_DIVISOR` is read only in `mercenaryUpkeepFor` |
+| Line counts | treasuryForecast.ts 436, treasuryForecast.test.ts 269, mercenaryRaiseAttention.test.ts 165, mercenaryRules.ts 467, mercenaryRules.test.ts 186, gameRuleMercenaryText.ts 144, gameRuleMercenaryText.test.ts 51 |
 
 ## Defect Inventory
 
@@ -418,3 +418,7 @@ The Phase Check passes, `check-doc-links` passes, the searches in step 7 return 
 
 | Phase | Result | Files changed beyond the lists | Sketch differences | Notes |
 | --- | --- | --- | --- | --- |
+| 0 | Pass | None | None | Baseline recorded above |
+| 1 | Pass | None | None | Phase Check clean; treasuryForecast (12), mercenaryRaiseAttention (7), briefingSectionsMercenaries (11), promptOutline pass. Final lines: treasuryForecast.ts 455, treasuryForecast.test.ts 295, mercenaryRaiseAttention.test.ts 186 |
+| 2 | Pass | None; no other test needed a number change | None | Phase Check plus check:renderer-types and build:renderer clean; all 35 named files pass. Final lines: mercenaryRules.ts 533, mercenaryRules.test.ts 204, gameRuleMercenaryText.ts 160, gameRuleMercenaryText.test.ts 57 |
+| 3 | Pass | None | The how-to-play `Global game` column grew by 2 characters, not 3, because only two of the four numbers gain a digit; every row of that table is padded to the new width | Step 7 searches return nothing. The engine constants table in `doc/README.md` also named `MERCENARY_UPKEEP_DIVISOR` (8), which step 7 does not search for; it now says (4). check-doc-links passes; Phase Check clean; native module rebuilt for Electron |

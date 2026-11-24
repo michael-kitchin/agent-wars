@@ -148,7 +148,7 @@ export function formatMercenaryFundsLine(funds: MercenaryFunds): string {
  *
  * Purpose: The rule must not double the basic figure and call it Advanced. Rounding happens after the multiplier.
  * When to use: Both mercenary rule paragraphs.
- * Expected outcome: `infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15)` on every map.
+ * Expected outcome: `infantry 5 (Advanced 10), armor 10 (20), naval 25 (50), air 15 (30)` on every map.
  * Exceptions: None.
  */
 function upkeepList(): string {

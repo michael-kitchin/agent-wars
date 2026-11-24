@@ -25,7 +25,7 @@ test('the credits rule names the global item price and the credits it adds', () 
 });
 
 test('the mercenary rule lists basic and Advanced upkeep', () => {
-  assert.ok(buildMercenaryRule().includes('infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15)'));
+  assert.ok(buildMercenaryRule().includes('infantry 5 (Advanced 10), armor 10 (20), naval 25 (50), air 15 (30)'));
 });
 
 test('the mercenary rule has five one-line paragraphs, the last two about firing', () => {

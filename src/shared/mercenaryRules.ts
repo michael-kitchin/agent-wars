@@ -14,8 +14,8 @@ import { formatCompactHireCost, formatCompactRaiseCost, formatCreditsAmount, for
 import { unitCostFor } from './gameRules';
 import type { TechLevel } from './techBonusTypes';
 
-/** Divisor that turns a global unit price into one turn of upkeep, before rounding up. */
-export const MERCENARY_UPKEEP_DIVISOR = 8;
+/** Divisor that turns a global unit price into one turn of upkeep, before rounding up. Four makes upkeep a quarter of the price. */
+export const MERCENARY_UPKEEP_DIVISOR = 4;
 
 /** Upkeep multiplier for an Advanced unit when the tech bonus is on. */
 export const MERCENARY_ADVANCED_TECH_MULTIPLIER = 2;
@@ -201,7 +201,7 @@ export function mercenaryReferenceCost(unitType: HireableUnitType): number {
  *
  * Purpose: One formula for payroll, fees, the top bar, and the hire panel.
  * When to use: After choosing the tech level the way `mercenaryTechMultiplier` describes.
- * Expected outcome: The reference cost times the tech multiplier, divided by 8, rounded up.
+ * Expected outcome: The reference cost times the tech multiplier, divided by `MERCENARY_UPKEEP_DIVISOR` (4), rounded up.
  * Exceptions: None.
  */
 export function mercenaryUpkeepFor(unitType: HireableUnitType, techLevel: TechLevel | undefined): number {
@@ -422,7 +422,7 @@ export function oneUnitRaiseShortage(
  *
  * Purpose: The type select shows the production cost and the credit price.
  * When to use: One option in the raise select.
- * Expected outcome: `Infantry (⚒20 + ¤3/turn)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
+ * Expected outcome: `Infantry (⚒20 + ¤5/turn)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
  * Exceptions: None.
  */
 export function formatHireOptionLabel(option: {
