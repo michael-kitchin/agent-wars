@@ -318,15 +318,36 @@ export function computeGridDistanceWithPathFallbackPure(
 }
 
 /**
- * Memoizes `gridDisk(origin, maxRange)` as a set for the null-distance fallback in `isWithinGridRangePure`.
+ * A fallback disk that `gridDisk` could not build.
  *
- * Purpose: Strategic scans test many unmeasurable pairs from the same few origins, such as every airport against every
- *   other airport in an air ferry search. Rebuilding and scanning the disk on each call dominated those scans.
- * When to use: Only through `fallbackDiskFor`; keys are `origin|maxRange`. Insertion order is the eviction order.
- * Expected outcome: Membership matches a fresh `gridDisk` call. Null records a disk that threw, so it is not retried.
+ * Purpose: The memo keeps the failure, with the thrown value, so the disk is not retried and a logging caller can still report it.
+ * When to use: Values of `gridDiskFallbackMemo`, and the result of `checkGridRangePure`.
+ * Expected outcome: One record per origin and range that threw.
  * Exceptions: None.
  */
-const gridDiskFallbackMemo = new Map<string, ReadonlySet<string> | null>();
+type GridDiskFailure = {
+  /**
+   * The value `gridDisk` threw.
+   *
+   * Contract: Usually an `Error` from h3-js.
+   * When to use: Logging callers.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly diskError: unknown;
+};
+
+/**
+ * Memoizes `gridDisk(origin, maxRange)` as a set for the null-distance fallback in `checkGridRangePure`.
+ *
+ * Purpose: Strategic scans test many unmeasurable pairs from the same few origins, such as every airport against every
+ *   other airport in an air ferry search. Rebuilding and scanning the disk on each call dominated those scans. The pure
+ *   and the logging range checks share this one memo.
+ * When to use: Only through `fallbackDiskFor`; keys are `origin|maxRange`. Insertion order is the eviction order.
+ * Expected outcome: Membership matches a fresh `gridDisk` call. A `GridDiskFailure` records a disk that threw, so it is not retried.
+ * Exceptions: None.
+ */
+const gridDiskFallbackMemo = new Map<string, ReadonlySet<string> | GridDiskFailure>();
 
 /**
  * Entry cap for `gridDiskFallbackMemo`, below the shared default because each value is a set of cells.
@@ -360,49 +381,158 @@ const GRID_DISK_FALLBACK_CELL_BUDGET = 200_000;
 let gridDiskFallbackCellCount = 0;
 
 /**
+ * The cell budget `fallbackDiskFor` enforces.
+ *
+ * Purpose: Tests lower it to exercise eviction without building hundreds of thousands of cells.
+ * When to use: `fallbackDiskFor` and `setGridDiskFallbackCellBudgetForTests` only.
+ * Expected outcome: `GRID_DISK_FALLBACK_CELL_BUDGET` outside tests.
+ * Exceptions: None.
+ */
+let gridDiskFallbackCellBudget = GRID_DISK_FALLBACK_CELL_BUDGET;
+
+/**
+ * Empties the fallback disk memo and sets its cell budget.
+ *
+ * Purpose: Eviction tests need a small budget and an empty memo, then the production budget back.
+ * When to use: Tests only. Pass no argument to restore `GRID_DISK_FALLBACK_CELL_BUDGET`.
+ * Expected outcome: The memo is empty, its cell count is 0, and later disks are kept under the given budget.
+ * Exceptions: None.
+ */
+export function setGridDiskFallbackCellBudgetForTests(budget: number = GRID_DISK_FALLBACK_CELL_BUDGET): void {
+  gridDiskFallbackMemo.clear();
+  gridDiskFallbackCellCount = 0;
+  gridDiskFallbackCellBudget = budget;
+}
+
+/**
+ * Cells a memo entry holds.
+ *
+ * Purpose: The cell budget counts disks, and a recorded failure holds none.
+ * When to use: `fallbackDiskFor` when it stores or evicts an entry.
+ * Expected outcome: The disk's size, or 0 for a failure or a missing entry.
+ * Exceptions: None.
+ */
+function cellsIn(entry: ReadonlySet<string> | GridDiskFailure | undefined): number {
+  return entry === undefined || 'diskError' in entry ? 0 : entry.size;
+}
+
+/**
  * The memoized fallback disk for one origin and range.
  *
  * Purpose: Builds each disk once, and evicts the oldest disks by entry count and by stored cells.
- * When to use: `isWithinGridRangePure` after `computeGridDistancePure` returns null.
- * Expected outcome: The same cells as `gridDisk(origin, maxRange)`, or null when that call throws.
+ * When to use: `checkGridRangePure` after `computeGridDistancePure` returns null.
+ * Expected outcome: The same cells as `gridDisk(origin, maxRange)`, or a `GridDiskFailure` holding what that call threw.
  * Exceptions: None.
  */
-function fallbackDiskFor(originH3Index: string, maxRange: number): ReadonlySet<string> | null {
+function fallbackDiskFor(originH3Index: string, maxRange: number): ReadonlySet<string> | GridDiskFailure {
   const key = `${originH3Index}|${maxRange}`;
   const known = gridDiskFallbackMemo.get(key);
   if (known !== undefined) return known;
-  let disk: ReadonlySet<string> | null;
+  let disk: ReadonlySet<string> | GridDiskFailure;
   try {
     disk = new Set(gridDisk(originH3Index, maxRange));
-  } catch {
-    disk = null;
+  } catch (diskError) {
+    disk = { diskError };
   }
   gridDiskFallbackMemo.set(key, disk);
-  gridDiskFallbackCellCount += disk?.size ?? 0;
+  gridDiskFallbackCellCount += cellsIn(disk);
   while (
     gridDiskFallbackMemo.size > 1 &&
-    (gridDiskFallbackMemo.size > GRID_DISK_FALLBACK_MEMO_CAPACITY || gridDiskFallbackCellCount > GRID_DISK_FALLBACK_CELL_BUDGET)
+    (gridDiskFallbackMemo.size > GRID_DISK_FALLBACK_MEMO_CAPACITY || gridDiskFallbackCellCount > gridDiskFallbackCellBudget)
   ) {
     const oldest = gridDiskFallbackMemo.keys().next().value;
     if (oldest === undefined) break;
-    gridDiskFallbackCellCount -= gridDiskFallbackMemo.get(oldest)?.size ?? 0;
+    gridDiskFallbackCellCount -= cellsIn(gridDiskFallbackMemo.get(oldest));
     gridDiskFallbackMemo.delete(oldest);
   }
   return disk;
 }
 
 /**
+ * The answer to one range check, with the disk failure when the fallback could not be built.
+ *
+ * Purpose: The pure check ignores the failure, and the main-process check logs it, from the same memoized result.
+ * When to use: The result of `checkGridRangePure`.
+ * Expected outcome: `within` is false whenever `diskError` is present.
+ * Exceptions: None.
+ */
+export type GridRangeCheck = {
+  /**
+   * Whether the destination is within range.
+   *
+   * Contract: The distance comparison, or membership in the fallback disk.
+   * When to use: Every caller.
+   * Expected outcome: False when the fallback disk could not be built.
+   * Exceptions: None.
+   */
+  readonly within: boolean;
+  /**
+   * What `gridDisk` threw while building the fallback disk.
+   *
+   * Contract: Present only when the distance was not measurable and the disk failed. The same value is returned on every
+   *   later check of that origin and range while the failure stays in the memo.
+   * When to use: Logging callers. Test presence with `'diskError' in result`.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly diskError?: unknown;
+};
+
+/**
+ * Checks whether a destination lies within a grid range of an origin, and reports a failed fallback disk.
+ *
+ * Purpose: The one implementation behind `isWithinGridRangePure` and the main-process `isWithinGridRangeSafe`, so both share
+ *   the distance memo, the fallback disk memo, and its limits.
+ * When to use: A caller that needs to log a disk failure. Otherwise use `isWithinGridRangePure`.
+ * Expected outcome: Uses `computeGridDistancePure` when it succeeds; otherwise membership in the memoized
+ *   `gridDisk(origin, maxRange)`. A disk that throws gives `within: false` and the thrown value as `diskError`.
+ * Exceptions: None. This module does not log.
+ */
+export function checkGridRangePure(args: {
+  /**
+   * The hex the range is measured from.
+   *
+   * Contract: An H3 index. An index `gridDisk` rejects reports `diskError`; h3-js gives an empty disk for some malformed strings instead.
+   * When to use: The unit, base, or anchor hex.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly originH3Index: string;
+  /**
+   * The hex being tested.
+   *
+   * Contract: An H3 index.
+   * When to use: The target or arrival hex.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly destinationH3Index: string;
+  /**
+   * The largest grid distance that counts as within range.
+   *
+   * Contract: Grid steps at the hexes' resolution.
+   * When to use: The weapon, ferry, or radius limit.
+   * Expected outcome: Read only. A negative or fractional value is passed to `gridDisk` as given.
+   * Exceptions: None.
+   */
+  readonly maxRange: number;
+}): GridRangeCheck {
+  const { originH3Index, destinationH3Index, maxRange } = args;
+  const distance = computeGridDistancePure(originH3Index, destinationH3Index);
+  if (distance !== null) return { within: distance <= maxRange };
+  const disk = fallbackDiskFor(originH3Index, maxRange);
+  if ('diskError' in disk) return { within: false, diskError: disk.diskError };
+  return { within: disk.has(destinationH3Index) };
+}
+
+/**
  * Returns true when `destinationH3Index` lies within `maxRange` H3 grid steps of `originH3Index`.
  *
- * Contract: Uses `computeGridDistancePure` when it succeeds; otherwise membership in the memoized `gridDisk(origin, maxRange)`.
+ * Contract: `checkGridRangePure` without the disk failure.
  * When to use: Tactical ranged legality and any code that must stay aligned with `isWithinGridRangeSafe` without logging.
- * Expected outcome: Matches `isWithinGridRangeSafe` for the same triple when disk fallback is not needed, and matches
- * when disk fallback is needed except disk-throw logging is omitted here.
+ * Expected outcome: The same boolean as `isWithinGridRangeSafe` for the same triple. Only the logging differs.
  * Exceptions: Returns false when disk enumeration throws.
  */
 export function isWithinGridRangePure(originH3Index: string, destinationH3Index: string, maxRange: number): boolean {
-  const distance = computeGridDistancePure(originH3Index, destinationH3Index);
-  if (distance !== null) return distance <= maxRange;
-  const disk = fallbackDiskFor(originH3Index, maxRange);
-  return disk !== null && disk.has(destinationH3Index);
+  return checkGridRangePure({ originH3Index, destinationH3Index, maxRange }).within;
 }

@@ -10,11 +10,13 @@
 import * as assert from 'assert';
 import { cellToChildren, cellToParent, getPentagons, getRes0Cells, gridDisk, gridDistance, gridPathCells } from 'h3-js';
 import {
+  checkGridRangePure,
   clearGridFallbackSearchesForTests,
   computeGridDistancePure,
   computeGridDistanceWithPathFallbackPure,
   computeGridPathCellsPure,
   isWithinGridRangePure,
+  setGridDiskFallbackCellBudgetForTests,
 } from '../shared/h3GridRangePure';
 
 /**
@@ -197,31 +199,67 @@ function testDiskFallbackMemoMatchesFreshDisk(): void {
 /**
  * Answers stay correct after the disk fallback memo evicts for its cell budget.
  *
- * Purpose: Large disks force eviction, and a miscounted budget could keep a stale disk or drop the one just built.
+ * Purpose: A miscounted budget could keep a stale disk or drop the one just built.
  * When to use: After changing the fallback disk eviction in `h3GridRangePure`.
- * Expected outcome: Every unmeasurable resolution-1 pair tested at range 25 matches fresh `gridDisk` membership, including
- *   the earliest origins after later ones pushed the stored cells past the budget.
+ * Expected outcome: With a budget far below the sample's cells, and with one smaller than a single disk, every unmeasurable
+ *   pair matches fresh `gridDisk` membership on the first and the repeated pass. The production budget is restored after.
  * Exceptions: Skips an origin with no unmeasurable destination among the cells tried.
  */
 function testDiskFallbackStaysCorrectAfterEviction(): void {
   const cells = getRes0Cells().flatMap((parent) => cellToChildren(parent, 1));
-  const range = 25;
   const pairs: Array<[string, string]> = [];
-  for (let i = 0; i < cells.length && pairs.length < 150; i += 5) {
+  for (let i = 0; i < cells.length && pairs.length < 40; i += 7) {
     const origin = cells[i]!;
     const destination = cells.find((cell) => computeGridDistancePure(origin, cell) === null);
     if (destination !== undefined) pairs.push([origin, destination]);
   }
-  assert.ok(pairs.length * gridDisk(pairs[0]![0], range).length > 200_000, 'the sample must exceed the cell budget');
-  const expected = pairs.map(([origin, destination]) => gridDisk(origin, range).includes(destination));
-  const first = pairs.map(([origin, destination]) => isWithinGridRangePure(origin, destination, range));
-  const again = pairs.map(([origin, destination]) => isWithinGridRangePure(origin, destination, range));
-  assert.deepStrictEqual(first, expected);
-  assert.deepStrictEqual(again, expected);
+  assert.ok(pairs.length >= 10, 'fixture needs unmeasurable pairs');
+  pairs.push(tacticalPairWhereGridPathCellsThrows());
+  try {
+    for (const [budget, range] of [[300, 4], [10, 3]] as const) {
+      setGridDiskFallbackCellBudgetForTests(budget);
+      const expected = pairs.map(([origin, destination]) => gridDisk(origin, range).includes(destination));
+      assert.ok(expected.includes(true) && expected.includes(false), 'the sample needs pairs inside and outside the disk');
+      for (let pass = 0; pass < 2; pass += 1) {
+        assert.deepStrictEqual(
+          pairs.map(([origin, destination]) => isWithinGridRangePure(origin, destination, range)),
+          expected,
+          `budget ${budget}, pass ${pass + 1}`
+        );
+      }
+    }
+  } finally {
+    setGridDiskFallbackCellBudgetForTests();
+  }
+}
+
+/**
+ * A failed fallback disk is reported, and reported again from the memo.
+ *
+ * Purpose: `isWithinGridRangeSafe` logs every failed check, so the memoized failure must still carry the thrown value.
+ * When to use: After changing `checkGridRangePure` or the failure record in the disk memo.
+ * Expected outcome: An origin `gridDisk` rejects gives `within: false` with a `diskError` on both calls. A measurable pair and a
+ *   buildable fallback disk carry no `diskError`.
+ * Exceptions: None.
+ */
+function testCheckGridRangeReportsDiskFailure(): void {
+  const [crossFrom, crossTo] = tacticalPairWhereGridPathCellsThrows();
+  for (let call = 0; call < 2; call += 1) {
+    const failed = checkGridRangePure({ originH3Index: 'ffffffffffffffff', destinationH3Index: crossTo, maxRange: 3 });
+    assert.strictEqual(failed.within, false);
+    assert.ok('diskError' in failed && failed.diskError !== undefined, `call ${call + 1} must report the disk failure`);
+  }
+  assert.deepStrictEqual(checkGridRangePure({ originH3Index: '81283ffffffffff', destinationH3Index: '81283ffffffffff', maxRange: 0 }), {
+    within: true,
+  });
+  const fallback = checkGridRangePure({ originH3Index: crossFrom, destinationH3Index: crossTo, maxRange: 64 });
+  assert.strictEqual('diskError' in fallback, false);
+  assert.strictEqual(fallback.within, isWithinGridRangePure(crossFrom, crossTo, 64));
 }
 
 const tests = [
   { name: 'computeGridDistancePure memo matches direct H3', fn: testComputeGridDistancePureMatchesDirectH3 },
+  { name: 'checkGridRangePure reports a failed disk', fn: testCheckGridRangeReportsDiskFailure },
   { name: 'the disk fallback memo matches a fresh gridDisk', fn: testDiskFallbackMemoMatchesFreshDisk },
   { name: 'the disk fallback stays correct after eviction', fn: testDiskFallbackStaysCorrectAfterEviction },
   { name: 'computeGridPathCellsPure covers face crossings', fn: testComputeGridPathCellsPureCoversFaceCrossings },

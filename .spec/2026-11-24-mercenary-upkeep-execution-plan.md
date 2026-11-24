@@ -161,7 +161,7 @@ These come from `.cursor/rules/` and `AGENTS.md`.
   - Each edited source or test file must stay under 600 lines. Record every final line count in the Completion Log.
   - **A file already over 600 lines only shrinks.** No phase edits a source file over 600 lines.
   - **Tests over 600 lines.** Two test files Phase 2 runs are over 600 lines: `envelopeJsonSchema.test.ts` (669) and `gameRuleText.test.ts` (626). If a test in either fails because of this plan, do not edit it in place. Delete that one test from the big file, add its corrected version to a new sibling test file with the same test name and the imports it needs, and record the move in the Completion Log.
-  - **Long docs.** Phase 3 edits three docs over 600 lines: `doc/combat-rules-v3.md` (776), `doc/how-to-play.md` (683), and `doc/ai-commander-prompts/example-strategic-prompt.md` (669). Each edit replaces text on the same line and adds no line.
+  - **Long docs.** Phase 3 edits three docs over 600 lines: `doc/combat-rules-v3.md` (776), `doc/how-to-play.md` (683), and `doc/ai-commander-prompts/example-strategic-prompt.md` (669). Each edit changes existing lines and adds no line.
 - **Reuse (rule 06).**
   - `isTreasuryDeep` stays the only "more than you need" test.
   - `mercenaryUpkeepFor` stays the only upkeep formula. Never write an upkeep number into production code.
@@ -171,6 +171,16 @@ These come from `.cursor/rules/` and `AGENTS.md`.
   - The situation message changes only in when the hoard bullet and the forecast's deep sentence appear, and in the upkeep and fee numbers it prints.
   - No heading, table, column, or attention bullet is added or removed.
 - **Docs.** Phase 3 updates `doc/`, `README.md`, and the release notes. Do not edit them earlier.
+
+### Prompt Layout
+
+| Text | Message | Where | Change |
+| --- | --- | --- | --- |
+| mercenary upkeep list | System | `## Mercenaries` under `# Rules` | new numbers from the constant; static |
+| hoard bullet | Situation | Attention Flags, last | appears only at 40 turns of upkeep; wording unchanged |
+| deep sentence | Situation | `# Mercenaries`, forecast paragraph | appears only at 40 turns of upkeep; wording unchanged |
+| funds line, Your Mercenaries, Raise Options, Rehire Candidates | Situation | `# Mercenaries` | new upkeep and fee numbers; no layout change |
+| raise bullet | Situation | Attention Flags | new fee numbers; same rule and wording |
 
 ---
 
@@ -256,7 +266,7 @@ Every result, anchor, and count is recorded in the Phase 0 Inventory. If an anch
 - with upkeep 100 on a small game, credits of `MERCENARY_UPKEEP_RESERVE_TURNS * 100` are not deep;
 - credits of `TREASURY_HOARD_UPKEEP_TURNS * 100` are deep.
 
-Build the forecast as a plain object: `{ credits, upkeepPerTurn: 100, queuedCredits: 0, coverTurns: null }`. Give the test an orienting comment that says why the gap matters.
+Build the forecast as a plain object: `{ credits, upkeepPerTurn: 100, queuedCredits: 0, coverTurns: null }`. The tests in this file carry no JSDoc block, so add a one-line `//` comment inside the test instead, as the deep test in `treasuryForecast.test.ts` does. It says why the gap matters: a treasury the raise flag leaves at its reserve must not read as more than needed.
 
 ### Tests to run
 
@@ -309,8 +319,8 @@ Shared:
 - `mercenaryRules.test`, `economySymbols.test`, `hireEntryHexes.test`, `matchChartSeries.test`, `mercenaryDismiss.test`, `selectionPanelSummary.test`, `topBarStats.test`, `unitOriginTooltipText.test`
 
 Main:
-- `creditsProductionFlow.test`, `mercenaryPayroll.test`, `mercenarySchema.test`, `mercenaryTurnFlow.test`, `productionBuildabilityFlow.test`, `productionOrders.test`
-- `gameActions/dismissMercenary.test`, `gameActions/unitOwnershipTransfer.test`, `gameDb/seatUnitOwnership.test`
+- `creditsProductionFlow.test`, `mercenaryHireRules.test`, `mercenaryPayroll.test`, `mercenarySchema.test`, `mercenaryTurnFlow.test`, `productionBuildabilityFlow.test`, `productionOrders.test`
+- `gameActions/dismissMercenary.test`, `gameActions/mercenaryFireRisk.test`, `gameActions/unitOwnershipTransfer.test`, `gameDb/seatUnitOwnership.test`
 - `matchStatistics/sideStatisticsRead.test`, `matchStatistics/statisticsHistory.test`, `tools/mercenaryTools.test`
 - `openRouter/briefingSections.test`, `openRouter/briefingSectionsMercenaries.test`, `openRouter/briefingSectionsMercenaryFiring.test`, `openRouter/mercenaryRaiseAttention.test`, `openRouter/treasuryForecast.test`
 - `openRouter/productionPriorities.test`, `openRouter/productionPrioritiesCredits.test`
@@ -335,7 +345,7 @@ The Phase Check, including `check:renderer-types` and `build:renderer`. Also con
 
 ### Steps
 
-Every edit below replaces text on the line where it already is. Add no line except the release-notes bullet.
+Every edit below changes existing lines. Add no line except the release-notes bullet.
 
 1. **The upkeep list.** Replace `infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15)` with **Exact** `infantry 5 (Advanced 10), armor 10 (20), naval 25 (50), air 15 (30)` in:
    - `doc/combat-rules-v3.md`;
@@ -344,7 +354,7 @@ Every edit below replaces text on the line where it already is. Add no line exce
    - `doc/ai-commander-prompts/example-strategic-prompt.md`.
 2. **`doc/combat-rules-v3.md`:** replace `The divisor is 8.` with **Exact** `The divisor is 4.`
 3. **`doc/how-to-play.md`:**
-   - replace `Upkeep: ¤3 infantry, ¤5 armor, ¤8 air, ¤13 naval` with **Exact** `Upkeep: ¤5 infantry, ¤10 armor, ¤15 air, ¤25 naval`. That table cell grows by 3 characters, so remove 3 spaces of the cell's trailing padding to keep the column's `|` aligned;
+   - replace `Upkeep: ¤3 infantry, ¤5 armor, ¤8 air, ¤13 naval` with **Exact** `Upkeep: ¤5 infantry, ¤10 armor, ¤15 air, ¤25 naval`. That cell is the widest in the `Global game` column of the `## Units at a Glance` table, so the column grows by 3 characters. Keep the table aligned in the source: on every other row of that table, add 3 spaces before the `Global game` column's closing `|`, and add 3 `-` to that column on the separator row. Change no other column, and add no row;
    - replace `infantry ¤5, armor ¤10, air ¤15, naval ¤25` with **Exact** `infantry ¤10, armor ¤20, air ¤30, naval ¤50`.
 4. **The deep line.** In `doc/ai-commander-prompts/strategic-prompt.md` and `information-decision-model.md`, replace `` `TREASURY_HOARD_UPKEEP_TURNS` (20) `` with **Exact** `` `TREASURY_HOARD_UPKEEP_TURNS` (40, twice `MERCENARY_UPKEEP_RESERVE_TURNS`) ``.
 5. **`doc/release-notes/v3.6.0.md`:** under `## What's in 3.6.0`, after the bullet that begins `- **Treasury advice that knows when to stop.**`, add **Exact**:
@@ -362,7 +372,7 @@ Part of your final pass:
 
 1. **Start a new match.** A 3.6.0 match saved before this change pays the new upkeep as soon as it loads, so the current test match would run short of credits and lose mercenaries to desertion.
 2. **Numbers.** The hire panel shows `¤5/turn` for basic infantry. The system prompt's mercenary rule lists `infantry 5 (Advanced 10), armor 10 (20), naval 25 (50), air 15 (30)`.
-3. **Steady state.** After about 30 turns, each side's mercenary count is near its credits income divided by its average upkeep. The Treasury line's turns of upkeep stay in the 20s and 30s.
+3. **Steady state.** After about 30 turns, each side's mercenary count is near its credits income divided by its average upkeep. The Mercenaries forecast's turns of cover settle between about 20 and 40.
 4. **No flicker.** While a side's treasury sits between 20 and 40 turns of upkeep, neither the hoard bullet nor the "more than you need" sentence appears.
 5. Run `npm run ui:smoke`, and `npm run doc:shots` if a screenshot shows mercenary costs.
 
