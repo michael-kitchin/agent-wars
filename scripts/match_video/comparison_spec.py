@@ -14,6 +14,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
+from scripts.match_video.comparison_geometry import (
+    CAPTURE_HEIGHT,
+    CAPTURE_WIDTH,
+    DEFAULT_CAPTURE,
+    LEGEND_HEIGHT,
+    LEGEND_Y,
+    TURN_CROP,
+    CaptureGeometry,
+    CaptureRect,
+)
+
 LOGGER = logging.getLogger(__name__)
 
 # Number of replays each layout shows. The quad layout adds a legend card in the fourth cell.
@@ -59,7 +70,8 @@ class ReplaySpec:
         Read from the comparison file by ``load_comparison_spec``.
     What to expect:
         ``file`` is relative to the source directory given on the command line.
-        ``legend_masks`` are sorted by time.
+        ``legend_masks`` are sorted by time. ``toolbar_hold_seconds`` None means the legend
+        and turn readout follow the replay to its end.
     """
 
     # Short identifier that the layouts use to pick this replay.
@@ -78,6 +90,9 @@ class ReplaySpec:
     legend_width: int
     # Masks over the end of the legend strip, in time order.
     legend_masks: tuple[LegendMask, ...]
+    # Replay time after which the legend and turn readout keep their last picture, or None.
+    # A finished match swaps its toolbar for the start menu, which this keeps off screen.
+    toolbar_hold_seconds: float | None
 
 
 @dataclass(frozen=True)
@@ -89,6 +104,7 @@ class ComparisonSpec:
         As the result of ``load_comparison_spec``; pass it to ``layout_replays``.
     What to expect:
         Every key in ``layouts`` names a replay, and each layout has the size in ``LAYOUT_SIZES``.
+        ``capture`` is ``DEFAULT_CAPTURE`` unless the file has a ``capture`` object.
     """
 
     # Heading on the legend card and the duo header band.
@@ -101,6 +117,8 @@ class ComparisonSpec:
     replays: tuple[ReplaySpec, ...]
     # Replay keys for each layout the file supports, in on-screen order.
     layouts: MappingProxyType[str, tuple[str, ...]]
+    # Where the map and the toolbar sit in every replay's frame.
+    capture: CaptureGeometry
 
 
 def load_comparison_spec(path: Path) -> ComparisonSpec:
@@ -110,7 +128,8 @@ def load_comparison_spec(path: Path) -> ComparisonSpec:
     When to use:
         At the start of a comparison run, and in tests on the shipped comparisons.
     What to expect:
-        A frozen spec. Optional replay fields default to no note and no legend masks.
+        A frozen spec. Optional replay fields default to no note, no legend masks, and no
+        toolbar hold. A missing ``capture`` object means a plain capture.
     Exceptions:
         ``ComparisonError`` when the file is missing, is not JSON, or breaks a rule above.
     """
@@ -136,6 +155,7 @@ def load_comparison_spec(path: Path) -> ComparisonSpec:
         footer=_text(root, "footer", ""),
         replays=replays,
         layouts=layouts,
+        capture=_capture_from(root.get("capture")),
     )
     LOGGER.debug("Loaded %d replays and layouts %s from %s.", len(replays), sorted(layouts), path)
     return spec
@@ -196,7 +216,70 @@ def _replay_from(item: object, index: int) -> ReplaySpec:
         note=_text(entry, "note", "", where=where),
         legend_width=legend_width,
         legend_masks=masks,
+        toolbar_hold_seconds=_optional_seconds(entry, "toolbar_hold_seconds", where),
     )
+
+
+def _capture_from(item: object) -> CaptureGeometry:
+    """
+    Why this exists:
+        Check the optional ``capture`` object against the 1920x1080 source frame.
+    When to use:
+        From ``load_comparison_spec``, with the field's value or None when it is absent.
+    What to expect:
+        ``DEFAULT_CAPTURE`` for None. Otherwise a geometry whose missing fields keep their
+        default, with every crop inside the frame.
+    Exceptions:
+        ``ComparisonError`` when a value is not a whole number or a crop leaves the frame.
+    """
+
+    if item is None:
+        return DEFAULT_CAPTURE
+    entry = _require_object(item, "capture")
+    shift = entry.get("toolbar_shift_y", DEFAULT_CAPTURE.toolbar_shift_y)
+    lowest = -min(LEGEND_Y, TURN_CROP.y)
+    highest = CAPTURE_HEIGHT - max(LEGEND_Y + LEGEND_HEIGHT, TURN_CROP.y + TURN_CROP.height)
+    if not isinstance(shift, int) or isinstance(shift, bool) or not lowest <= shift <= highest:
+        raise ComparisonError(f"capture.toolbar_shift_y must be a whole number from {lowest} to {highest}.")
+    raw_crop = entry.get("map_crop")
+    if raw_crop is None:
+        return CaptureGeometry(DEFAULT_CAPTURE.map_crop, shift)
+    crop_entry = _require_object(raw_crop, "capture.map_crop")
+    values = [crop_entry.get(field) for field in CaptureRect._fields]
+    if not all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        raise ComparisonError("capture.map_crop needs whole numbers for x, y, width, and height.")
+    crop = CaptureRect(*values)
+    inside = (
+        crop.x >= 0
+        and crop.y >= 0
+        and crop.width > 0
+        and crop.height > 0
+        and crop.x + crop.width <= CAPTURE_WIDTH
+        and crop.y + crop.height <= CAPTURE_HEIGHT
+    )
+    if not inside:
+        raise ComparisonError(f"capture.map_crop must lie inside the {CAPTURE_WIDTH}x{CAPTURE_HEIGHT} frame.")
+    return CaptureGeometry(crop, shift)
+
+
+def _optional_seconds(entry: dict, field: str, where: str) -> float | None:
+    """
+    Why this exists:
+        Read an optional replay time that must be above zero when it is given.
+    When to use:
+        For ``toolbar_hold_seconds``.
+    What to expect:
+        The time in seconds, or None when the field is absent.
+    Exceptions:
+        ``ComparisonError`` when the field is not a positive, finite number.
+    """
+
+    value = entry.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or value <= 0:
+        raise ComparisonError(f"{where}.{field} must be a positive number of seconds.")
+    return float(value)
 
 
 def _mask_from(item: object, where: str, legend_width: int) -> LegendMask:

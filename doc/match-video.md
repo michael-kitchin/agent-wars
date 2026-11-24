@@ -34,7 +34,7 @@ A yuv420 crop needs even edges. `align_region_to_even_pixels` rounds `x1` and `y
 
 ## Side-by-side comparisons
 
-`scripts/compose_match_comparison.py` composes condensed replays into one 1920x1080 video. A comparison file names the replays and their labels. The comparison of v2.21.0, v2.22.0, and v3.0.0 is `scripts/match_video/comparisons/world_war_n.json`. ffmpeg and ffprobe must be on PATH, and Pillow must be installed (`scripts/match_video/requirements.txt`).
+`scripts/compose_match_comparison.py` composes condensed replays into one 1920x1080 video. A comparison file names the replays and their labels. The comparison of v2.21.0, v2.22.0, and v3.0.0 is `scripts/match_video/comparisons/world_war_n.json`. The comparison of v3.0.0, v3.4.1, and v3.6.0 is `scripts/match_video/comparisons/one_hundred_months.json`. ffmpeg and ffprobe must be on PATH, and Pillow must be installed (`scripts/match_video/requirements.txt`).
 
 From the repository root:
 
@@ -56,23 +56,29 @@ The faction legend for each replay is cropped live from the game's "Observing" l
 
 Every replay starts at `--start` (default 0) and runs for `--duration`. Without `--duration`, the output stops `--end-trim` seconds before the shortest replay in the layout ends. The default trim is 1 second (`_DEFAULT_END_TRIM_SECONDS`). The last `FADE_OUT_SECONDS` (0.75) fade to black unless `--no-fade` is set.
 
+A `--duration` longer than the replays holds each replay's last frame until the output ends. `one_hundred_months.json` is composed with `--duration 93`, which holds the final maps for 3 seconds after the 90-second replays end.
+
 The output is H.264 at 30 fps (`OUTPUT_FPS`) with no audio. `--crf` defaults to 20 and `--preset` to `veryfast`.
 
 The replays are aligned by elapsed time, not by turn. Condensed replays spend slightly different numbers of frames per turn, so their turn counters drift apart over the video.
 
 ### Comparison file
 
-`load_comparison_spec` in `scripts/match_video/comparison_spec.py` reads and checks the file. The top level holds `title`, `subtitle`, an optional `footer`, `replays`, and `layouts`. `layouts` maps `quad`, `duo`, or both to replay keys in on-screen order. `LAYOUT_SIZES` gives how many keys each layout takes.
+`load_comparison_spec` in `scripts/match_video/comparison_spec.py` reads and checks the file. The top level holds `title`, `subtitle`, an optional `footer`, an optional `capture`, `replays`, and `layouts`. `layouts` maps `quad`, `duo`, or both to replay keys in on-screen order. `LAYOUT_SIZES` gives how many keys each layout takes.
 
-Each replay holds `key`, `file` (relative to `--source-dir`), `version`, `nickname`, `turns_shown`, and `legend_width`, plus an optional `note` and optional `legend_masks`.
+Each replay holds `key`, `file` (relative to `--source-dir`), `version`, `nickname`, `turns_shown`, and `legend_width`, plus an optional `note`, optional `legend_masks`, and an optional `toolbar_hold_seconds`.
 
 `turns_shown` is the number of completed turns at the comparison's last frame, not the replay's total. To find it, render `--still` at the end of the output and read each turn readout. A readout of "Turn 516 · Planning" means 515 completed turns.
 
 `legend_width` is the width of the legend crop in source pixels, starting at `LEGEND_X`. The crop should end just before the game's "View as" label. A knockout marker such as "(T216)" lengthens the legend and pushes "View as" to the right. A replay with knockouts therefore uses its final legend width and one `legend_masks` entry for each step. `x` is where "View as" starts in the strip before that knockout, and `until_seconds` is the replay time when the knockout appears. Check each time with `--still` just before and just after it.
 
+`toolbar_hold_seconds` is a replay time after which the legend and the turn readout keep their last picture. A finished match swaps its toolbar for the start menu, so a replay that runs to a victory sets this just before that swap. `--still` ignores it.
+
 ### Capture assumptions
 
 The crops in `scripts/match_video/comparison_geometry.py` assume a 1920x1080 capture of the maximized game window, with the toolbar along the top, the command rail on the right, and the Windows taskbar along the bottom. A capture with another size or layout needs new crops there.
+
+A replay that was re-exported from a video editor can sit lower in the frame and lose its bottom rows. The optional `capture` object of the comparison file covers that case for every replay in the file (`CaptureGeometry`). `toolbar_shift_y` is how many pixels the toolbar sits below its usual place, and it moves the legend and turn readout crops. `map_crop` replaces `MAP_CROP` and holds `x`, `y`, `width`, and `height` in source pixels. Keep it close to 16:9, because it is scaled to the 960x540 pane.
 
 ### Title overlays
 

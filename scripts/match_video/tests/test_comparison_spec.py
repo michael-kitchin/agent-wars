@@ -7,9 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.match_video.comparison_geometry import DEFAULT_CAPTURE
 from scripts.match_video.comparison_spec import ComparisonError, layout_replays, load_comparison_spec
 
 _SHIPPED = Path(__file__).resolve().parents[1] / "comparisons" / "world_war_n.json"
+_SHIPPED_SHIFTED = Path(__file__).resolve().parents[1] / "comparisons" / "one_hundred_months.json"
 
 
 def _replay(key: str, **extra: object) -> dict:
@@ -56,6 +58,20 @@ class ComparisonSpecTests(unittest.TestCase):
         spec = self._load(_payload())
         first = spec.replays[0]
         self.assertEqual((first.note, first.legend_masks, spec.footer), ("", (), ""))
+        self.assertEqual((first.toolbar_hold_seconds, spec.capture), (None, DEFAULT_CAPTURE))
+
+    def test_shipped_editor_export_comparison_moves_the_crops_and_holds_the_finished_toolbar(self) -> None:
+        spec = load_comparison_spec(_SHIPPED_SHIFTED)
+        replays = layout_replays(spec, "quad")
+        self.assertEqual([replay.key for replay in replays], ["v300", "v341", "v360"])
+        self.assertEqual(spec.capture.toolbar_shift_y, 16)
+        self.assertEqual(tuple(spec.capture.map_crop), (126, 84, 1716, 966))
+        self.assertEqual([replay.toolbar_hold_seconds for replay in replays], [None, None, 89.2])
+
+    def test_map_crop_outside_the_frame_is_rejected(self) -> None:
+        capture = {"map_crop": {"x": 126, "y": 84, "width": 1716, "height": 1000}}
+        with self.assertRaisesRegex(ComparisonError, "inside the 1920x1080 frame"):
+            self._load(_payload(capture=capture))
 
     def test_layout_naming_an_unknown_replay_is_rejected(self) -> None:
         with self.assertRaisesRegex(ComparisonError, "unknown replays: z"):

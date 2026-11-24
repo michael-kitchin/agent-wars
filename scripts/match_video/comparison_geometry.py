@@ -7,6 +7,7 @@ along the bottom. Canvas positions are in pixels of the 1920x1080 output.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import NamedTuple
 
 
@@ -46,6 +47,10 @@ class CanvasPoint(NamedTuple):
     y: int
 
 
+# Size of the source capture every crop is measured in.
+CAPTURE_WIDTH = 1920
+CAPTURE_HEIGHT = 1080
+
 # Output frame size. Each layout fills it exactly.
 CANVAS_WIDTH = 1920
 CANVAS_HEIGHT = 1080
@@ -75,6 +80,31 @@ TURN_DIVIDER_COLOR = "0x293240"
 
 # Toolbar background. Panels and empty canvas use it so the cropped UI blends in.
 BACKGROUND_RGB = (17, 25, 37)
+
+
+
+@dataclass(frozen=True)
+class CaptureGeometry:
+    """
+    Why this exists:
+        Hold the crops that change when a replay was re-exported from a video editor,
+        which can move the game window inside the frame and trim its edges.
+    When to use:
+        Read from the optional ``capture`` object of a comparison file. ``DEFAULT_CAPTURE``
+        is a plain capture of the maximized game window.
+    What to expect:
+        One geometry applies to every replay in the comparison.
+    """
+
+    # Window on the hex map, in source pixels. It is scaled to one replay pane.
+    map_crop: CaptureRect
+    # Pixels the toolbar sits below its place in a plain capture. The legend and
+    # turn readout crops move down by this much.
+    toolbar_shift_y: int
+
+
+# Geometry of a plain 1920x1080 capture of the maximized game window.
+DEFAULT_CAPTURE = CaptureGeometry(MAP_CROP, 0)
 
 # Quad layout: replay panes in on-screen order, then the legend card.
 QUAD_REPLAY_ORIGINS = (CanvasPoint(0, 0), CanvasPoint(960, 0), CanvasPoint(960, 540))

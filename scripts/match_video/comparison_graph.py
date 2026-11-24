@@ -23,7 +23,6 @@ from scripts.match_video.comparison_geometry import (
     LEGEND_HEIGHT,
     LEGEND_X,
     LEGEND_Y,
-    MAP_CROP,
     PANE_HEIGHT,
     PANE_WIDTH,
     QUAD_CARD_ORIGIN,
@@ -31,6 +30,7 @@ from scripts.match_video.comparison_geometry import (
     TURN_CROP,
     TURN_DIVIDER_COLOR,
     CanvasPoint,
+    CaptureGeometry,
 )
 from scripts.match_video.comparison_panels import render_duo_bands, render_quad_card, render_tag_panel
 from scripts.match_video.comparison_spec import ComparisonSpec, ReplaySpec, layout_replays
@@ -136,7 +136,7 @@ def build_comparison_plan(request: LayoutRequest) -> FfmpegPlan:
         request.window.fade_out,
     )
     replays = layout_replays(request.spec, request.layout)
-    graph = _GraphBuilder(request.window)
+    graph = _GraphBuilder(request.window, request.spec.capture)
     for replay in replays:
         graph.add_replay(replay, request.source_dir / replay.file)
     if request.layout == "quad":
@@ -164,10 +164,10 @@ class _GraphBuilder:
         Each replay exposes three labeled streams: its scaled map, legend strip, and turn readout.
     """
 
-    def __init__(self, window: RenderWindow) -> None:
+    def __init__(self, window: RenderWindow, capture: CaptureGeometry) -> None:
         """
         Why this exists:
-            Start an empty graph for one render window.
+            Start an empty graph for one render window and one capture geometry.
         When to use:
             Once per plan.
         What to expect:
@@ -176,6 +176,8 @@ class _GraphBuilder:
 
         # Which part of the replays every input reads.
         self._window = window
+        # Where the map and the toolbar sit in every replay's frame.
+        self._capture = capture
         # Arguments for each input, in input order.
         self._inputs: list[list[str]] = []
         # Filter chains that prepare the replay streams.
@@ -194,6 +196,8 @@ class _GraphBuilder:
         What to expect:
             Three labeled streams for ``map``, ``legend``, and ``turn``. The legend is masked
             per ``replay.legend_masks``; the turn readout has the toolbar divider keyed out.
+            Both end at ``replay.toolbar_hold_seconds`` when it is set, and the overlay then
+            repeats their last frame.
         """
 
         index = len(self._inputs)
@@ -206,14 +210,17 @@ class _GraphBuilder:
             timing = (["-ss", _seconds(window.start_seconds)] if window.start_seconds > 0 else [])
             timing += ["-t", _seconds(window.duration_seconds)]
         self._inputs.append([*timing, "-i", str(path)])
+        map_crop = self._capture.map_crop
+        shift = self._capture.toolbar_shift_y
+        hold = _toolbar_hold(replay, window)
         self._filters += [
             f"[{index}:v]setpts=PTS-STARTPTS,fps={OUTPUT_FPS},split=3[{label}a][{label}b][{label}c]",
-            f"[{label}a]crop={MAP_CROP.width}:{MAP_CROP.height}:{MAP_CROP.x}:{MAP_CROP.y},"
+            f"[{label}a]crop={map_crop.width}:{map_crop.height}:{map_crop.x}:{map_crop.y},"
             f"scale={PANE_WIDTH}:{PANE_HEIGHT}:flags=lanczos[{label}map]",
-            f"[{label}b]crop={replay.legend_width}:{LEGEND_HEIGHT}:{LEGEND_X}:{LEGEND_Y},format=rgb24"
-            f"{_legend_masks(replay, window)}[{label}legend]",
-            f"[{label}c]crop={TURN_CROP.width}:{TURN_CROP.height}:{TURN_CROP.x}:{TURN_CROP.y},"
-            f"colorkey={TURN_DIVIDER_COLOR}:0.04:0[{label}turn]",
+            f"[{label}b]crop={replay.legend_width}:{LEGEND_HEIGHT}:{LEGEND_X}:{LEGEND_Y + shift},format=rgb24"
+            f"{_legend_masks(replay, window)}{hold}[{label}legend]",
+            f"[{label}c]crop={TURN_CROP.width}:{TURN_CROP.height}:{TURN_CROP.x}:{TURN_CROP.y + shift},"
+            f"colorkey={TURN_DIVIDER_COLOR}:0.04:0{hold}[{label}turn]",
         ]
 
     def add_image(self, path: Path) -> str:
@@ -364,6 +371,26 @@ def _legend_masks(replay: ReplaySpec, window: RenderWindow) -> str:
         elif mask.until_seconds > window.start_seconds:
             parts.append(f"{box}:enable='lt(t,{_seconds(mask.until_seconds - window.start_seconds)})'")
     return "".join(f",{part}" for part in parts)
+
+
+def _toolbar_hold(replay: ReplaySpec, window: RenderWindow) -> str:
+    """
+    Why this exists:
+        Stop a replay's legend and turn readout before a finished match swaps its toolbar
+        for the start menu.
+    When to use:
+        While building a replay's legend and turn chains.
+    What to expect:
+        Filter text starting with a comma, or an empty string. The stream ends at
+        ``toolbar_hold_seconds`` on the replay clock, and the overlay repeats its last frame.
+        A still, a replay without a hold, and a window that starts at or after the hold
+        get an empty string.
+    """
+
+    hold = replay.toolbar_hold_seconds
+    if hold is None or window.still_seconds is not None or hold <= window.start_seconds:
+        return ""
+    return f",trim=end={_seconds(hold - window.start_seconds)}"
 
 
 def _gutter(x: int, y: int, width: int, height: int) -> str:
