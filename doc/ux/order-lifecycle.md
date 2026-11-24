@@ -101,6 +101,7 @@ None.
 - `src/renderer/map/mapDoubleClickHandler.ts`
 - `src/renderer/tactical/tacticalPendingMarchPath.ts`
 - `src/renderer/tactical/tacticalEmbarkSealiftMerge.ts`
+- `src/shared/sealiftPendingEmbarks.ts` (`mergePendingEmbarksIntoSealiftState`)
 - `src/renderer/map/stackCallout.ts`
 - `src/renderer/map/stackCalloutSealift.ts`
 - `src/main/gameActions/dismissMercenary.ts` (`executeDismissMercenary`)

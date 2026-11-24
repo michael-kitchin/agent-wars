@@ -3,10 +3,11 @@ import { isLandUnitType } from '../../shared/landUnitType';
  * Immediate tactical sealift slot edits (embark/debark/reassign) mirroring strategic `executeSealiftSlotUpdate` on the active snapshot.
  */
 
-import type { EmbarkOrder, SealiftStackState } from '../../shared/ipcTypes';
+import type { EmbarkOrder, SealiftSlotEdit, SealiftStackState } from '../../shared/ipcTypes';
+import { sealiftRowCargoIds } from '../../shared/sealiftStackState';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { canManualDebarkFromHex, syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../gameActions/sealift';
-import { normalizeSealiftSlots, type SealiftSlotPair } from '../gameActions/sealiftSlotAssignment';
+import { applySealiftSlotEdit } from '../gameActions/sealiftSlotAssignment';
 import { isDbReady } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { writeTacticalBattleSnapshotToGameConfig } from './tacticalBattlePersistence';
@@ -20,8 +21,6 @@ import {
 } from './tacticalSealiftStackState';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
-
-type SealiftSlots = SealiftSlotPair;
 
 /**
  * Clears human infantry/armor embark links for sub-units co-located at one tactical hex (draft for reassignment).
@@ -41,21 +40,18 @@ function clearHumanLandEmbarksAtHex(snap: TacticalBattleSnapshot, h3Index: strin
 }
 
 /**
- * Lists embark pairs from a normalized tactical slot map in deterministic carrier/slot order.
+ * Turns each carrier's cargo into embark orders.
  *
- * Purpose: Supplies `EmbarkOrder` rows for validation and strategic DB sync in a stable sequence.
- * When to use: After slot normalization in `projectTacticalSealiftSlotChange`.
- * Expected outcome: At most two orders per naval id; slot1 precedes slot2; naval ids sorted lexicographically.
+ * Purpose: The tactical snapshot and the parent-level transport rows both take orders as unit and carrier pairs.
+ * When to use: After a projected slot edit, and when syncing the strategic rows.
+ * Expected outcome: One order per cargo id, carriers sorted by id and each carrier's ids in layout order.
  * Exceptions: None.
  */
-function embarkOrdersFromTacticalSlots(slotsByNavalId: Map<string, SealiftSlots>): EmbarkOrder[] {
+function embarkOrdersFromTacticalCargo(cargoByCarrierId: ReadonlyMap<string, readonly string[]>): EmbarkOrder[] {
   const out: EmbarkOrder[] = [];
-  const navalIds = [...slotsByNavalId.keys()].sort((a, b) => a.localeCompare(b));
-  for (const navalUnitId of navalIds) {
-    const s = slotsByNavalId.get(navalUnitId);
-    if (!s) continue;
-    if (s.slot1UnitId) out.push({ unitId: s.slot1UnitId, navalUnitId });
-    if (s.slot2UnitId) out.push({ unitId: s.slot2UnitId, navalUnitId });
+  const carrierIds = [...cargoByCarrierId.keys()].sort((a, b) => a.localeCompare(b));
+  for (const navalUnitId of carrierIds) {
+    for (const unitId of cargoByCarrierId.get(navalUnitId) ?? []) out.push({ unitId, navalUnitId });
   }
   return out;
 }
@@ -74,7 +70,7 @@ export type TacticalSealiftSlotProjectResult =
  */
 export function projectTacticalSealiftSlotChange(
   snap: TacticalBattleSnapshot,
-  args: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }
+  args: SealiftSlotEdit
 ): TacticalSealiftSlotProjectResult {
   tacticalLogQuery('projectTacticalSealiftSlotChange', {
     h3Index: args.h3Index,
@@ -92,9 +88,6 @@ export function projectTacticalSealiftSlotChange(
     return { success: false, reason: 'Selected naval unit is not in this stack.' };
   }
   const carrierIsAir = snap.subUnits.some((unit) => unit.id === args.navalUnitId && unit.unitType === 'air');
-  if (carrierIsAir && args.slotIndex === 2) {
-    return { success: false, reason: 'An air unit has only one infantry slot.' };
-  }
   const isDebark = args.landUnitId === null;
   if (isDebark) {
     if (!carrierIsAir && !canManualDebarkFromHex(args.h3Index, HUMAN_SEAT_ID)) {
@@ -121,37 +114,20 @@ export function projectTacticalSealiftSlotChange(
   }
 
   const landTypeById = new Map(baseState.landOptions.map((o) => [o.unitId, o.unitType] as const));
-  const slotsByNavalId = new Map<string, SealiftSlots>(
-    baseState.navalRows.map((row) => [
-      row.navalUnitId,
-      { slot1UnitId: row.slot1UnitId, slot2UnitId: row.slot2UnitId },
-    ])
-  );
-
-  if (landKey.length > 0) {
-    for (const slots of slotsByNavalId.values()) {
-      if (slots.slot1UnitId === landKey) slots.slot1UnitId = null;
-      if (slots.slot2UnitId === landKey) slots.slot2UnitId = null;
-    }
-  }
-
-  const targetSlots = slotsByNavalId.get(args.navalUnitId);
-  if (!targetSlots) return { success: false, reason: 'Selected naval unit is not available.' };
-  const targetKey = args.slotIndex === 1 ? 'slot1UnitId' : 'slot2UnitId';
-  targetSlots[targetKey] = landKey.length > 0 ? landKey : null;
-  if (
-    args.slotIndex === 2 &&
-    landKey.length > 0 &&
-    targetSlots.slot1UnitId &&
-    landTypeById.get(targetSlots.slot1UnitId) === 'armor'
-  ) {
-    return { success: false, reason: 'This naval unit already carries armor and has no second slot.' };
-  }
-
-  normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
+  const outcome = applySealiftSlotEdit({
+    edit: { navalUnitId: args.navalUnitId, slotIndex: args.slotIndex, landUnitId: landKey.length > 0 ? landKey : null },
+    cargo: {
+      carrierIds: navalIds,
+      carrierTypeById: new Map(baseState.navalRows.map((row) => [row.navalUnitId, row.carrierUnitType] as const)),
+      cargoByCarrierId: new Map(baseState.navalRows.map((row) => [row.navalUnitId, sealiftRowCargoIds(row)] as const)),
+      landTypeById,
+    },
+  });
+  if (!outcome.ok) return { success: false, reason: outcome.reason };
+  const cargoByCarrierId = outcome.cargoByCarrierId;
 
   let acc = clearHumanLandEmbarksAtHex(snap, args.h3Index);
-  const embarkOrders = embarkOrdersFromTacticalSlots(slotsByNavalId);
+  const embarkOrders = embarkOrdersFromTacticalCargo(cargoByCarrierId);
   for (const e of embarkOrders) {
     const checked = validateTacticalHumanEmbarkOrder(e, acc.subUnits, snap.enclosingStrategicH3Index);
     if (!checked.valid) {
@@ -176,12 +152,7 @@ export type TacticalSealiftSlotSessionResult =
  * Expected outcome: Active snapshot and `game_config` JSON updated; SQLite transport rows match the projected slots for parents at the hex.
  * Exceptions: Logs and returns failure when no tactical session is active or projection fails.
  */
-export function applyTacticalSealiftSlotChangeInSession(args: {
-  h3Index: string;
-  navalUnitId: string;
-  slotIndex: 1 | 2;
-  landUnitId: string | null;
-}): TacticalSealiftSlotSessionResult {
+export function applyTacticalSealiftSlotChangeInSession(args: SealiftSlotEdit): TacticalSealiftSlotSessionResult {
   tacticalLogMutate('applyTacticalSealiftSlotChangeInSession', {
     h3Index: args.h3Index,
     navalUnitId: args.navalUnitId,
@@ -193,13 +164,8 @@ export function applyTacticalSealiftSlotChangeInSession(args: {
   const projected = projectTacticalSealiftSlotChange(snap, args);
   if (!projected.success) return projected;
   if (isDbReady()) {
-    const embarkPairs = embarkOrdersFromTacticalSlots(
-      new Map(
-        projected.state.navalRows.map((row) => [
-          row.navalUnitId,
-          { slot1UnitId: row.slot1UnitId, slot2UnitId: row.slot2UnitId },
-        ])
-      )
+    const embarkPairs = embarkOrdersFromTacticalCargo(
+      new Map(projected.state.navalRows.map((row) => [row.navalUnitId, sealiftRowCargoIds(row)] as const))
     );
     syncStrategicSealiftFromTacticalHexEmbarkPairs({
       battle: projected.battle,

@@ -1,9 +1,9 @@
 /**
  * Airlift checks the ship embark path calls when the carrier is an air unit.
  *
- * Purpose: Boarding and fighting rules for one infantry unit on an air unit, without the port and coast checks a ship uses.
+ * Purpose: Boarding and fighting rules for infantry on an air unit, without the port and coast checks a ship uses.
  * When to use: `applyEmbarkOrdersForPlayer`, the stack slot editor, and combat filters.
- * Expected outcome: Infantry on the same hex can board an empty air unit. That infantry does not fight until it leaves.
+ * Expected outcome: Infantry on the same hex can board an air unit that has room. That infantry does not fight until it leaves.
  * Exceptions: None.
  */
 
@@ -34,7 +34,7 @@ export type AirliftEmbarkArgs = {
  *
  * Purpose: The air branch of embark. A ship does not call this.
  * When to use: Before inserting a row whose carrier is an air unit.
- * Expected outcome: True when both units share a hex and a player, the land unit is infantry, the carrier is air, and the air unit has room.
+ * Expected outcome: True when both units share a hex and a player, the land unit is infantry, the carrier is air, and the air unit has room under `carrierAcceptsLandUnit`.
  * Exceptions: None.
  */
 export function airliftEmbarkAllowed(args: AirliftEmbarkArgs): boolean {
@@ -46,7 +46,11 @@ export function airliftEmbarkAllowed(args: AirliftEmbarkArgs): boolean {
   if (args.landPlayer !== args.carrierPlayer) return false;
   if (args.landH3Index !== args.carrierH3Index) return false;
   if (args.carrierUnitType !== 'air') return false;
-  return carrierAcceptsLandUnit(args.carrierUnitType, args.landUnitType, args.embarkedLandUnitTypes);
+  return carrierAcceptsLandUnit({
+    carrierUnitType: args.carrierUnitType,
+    landUnitType: args.landUnitType,
+    aboardUnitTypes: args.embarkedLandUnitTypes,
+  });
 }
 
 /**

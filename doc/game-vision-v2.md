@@ -71,7 +71,7 @@ Per-side caps scale with match size (Small 12/8/8/6 infantry/armor/naval/air; De
 
 The global roster is validated when: the LLM reasons clearly about force allocation, production decisions feel meaningful, and games at this level alone produce interesting strategic tension for 15–30 turns.
 
-**Live scenario:** [`region_vs_region`](region-vs-region.md). Each side has a home. On the global map that home is a region, and the two homes may match. On a regional map each home is a different side group. A side is knocked out when other sides and Neutral together hold at least 90% of its home's original urban cells, on every map, when its home has no urban production left, or when it holds no city hex anywhere. Bombing does not lower that target. A home with no original urban cells falls back to every hex. Both home outlines are always visible.
+**Live scenario:** [`region_vs_region`](region-vs-region.md). Each side has a home. On the global map that home is a region, and the two homes may match. On a regional map each home is a different side group. A side is knocked out when other sides and Neutral together hold at least 80% of its home's original urban cells, on every map, when its home has no urban production left, or when it holds no city hex anywhere. Bombing does not lower that target. A home with no original urban cells falls back to every hex. Both home outlines are always visible.
 
 ### Tactical Level: Unit Multiplication
 

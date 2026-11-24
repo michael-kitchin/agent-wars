@@ -69,6 +69,7 @@ import type {
 } from '../shared/ipc/gameApiTypes';
 import type { HexNamingCaption } from '../shared/hexNamingCaption';
 import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
+import { sealiftPreloadApi } from './preloadSealiftApi';
 /**
  * Documents the module-scope binding `openRouterLogListener` (openRouterLogListener: ((payload: { line: string; isError?: boolean })).
 
@@ -781,46 +782,7 @@ applyBuildQueueTemplateToHexes: (payload: {
     h3Indexes: string[];
     keepBuilding: boolean;
   }): Promise<SetHexesKeepBuildingResult> => ipcRenderer.invoke(IPC_GAME.setHexesKeepBuilding, payload),
-    /**
-   * Documents the object literal property `getSealiftStackState` (getSealiftStackState: (payload: { h3Index: string }) => ipcRenderer.invoke('game:getSealiftStackState', payload)).
-
-   * Purpose: Supports maintainability by documenting why `getSealiftStackState` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-getSealiftStackState: (payload: { h3Index: string }) =>
-    ipcRenderer.invoke(IPC_GAME.getSealiftStackState, payload),
-    /**
-   * Documents the object literal property `getTacticalSealiftStackState` (getTacticalSealiftStackState: (payload: { h3Index: string }) => ipcRenderer.invoke('game:getTacticalSealiftStackState', payload)).
-
-   * Purpose: Exposes tactical sealift stack rows keyed by tactical sub-unit ids while a tactical battle is active.
-   * When to use: Stack callout sealift section during tactical planning when strategic sealift IPC is unavailable.
-   * Expected outcome: Same `SealiftStackState` envelope as `getSealiftStackState`, with sub-unit ids in slot fields.
-   * Exceptions: IPC errors propagate as promise rejections.
-   */
-getTacticalSealiftStackState: (payload: { h3Index: string }) =>
-    ipcRenderer.invoke(IPC_GAME.getTacticalSealiftStackState, payload),
-    /**
-   * Documents the object literal property `updateTacticalSealiftSlot` (updateTacticalSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) => ipcRenderer.invoke('game:updateTacticalSealiftSlot', payload)).
-
-   * Purpose: Commits one tactical sealift slot edit to the main-process snapshot and strategic transport rows.
-   * When to use: Stack callout sealift controls during tactical battles instead of `updateSealiftSlot`.
-   * Expected outcome: Promise resolves to success flag, optional `tacticalBattle` snapshot, and optional stack `state`.
-   * Exceptions: IPC errors propagate as promise rejections.
-   */
-updateTacticalSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) =>
-    ipcRenderer.invoke(IPC_GAME.updateTacticalSealiftSlot, payload),
-    /**
-   * Documents the object literal property `updateSealiftSlot` (updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) => ipcRenderer.invoke('game:updateSeali).
-
-   * Purpose: Supports maintainability by documenting why `updateSealiftSlot` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) =>
-    ipcRenderer.invoke(IPC_GAME.updateSealiftSlot, payload),
+  ...sealiftPreloadApi,
     /**
    * Documents the object literal property `cancelRequestAiOrders` (cancelRequestAiOrders: (): Promise<void> => ipcRenderer.invoke('game:cancelRequestAiOrders')).
 

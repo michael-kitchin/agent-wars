@@ -1,0 +1,93 @@
+/*
+ * Stack callout: the unit list, its Select and Transport widths, and the Transport tab's cargo slots.
+ * Loaded after overlayChrome.css, which holds the shared tab bar and the controls the callout shares with the build popup.
+ */
+.stack-callout {
+  position: fixed;
+  pointer-events: auto;
+  padding: 0.35rem 0.5rem;
+  /* Same widths as the build popup: a plain callout is exactly this wide; Select and Transport tabs raise only the cap. */
+  min-width: 200px;
+  width: fit-content;
+  max-width: 200px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12px;
+  z-index: 6500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.stack-callout.hidden { display: none; }
+/* Select and Transport tabs, like a build popup with Build and Hire tabs. The plain minimum still applies. */
+.stack-callout.stack-callout-wide { max-width: 280px; }
+/* A part of the tab that is not shown. Beats the action row's inline display. */
+.stack-callout [hidden] { display: none !important; }
+.stack-callout ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.stack-callout li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+}
+.stack-callout li:last-child { margin-bottom: 0; }
+.stack-callout .unit-label {
+  flex: 1 1 auto;
+  max-width: 180px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stack-sealift-section {
+  margin-top: 0.45rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--chrome-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.stack-sealift-title {
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--chrome-text);
+}
+.stack-sealift-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.stack-sealift-naval {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stack-sealift-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+.stack-sealift-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.stack-sealift-select {
+  min-width: 98px;
+  max-width: 120px;
+  font-size: 11px;
+  padding: 0.08rem 0.2rem;
+}

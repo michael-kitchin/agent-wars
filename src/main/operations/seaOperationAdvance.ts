@@ -7,23 +7,18 @@
  * Exceptions: None. The caller supplies the facts. This file does not read the database or the map.
  */
 
-import { compareCodeUnits } from '../../shared/codeUnitOrder';
-import type { Operation, OperationPhase } from '../../shared/operationTypes';
+import type { Operation } from '../../shared/operationTypes';
 import { logDebug } from '../logger';
-import { fillShip } from './liftRules';
-import { seaMusterReady } from './seaMusterRules';
-import { isCampaignLift } from '../../shared/operationPurpose';
+import { advanceSeaMuster } from './seaOperationMuster';
+import { cancelAll, continueOperation, elapsedTurns, ended } from './seaOperationStepHelpers';
 import {
   OPERATION_ASSAULT_TIMEOUT_TURNS,
-  OPERATION_MIN_GROUND_UNITS,
-  OPERATION_MUSTER_TIMEOUT_TURNS,
   OPERATION_TRANSIT_TIMEOUT_TURNS,
 } from './operationRules';
 
 import type {
   OperationAction,
   OperationFacts,
-  OperationOutcome,
   OperationStep,
 } from './operationStepTypes';
 export type {
@@ -70,18 +65,6 @@ interface RemainingForce {
    * Exceptions: None.
    */
   readonly releasedIds: readonly string[];
-}
-
-/**
- * How many turns the current phase has already lasted.
- *
- * Purpose: A timeout fires when this reaches the phase constant. The opening tick is zero.
- * When to use: Muster, transit, and assault.
- * Expected outcome: `turnNumber - phaseTurn`.
- * Exceptions: None.
- */
-function elapsedTurns(operation: Operation, facts: OperationFacts): number {
-  return facts.turnNumber - operation.phaseTurn;
 }
 
 /**
@@ -248,30 +231,6 @@ function dropUncarried(operation: Operation, facts: OperationFacts, force: Remai
 }
 
 /**
- * A cancel for each id, in the order given.
- *
- * Purpose: Giving up a muster clears the orders the operation had assigned.
- * When to use: When a muster abandons, and for units that do not board.
- * Expected outcome: One `cancelOrder` per id.
- * Exceptions: None.
- */
-function cancelAll(ids: readonly string[]): OperationAction[] {
-  return ids.map((unitId) => ({ kind: 'cancelOrder' as const, unitId }));
-}
-
-/**
- * An ended step with no stored operation.
- *
- * Purpose: The four end outcomes share one shape.
- * When to use: Abandon, loss, and completion.
- * Expected outcome: `next` is null.
- * Exceptions: None.
- */
-function ended(outcome: OperationOutcome, reason: string, actions: readonly OperationAction[], releasedIds: readonly string[]): OperationStep {
-  return { next: null, actions, releasedIds, outcome, reason };
-}
-
-/**
  * Lost only when a unit or ship that was not released is missing from the map.
  *
  * Purpose: A transit that the commander emptied is abandoned. One that lost a unit or a ship is lost.
@@ -285,173 +244,6 @@ function departureOutcome(operation: Operation, releasedIds: readonly string[], 
     .filter((id) => !released.has(id))
     .some((id) => !facts.unitHexById.has(id));
   return gone ? 'lost' : 'abandoned';
-}
-
-/**
- * Lost only when the side that emptied lost a member to the map.
- *
- * Purpose: A sunk ship or a destroyed force is a loss, while a muster the commander emptied is abandoned.
- * When to use: When a muster has no ground unit or no ship left.
- * Expected outcome: `lost` when the ground units are all gone and one of them, not released, is absent from `unitHexById`, or the same for the ships. Otherwise `abandoned`.
- * Exceptions: None.
- */
-function emptyMusterOutcome(args: {
-  readonly operation: Operation;
-  readonly facts: OperationFacts;
-  readonly unitIds: readonly string[];
-  readonly carrierIds: readonly string[];
-  readonly releasedIds: readonly string[];
-}): 'abandoned' | 'lost' {
-  const released = new Set(args.releasedIds);
-  const lostFrom = (ids: readonly string[]): boolean => ids.some((id) => !released.has(id) && !args.facts.unitHexById.has(id));
-  const groundLost = args.unitIds.length === 0 && lostFrom(args.operation.unitIds);
-  const shipsLost = args.carrierIds.length === 0 && lostFrom(args.operation.carrierIds);
-  return groundLost || shipsLost ? 'lost' : 'abandoned';
-}
-
-/**
- * The march or defend that brings a unit to the muster, or null when it already has it.
- *
- * Purpose: A unit standing on the port defends there. Any other unit marches there.
- * When to use: Muster, when the force is not yet ready to load.
- * Expected outcome: One action, or null when the stored order is already the one this would write.
- * Exceptions: None.
- */
-function gatherAction(unitId: string, musterH3: string, facts: OperationFacts): OperationAction | null {
-  const order = facts.storedOrderById.get(unitId);
-  if (facts.unitHexById.get(unitId) === musterH3) {
-    if (order?.type === 'defend' && order.h3Index === musterH3) return null;
-    return { kind: 'defend', unitId, atH3: musterH3 };
-  }
-  if (order?.type === 'march' && order.h3Index === musterH3) return null;
-  return { kind: 'march', unitId, toH3: musterH3 };
-}
-
-/**
- * Copies an operation with a new force and, when the phase changes, a new phase clock.
- *
- * Purpose: Callers spread one object instead of repeating every stored field.
- * When to use: When a phase continues or changes but the operation is not finished.
- * Expected outcome: A new operation. The input is not changed.
- * Exceptions: None.
- */
-function continueOperation(operation: Operation, patch: {
-  readonly unitIds: readonly string[];
-  readonly carrierIds: readonly string[];
-  readonly phase: OperationPhase;
-  readonly phaseTurn: number;
-  readonly landingH3?: string | null;
-  readonly musterH3?: string;
-}): Operation {
-  return {
-    ...operation,
-    unitIds: patch.unitIds,
-    carrierIds: patch.carrierIds,
-    phase: patch.phase,
-    phaseTurn: patch.phaseTurn,
-    landingH3: patch.landingH3 !== undefined ? patch.landingH3 : operation.landingH3,
-    musterH3: patch.musterH3 ?? operation.musterH3,
-  };
-}
-
-/**
- * Loads the units waiting at the port and sails the ships that took them.
- *
- * Purpose: Ready muster returns only these actions, not the gather marches.
- * When to use: When the muster is ready (the ships its troops need are at the port, or the timeout has come) and a landing exists.
- * Expected outcome: Cancel and embark for each loaded unit, a march for each loaded ship, and cancels for everyone else.
- * Exceptions: None.
- */
-function loadAndSail(args: {
-  readonly operation: Operation;
-  readonly facts: OperationFacts;
-  readonly unitIds: readonly string[];
-  readonly carrierIds: readonly string[];
-  readonly presentIds: readonly string[];
-  readonly shipsPresent: readonly string[];
-  readonly landing: string;
-}): OperationStep {
-  const { operation, facts, unitIds, carrierIds, presentIds, shipsPresent, landing } = args;
-  let waiting = [...presentIds];
-  const embarked = new Set<string>();
-  const loadedShips = new Set<string>();
-  const actions: OperationAction[] = [];
-  for (const shipId of [...shipsPresent].sort(compareCodeUnits)) {
-    if (waiting.length === 0) break;
-    const chosen = fillShip(waiting.map((id) => ({ id, unitType: facts.unitTypeById.get(id) ?? '' })));
-    if (chosen.length === 0) break;
-    for (const unitId of chosen) {
-      actions.push({ kind: 'cancelOrder', unitId });
-      actions.push({ kind: 'embark', unitId, carrierId: shipId });
-      embarked.add(unitId);
-    }
-    loadedShips.add(shipId);
-    const chosenIds = new Set(chosen);
-    waiting = waiting.filter((id) => !chosenIds.has(id));
-  }
-  for (const shipId of [...loadedShips].sort(compareCodeUnits)) {
-    actions.push({ kind: 'march', unitId: shipId, toH3: landing });
-  }
-  for (const shipId of carrierIds) {
-    if (!loadedShips.has(shipId)) actions.push({ kind: 'cancelOrder', unitId: shipId });
-  }
-  for (const unitId of unitIds) {
-    if (!embarked.has(unitId)) actions.push({ kind: 'cancelOrder', unitId });
-  }
-  const next = continueOperation(operation, {
-    unitIds: unitIds.filter((unitId) => embarked.has(unitId)),
-    carrierIds: carrierIds.filter((shipId) => loadedShips.has(shipId)),
-    phase: 'transit',
-    phaseTurn: facts.turnNumber,
-    landingH3: landing,
-  });
-  return { next, actions, releasedIds: [], outcome: 'running', reason: 'muster-loaded' };
-}
-
-/**
- * Advances a muster: gather, load, or give up.
- *
- * Purpose: The force marches to the port and boards when every troop and the ships those troops need are there, or at the timeout with the minimum troops and a ship. The minimum is `OPERATION_MIN_GROUND_UNITS`, or for a campaign lift its own `minGroundUnits`, counted as the troops the ships at the port can carry.
- * When to use: `operation.phase` is `muster`.
- * Expected outcome: `transit` when the force loads. `abandoned` when it cannot, or `lost` when it emptied because a unit or ship is gone from the map. Otherwise the same phase.
- * Exceptions: None. A null landing abandons without embarking.
- */
-function advanceMuster(operation: Operation, facts: OperationFacts, unitIds: readonly string[], carrierIds: readonly string[], releasedIds: readonly string[]): OperationStep {
-  const remaining = [...unitIds, ...carrierIds];
-  if (unitIds.length === 0 || carrierIds.length === 0) {
-    const outcome = emptyMusterOutcome({ operation, facts, unitIds, carrierIds, releasedIds });
-    return ended(outcome, 'muster-empty', cancelAll(remaining), releasedIds);
-  }
-  const presentIds = unitIds.filter((unitId) => facts.unitHexById.get(unitId) === operation.musterH3);
-  const shipsPresent = carrierIds.filter((shipId) => facts.unitHexById.get(shipId) === operation.musterH3);
-  const timedOut = elapsedTurns(operation, facts) >= OPERATION_MUSTER_TIMEOUT_TURNS;
-  const ready = seaMusterReady({
-    presentUnitTypes: presentIds.map((unitId) => facts.unitTypeById.get(unitId) ?? ''),
-    remainingUnitCount: unitIds.length,
-    shipsPresentCount: shipsPresent.length,
-    remainingShipCount: carrierIds.length,
-    timedOut,
-    minUnitsAtTimeout: operation.minGroundUnits ?? OPERATION_MIN_GROUND_UNITS,
-    campaignLift: isCampaignLift(operation),
-  });
-  if (timedOut && !ready) return ended('abandoned', 'muster-timeout', cancelAll(remaining), releasedIds);
-  if (ready) {
-    const landing = facts.chooseLanding(operation.musterH3);
-    if (landing === null) return ended('abandoned', 'muster-no-landing', cancelAll(remaining), releasedIds);
-    const loaded = loadAndSail({ operation, facts, unitIds, carrierIds, presentIds, shipsPresent, landing });
-    return { ...loaded, releasedIds };
-  }
-  const actions = remaining.flatMap((unitId) => {
-    const action = gatherAction(unitId, operation.musterH3, facts);
-    return action === null ? [] : [action];
-  });
-  return {
-    next: continueOperation(operation, { unitIds, carrierIds, phase: 'muster', phaseTurn: operation.phaseTurn }),
-    actions,
-    releasedIds,
-    outcome: 'running',
-    reason: 'muster-gather',
-  };
 }
 
 /**
@@ -698,7 +490,7 @@ export function advanceSeaOperation(operation: Operation, facts: OperationFacts)
   const force = remainingForce(operation, facts);
   const unitIds = dropUncarried(operation, facts, force);
   const step = operation.phase === 'muster'
-    ? advanceMuster(operation, facts, unitIds, force.carrierIds, force.releasedIds)
+    ? advanceSeaMuster({ operation, facts, unitIds, carrierIds: force.carrierIds, releasedIds: force.releasedIds })
     : operation.phase === 'transit'
       ? advanceTransit(operation, facts, unitIds, force.carrierIds, force.releasedIds)
       : operation.phase === 'assault'

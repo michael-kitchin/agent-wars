@@ -132,10 +132,20 @@ export const OPERATION_OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const;
  *
  * Purpose: A force that never gathers does not wait forever.
  * When to use: When elapsed turns, which are zero on the tick the phase began, reach this value.
- * Expected outcome: 10. Enough units already at the port continue. Fewer than the minimum abandon the operation.
+ * Expected outcome: 10. A raid sails when the ships at the port can carry at least `SEA_RAID_TIMEOUT_MIN_SHARE` of its remaining troops and at least `OPERATION_MIN_GROUND_UNITS`; a campaign lift needs its own minimum. Otherwise the operation is abandoned.
  * Exceptions: None.
  */
 export const OPERATION_MUSTER_TIMEOUT_TURNS = 10;
+
+/**
+ * Share of a raid's remaining troops the ships at the port must be able to carry when its muster times out.
+ *
+ * Purpose: A raid that sails with a fraction of its force is ground down on landing, so a short raid is called off instead.
+ * When to use: `seaMusterReady`, for a raid whose muster has reached `OPERATION_MUSTER_TIMEOUT_TURNS`. Campaign lifts use their own `minGroundUnits`.
+ * Expected outcome: 0.75. The raid sails when it can carry at least `ceil(0.75 × remaining troops)` and at least `OPERATION_MIN_GROUND_UNITS`.
+ * Exceptions: None.
+ */
+export const SEA_RAID_TIMEOUT_MIN_SHARE = 0.75;
 
 /**
  * Turns in `transit` before the ships turn back.

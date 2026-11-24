@@ -1,4 +1,5 @@
 import { isLandUnitType } from '../../shared/landUnitType';
+import { carrierAcceptsLandUnit, carrierFullReason } from '../../shared/carrierCargoRules';
 /**
  * Snapshot-based validation for opponent tactical orders (air, ferry, embark) using tactical geometry and strategic infrastructure DB rows.
  */
@@ -155,10 +156,12 @@ function validateTacticalEmbarkOrderForPlayer(args: {
     if (land.h3Index !== naval.h3Index) return tacticalInvalidResult('Embark requires co-located land and air units');
     if (land.embarkedOnSubUnitId === order.navalUnitId) return tacticalValidResult();
     if (land.embarkedOnSubUnitId) return tacticalInvalidResult('Land unit already embarked on a different carrier');
-    const aboard = subUnits.filter(
-      (unit) => unit.embarkedOnSubUnitId === order.navalUnitId && unit.unitType === 'infantry'
-    ).length;
-    if (aboard >= 1) return tacticalInvalidResult('An air unit has only one infantry slot.');
+    const aboardUnitTypes = subUnits
+      .filter((unit) => unit.embarkedOnSubUnitId === order.navalUnitId)
+      .map((unit) => unit.unitType);
+    if (!carrierAcceptsLandUnit({ carrierUnitType: 'air', landUnitType: land.unitType, aboardUnitTypes })) {
+      return tacticalInvalidResult(carrierFullReason('air'));
+    }
     tacticalLogQuery(`${logLabel} ok`, { unitId: order.unitId, carrier: 'air' });
     return tacticalValidResult();
   }
@@ -173,18 +176,11 @@ function validateTacticalEmbarkOrderForPlayer(args: {
   if (!canPlayerEmbarkFromTacticalHex(land.h3Index, player, enclosingStrategicH3Index)) {
     return tacticalInvalidResult('Embarkation requires a valid port or coastal stack');
   }
-  let existingArmor = false;
-  let existingInfantry = 0;
-  for (const u of subUnits) {
-    if (u.embarkedOnSubUnitId !== order.navalUnitId) continue;
-    if (u.unitType === 'armor') existingArmor = true;
-    if (u.unitType === 'infantry') existingInfantry += 1;
-  }
-  if (land.unitType === 'armor' && (existingArmor || existingInfantry > 0)) {
-    return tacticalInvalidResult('Naval unit cannot load armor when cargo is already embarked');
-  }
-  if (land.unitType === 'infantry' && (existingArmor || existingInfantry >= 2)) {
-    return tacticalInvalidResult('Naval infantry capacity exhausted');
+  const aboardUnitTypes = subUnits
+    .filter((unit) => unit.embarkedOnSubUnitId === order.navalUnitId)
+    .map((unit) => unit.unitType);
+  if (!carrierAcceptsLandUnit({ carrierUnitType: 'naval', landUnitType: land.unitType, aboardUnitTypes })) {
+    return tacticalInvalidResult(carrierFullReason('naval'));
   }
   tacticalLogQuery(`${logLabel} ok`, { unitId: order.unitId });
   return tacticalValidResult();
@@ -193,9 +189,9 @@ function validateTacticalEmbarkOrderForPlayer(args: {
 /**
  * Validates opponent embark orders against tactical sub-units after movement, mirroring sealift slot rules.
  *
- * Contract: Infantry/armor may board opponent naval in the same tactical cell when embark hex rules pass; capacity matches `applyEmbarkOrdersForPlayer`.
+ * Contract: Infantry/armor may board opponent naval in the same tactical cell when embark hex rules pass; capacity matches `carrierAcceptsLandUnit`.
  * When to use: Tactical AI flow before mutating `embarkedOnSubUnitId` on the tactical snapshot.
- * Expected outcome: Valid when co-located, types match, port rule passes, and carrier slots allow the cargo type.
+ * Expected outcome: Valid when co-located, types match, port rule passes, and the carrier's slots have room for the cargo.
  * Exceptions: None; unknown ids yield invalid with a reason string.
  */
 export function validateTacticalOpponentEmbarkOrder(

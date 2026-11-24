@@ -33,7 +33,7 @@ export interface AirDropOrder {
  *
  * Purpose: The air unit flies to the target and, when it survives, flies back. The infantry stays on the target.
  * When to use: The Ready result and a battle beat.
- * Expected outcome: `returnsToBase` is false when return fire destroyed the air unit. `infantryUnitId` is set only when the infantry landed.
+ * Expected outcome: `returnsToBase` is false when return fire destroyed the air unit. `infantryUnitIds` is set only when the infantry landed.
  * Exceptions: None.
  */
 export interface AirDropAnimationMove {
@@ -83,12 +83,32 @@ export interface AirDropAnimationMove {
    */
   readonly returnsToBase: boolean;
   /**
-   * The infantry that landed, when the drop survived.
+   * Every infantry unit that landed, when the drop survived.
    *
-   * Contract: Playback draws that unit from the airport to the target and leaves it there.
+   * Contract: Every infantry unit that landed, in id order. Playback draws each from the airport to the target and leaves it there.
    * When to use: A drop that was not shot down.
-   * Expected outcome: Absent when the air unit was destroyed. The infantry never reaches the target in that case.
+   * Expected outcome: Absent when the air unit was destroyed. No infantry reaches the target in that case.
    * Exceptions: None.
    */
-  readonly infantryUnitId?: string;
+  readonly infantryUnitIds?: readonly string[];
+}
+
+/**
+ * The air drop playback rows a Ready result carries.
+ *
+ * Purpose: Keeps the air drop field beside its row type so `ReadyResult` stays under the file-size limit.
+ * When to use: `ReadyResult` extends this interface.
+ * Expected outcome: `airDropMoves` is present only when a drop flew this turn.
+ * Exceptions: None.
+ */
+export interface AirDropPlaybackFields {
+  /**
+   * Air drops that flew this turn.
+   *
+   * Contract: Playback sends the air unit out and back, and the infantry one way, when the drop survived.
+   * When to use: After Ready. Absent when no drop flew.
+   * Expected outcome: Each row is one carrier. `infantryUnitIds` lists every infantry unit that landed, and is absent when the drop was shot down.
+   * Exceptions: None.
+   */
+  airDropMoves?: AirDropAnimationMove[];
 }

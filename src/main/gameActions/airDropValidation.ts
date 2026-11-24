@@ -3,7 +3,7 @@
  *
  * Purpose: Planning and resolution share one gate. An enemy on the hex does not close it.
  * When to use: Submit, the map hover, and `resolveAirDropPhase` before each order.
- * Expected outcome: Valid when the air unit is based, carries exactly one infantry unit, and the target is land within strike range.
+ * Expected outcome: Valid when the air unit is based, carries only infantry (at least one unit), and the target is land within strike range.
  * Exceptions: None. A closed database returns a reason.
  */
 
@@ -35,7 +35,7 @@ export type AirDropValidationResult = { valid: true } | { valid: false; reason: 
 /**
  * Checks one strategic air drop.
  *
- * Purpose: The air unit must be on an intact airport that is not a neutral border, with one infantry unit aboard.
+ * Purpose: The air unit must be on an intact airport that is not a neutral border, with infantry aboard.
  * When to use: Before storing a drop and again when the turn resolves.
  * Expected outcome: `{ valid: true }`, or one reason. A fortification, a friendly unit, and an enemy unit do not fail the order.
  * Exceptions: None.
@@ -69,8 +69,8 @@ export function validateAirDropOrder(
      WHERE uta.naval_unit_id = ?`,
     [unitId]
   );
-  if (cargo.length !== 1 || cargo[0]?.unitType !== 'infantry') {
-    return { valid: false, reason: 'Air drop needs exactly one infantry unit aboard.' };
+  if (cargo.length === 0 || cargo.some((unit) => unit.unitType !== 'infantry')) {
+    return { valid: false, reason: 'Air drop needs infantry aboard.' };
   }
   if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
   if (targetH3Index === unit.h3_index) return { valid: false, reason: 'Air drop cannot target the air unit\'s own hex.' };

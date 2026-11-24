@@ -15,6 +15,7 @@ import { isTalkStageEnabled } from '../commanderPoolRounds';
 import { sideAgreementsEnabled } from '../sideAgreementGate';
 import { missileRangeHexes } from '../../../shared/gameRules';
 import { AIR_STRIKE_RANGE_HEXES } from '../../../shared/tacticalRanges';
+import { AIRLIFT_INFANTRY_CAPACITY } from '../../../shared/carrierCargoRules';
 import { regionalWinPathsBullet } from '../scenarioGoals';
 import { buildStrategicDoctrineBlock } from './doctrineText';
 import type { CoachingGates } from './coachingGates';
@@ -162,7 +163,7 @@ export function buildStrategicToolsBlock(gates: CoachingGates): string {
     },
     {
       include: gates.hasAirUnits,
-      text: `Air units strike within ${AIR_STRIKE_RANGE_HEXES} hexes of their airport, carry one infantry unit between airports, and drop it within ${AIR_STRIKE_RANGE_HEXES} hexes.`,
+      text: `Air units strike within ${AIR_STRIKE_RANGE_HEXES} hexes of their airport, carry up to ${AIRLIFT_INFANTRY_CAPACITY} infantry units between airports, and drop them within ${AIR_STRIKE_RANGE_HEXES} hexes.`,
     },
     {
       include: gates.mercenariesAvailable === true,

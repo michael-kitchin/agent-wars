@@ -71,7 +71,7 @@ test('a miss lands the infantry and leaves the air unit on its cell', () => {
   assert.equal(infantry?.embarkedOnSubUnitId, null);
   assert.equal(air?.h3Index, 'origin');
   assert.equal(result.moves[0]?.returnsToBase, true);
-  assert.equal(result.moves[0]?.infantryUnitId, 'inf-1');
+  assert.deepEqual(result.moves[0]?.infantryUnitIds, ['inf-1']);
   assert.equal(result.removedUnits.length, 0);
 });
 
@@ -83,7 +83,7 @@ test('a fortified cell is refused, and missing cargo is still the cargo sentence
     ...fortified,
     subUnits: fortified.subUnits.filter((unit) => unit.id !== 'inf-1'),
   };
-  assert.equal(tacticalAirDropRefusal(empty, 'air-1', 'target'), 'Air drop needs exactly one infantry unit aboard.');
+  assert.equal(tacticalAirDropRefusal(empty, 'air-1', 'target'), 'Air drop needs infantry aboard.');
   assert.equal(
     tacticalAirDropTargetRefusal(empty, { player: 'human', h3Index: 'origin' }, 'target'),
     FORTIFIED_CELL_BLOCKED_HOVER
@@ -102,5 +102,64 @@ test('return fire removes the air unit and the infantry', () => {
   });
   assert.equal(result.subUnits.some((unit) => unit.id === 'air-1' || unit.id === 'inf-1'), false);
   assert.equal(result.moves[0]?.returnsToBase, false);
-  assert.equal(result.moves[0]?.infantryUnitId, undefined);
+  assert.equal(result.moves[0]?.infantryUnitIds, undefined);
+});
+
+/**
+ * The drop battle with a second infantry sub-unit aboard the air unit.
+ *
+ * Purpose: The two-infantry cases need cargo beyond the one-unit default.
+ * When to use: The landing and return-fire cases for two infantry.
+ * Expected outcome: `inf-2` is embarked on `air-1`. Capacity is not checked here.
+ * Exceptions: None.
+ */
+function battleWithTwoInfantry(enemyType: 'infantry' | 'armor'): TacticalBattleSnapshot {
+  const base = battle(enemyType);
+  const second: TacticalSubUnitSnapshot = {
+    id: 'inf-2',
+    parentUnitId: 'inf-2',
+    player: 'human',
+    unitType: 'infantry',
+    h3Index: 'origin',
+    displayName: 'Infantry',
+    embarkedOnSubUnitId: 'air-1',
+  };
+  return { ...base, subUnits: [...base.subUnits, second] };
+}
+
+test('a battle drop lands every infantry sub-unit aboard', () => {
+  const result = resolveTacticalAirDrops({
+    battle: battleWithTwoInfantry('infantry'),
+    orders: [{ unitId: 'air-1', targetH3Index: 'target' }],
+    strikeUnitIds: new Set(),
+    rollDie: () => 100,
+    onRoll: () => undefined,
+    originHitBonusAt: noOriginHitBonus,
+    techHitBonusAt: noTechHitBonus,
+  });
+  for (const id of ['inf-1', 'inf-2']) {
+    const unit = result.subUnits.find((row) => row.id === id);
+    assert.equal(unit?.h3Index, 'target');
+    assert.equal(unit?.embarkedOnSubUnitId, null);
+  }
+  assert.deepEqual(result.moves[0]?.infantryUnitIds, ['inf-1', 'inf-2']);
+});
+
+test('a shot-down battle drop loses every infantry sub-unit aboard', () => {
+  const result = resolveTacticalAirDrops({
+    battle: battleWithTwoInfantry('infantry'),
+    orders: [{ unitId: 'air-1', targetH3Index: 'target' }],
+    strikeUnitIds: new Set(),
+    rollDie: () => 1,
+    onRoll: () => undefined,
+    originHitBonusAt: noOriginHitBonus,
+    techHitBonusAt: noTechHitBonus,
+  });
+  assert.equal(result.subUnits.some((unit) => ['air-1', 'inf-1', 'inf-2'].includes(unit.id)), false);
+});
+
+test('a battle drop with no infantry aboard needs infantry aboard', () => {
+  const empty = battle('infantry');
+  const bare = { ...empty, subUnits: empty.subUnits.filter((unit) => unit.id !== 'inf-1') };
+  assert.equal(tacticalAirDropRefusal(bare, 'air-1', 'target'), 'Air drop needs infantry aboard.');
 });

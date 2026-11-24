@@ -258,16 +258,18 @@ test('updateTacticalSealiftSlot embarks then debarks and syncs strategic transpo
     const row0 = st0.navalRows[0]!;
     const navalUnitId = row0.navalUnitId;
     const landSubId = st0.landOptions[0]!.unitId;
-    if (row0.slot1UnitId === landSubId) {
-      assert.equal(updateTacticalSealiftSlot(stackHex, navalUnitId, 1, null).success, true);
-    } else if (row0.slot2UnitId === landSubId) {
-      assert.equal(updateTacticalSealiftSlot(stackHex, navalUnitId, 2, null).success, true);
+    const aboardSlot = row0.slots.findIndex((slot) => slot.unitId === landSubId) + 1;
+    if (aboardSlot > 0) {
+      assert.equal(
+        updateTacticalSealiftSlot({ h3Index: stackHex, navalUnitId, slotIndex: aboardSlot, landUnitId: null }).success,
+        true
+      );
     }
     const st1 = getTacticalSealiftStackStateForHex(stackHex);
     const row1 = st1.navalRows[0]!;
-    if (row1.slot1UnitId && row1.slot2UnitId) return;
-    const putSlot: 1 | 2 = row1.slot1UnitId ? 2 : 1;
-    const emb = updateTacticalSealiftSlot(stackHex, navalUnitId, putSlot, landSubId);
+    const emptySlot = row1.slots.findIndex((slot) => slot.unitId === null && slot.coveredByUnitId === null) + 1;
+    if (emptySlot === 0) return;
+    const emb = updateTacticalSealiftSlot({ h3Index: stackHex, navalUnitId, slotIndex: emptySlot, landUnitId: landSubId });
     assert.equal(emb.success, true, emb.reason);
     const landAfter = getActiveTacticalBattleSnapshot()!.subUnits.find((u) => u.id === landSubId);
     assert.equal(landAfter?.embarkedOnSubUnitId, navalUnitId);
@@ -279,7 +281,10 @@ test('updateTacticalSealiftSlot embarks then debarks and syncs strategic transpo
       );
       assert.ok(row?.navalUnitId);
     }
-    const deb = updateTacticalSealiftSlot(stackHex, navalUnitId, putSlot, null);
+    const placedSlot = getTacticalSealiftStackStateForHex(stackHex).navalRows[0]!.slots.findIndex(
+      (slot) => slot.unitId === landSubId
+    ) + 1;
+    const deb = updateTacticalSealiftSlot({ h3Index: stackHex, navalUnitId, slotIndex: placedSlot, landUnitId: null });
     assert.equal(deb.success, true, deb.reason);
     const landDeb = getActiveTacticalBattleSnapshot()!.subUnits.find((u) => u.id === landSubId);
     assert.ok(!landDeb?.embarkedOnSubUnitId);

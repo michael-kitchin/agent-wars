@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { NEUTRAL_OWNER_ID } from './seatIds';
-import { countCityHexesBySeat, DEFAULT_TURN_LIMIT, rankSeatsByCityHexes, victorySettingsForRequest } from './victoryRules';
+import { countCityHexesBySeat, DEFAULT_TURN_LIMIT, HOME_CONTROL_WIN_MIN_URBAN_SHARE, rankSeatsByCityHexes, victorySettingsForRequest } from './victoryRules';
 
 test('an omitted rule is Deathmatch and a city-hex rule keeps a listed limit', () => {
   assert.deepEqual(victorySettingsForRequest(undefined, 40), { rule: 'last_side_standing', turnLimit: null });
@@ -43,4 +43,8 @@ test('tied city hexes share first place', () => {
   assert.equal(places.get('human'), 1);
   assert.equal(places.get('opponent'), 1);
   assert.equal(places.get('opponent2'), 3);
+});
+
+test('the home-loss share is 80% on every map', () => {
+  assert.equal(HOME_CONTROL_WIN_MIN_URBAN_SHARE, 0.8);
 });

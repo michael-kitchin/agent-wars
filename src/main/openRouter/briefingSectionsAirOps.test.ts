@@ -131,7 +131,41 @@ function testFerryDestinationsHonorSnowRange(): void {
   assert.equal(ferryCount(true, ['snow']), snowHex);
 }
 
+/**
+ * Verifies the Aboard cell lists every infantry unit aboard.
+ *
+ * Purpose: An air unit carries two infantry, and the table must name both in id order.
+ * When to use: After edits to `infantryAboardLabel`.
+ * Expected outcome: Two ids in `compareCodeUnits` order joined with `, `.
+ * Exceptions: Propagates assertion errors.
+ */
+function testAboardCellListsEveryInfantryUnitAboard(): void {
+  const base = WATER_NO_PORT;
+  const md = buildAirOperationsBriefingBlock(
+    {
+      hexes: [{ h3Index: base, terrain: 'land', terrainKind: 'plains' }],
+      units: [
+        { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: base },
+        { id: 'opponent-inf-b', player: 'opponent', unitType: 'infantry', h3Index: base, embarkedOnCarrierUnitId: 'opponent-air-1' },
+        { id: 'opponent-inf-a', player: 'opponent', unitType: 'infantry', h3Index: base, embarkedOnCarrierUnitId: 'opponent-air-1' },
+      ],
+      phase: 'planning',
+      turnNumber: 1,
+      pendingOrders: [],
+      strategicControl: [{ h3Index: base, controllerPlayerId: 'opponent' }],
+      strategicInfrastructure: [{ h3Index: base, urbanHexCount: 0, airportCount: 1, seaportCount: 0 }],
+    } as GameStateSnapshot,
+    (h3) => h3,
+    'strategic'
+  );
+  const airRow = md.split('\n').find((line) => line.includes('opponent-air-1'));
+  assert.ok(airRow, 'air unit row must be present');
+  const cells = airRow.split('|').map((c) => c.trim()).filter((c) => c.length > 0);
+  assert.equal(cells[2], 'opponent-inf-a, opponent-inf-b');
+}
+
 function run(): void {
+  testAboardCellListsEveryInfantryUnitAboard();
   testStrikeableInfraCountsOnlyHumanControlled();
   testStrategicAirSectionOmitsWhenRosterEmpty();
   testFerryDestinationsHonorSnowRange();

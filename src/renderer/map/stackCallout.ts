@@ -42,6 +42,7 @@ import {
   resetStackCalloutNonSelectableUnitIds,
 } from './stackCalloutSelectionToggles';
 import { invalidateSealiftSectionRenders, renderSealiftSection } from './stackCalloutSealift';
+import { keepStackCalloutTab } from './stackCalloutTabs';
 
 
 /**
@@ -378,6 +379,7 @@ export function showStackCallout(
     listEl.appendChild(li);
   }
   applyStackCalloutSelectionButtonVisibility(calloutEl, currentStackCalloutNonSelectableUnitIds());
+  keepStackCalloutTab(calloutEl);
 
   calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;

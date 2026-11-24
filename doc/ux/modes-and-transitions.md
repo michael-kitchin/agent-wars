@@ -158,7 +158,7 @@ On the map, tactical play limits orders to the battle area and shows the battle 
 
 ## Open Questions
 
-- The knockout notice and the knocked-out dialog take their share wording from the map profile (`controlWinMinUrbanShare` in `src/renderer/gameplay/knockoutNotices.ts` and `knockoutDialog.ts`). A home that started with no original urban cells is judged by the every-hex rule on the engine side, but the text still says "90% of its home's cities". The spec does not say whether the wording should follow the engine's per-home fallback.
+- The knockout notice and the knocked-out dialog take their share wording from the map profile (`controlWinMinUrbanShare` in `src/renderer/gameplay/knockoutNotices.ts` and `knockoutDialog.ts`). A home that started with no original urban cells is judged by the every-hex rule on the engine side, but the text still says "80% of its home's cities". The spec does not say whether the wording should follow the engine's per-home fallback.
 
 ## Code Entry Points
 

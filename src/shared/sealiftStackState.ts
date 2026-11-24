@@ -1,4 +1,4 @@
-import type { SealiftStackState } from './ipc/sealiftTypes';
+import type { SealiftNavalRow, SealiftStackState } from './ipc/sealiftTypes';
 
 /**
  * Builds an empty / unsupported sealift stack state for invalid or inactive contexts.
@@ -19,4 +19,16 @@ export function emptySealiftStackState(h3Index: string = ''): SealiftStackState 
     navalRows: [],
     landOptions: [],
   };
+}
+
+/**
+ * Lists the land units a carrier row holds.
+ *
+ * Purpose: Callers that need cargo ids, not slot shapes, read them from one place.
+ * When to use: Building embark pairs, slot edits, and the list of ids already aboard.
+ * Expected outcome: The non-null `unitId` of each slot, in slot order. Covered slots add nothing.
+ * Exceptions: None.
+ */
+export function sealiftRowCargoIds(row: SealiftNavalRow): string[] {
+  return row.slots.flatMap((slot) => (slot.unitId === null ? [] : [slot.unitId]));
 }

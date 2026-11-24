@@ -12,7 +12,7 @@
  *
  * Purpose: Callers branch on the method without stringly typed checks.
  * When to use: Stored operations and candidate rows.
- * Expected outcome: `sea` for a landing by ship, or `air` for one infantry unit dropped from an air unit.
+ * Expected outcome: `sea` for a landing by ship, or `air` for up to `AIRLIFT_INFANTRY_CAPACITY` infantry units dropped from one air unit.
  * Exceptions: None.
  */
 export type OperationMethod = 'sea' | 'air';
@@ -293,7 +293,7 @@ export interface OperationCandidate {
   /**
    * Ground units the row describes.
    *
-   * Contract: Sea ids are the units a launch would embark, at least two. Air is the one infantry. Land ids are the campaign ground units, and a land launch does not assign them.
+   * Contract: Sea ids are the units a launch would embark, at least two. Air is the infantry it carries. Land ids are the campaign ground units, and a land launch does not assign them.
    * When to use: A sea or air stored operation's `unitIds`. The land briefing does not print this list.
    * Expected outcome: Infantry and armor ids.
    * Exceptions: None.

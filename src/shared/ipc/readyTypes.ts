@@ -1,5 +1,5 @@
 import type { AirStrikeAnimationMove, FerryAnimationMove } from './ordersTypes';
-import type { AirDropAnimationMove } from './airDropTypes';
+import type { AirDropPlaybackFields } from './airDropTypes';
 import type { FortificationReport } from './fortificationTypes';
 import type { MissileLaunchRecord } from './missileTypes';
 import type { SightCueBeam } from './sightCueTypes';
@@ -204,7 +204,7 @@ destroyedAirUnitsCount: number;
  *   dice rolls from `CombatDicePlaybackFields`.
  * Exceptions: None.
  */
-export interface ReadyResult extends CombatDicePlaybackFields {
+export interface ReadyResult extends CombatDicePlaybackFields, AirDropPlaybackFields {
     /**
    * Specifies the contract for the `success` member (success: boolean;).
 
@@ -448,15 +448,6 @@ airStrikeRemovedUnits?: RemovedUnitSnapshot[];
    * Exceptions: None.
    */
 airStrikeMoves?: AirStrikeAnimationMove[];
-  /**
-   * Air drops that flew this turn.
-   *
-   * Contract: Playback sends the air unit out and back, and the infantry one way, when the drop survived.
-   * When to use: After Ready. Absent when no drop flew.
-   * Expected outcome: Each row is one carrier. `infantryUnitId` is set only when the infantry landed.
-   * Exceptions: None.
-   */
-  airDropMoves?: AirDropAnimationMove[];
     /**
    * Specifies the contract for the `airStrikeAttemptCount` member (airStrikeAttemptCount?: number;).
 

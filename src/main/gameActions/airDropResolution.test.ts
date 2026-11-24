@@ -86,7 +86,7 @@ test('infantry lands on an enemy hex and on an empty hex, and the air unit stays
     });
     const landed = resolveAirDropPhase([{ unitId: 'air-1', targetH3Index: target }], () => 100);
     assert.equal(landed.moves[0]?.returnsToBase, true);
-    assert.equal(landed.moves[0]?.infantryUnitId, 'inf-1');
+    assert.deepEqual(landed.moves[0]?.infantryUnitIds, ['inf-1']);
     assert.equal(dbGetOne<{ h3Index: string }>('SELECT h3_index AS h3Index FROM units WHERE id = ?', ['air-1'])?.h3Index, origin);
     assert.equal(dbGetOne<{ h3Index: string }>('SELECT h3_index AS h3Index FROM units WHERE id = ?', ['inf-1'])?.h3Index, target);
     const roster = listUnitsForSnapshot().filter((unit) => !landed.removedUnitIds.includes(unit.id));
@@ -118,7 +118,7 @@ test('return fire removes the air unit and the infantry, and the infantry never 
     });
     const shot = resolveAirDropPhase([{ unitId: 'air-1', targetH3Index: target }], () => 1);
     assert.equal(shot.moves[0]?.returnsToBase, false);
-    assert.equal(shot.moves[0]?.infantryUnitId, undefined);
+    assert.equal(shot.moves[0]?.infantryUnitIds, undefined);
     assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['air-1']) == null, true);
     assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['inf-1']) == null, true);
     assert.equal(shot.diceRolls[0]?.kind, 'antiAir');
@@ -198,5 +198,62 @@ test('a version 26 database without the drop table still opens, and the ensure c
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pending_air_drop_orders'"
     ).get() as { name: string } | undefined;
     assert.equal(row?.name, 'pending_air_drop_orders');
+  });
+});
+
+/**
+ * Adds a second infantry unit aboard the carrier from `placeCarrier`.
+ *
+ * Purpose: The two-infantry cases need cargo beyond the carrier's one-unit default.
+ * When to use: After `placeCarrier`, inside a temporary match.
+ * Expected outcome: `inf-2` is on `origin` with an assignment row. Capacity is not checked here.
+ * Exceptions: Propagates an insert error.
+ */
+function placeSecondInfantry(origin: string): void {
+  insertUnitRow(dbRun, {
+    id: 'inf-2',
+    player: HUMAN_SEAT_ID,
+    unitType: 'infantry',
+    displayOrder: 4,
+    h3Index: origin,
+    origin: null,
+    formedTurn: 1,
+  });
+  dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['inf-2', 'air-1']);
+}
+
+test('a drop lands every infantry unit aboard', () => {
+  withTempGameDb('aw-air-drop-both-', () => {
+    const { origin, target } = airportAndLandTarget();
+    placeCarrier(origin);
+    placeSecondInfantry(origin);
+    const landed = resolveAirDropPhase([{ unitId: 'air-1', targetH3Index: target }], () => 100);
+    assert.deepEqual(landed.moves[0]?.infantryUnitIds, ['inf-1', 'inf-2']);
+    for (const id of ['inf-1', 'inf-2']) {
+      assert.equal(dbGetOne<{ h3Index: string }>('SELECT h3_index AS h3Index FROM units WHERE id = ?', [id])?.h3Index, target);
+      assert.equal(dbGetOne('SELECT land_unit_id FROM unit_transport_assignments WHERE land_unit_id = ?', [id]) == null, true);
+    }
+  });
+});
+
+test('a shot-down drop loses every infantry unit aboard', () => {
+  withTempGameDb('aw-air-drop-shot-both-', () => {
+    const { origin, target } = airportAndLandTarget();
+    placeCarrier(origin);
+    placeSecondInfantry(origin);
+    insertUnitRow(dbRun, {
+      id: 'enemy-1',
+      player: 'opponent',
+      unitType: 'armor',
+      displayOrder: 3,
+      h3Index: target,
+      origin: null,
+      formedTurn: 1,
+    });
+    const shot = resolveAirDropPhase([{ unitId: 'air-1', targetH3Index: target }], () => 1);
+    assert.equal(shot.moves[0]?.returnsToBase, false);
+    assert.ok(shot.removedUnitIds.includes('inf-1') && shot.removedUnitIds.includes('inf-2'));
+    assert.equal(shot.carrierIdByCargoId.get('inf-1'), 'air-1');
+    assert.equal(shot.carrierIdByCargoId.get('inf-2'), 'air-1');
   });
 });

@@ -14,6 +14,8 @@ import {
   stackCalloutCloseTooltipText,
   stackRemoveAllTooltipText,
   stackSelectAllTooltipText,
+  stackSelectTabTooltipText,
+  stackTransportTabTooltipText,
   stackUnitToggleSelectedTooltipText,
   stackUnitToggleTooltipText,
   stackUnitToggleUnselectedTooltipText,
@@ -25,6 +27,8 @@ test('each popup control tip is its sentence', () => {
   assert.equal(multiHexQueueRemoveTooltipText, 'Remove this row on every selected hex.');
   assert.equal(buildTabTooltipText, 'Show the build queue for this hex.');
   assert.equal(hireTabTooltipText, 'Show hiring for this hex.');
+  assert.equal(stackSelectTabTooltipText, 'Show the units in this hex to select.');
+  assert.equal(stackTransportTabTooltipText, 'Load and unload ships and air units in this hex.');
   assert.equal(stackCalloutCloseTooltipText, 'Close this list.');
   assert.equal(
     stackUnitToggleUnselectedTooltipText,

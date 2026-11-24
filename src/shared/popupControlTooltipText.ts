@@ -58,6 +58,26 @@ export const buildTabTooltipText = 'Show the build queue for this hex.';
 export const hireTabTooltipText = 'Show hiring for this hex.';
 
 /**
+ * Tip for the stack callout's Select tab.
+ *
+ * Purpose: The tab shows the unit list and its selection controls, and hides the cargo slots.
+ * When to use: The Select tab button.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const stackSelectTabTooltipText = 'Show the units in this hex to select.';
+
+/**
+ * Tip for the stack callout's Transport tab.
+ *
+ * Purpose: The tab shows the ship and air unit cargo slots, and hides the unit list.
+ * When to use: The Transport tab button.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const stackTransportTabTooltipText = 'Load and unload ships and air units in this hex.';
+
+/**
  * Tip for closing the stack callout.
  *
  * Purpose: The close control dismisses the unit list.

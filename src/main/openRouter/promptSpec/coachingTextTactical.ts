@@ -8,6 +8,7 @@
  */
 
 import { logTrace } from '../../logger';
+import { AIRLIFT_INFANTRY_CAPACITY } from '../../../shared/carrierCargoRules';
 import type { CoachingGates } from './coachingGates';
 import { buildDoctrineBlock } from './doctrineText';
 import { buildStrategyBlock } from './coachingTextStrategic';
@@ -140,7 +141,7 @@ const REACH_BULLET =
  * Exceptions: None.
  */
 const AIR_STRIKE_BULLET =
-  '- An air sub-unit may strike or drop anywhere in the footprint, or ferry one hop to an intact airport cell. It carries one infantry sub-unit. A drop onto a cell fortified by the other side is illegal. It cannot strike and drop, or drop and ferry, in the same beat.';
+  `- An air sub-unit may strike or drop anywhere in the footprint, or ferry one hop to an intact airport cell. It carries up to ${AIRLIFT_INFANTRY_CAPACITY} infantry sub-units, and a drop lands all of them. A drop onto a cell fortified by the other side is illegal. It cannot strike and drop, or drop and ferry, in the same beat.`;
 
 /**
  * Sealift still works inside the footprint.

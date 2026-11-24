@@ -72,7 +72,7 @@ const EMPTY_TURN_ORDERS: OperationTurnOrderSet = {
  * Builds the ferry or drop for one air operation that is in transit.
  *
  * Purpose: The air unit ferries until it is based at the launch airport, then drops. It does not do both on the same turn.
- * When to use: Once per transit operation whose carrier and infantry are both present.
+ * When to use: Once per transit operation whose carrier is present and whose infantry is all aboard.
  * Expected outcome: One ferry, one drop, or nothing when the launch airport was not stored.
  * Exceptions: None.
  */
@@ -102,7 +102,7 @@ function isDrop(order: FerryOrder | AirDropOrder): order is AirDropOrder {
  *
  * Purpose: Ready adds these whether or not the commander was consulted.
  * When to use: Pass the snapshot whose units include the seat's air units and their cargo.
- * Expected outcome: Orders for transit operations whose infantry is aboard, and the carrier of every air operation. Empty lists when a read throws.
+ * Expected outcome: Orders for transit operations whose infantry is all aboard, and the carrier of every air operation. Empty lists when a read throws.
  * Exceptions: None. A thrown error is logged.
  */
 export function operationTurnOrders(seatId: string, state: GameStateSnapshot): OperationTurnOrderSet {
@@ -117,10 +117,9 @@ export function operationTurnOrders(seatId: string, state: GameStateSnapshot): O
       if (carrierId !== undefined) carrierIds.add(carrierId);
       if (operation.phase !== 'transit' || carrierId === undefined) continue;
       const carrier = byId.get(carrierId);
-      const infantryId = operation.unitIds[0];
-      const infantry = infantryId === undefined ? undefined : byId.get(infantryId);
-      if (carrier === undefined || infantry === undefined) continue;
-      if (infantry.embarkedOnCarrierUnitId !== carrierId) continue;
+      const cargo = operation.unitIds.map((id) => byId.get(id)).filter((unit) => unit !== undefined);
+      if (carrier === undefined || cargo.length === 0) continue;
+      if (cargo.some((unit) => unit.embarkedOnCarrierUnitId !== carrierId)) continue;
       const order = transitOrder(operation, carrier.h3Index);
       if (order === null) continue;
       if (isDrop(order)) airDropOrders.push(order);

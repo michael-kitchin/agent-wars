@@ -278,7 +278,7 @@ test('option copy names an air drop when air is present and tells the model to p
   for (const text of [strategic, tactical]) {
     assert.match(text, /airDrops/);
     assert.match(text, /picks only one of air strike, air drop, and ferry/);
-    assert.match(text, /When its Aboard column is none/);
+    assert.match(text, /When its Aboard column lists fewer than 2 infantry/);
   }
   assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airDrops/);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airDrops/);

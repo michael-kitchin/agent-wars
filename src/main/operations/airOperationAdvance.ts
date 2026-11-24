@@ -1,7 +1,7 @@
 /**
  * Decides the next phase, the orders, and the end of one air operation.
  *
- * Purpose: One pure step so the turn hook can apply orders without re-deciding them.
+ * Purpose: One pure step so the turn hook can apply orders without re-deciding them. An operation names up to `AIRLIFT_INFANTRY_CAPACITY` infantry units, and every rule treats the listed units together.
  * When to use: Once per stored air operation each planning turn, and once on the tick an air operation is launched.
  * Expected outcome: The next stored operation, or null when it ended, plus the actions to apply in order. An end defends the air unit when it still exists.
  * Exceptions: None. The caller supplies the facts. This file does not read the database or the map.
@@ -15,6 +15,71 @@ import {
   OPERATION_MUSTER_TIMEOUT_TURNS,
 } from './operationRules';
 import type { OperationAction, OperationFacts, OperationOutcome, OperationStep } from './seaOperationAdvance';
+
+/**
+ * What a phase rule reads about one air operation.
+ *
+ * Purpose: One parameter object for the phase rules so each stays within the argument limit.
+ * When to use: `advanceAirOperation`, after the carrier is known to exist.
+ * Expected outcome: The stored operation, this tick's facts, the carrier and its hex, the infantry still on the map, and the phase clock.
+ * Exceptions: None.
+ */
+interface AirPhaseInput {
+  /**
+   * The stored operation.
+   *
+   * Contract: Not changed by any rule.
+   * When to use: Reading the muster hex, the objective, and the launch turn.
+   * Expected outcome: The operation passed to `advanceAirOperation`.
+   * Exceptions: None.
+   */
+  readonly operation: Operation;
+  /**
+   * The facts for this tick.
+   *
+   * Contract: Positions, stored orders, and cargo links as of the planning turn.
+   * When to use: Locating the infantry and the carrier.
+   * Expected outcome: Read only.
+   * Exceptions: None.
+   */
+  readonly facts: OperationFacts;
+  /**
+   * The air unit that carries the infantry.
+   *
+   * Contract: An id present in `facts.unitHexById`.
+   * When to use: Every rule that writes an order for the carrier.
+   * Expected outcome: The first id in `operation.carrierIds`.
+   * Exceptions: None.
+   */
+  readonly carrierId: string;
+  /**
+   * The hex the air unit occupies.
+   *
+   * Contract: The hex `facts.unitHexById` gives for `carrierId`.
+   * When to use: Unloading and the muster check.
+   * Expected outcome: A hex id.
+   * Exceptions: None.
+   */
+  readonly carrierHex: string;
+  /**
+   * Infantry still on the map, in stored order.
+   *
+   * Contract: Ids of `operation.unitIds` that appear in `facts.unitHexById`.
+   * When to use: Every phase rule.
+   * Expected outcome: Possibly empty; an empty list ends the operation.
+   * Exceptions: None.
+   */
+  readonly live: readonly string[];
+  /**
+   * Turns the current phase has lasted.
+   *
+   * Contract: `turnNumber - phaseTurn`.
+   * When to use: Timeouts.
+   * Expected outcome: Zero on the opening tick.
+   * Exceptions: None.
+   */
+  readonly elapsed: number;
+}
 
 /**
  * Ends the operation and defends the air unit on its current hex when that unit still exists.
@@ -40,11 +105,11 @@ function endAirOperation(args: {
 }
 
 /**
- * Keeps the operation, changing phase when the caller names a new one.
+ * Keeps the operation, changing phase or the infantry list when the caller names a new one.
  *
- * Purpose: A phase change records the turn it began. Staying in the phase keeps `phaseTurn`.
+ * Purpose: A phase change records the turn it began. Staying in the phase keeps `phaseTurn`. A shorter infantry list is stored when units left.
  * When to use: Muster, transit, and assault rules that do not end the operation.
- * Expected outcome: `outcome` is `running`. `phaseTurn` is the current turn only when `phase` differs.
+ * Expected outcome: `outcome` is `running`. `next` is the stored operation itself when the phase and the infantry list are unchanged. `phaseTurn` is the current turn only when `phase` differs.
  * Exceptions: None.
  */
 function keepAirOperation(args: {
@@ -53,12 +118,22 @@ function keepAirOperation(args: {
   readonly actions: readonly OperationAction[];
   readonly reason: string;
   readonly phase?: OperationPhase;
+  readonly unitIds?: readonly string[];
+  readonly releasedIds?: readonly string[];
 }): OperationStep {
   const phase = args.phase ?? args.operation.phase;
-  const next = phase === args.operation.phase
+  const unitIds = args.unitIds ?? args.operation.unitIds;
+  const sameList = unitIds.length === args.operation.unitIds.length
+    && unitIds.every((id, index) => id === args.operation.unitIds[index]);
+  const next = phase === args.operation.phase && sameList
     ? args.operation
-    : { ...args.operation, phase, phaseTurn: args.facts.turnNumber };
-  return { next, actions: args.actions, releasedIds: [], outcome: 'running', reason: args.reason };
+    : {
+      ...args.operation,
+      unitIds,
+      phase,
+      phaseTurn: phase === args.operation.phase ? args.operation.phaseTurn : args.facts.turnNumber,
+    };
+  return { next, actions: args.actions, releasedIds: args.releasedIds ?? [], outcome: 'running', reason: args.reason };
 }
 
 /**
@@ -90,7 +165,7 @@ function aboard(facts: OperationFacts, infantryId: string, carrierId: string): b
  * Takes the infantry off the operation without leaving it aboard.
  *
  * Purpose: A cancel and a failed muster must not finish with the infantry still assigned to the air unit.
- * When to use: When the infantry still exists.
+ * When to use: When the infantry still exists. Called once per infantry unit.
  * Expected outcome: An unload and a defend on the carrier hex when aboard. Otherwise a cancel of the infantry's order.
  * Exceptions: None.
  */
@@ -106,6 +181,18 @@ function detachInfantry(facts: OperationFacts, infantryId: string, carrierId: st
 }
 
 /**
+ * The infantry of an operation that is still on the map.
+ *
+ * Purpose: A unit missing from the map has been lost or removed, and no rule orders it.
+ * When to use: The start of every phase rule and of cancel.
+ * Expected outcome: Ids of `operation.unitIds` found in `facts.unitHexById`, in stored order.
+ * Exceptions: None.
+ */
+function liveInfantry(operation: Operation, facts: OperationFacts): string[] {
+  return operation.unitIds.filter((id) => facts.unitHexById.has(id));
+}
+
+/**
  * Advances one air operation by one planning turn.
  *
  * Purpose: Muster walks the infantry to the airport, transit ferries and drops by turn order, and assault waits for control.
@@ -114,147 +201,147 @@ function detachInfantry(facts: OperationFacts, infantryId: string, carrierId: st
  * Exceptions: None.
  */
 export function advanceAirOperation(operation: Operation, facts: OperationFacts): OperationStep {
-  const infantryId = operation.unitIds[0];
   const carrierId = operation.carrierIds[0];
   const carrierHex = carrierId === undefined ? undefined : facts.unitHexById.get(carrierId);
-  const infantryHex = infantryId === undefined ? undefined : facts.unitHexById.get(infantryId);
+  const live = liveInfantry(operation, facts);
   const elapsed = facts.turnNumber - operation.phaseTurn;
   logDebug('airOperationAdvance advanceAirOperation', {
     id: operation.id,
     phase: operation.phase,
     elapsed,
     carrierHex: carrierHex ?? null,
-    infantryHex: infantryHex ?? null,
+    liveInfantryCount: live.length,
   });
-  if (carrierHex === undefined) {
-    const actions = operation.phase === 'muster' && infantryHex !== undefined && infantryId !== undefined
-      ? [{ kind: 'cancelOrder' as const, unitId: infantryId }]
+  if (carrierId === undefined || carrierHex === undefined) {
+    const actions = operation.phase === 'muster'
+      ? live.map((unitId) => ({ kind: 'cancelOrder' as const, unitId }))
       : [];
     return endAirOperation({ outcome: 'lost', reason: 'carrier-missing', actions, carrierId: undefined, facts });
   }
-  if (operation.phase === 'muster') return advanceMuster({ operation, facts, infantryId, carrierId, carrierHex, infantryHex, elapsed });
-  if (operation.phase === 'transit') return advanceTransit({ operation, facts, infantryId, carrierId, carrierHex, infantryHex, elapsed });
-  if (operation.phase === 'assault') return advanceAssault({ operation, facts, infantryId, carrierId, infantryHex, elapsed });
+  const input: AirPhaseInput = { operation, facts, carrierId, carrierHex, live, elapsed };
+  if (operation.phase === 'muster') return advanceMuster(input);
+  if (operation.phase === 'transit') return advanceTransit(input);
+  if (operation.phase === 'assault') return advanceAssault(input);
   return { next: operation, actions: [], releasedIds: [], outcome: 'running', reason: 'already-returning' };
 }
 
 /**
- * Walks the infantry to the airport and loads it once both are there.
+ * Walks the infantry to the airport and loads it once every remaining unit is there.
  *
- * Purpose: The air unit holds fire while the infantry marches. A foreign order or a missing unit ends the operation. The launch tick replaces the infantry's earlier order.
+ * Purpose: The air unit holds fire while the infantry marches. A unit given its own order is released, and the others go on. A missing unit is dropped from the list. The launch tick replaces each unit's earlier order.
  * When to use: The `muster` phase only.
- * Expected outcome: A march, or an embark into `transit`, or an end that defends the air unit.
+ * Expected outcome: A march for each unit not yet at the airport, or an embark of every remaining unit into `transit`, or an end that defends the air unit.
  * Exceptions: None.
  */
-function advanceMuster(args: {
-  readonly operation: Operation;
-  readonly facts: OperationFacts;
-  readonly infantryId: string | undefined;
-  readonly carrierId: string;
-  readonly carrierHex: string;
-  readonly infantryHex: string | undefined;
-  readonly elapsed: number;
-}): OperationStep {
-  const { operation, facts, infantryId, carrierId, carrierHex, infantryHex, elapsed } = args;
-  if (infantryHex === undefined || infantryId === undefined) {
+function advanceMuster(input: AirPhaseInput): OperationStep {
+  const { operation, facts, carrierId, carrierHex, live, elapsed } = input;
+  if (live.length === 0) {
     return endAirOperation({ outcome: 'abandoned', reason: 'infantry-missing', actions: [], carrierId, facts });
   }
   if (carrierHex !== operation.musterH3) {
     return endAirOperation({
       outcome: 'abandoned',
       reason: 'carrier-left',
-      actions: detachInfantry(facts, infantryId, carrierId),
+      actions: live.flatMap((unitId) => detachInfantry(facts, unitId, carrierId)),
       carrierId,
       facts,
     });
   }
-  const stored = facts.storedOrderById.get(infantryId);
-  const onMuster = stored !== undefined
-    && (stored.type === 'march' || stored.type === 'defend')
-    && stored.h3Index === operation.musterH3;
   const launchTick = operation.launchedTurn === facts.turnNumber;
-  if (!launchTick && stored !== undefined && !onMuster) {
-    return endAirOperation({
-      outcome: 'abandoned',
-      reason: 'infantry-order',
-      actions: [],
-      releasedIds: [infantryId],
-      carrierId,
-      facts,
-    });
+  const givenOwnOrder = (unitId: string): boolean => {
+    const stored = facts.storedOrderById.get(unitId);
+    const onMuster = stored !== undefined
+      && (stored.type === 'march' || stored.type === 'defend')
+      && stored.h3Index === operation.musterH3;
+    return !launchTick && stored !== undefined && !onMuster;
+  };
+  const released = live.filter(givenOwnOrder);
+  const kept = live.filter((unitId) => !givenOwnOrder(unitId));
+  if (kept.length === 0) {
+    return endAirOperation({ outcome: 'abandoned', reason: 'infantry-order', actions: [], releasedIds: released, carrierId, facts });
   }
   if (elapsed >= OPERATION_MUSTER_TIMEOUT_TURNS) {
     return endAirOperation({
       outcome: 'abandoned',
       reason: 'muster-timeout',
-      actions: detachInfantry(facts, infantryId, carrierId),
+      actions: kept.flatMap((unitId) => detachInfantry(facts, unitId, carrierId)),
+      releasedIds: released,
       carrierId,
       facts,
     });
   }
-  if (infantryHex === operation.musterH3) {
+  if (kept.every((unitId) => facts.unitHexById.get(unitId) === operation.musterH3)) {
     return keepAirOperation({
       operation,
       facts,
       reason: 'loaded',
       phase: 'transit',
+      unitIds: kept,
+      releasedIds: released,
       actions: [
         ...holdUnless(facts, carrierId),
-        { kind: 'cancelOrder', unitId: infantryId },
-        { kind: 'embark', unitId: infantryId, carrierId },
+        ...kept.flatMap((unitId) => [
+          { kind: 'cancelOrder' as const, unitId },
+          { kind: 'embark' as const, unitId, carrierId },
+        ]),
       ],
     });
   }
-  const marching = stored?.type === 'march' && stored.h3Index === operation.musterH3;
+  const marches = kept
+    .filter((unitId) => facts.unitHexById.get(unitId) !== operation.musterH3)
+    .filter((unitId) => {
+      const stored = facts.storedOrderById.get(unitId);
+      return !(stored?.type === 'march' && stored.h3Index === operation.musterH3);
+    })
+    .map((unitId) => ({ kind: 'march' as const, unitId, toH3: operation.musterH3 }));
   return keepAirOperation({
     operation,
     facts,
     reason: 'mustering',
-    actions: [
-      ...holdUnless(facts, carrierId),
-      ...(marching ? [] : [{ kind: 'march' as const, unitId: infantryId, toH3: operation.musterH3 }]),
-    ],
+    unitIds: kept,
+    releasedIds: released,
+    actions: [...holdUnless(facts, carrierId), ...marches],
   });
 }
 
 /**
  * Waits while the infantry is aboard, then starts the assault or ends once it is on the ground.
  *
- * Purpose: The ferry and the drop are turn orders. This step only notices that the infantry has landed or that the drop is no longer legal.
+ * Purpose: The ferry and the drop are turn orders. This step only notices that the infantry has landed or that the drop is no longer legal. Units that landed already defend where they stand and leave the list.
  * When to use: The `transit` phase only.
- * Expected outcome: No action while the drop is still legal. An assault, a completion, or an unload when it is not.
+ * Expected outcome: No action beyond those defends while the drop is still legal. An assault, a completion, or an unload when it is not.
  * Exceptions: None.
  */
-function advanceTransit(args: {
-  readonly operation: Operation;
-  readonly facts: OperationFacts;
-  readonly infantryId: string | undefined;
-  readonly carrierId: string;
-  readonly carrierHex: string;
-  readonly infantryHex: string | undefined;
-  readonly elapsed: number;
-}): OperationStep {
-  const { operation, facts, infantryId, carrierId, carrierHex, infantryHex, elapsed } = args;
-  if (infantryHex === undefined || infantryId === undefined) {
+function advanceTransit(input: AirPhaseInput): OperationStep {
+  const { operation, facts, carrierId, carrierHex, live, elapsed } = input;
+  if (live.length === 0) {
     return endAirOperation({ outcome: 'lost', reason: 'infantry-missing', actions: [], carrierId, facts });
   }
-  if (!aboard(facts, infantryId, carrierId)) {
-    if (infantryHex === operation.objectiveH3 && facts.objectiveIsOwn) {
+  const onBoard = live.filter((unitId) => aboard(facts, unitId, carrierId));
+  const ashore = live.filter((unitId) => !aboard(facts, unitId, carrierId));
+  const defendWhereTheyStand = ashore.flatMap((unitId): OperationAction[] => {
+    const hex = facts.unitHexById.get(unitId);
+    return hex === undefined ? [] : [{ kind: 'defend', unitId, atH3: hex }];
+  });
+  if (onBoard.length === 0) {
+    const onObjective = ashore.filter((unitId) => facts.unitHexById.get(unitId) === operation.objectiveH3);
+    if (onObjective.length > 0 && facts.objectiveIsOwn) {
       return endAirOperation({ outcome: 'completed', reason: 'objective-held', actions: [], carrierId, facts });
     }
-    if (infantryHex === operation.objectiveH3) {
+    if (onObjective.length > 0) {
       return keepAirOperation({
         operation,
         facts,
         reason: 'assault',
         phase: 'assault',
-        actions: [{ kind: 'defend', unitId: infantryId, atH3: infantryHex }],
+        unitIds: onObjective,
+        actions: defendWhereTheyStand,
       });
     }
     return endAirOperation({
       outcome: 'abandoned',
       reason: 'landed-elsewhere',
-      actions: [{ kind: 'defend', unitId: infantryId, atH3: infantryHex }],
+      actions: defendWhereTheyStand,
       carrierId,
       facts,
     });
@@ -267,14 +354,17 @@ function advanceTransit(args: {
       outcome: 'abandoned',
       reason: 'transit-unload',
       actions: [
-        { kind: 'unload', unitId: infantryId },
-        { kind: 'defend', unitId: infantryId, atH3: carrierHex },
+        ...defendWhereTheyStand,
+        ...onBoard.flatMap((unitId): OperationAction[] => [
+          { kind: 'unload', unitId },
+          { kind: 'defend', unitId, atH3: carrierHex },
+        ]),
       ],
       carrierId,
       facts,
     });
   }
-  return keepAirOperation({ operation, facts, reason: 'in-transit', actions: [] });
+  return keepAirOperation({ operation, facts, reason: 'in-transit', unitIds: onBoard, actions: defendWhereTheyStand });
 }
 
 /**
@@ -285,16 +375,9 @@ function advanceTransit(args: {
  * Expected outcome: No action while the city is still enemy and the timeout has not been reached. An end defends the air unit.
  * Exceptions: None.
  */
-function advanceAssault(args: {
-  readonly operation: Operation;
-  readonly facts: OperationFacts;
-  readonly infantryId: string | undefined;
-  readonly carrierId: string;
-  readonly infantryHex: string | undefined;
-  readonly elapsed: number;
-}): OperationStep {
-  const { operation, facts, infantryId, carrierId, infantryHex, elapsed } = args;
-  if (infantryHex === undefined || infantryId === undefined) {
+function advanceAssault(input: AirPhaseInput): OperationStep {
+  const { operation, facts, carrierId, live, elapsed } = input;
+  if (live.length === 0) {
     return endAirOperation({ outcome: 'lost', reason: 'infantry-missing', actions: [], carrierId, facts });
   }
   if (facts.objectiveIsOwn) {
@@ -303,32 +386,32 @@ function advanceAssault(args: {
   if (elapsed >= OPERATION_ASSAULT_TIMEOUT_TURNS) {
     return endAirOperation({ outcome: 'abandoned', reason: 'assault-timeout', actions: [], carrierId, facts });
   }
-  return keepAirOperation({ operation, facts, reason: 'holding', actions: [] });
+  return keepAirOperation({ operation, facts, reason: 'holding', unitIds: live, actions: [] });
 }
 
 /**
- * Cancels one air operation without leaving the infantry aboard.
+ * Cancels one air operation without leaving any infantry aboard.
  *
- * Purpose: The commander takes the air unit back with cancel. The infantry is unloaded or its march is cancelled.
+ * Purpose: The commander takes the air unit back with cancel. Each infantry unit is unloaded or has its march cancelled.
  * When to use: A cancel command whose operation method is `air`. A `return` phase is left stored.
  * Expected outcome: An ended operation that defends the air unit, or the same operation when the phase is `return`.
  * Exceptions: None.
  */
 export function cancelAirOperation(operation: Operation, facts: OperationFacts): OperationStep {
-  const infantryId = operation.unitIds[0];
   const carrierId = operation.carrierIds[0];
   const carrierHex = carrierId === undefined ? undefined : facts.unitHexById.get(carrierId);
+  const live = liveInfantry(operation, facts);
   logDebug('airOperationAdvance cancelAirOperation', { id: operation.id, phase: operation.phase });
   if (operation.phase === 'return') {
     return { next: operation, actions: [], releasedIds: [], outcome: 'running', reason: 'already-returning' };
   }
   if (carrierHex === undefined) {
-    const actions = operation.phase === 'muster' && infantryId !== undefined && facts.unitHexById.has(infantryId)
-      ? [{ kind: 'cancelOrder' as const, unitId: infantryId }]
+    const actions = operation.phase === 'muster'
+      ? live.map((unitId) => ({ kind: 'cancelOrder' as const, unitId }))
       : [];
     return endAirOperation({ outcome: 'lost', reason: 'carrier-missing', actions, carrierId: undefined, facts });
   }
-  const actions = infantryId === undefined ? [] : detachInfantry(facts, infantryId, carrierId);
+  const actions = live.flatMap((unitId) => detachInfantry(facts, unitId, carrierId));
   return endAirOperation({
     outcome: 'abandoned',
     reason: operation.phase === 'assault' ? 'cancel-assault' : 'cancel',

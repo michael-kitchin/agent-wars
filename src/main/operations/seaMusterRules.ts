@@ -9,6 +9,7 @@
 
 import { logTrace } from '../logger';
 import { fillShip, shipsNeeded } from './liftRules';
+import { SEA_RAID_TIMEOUT_MIN_SHARE } from './operationRules';
 
 /**
  * Inputs to the muster readiness rule.
@@ -65,11 +66,11 @@ export interface SeaMusterReadyArgs {
    */
   readonly timedOut: boolean;
   /**
-   * Fewest troops at the port that may sail once the muster has timed out.
+   * Fewest troops the ships at the port must carry once the muster has timed out.
    *
-   * Contract: A positive count.
+   * Contract: A positive count. For a raid, the floor under `SEA_RAID_TIMEOUT_MIN_SHARE`; for a campaign lift, the whole minimum.
    * When to use: Only when `timedOut` is true.
-   * Expected outcome: Fewer present troops than this means the operation is abandoned.
+   * Expected outcome: Fewer troops carried than the minimum means the operation is abandoned.
    * Exceptions: None.
    */
   readonly minUnitsAtTimeout: number;
@@ -77,8 +78,8 @@ export interface SeaMusterReadyArgs {
    * Whether the muster belongs to a campaign lift.
    *
    * Contract: True only for a campaign lift. Absent or false means a raid.
-   * When to use: Only when `timedOut` is true. A campaign lift compares the troops the present ships can carry, not every present troop, with `minUnitsAtTimeout`, because its minimum is the force the landing needs.
-   * Expected outcome: Switches the timeout test to the smaller of the present troops and what the present ships can carry.
+   * When to use: Only when `timedOut` is true. A campaign lift needs `minUnitsAtTimeout` carried. A raid needs the larger of that and `SEA_RAID_TIMEOUT_MIN_SHARE` of its remaining troops.
+   * Expected outcome: Chooses the timeout bar: the campaign lift's own minimum, or the raid's share of its remaining troops.
    * Exceptions: None.
    */
   readonly campaignLift?: boolean;
@@ -87,9 +88,9 @@ export interface SeaMusterReadyArgs {
 /**
  * Counts the troops a number of ships can take aboard.
  *
- * Purpose: A timed-out campaign lift sails only with the force its landing needs, so it counts what the ships at the port can carry, not every troop waiting there.
- * When to use: From `seaMusterReady` at the timeout of a campaign lift.
- * Expected outcome: The troops loaded by filling `shipCount` ships one by one with `fillShip`, the same per-ship rule the lift's loading uses: two infantry, or one unit. At most the number of infantry and armor in `unitTypes`.
+ * Purpose: A timed-out muster sails only with the force the ships at the port can take, so it counts what they can carry, not every troop waiting there.
+ * When to use: From `seaMusterReady` at the timeout of a raid or a campaign lift.
+ * Expected outcome: The troops loaded by filling `shipCount` ships one by one with `fillShip`, the same per-ship rule the lift's loading uses: up to `NAVAL_CARGO_SLOTS` slots, armor first. At most the number of infantry and armor in `unitTypes`.
  * Exceptions: None.
  */
 function troopsShipsCanCarry(unitTypes: readonly string[], shipCount: number): number {
@@ -107,24 +108,26 @@ function troopsShipsCanCarry(unitTypes: readonly string[], shipCount: number): n
 /**
  * Tells whether a muster may load and sail.
  *
- * Purpose: A muster waits until every troop is at the port and the ships those troops need are there too. At the timeout it sails with the troops and ships it has, if enough troops came. For a campaign lift, enough means enough troops the ships at the port can carry.
+ * Purpose: A muster waits until every troop is at the port and the ships those troops need are there too. At the timeout it sails with the troops and ships it has, if the ships can carry enough. A raid needs `SEA_RAID_TIMEOUT_MIN_SHARE` of its remaining troops, and a campaign lift needs its own minimum.
  * When to use: Each turn a sea operation is in its muster phase.
- * Expected outcome: False with no ship at the port. At the timeout, true when the troop minimum is met: a raid counts the present troops, and a campaign lift counts the smaller of the present troops and what the present ships can carry. Otherwise true when every troop is present and the ships present cover the smaller of the ships left and the ships the troops need.
+ * Expected outcome: False with no ship at the port. At the timeout, true when the smaller of the present troops and what the present ships can carry reaches the bar: `max(minUnitsAtTimeout, ceil(SEA_RAID_TIMEOUT_MIN_SHARE × remaining troops))` for a raid, `minUnitsAtTimeout` for a campaign lift. Otherwise true when every troop is present and the ships present cover the smaller of the ships left and the ships the troops need.
  * Exceptions: None.
  */
 export function seaMusterReady(args: SeaMusterReadyArgs): boolean {
   const { presentUnitTypes, remainingUnitCount, shipsPresentCount, remainingShipCount, timedOut, minUnitsAtTimeout } = args;
   let ready: boolean;
+  let needed: number | null = null;
   if (shipsPresentCount === 0) ready = false;
   else if (timedOut) {
-    const counted = args.campaignLift === true
-      ? Math.min(presentUnitTypes.length, troopsShipsCanCarry(presentUnitTypes, shipsPresentCount))
-      : presentUnitTypes.length;
-    ready = counted >= minUnitsAtTimeout;
+    const carried = Math.min(presentUnitTypes.length, troopsShipsCanCarry(presentUnitTypes, shipsPresentCount));
+    needed = args.campaignLift === true
+      ? minUnitsAtTimeout
+      : Math.max(minUnitsAtTimeout, Math.ceil(SEA_RAID_TIMEOUT_MIN_SHARE * remainingUnitCount));
+    ready = carried >= needed;
   } else {
     ready = presentUnitTypes.length === remainingUnitCount
       && shipsPresentCount >= Math.min(remainingShipCount, shipsNeeded(presentUnitTypes));
   }
-  logTrace('seaMusterRules seaMusterReady', { presentCount: presentUnitTypes.length, remainingUnitCount, shipsPresentCount, remainingShipCount, timedOut, ready });
+  logTrace('seaMusterRules seaMusterReady', { presentCount: presentUnitTypes.length, remainingUnitCount, shipsPresentCount, remainingShipCount, timedOut, needed, ready });
   return ready;
 }

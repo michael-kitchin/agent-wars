@@ -8,6 +8,7 @@
  */
 
 import { compareCodeUnits } from '../../shared/codeUnitOrder';
+import { NAVAL_CARGO_SLOTS, cargoSlotsUsed, carrierAcceptsLandUnit } from '../../shared/carrierCargoRules';
 import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { isLandUnitType } from '../../shared/landUnitType';
 import type { GameStateSnapshot } from '../gameDb';
@@ -147,21 +148,25 @@ export function rankLiftCities(cities: readonly LiftCity[]): LiftCity[] {
 /**
  * One ship load from the candidates still waiting.
  *
- * Purpose: A ship takes two infantry when it can, and otherwise one unit, with infantry ahead of armor.
+ * Purpose: A ship has `NAVAL_CARGO_SLOTS` slots; armor takes 2 and infantry 1. Armor goes aboard first so repeated calls use exactly `shipsNeeded` ships.
  * When to use: Once per ship, over the units not yet assigned.
- * Expected outcome: Two lowest infantry ids, or one id. Other unit types are ignored. Empty when no infantry or armor remains.
+ * Expected outcome: Armor ids in id order, then infantry ids in id order, each added while the ship has room. Other unit types are ignored. Empty when no infantry or armor remains.
  * Exceptions: None.
  */
 export function fillShip(candidates: readonly { readonly id: string; readonly unitType: string }[]): string[] {
-  const infantry = candidates
-    .filter((unit) => unit.unitType === 'infantry')
+  const byType = (unitType: string): string[] => candidates
+    .filter((unit) => unit.unitType === unitType)
     .map((unit) => unit.id)
     .sort(compareCodeUnits);
-  const armor = candidates
-    .filter((unit) => unit.unitType === 'armor')
-    .map((unit) => unit.id)
-    .sort(compareCodeUnits);
-  const chosen = infantry.length >= 2 ? [infantry[0]!, infantry[1]!] : infantry.length === 1 ? [infantry[0]!] : armor.length > 0 ? [armor[0]!] : [];
+  const typeById = new Map(candidates.map((unit) => [unit.id, unit.unitType] as const));
+  const chosen: string[] = [];
+  const aboardUnitTypes: string[] = [];
+  for (const id of [...byType('armor'), ...byType('infantry')]) {
+    const landUnitType = typeById.get(id) ?? '';
+    if (!carrierAcceptsLandUnit({ carrierUnitType: 'naval', landUnitType, aboardUnitTypes })) continue;
+    chosen.push(id);
+    aboardUnitTypes.push(landUnitType);
+  }
   logTrace('liftRules fillShip', { candidateCount: candidates.length, chosen });
   return chosen;
 }
@@ -169,19 +174,13 @@ export function fillShip(candidates: readonly { readonly id: string; readonly un
 /**
  * Ships required for a list of unit types.
  *
- * Purpose: Two infantry share a ship. Each armor unit needs its own. Other types do not add a ship.
+ * Purpose: A ship has `NAVAL_CARGO_SLOTS` slots; infantry takes 1 and armor 2. Other types do not add a ship.
  * When to use: Before keeping a force that the available ships can carry.
- * Expected outcome: Armor count plus the infantry count rounded up by twos. An empty list returns 0.
+ * Expected outcome: The slots the units take, divided by `NAVAL_CARGO_SLOTS` and rounded up. An empty list returns 0.
  * Exceptions: None.
  */
 export function shipsNeeded(unitTypes: readonly string[]): number {
-  let infantryCount = 0;
-  let armorCount = 0;
-  for (const unitType of unitTypes) {
-    if (unitType === 'infantry') infantryCount += 1;
-    else if (unitType === 'armor') armorCount += 1;
-  }
-  const needed = armorCount + Math.ceil(infantryCount / 2);
+  const needed = Math.ceil(cargoSlotsUsed(unitTypes) / NAVAL_CARGO_SLOTS);
   logTrace('liftRules shipsNeeded', { typeCount: unitTypes.length, needed });
   return needed;
 }

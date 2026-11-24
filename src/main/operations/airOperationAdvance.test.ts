@@ -250,3 +250,111 @@ test('advanceOperation routes air and sea to their own decisions', () => {
   );
   assert.notEqual(sea.reason, 'carrier-missing');
 });
+
+/**
+ * Facts for an operation with two infantry units.
+ *
+ * Purpose: The two-infantry cases differ only in where each unit stands and which are aboard.
+ * When to use: The two-infantry cases below.
+ * Expected outcome: Both infantry units are on the map, at the hexes named in `hexes`.
+ * Exceptions: None.
+ */
+function twoInfantryFacts(hexes: Record<string, string>, patch: Partial<OperationFacts> = {}): OperationFacts {
+  const unitHexById = new Map<string, string>([['air-1', AIRPORT], ...Object.entries(hexes)]);
+  return facts({ unitHexById, ...patch });
+}
+
+test('a two-infantry air muster marches the infantry that is not yet at the airport', () => {
+  const step = advanceAirOperation(
+    operation({ unitIds: ['inf-a', 'inf-b'] }),
+    twoInfantryFacts({ 'inf-a': AIRPORT, 'inf-b': OTHER })
+  );
+  const marches = step.actions.filter((action) => action.kind === 'march');
+  assert.deepEqual(marches.map((action) => action.unitId), ['inf-b']);
+  assert.equal(step.actions.some((action) => action.kind === 'embark'), false);
+  assert.equal(step.next?.phase, 'muster');
+});
+
+test('a two-infantry air muster loads both and enters transit', () => {
+  const step = advanceAirOperation(
+    operation({ unitIds: ['inf-a', 'inf-b'] }),
+    twoInfantryFacts({ 'inf-a': AIRPORT, 'inf-b': AIRPORT })
+  );
+  assert.deepEqual(
+    step.actions.map((action) => `${action.kind}:${action.unitId}`),
+    ['holdFire:air-1', 'cancelOrder:inf-a', 'embark:inf-a', 'cancelOrder:inf-b', 'embark:inf-b']
+  );
+  assert.equal(step.next?.phase, 'transit');
+  assert.deepEqual(step.next?.unitIds, ['inf-a', 'inf-b']);
+});
+
+test('an air muster goes on with the infantry left when one is gone', () => {
+  const step = advanceAirOperation(
+    operation({ unitIds: ['inf-a', 'inf-b'] }),
+    twoInfantryFacts({ 'inf-a': OTHER })
+  );
+  assert.equal(step.outcome, 'running');
+  assert.deepEqual(step.next?.unitIds, ['inf-a']);
+});
+
+test('an air muster releases infantry given its own order and keeps the other', () => {
+  const step = advanceAirOperation(
+    operation({ unitIds: ['inf-a', 'inf-b'], launchedTurn: 0 }),
+    twoInfantryFacts(
+      { 'inf-a': OTHER, 'inf-b': OTHER },
+      {
+        turnNumber: 2,
+        storedOrderById: new Map([
+          ['air-1', { type: 'hold_fire', h3Index: AIRPORT }],
+          ['inf-a', { type: 'march', h3Index: 'elsewhere' }],
+        ]),
+      }
+    )
+  );
+  assert.deepEqual(step.releasedIds, ['inf-a']);
+  assert.deepEqual(step.next?.unitIds, ['inf-b']);
+  assert.equal(step.actions.some((action) => action.unitId === 'inf-a'), false);
+});
+
+test('a two-infantry transit that dropped both assaults with both', () => {
+  const step = advanceAirOperation(
+    operation({ phase: 'transit', unitIds: ['inf-a', 'inf-b'] }),
+    twoInfantryFacts({ 'inf-a': CITY, 'inf-b': CITY })
+  );
+  assert.equal(step.next?.phase, 'assault');
+  assert.deepEqual(step.next?.unitIds, ['inf-a', 'inf-b']);
+  assert.ok(defends(step.actions, 'inf-a', CITY));
+  assert.ok(defends(step.actions, 'inf-b', CITY));
+});
+
+test('a two-infantry transit past its timeout unloads both', () => {
+  const step = advanceAirOperation(
+    operation({ phase: 'transit', unitIds: ['inf-a', 'inf-b'], phaseTurn: 1 }),
+    twoInfantryFacts(
+      { 'inf-a': AIRPORT, 'inf-b': AIRPORT },
+      {
+        turnNumber: 1 + OPERATION_AIR_TRANSIT_TIMEOUT_TURNS,
+        carrierByCargoId: new Map([['inf-a', 'air-1'], ['inf-b', 'air-1']]),
+      }
+    )
+  );
+  assert.equal(step.outcome, 'abandoned');
+  assert.deepEqual(
+    step.actions.filter((action) => action.kind === 'unload').map((action) => action.unitId),
+    ['inf-a', 'inf-b']
+  );
+  assert.ok(defends(step.actions, 'inf-a', AIRPORT));
+  assert.ok(defends(step.actions, 'inf-b', AIRPORT));
+});
+
+test('cancelling a two-infantry air muster cancels both marches', () => {
+  const step = cancelAirOperation(
+    operation({ unitIds: ['inf-a', 'inf-b'] }),
+    twoInfantryFacts({ 'inf-a': OTHER, 'inf-b': OTHER })
+  );
+  assert.deepEqual(
+    step.actions.filter((action) => action.kind === 'cancelOrder').map((action) => action.unitId),
+    ['inf-a', 'inf-b']
+  );
+  assert.equal(step.next, null);
+});

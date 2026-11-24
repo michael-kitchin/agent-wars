@@ -156,8 +156,7 @@ export function listAirOperationCandidates(args: {
         return compareCodeUnits(left.id, right.id);
       })
       .slice(0, AIRLIFT_INFANTRY_CAPACITY);
-    const chosen = infantry[0];
-    if (chosen === undefined) continue;
+    if (infantry.length === 0) continue;
     const airports = launchAirports({ state: args.state, seatId: args.seatId, air });
     const kept: OperationCandidate[] = [];
     for (const city of cities) {
@@ -168,7 +167,7 @@ export function listAirOperationCandidates(args: {
       if (!landUnitCanOccupyHex(city.h3Index, args.landMass)) continue;
       const landingH3 = launchAirportForCity(air.h3Index, airports, city.h3Index);
       if (landingH3 === null) continue;
-      const infantrySteps = steps.get(chosen.h3Index) ?? 0;
+      const infantrySteps = Math.max(...infantry.map((unit) => steps.get(unit.h3Index) ?? 0));
       const etaTurns = infantrySteps + 1 + (landingH3 === air.h3Index ? 0 : 1);
       const defenders = args.terrain.enemyUnitsWithin(city.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS);
       kept.push({
@@ -176,7 +175,7 @@ export function listAirOperationCandidates(args: {
         objectiveH3: city.h3Index,
         musterH3: air.h3Index,
         landingH3,
-        unitIds: [chosen.id],
+        unitIds: infantry.map((unit) => unit.id),
         carrierIds: [air.id],
         etaTurns,
         urbanHexCount: city.urbanHexCount,

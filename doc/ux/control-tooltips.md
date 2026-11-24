@@ -168,6 +168,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Multi-hex queue remove: Remove this row on every selected hex (`multiHexQueueRemoveTooltipText`).
 - Build tab: Show the build queue for this hex (`buildTabTooltipText`).
 - Hire tab: Show hiring for this hex (`hireTabTooltipText`).
+- Stack callout Select tab: Show the units in this hex to select (`stackSelectTabTooltipText`).
+- Stack callout Transport tab: Load and unload ships and air units in this hex (`stackTransportTabTooltipText`).
 - Stack callout close: Close this list (`stackCalloutCloseTooltipText`).
 - Stack row toggle, when the unit is not selected: Select only this unit and close the list. Shift toggles it and leaves the list open (`stackUnitToggleUnselectedTooltipText`).
 - Stack row toggle, when the unit is selected: Remove this unit from the selection and close the list. Shift toggles it and leaves the list open (`stackUnitToggleSelectedTooltipText`).

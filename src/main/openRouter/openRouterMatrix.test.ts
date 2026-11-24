@@ -28,6 +28,7 @@ import {
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
 import { CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
 import { buildFixtureState, installElectronMock } from './openRouterTestHelpers';
+import { assertRosterTransportGuidance } from '../testSupport/promptRosterAssertions';
 
 /**
  * Documents the `ChatResponse` type alias (type ChatResponse).
@@ -281,39 +282,7 @@ async function run(): Promise<void> {
       );
       const hasAir = state.units.some((u) => u.player === 'opponent' && u.unitType === 'air');
       const hasNaval = state.units.some((u) => u.player === 'opponent' && u.unitType === 'naval');
-      if (hasAir) {
-        assert.ok(systemPrompt.includes('# Air Operations Status'), `air-ops status guidance missing for mask=${mask}`);
-        assert.ok(
-          systemPrompt.includes('hopping controlled intact airports') &&
-            systemPrompt.includes('plan_route confirms the chain'),
-          `air-ops rules guidance missing for mask=${mask}`
-        );
-        assert.ok(
-          systemPrompt.includes('Optional top-level air actions: airStrikes[] entries use'),
-          `air-strike JSON contract guidance missing for mask=${mask}`
-        );
-        assert.ok(
-          systemPrompt.includes('ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }'),
-          `ferry JSON contract guidance missing for mask=${mask}`
-        );
-      } else {
-        assert.ok(!systemPrompt.includes('# Air Operations Status'), `air-ops section must be omitted when roster has no air, mask=${mask}`);
-        assert.ok(!systemPrompt.includes('airStrikes'), `airStrikes must be omitted when roster has no air, mask=${mask}`);
-      }
-      if (hasNaval) {
-        assert.ok(systemPrompt.includes('# Naval Transport Status'), `naval transport missing for mask=${mask}`);
-        assert.ok(systemPrompt.includes('Embark: coastal'), `embark rule missing for mask=${mask}`);
-      } else {
-        assert.ok(!systemPrompt.includes('# Naval Transport Status'), `naval section must be omitted when the roster has no naval unit, mask=${mask}`);
-      }
-      if (hasAir) {
-        assert.ok(systemPrompt.includes('An air unit carries one infantry unit'), `airlift rule missing for mask=${mask}`);
-      }
-      if (hasNaval) {
-        assert.ok(systemPrompt.includes('transport_move'), `sealift actions missing for mask=${mask}`);
-      } else {
-        assert.ok(!systemPrompt.includes('transport_move'), `transport_move must be omitted when roster has no naval, mask=${mask}`);
-      }
+      assertRosterTransportGuidance({ systemPrompt, mask, hasAir, hasNaval });
       assert.ok(
         systemPrompt.includes(`Global Earth map, H3 resolution ${mapData.H3_RESOLUTION}`),
         `global-map context guidance missing for mask=${mask}`

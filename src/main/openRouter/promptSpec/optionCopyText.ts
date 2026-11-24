@@ -12,6 +12,7 @@
  */
 
 import { logDebug } from '../../logger';
+import { AIRLIFT_INFANTRY_CAPACITY } from '../../../shared/carrierCargoRules';
 import type { CoachingGates } from './coachingGates';
 import type { PromptCoordinateMode } from './promptCoordinateMode';
 
@@ -35,7 +36,7 @@ export function buildOptionCopyMappingClause(args: {
     ? '; copy an air strike Target Hex into airStrikes; copy an air drop Target Hex into airDrops'
     : '';
   const airChoice = args.hasAirUnits
-    ? ` An air ${actor} picks only one of air strike, air drop, and ferry. When its Aboard column is none, embark one infantry ${actor} from its hex in the same orders list.`
+    ? ` An air ${actor} picks only one of air strike, air drop, and ferry. When its Aboard column lists fewer than ${AIRLIFT_INFANTRY_CAPACITY} infantry, embark infantry ${actor}s from its hex in the same orders list, one embark row each.`
     : '';
   const moveKinds = actor === 'unit' ? 'approach, advance, or move/melee' : 'approach or move/melee';
   return (

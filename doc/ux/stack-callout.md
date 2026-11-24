@@ -12,6 +12,7 @@ Opens in Strategic planning and Tactical planning after a plain click on a unit 
 
 ## Information Displayed
 
+- A hex with a Transport section opens on Select and Transport tabs (`SELECT_TAB_LABEL`, `TRANSPORT_TAB_LABEL` in `src/shared/stackCalloutTabs.ts`), styled like the build popup's Build and Hire tabs. Select holds the unit rows, the All controls, and the close control. Transport holds the sealift section described below. A hex with no Transport section shows the Select content with no tab bar. The tab is remembered for the hex it was chosen on (`nextStackCalloutTab`): reopening the callout there, or refreshing it after a selection or slot change, keeps that tab, and the first callout with tabs on another hex opens on Select. A hex without tabs leaves the choice as it was. Control tips for both tabs are in [control-tooltips.md](control-tooltips.md).
 - One row per unit in the hex, sorted by side, type, and name. Each row shows the unit name, preceded by the unit's origin flag for both human and enemy units. In a match of three or more seats, a unit that is not the viewer's reads "{name} · {unit name}" (`formatUnitNameForViewer` in `src/shared/sideLabels.ts`). The name is `sideDisplayName` (`src/shared/sideNicknames.ts`). A null nickname shows `Human` for the human seat and the short home name for an AI seat. A two-seat match keeps the plain name. A Neutral unit uses that same plain name. On the global map the flag is the national flag of the birth country. On a regional map it is the subdivision flag when that origin's ISO 3166-2 code has a file, and otherwise the national flag of the origin's country. A battle unit shows the flag of the strategic unit it came from. A unit whose origin has no flag file shows a gray placeholder flag, and a unit with no recorded origin shows no flag.
 - Hovering a unit flag, or the map token of a hex that holds one stationary unit, shows a tooltip one second after the pointer arrives. Moving on that flag or token does not start the wait again. The token hover does not open this list and does not select the unit. That tooltip hides when the pointer leaves the token. A token whose unit has no recorded origin keeps the hex tooltip. A stack token does not show that tooltip; the list still opens from a click. The flag tooltip appears on every surface that shows a unit flag, including loss toasts. The label beside the flag is unchanged, including a selected-unit count or a pending order. The tooltip hides when that flag is no longer visible.
   - The tooltip starts with `Unit:` and the same flag and display name shown beside the flag, then `DOB:` and the date that strategic unit was formed. After those lines, `mercenaryTooltipValue` may add bold `Mercenary:` (`MERCENARY_TOOLTIP_LABEL`). The current player's mercenary, the human seat from `findHumanSeat`, shows `formatMercenaryTooltipValue` (`¤N/turn`, `CREDITS_SYMBOL`). Another side's mercenary shows that side's name from `sideDisplayName` (`src/shared/sideNicknames.ts`), such as `N. America`. A null nickname shows `Human` for the human seat and the short home name for an AI seat. A Neutral unit shows `For Hire` (`MERCENARY_TOOLTIP_FOR_HIRE`) when `neutralUnitOfferedForRehire` accepts it: a hireable type, not aboard a ship, not carrying cargo, and not in a hex another side has fortified. A loss-toast flag has no Mercenary line. A missing name omits the Unit line, and a missing formation turn omits the DOB line. When any identity line is present, a blank line follows.
@@ -24,8 +25,9 @@ Opens in Strategic planning and Tactical planning after a plain click on a unit 
 - When the hex has human units and Shift is not held, a "+ All" control selects the selectable human units.
 - When Shift is held and the hex has human units, "+ All" adds them and "- All" removes them.
 - A close control. Control tips for the close control, the row toggles, and the All controls are in [control-tooltips.md](control-tooltips.md).
-- The callout opens `TOOLTIP_OFFSET_PX` (12) below and to the right of the click, then shifts so it stays inside the window (`placeAnchoredPopup`). It may cover the top bar, the console, or the minimap. A callout taller or wider than the window sits against the top and left and may still be clipped. Appending or removing the sealift section moves it again without hiding it.
-- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags. An air unit on the hex adds a row when infantry there can board, or when that air unit already carries infantry. Armor alone does not add one. The air row has one infantry slot, and debark is allowed on the hex the air unit occupies. At a land seaport with no water or coast in or next to its hex, the ship rows' embark lists are disabled, because nothing can board there, and debark stays available (`port_no_sea_access` from `getSealiftStackContextModeForHex`). Control tips for a slot list and its debark button are in [control-tooltips.md](control-tooltips.md).
+- The callout is at least 200 px wide. A callout with no tabs is capped at that width. A callout with Select and Transport tabs uses `.stack-callout-wide` and may grow to 280 px on either tab (`static/stackCalloutChrome.css`), the same widths as the build popup.
+- The callout opens `TOOLTIP_OFFSET_PX` (12) below and to the right of the click, then shifts so it stays inside the window (`placeAnchoredPopup`). It may cover the top bar, the console, or the minimap. A callout taller or wider than the window sits against the top and left and may still be clipped. Appending or removing the sealift section, which adds or removes the tabs, or switching tabs, moves it again without hiding it.
+- On the Transport tab, a sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags. An air unit on the hex adds a row when infantry there can board, or when that air unit already carries infantry. Armor alone does not add one. A ship row has four slot lists (`NAVAL_CARGO_SLOTS`) and an air row two infantry slots (`AIR_CARGO_SLOTS`). Cargo is packed armor first, then infantry, each in id order. An armor unit fills its slot and the next one, and the next slot shows that armor's label and is disabled with no debark button. Picking a unit for a slot replaces what was there, and an edit that would overfill the carrier is refused with a toast. Debark is allowed on the hex the air unit occupies. At a land seaport with no water or coast in or next to its hex, the ship rows' embark lists are disabled, because nothing can board there, and debark stays available (`port_no_sea_access` from `getSealiftStackContextModeForHex`). Control tips for a slot list and its debark button are in [control-tooltips.md](control-tooltips.md).
 
 Enemy rows have no selection toggle.
 
@@ -37,6 +39,7 @@ Enemy rows have no selection toggle.
 - When the player clicks "+ All" without Shift, the selectable human units in the hex become the selection and the callout closes.
 - When Shift is held and the player clicks "+ All", those units are added. "- All" removes them.
 - When the player clicks the close control, the callout closes.
+- When the player clicks the Select or Transport tab, that tab's content shows, the other's hides, and the choice is remembered for the hex.
 - When the player presses outside the callout, it closes. A press on the same spot as the opening click is left for the double-click handler.
 
 ### Keyboard
@@ -52,7 +55,7 @@ Enemy rows have no selection toggle.
 ## States
 
 - Scheduled: a click on a unit icon asked for the callout, and the delay has not elapsed.
-- Open: the list is visible.
+- Open: the list is visible. With tabs, Select or Transport is the shown tab.
 - Closed: hidden. This is the start state.
 
 ## Invariants
@@ -66,7 +69,7 @@ Enemy rows have no selection toggle.
 
 ## Strategic and Tactical Differences
 
-The rows, All controls, and toggles work the same in both theaters. In Tactical planning the callout lists battle units. A sealift section can appear in either theater when that hex has sealift capacity. Changing a slot or pressing debark applies immediately in both theaters. That change hides or shows the embarked unit's selection toggle on the open list, and a toggle that is shown again matches whether that unit is selected. The unit rows stay on screen while the sealift section is replaced. A rejected change restores the slot list to the cargo it showed before the click and shows an error toast. In Tactical planning a successful change also drops pending marches for the units involved. At battle-detail zoom on the strategic map, the callout does not open.
+The rows, All controls, toggles, and the Select and Transport tabs work the same in both theaters. In Tactical planning the callout lists battle units. A sealift section can appear in either theater when that hex has sealift capacity. Changing a slot or pressing debark applies immediately in both theaters. That change hides or shows the embarked unit's selection toggle on the open list, and a toggle that is shown again matches whether that unit is selected. The shown tab stays while the sealift section is replaced: on Select the unit rows stay on screen, and on Transport the rebuilt unit rows stay hidden. A rejected change restores the slot list to the cargo it showed before the click and shows an error toast. In Tactical planning a successful change also drops pending marches for the units involved. At battle-detail zoom on the strategic map, the callout does not open.
 
 ## Related Documents
 
@@ -94,6 +97,15 @@ None.
 - `src/renderer/map/stackCalloutHost.ts`
 - `src/renderer/map/stackCalloutSelectionToggles.ts`
 - `src/renderer/map/stackCalloutSealift.ts`
+- `src/renderer/map/stackCalloutTabs.ts` (`syncStackCalloutTabs`, `keepStackCalloutTab`)
+- `src/shared/stackCalloutTabs.ts` (`SELECT_TAB_LABEL`, `TRANSPORT_TAB_LABEL`, `nextStackCalloutTab`)
+- `static/stackCalloutChrome.css` (`.stack-callout`, `.stack-callout-wide`)
+- `static/overlayChrome.css` (`.stack-callout-tab-bar`, shared with `.build-popup-tab-bar`)
+- `src/shared/carrierCargoRules.ts` (`NAVAL_CARGO_SLOTS`, `AIR_CARGO_SLOTS`, `layoutCargoSlots`)
+- `src/shared/sealiftPendingEmbarks.ts` (`mergePendingEmbarksIntoSealiftState`)
+- `src/main/gameActions/sealiftSlotAssignment.ts` (`applySealiftSlotEdit`, `buildSealiftNavalRows`)
+- `src/main/gameActions/sealiftStackPopup.ts` (`readSealiftStackState`, `executeSealiftSlotUpdate`)
+- `src/main/tacticalBattle/tacticalSealiftSlotUpdate.ts` (`applyTacticalSealiftSlotChangeInSession`)
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`
 - `src/shared/soleSelectableHumanUnit.ts`

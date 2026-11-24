@@ -313,6 +313,21 @@ test('an air muster names the infantry marching to the air unit', () => {
   );
 });
 
+test('an air muster with two infantry names both and uses the plural', () => {
+  const text = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [operation({
+      method: 'air',
+      phase: 'muster',
+      unitIds: ['inf-a', 'inf-b'],
+      carrierIds: ['air-1'],
+      landingH3: 'port',
+    })],
+    format: (hex) => hex,
+  });
+  assert.match(text, /inf-a and inf-b are marching to port to board air-1./);
+});
+
 test('an air transit says the air unit drops when it is already on the launch airport', () => {
   const text = buildOperationsSection({
     state: state({
@@ -554,4 +569,27 @@ test('the campaign bullet leads the section in each phase and a missing plan wri
     }),
     '',
   );
+});
+
+test('an air option with two infantry names them in the plural', () => {
+  const units = [
+    { id: 'inf-a', player: 'opponent', unitType: 'infantry', h3Index: 'port' },
+    { id: 'inf-b', player: 'opponent', unitType: 'infantry', h3Index: 'port' },
+    { id: 'air-1', player: 'opponent', unitType: 'air', h3Index: 'port' },
+  ];
+  const render = (landingH3: string): string => buildOperationOptionsSection({
+    state: state({ units, urban: 4 }),
+    seatId: 'opponent',
+    candidates: [candidate({
+      method: 'air',
+      musterH3: 'port',
+      landingH3,
+      unitIds: ['inf-a', 'inf-b'],
+      carrierIds: ['air-1'],
+      etaTurns: 3,
+    })],
+    format: (hex) => hex,
+  });
+  assert.match(render('port'), /2 infantry units muster at port; air-1 carries them; drops on city/);
+  assert.match(render('airport'), /2 infantry units muster at port; air-1 ferries them to airport; drops on city/);
 });

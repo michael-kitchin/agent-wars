@@ -13,6 +13,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { buildConsultMessages, CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
 import { buildConsultPromptParts, joinConsultPromptParts } from './consultPromptParts';
 import { AIR_PLAN_ROUTE_PROMPT_SUFFIX } from './openRouterToolCatalog';
+import { AIRLIFT_RULE_STRATEGIC, NAVAL_EMBARK_RULE } from './promptSpec/briefingGuideText';
 import { sideMessageRuleBlock } from './promptSpec/sideMessageRuleText';
 import { TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS } from './tacticalPromptProjection';
 import { assertHeadingsNest, headingOutline } from '../testSupport/promptOutlineHelpers';
@@ -241,4 +242,31 @@ test('a tactical consult lists the Sides table with the code column and keeps it
   assert.ok(parts.staticSystemText.includes('| Side | Code (unit id prefix) | Home region | Status |'));
   assert.ok(parts.staticSystemText.includes('| a1 |'));
   assertHeadingsNest(headingOutline(parts.staticSystemText));
+});
+
+test('capacity rules sit in the system message and capacity use in the situation', () => {
+  const hex = '810ebffffffffff';
+  const state = {
+    ...battleState(1, 'March, Year 1', hex, 'naval'),
+    units: [
+      { id: 'opponent-naval-1', player: 'opponent', unitType: 'naval', h3Index: hex },
+      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: hex },
+    ],
+  } as unknown as GameStateSnapshot;
+  const parts = buildConsultPromptParts({
+    state,
+    coordMap: {
+      latLngByH3: new Map<string, [number, number]>([[hex, [1, 2]]]),
+      resolveToH3: () => hex as string | undefined,
+      format: (h3: string) => h3,
+    },
+    enabledToolNames: ['plan_route'],
+    coordinateContext: { mode: 'strategic' },
+    productionAttention: null,
+  });
+  assert.ok(parts.staticSystemText.includes(NAVAL_EMBARK_RULE));
+  assert.ok(parts.staticSystemText.includes(AIRLIFT_RULE_STRATEGIC));
+  assert.ok(!parts.situationText.includes(NAVAL_EMBARK_RULE));
+  assert.ok(!parts.situationText.includes(AIRLIFT_RULE_STRATEGIC));
+  assert.ok(parts.situationText.includes('/4'));
 });

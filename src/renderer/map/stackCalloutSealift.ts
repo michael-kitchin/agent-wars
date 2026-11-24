@@ -5,7 +5,8 @@ import { mergePendingTacticalEmbarkOrdersIntoSealiftState } from '../tactical/ta
 import { sealiftDebarkTooltipText, sealiftSelectTooltipText } from '../chrome/controlTooltipText';
 import { placeOpenStackCallout } from '../chrome/placeAnchoredPopup';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
-import type { GameStateSnapshot, SealiftStackState } from '../../shared/ipcTypes';
+import type { GameStateSnapshot, SealiftCargoSlot, SealiftStackState } from '../../shared/ipcTypes';
+import { sealiftRowCargoIds } from '../../shared/sealiftStackState';
 import {
   formatTargetingValidationReason,
   formatUnitDisplayName,
@@ -16,6 +17,7 @@ import {
   updatePendingOrdersSidebar,
 } from './stackCalloutHost';
 import { setStackPopupNonSelectableUnitIds } from './stackCalloutSelectionToggles';
+import { syncStackCalloutTabs } from './stackCalloutTabs';
 
 /**
  * Monotonic generation for in-flight stack sealift renders.
@@ -68,7 +70,7 @@ export function buildSealiftUnitLabel(unitId: string, unitType: string): string 
  *
  * Purpose: Cargo slot UI is async; a generation token drops stale awaits so each fleet is listed once.
  * When to use: End of `showStackCallout` and after a fleet list or debark button changes an assignment.
- * Expected outcome: At most one sealift section for the latest stack hex. The previous section stays until the replacement is appended, so the unit list does not blank while embarked selection toggles hide. Hidden or superseded renders do not append.
+ * Expected outcome: At most one sealift section for the latest stack hex. The previous section stays until the replacement is appended, so the unit list does not blank while embarked selection toggles hide. Hidden or superseded renders do not append. The section is the Transport tab: `syncStackCalloutTabs` adds the Select and Transport tabs when it is appended and removes them when the hex has no section.
  * Exceptions: Logs to the console if sealift IPC throws.
  */
 export async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void> {
@@ -76,12 +78,14 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
   const h3Index = units[0]?.h3Index;
   if (!h3Index) {
     removeSealiftSection(calloutEl);
+    syncStackCalloutTabs(calloutEl, false);
     placeOpenStackCallout();
     return;
   }
   const api = window.gameApi;
   if (!api) {
     removeSealiftSection(calloutEl);
+    syncStackCalloutTabs(calloutEl, false);
     placeOpenStackCallout();
     return;
   }
@@ -109,12 +113,11 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
     if (!state.showSealiftSection) {
       removeSealiftSection(calloutEl);
+      syncStackCalloutTabs(calloutEl, false);
       placeOpenStackCallout();
       return;
     }
-    const nonSelectableEmbarkedIds = state.navalRows
-      .flatMap((row) => [row.slot1UnitId, row.slot2UnitId])
-      .filter((unitId): unitId is string => typeof unitId === 'string' && unitId.length > 0);
+    const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => sealiftRowCargoIds(row));
     setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
     if (generation !== sealiftSectionRenderGeneration) return;
 
@@ -132,38 +135,44 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
       const right = document.createElement('div');
       right.className = 'stack-sealift-slots';
 
-      const addSlotControl = (
-        slotIndex: 1 | 2,
-        selectedUnitId: string | null,
-        slotDisabled: boolean,
-        debarkEnabled: boolean
-      ) => {
+      const addSlotControl = (slotIndex: number, slot: SealiftCargoSlot) => {
+        const debarkEnabled = slot.debarkEnabled;
+        const selectedUnitId = slot.unitId;
         const slotRow = document.createElement('div');
         slotRow.className = 'stack-sealift-slot-row';
         const select = document.createElement('select');
         select.className = 'stack-sealift-select';
-        select.disabled = slotDisabled;
-        const noneOption = document.createElement('option');
-        noneOption.value = '';
-        noneOption.textContent = '(none)';
-        select.appendChild(noneOption);
-        const carrierType = units.find((unit) => unit.id === row.navalUnitId)?.unitType;
-        const options = carrierType === 'air'
-          ? state.landOptions.filter((option) => option.unitType === 'infantry')
-          : state.landOptions;
-        for (const option of options) {
-          const opt = document.createElement('option');
-          opt.value = option.unitId;
-          opt.textContent = buildSealiftUnitLabel(option.unitId, option.unitType);
-          select.appendChild(opt);
-        }
-        select.value = selectedUnitId ?? '';
-        select.dataset.prevLand = selectedUnitId ?? '';
+        select.disabled = slot.disabled;
         const selectHost = document.createElement('span');
         selectHost.className = 'control-tooltip-host';
         selectHost.setAttribute('data-control-tooltip', sealiftSelectTooltipText);
         selectHost.appendChild(select);
-        select.addEventListener('change', async () => {
+        if (slot.coveredByUnitId !== null) {
+          select.disabled = true;
+          const coveredOption = document.createElement('option');
+          coveredOption.value = slot.coveredByUnitId;
+          coveredOption.textContent = buildSealiftUnitLabel(slot.coveredByUnitId, 'armor');
+          select.appendChild(coveredOption);
+          select.value = slot.coveredByUnitId;
+        } else {
+          const noneOption = document.createElement('option');
+          noneOption.value = '';
+          noneOption.textContent = '(none)';
+          select.appendChild(noneOption);
+          const options = row.carrierUnitType === 'air'
+            ? state.landOptions.filter((option) => option.unitType === 'infantry')
+            : state.landOptions;
+          for (const option of options) {
+            const opt = document.createElement('option');
+            opt.value = option.unitId;
+            opt.textContent = buildSealiftUnitLabel(option.unitId, option.unitType);
+            select.appendChild(opt);
+          }
+          select.value = selectedUnitId ?? '';
+          select.dataset.prevLand = selectedUnitId ?? '';
+        }
+        // A covered slot only names the armor that fills it, so it takes no edits.
+        if (slot.coveredByUnitId === null) select.addEventListener('change', async () => {
           const selected = select.value.trim();
           if (tacticalSealiftMode) {
             const prev = select.dataset.prevLand ?? '';
@@ -270,17 +279,14 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
         right.appendChild(slotRow);
       };
 
-      addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
-      const carrierType = units.find((unit) => unit.id === row.navalUnitId)?.unitType;
-      if (carrierType !== 'air') {
-        addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
-      }
+      row.slots.forEach((slot, index) => addSlotControl(index + 1, slot));
       rowEl.appendChild(right);
       section.appendChild(rowEl);
     }
     if (generation !== sealiftSectionRenderGeneration) return;
     removeSealiftSection(calloutEl);
     calloutEl.appendChild(section);
+    syncStackCalloutTabs(calloutEl, true);
     placeOpenStackCallout();
   } catch (err) {
     console.error('sealift stack section failed:', err);

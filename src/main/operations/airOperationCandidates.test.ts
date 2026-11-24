@@ -1,5 +1,5 @@
 /**
- * Air drop candidates: one infantry unit, an empty city, and the airport the drop uses.
+ * Air drop candidates: up to two infantry units, an empty city, and the airport the drop uses.
  *
  * Purpose: The search must return a drop the turn advance can store, and must return nothing when the city is occupied or the infantry cannot walk.
  * When to use: After changes to `listAirOperationCandidates`.
@@ -324,4 +324,23 @@ test('snow shortens a ferry to an airport the air unit is not acclimated for', (
   assert.equal(search(untaggedOn.state, untaggedOn.landMass).some((candidate) => candidate.landingH3 === geometry.far), false);
   assert.equal(search(untaggedOff.state, untaggedOff.landMass).some((candidate) => candidate.landingH3 === geometry.far), true);
   assert.equal(search(taggedOn.state, taggedOn.landMass).some((candidate) => candidate.landingH3 === geometry.far), true);
+});
+
+test('an air option takes up to two nearest infantry and times the farther one', () => {
+  const airport = latLngToCell(0, 0, 1);
+  const city = gridDisk(airport, 2).find((hex) => hex !== airport && !gridDisk(airport, 1).includes(hex))!;
+  const mid = gridDisk(airport, 1).find((hex) => hex !== airport)!;
+  const near = new Set(gridDisk(airport, 1));
+  const far = gridDisk(mid, 1).find((hex) => !near.has(hex))!;
+  const built = field({
+    steps: 2,
+    cities: [{ h3Index: city, urbanHexCount: 4 }],
+    extraUnits: [
+      { id: 'inf-b', player: SEAT, unitType: 'infantry' as const, h3Index: mid },
+      { id: 'inf-c', player: SEAT, unitType: 'infantry' as const, h3Index: far },
+    ],
+  });
+  const candidates = search(built.state, built.landMass);
+  assert.deepEqual(candidates[0]?.unitIds, ['inf-b', 'inf-a']);
+  assert.equal(candidates[0]?.etaTurns, 3);
 });

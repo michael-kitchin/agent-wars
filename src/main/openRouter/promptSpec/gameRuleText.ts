@@ -43,8 +43,6 @@ import { BUILD_PREREQUISITES_BY_TYPE } from '../../productionRules';
 import { buildMinimumUrbanCells, unitCostFor } from '../../../shared/gameRules';
 import { NAVAL_MOVEMENT_PROMPT_RULE } from '../../navalMovementMessages';
 import {
-  AIR_FERRY_RANGE_HEXES,
-  AIR_STRIKE_RANGE_HEXES,
   MOVEMENT_RANGE_BY_UNIT_TYPE,
   RANGED_RANGE_BY_UNIT_TYPE,
 } from '../../../shared/tacticalRanges';
@@ -53,11 +51,11 @@ import {
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
 } from '../../../shared/tacticalTransportLink';
 import { originHitBonusForSource } from '../../../shared/originBonusRules';
-import { strategicFerryRangeHexes } from '../../../shared/weatherBonusRules';
 import { TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE } from '../../../shared/terrainBonusMarch';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import { buildTerrainCoverRule, buildWeatherRule } from './gameRuleEnvironmentText';
 import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
+import { buildAirEmploymentRule } from './gameRuleAirText';
 import { buildMissileEmploymentRule, MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
 import { buildFortificationProductionRulePart, buildFortificationRule } from './gameRuleFortificationText';
 import {
@@ -70,6 +68,7 @@ import { NAVAL_SEA_ACCESS_RULE_PART } from '../../../shared/seaAccess';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 export { buildTerrainCoverRule, buildWeatherRule };
+export { buildAirEmploymentRule } from './gameRuleAirText';
 
 /**
  * Roster and tool flags that choose optional combat-rule clauses.
@@ -516,30 +515,6 @@ export function buildRangedReachRule(mode: PromptCoordinateMode, includeMountain
     );
   }
   return 'Infantry has no strategic ranged_attack (melee only); use movement and melee.';
-}
-
-/**
- * Strike and ferry limits for air units, or empty when the roster has none.
- *
- * Purpose: Strategic radius comes from `AIR_STRIKE_RANGE_HEXES` / `AIR_FERRY_RANGE_HEXES`; a beat strikes anywhere in the footprint.
- * When to use: Combat paragraph when `hasAirUnits` is true; also asserted on its own.
- * Expected outcome: Tactical text never quotes the strategic strike radius.
- * Exceptions: None.
- */
-export function buildAirEmploymentRule(gates: GameRuleTextGates): string {
-  logTrace('promptSpec buildAirEmploymentRule', { ...gates });
-  if (!gates.hasAirUnits) return '';
-  if (gates.coordinateMode === 'tactical') {
-    return 'An air unit strikes and drops anywhere in the battle footprint and ferries one hop between intact airport cells. An air sub-unit carries one infantry sub-unit. A drop onto a cell fortified by the other side is illegal. A drop onto an enemy cell is fought in melee if both remain.';
-  }
-  const snowHop = strategicFerryRangeHexes({ weatherAtDestination: 'snow', tags: [], enabled: true });
-  return [
-    `An air unit ferries any distance in one turn by hopping controlled intact airports. Each hop is at most ${AIR_FERRY_RANGE_HEXES} hexes, or ${snowHop} into snow when the unit lacks the snow tag.`,
-    `It strikes within ${AIR_STRIKE_RANGE_HEXES} hexes of its current airport. It does not strike from the end of a ferry on the same turn.`,
-    'It carries one infantry unit. embark with that air unit\'s id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed.',
-    `airDrops lands that infantry on a land hex within ${AIR_STRIKE_RANGE_HEXES} of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered.`,
-    'When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.',
-  ].join('\n\n');
 }
 
 /**

@@ -1,12 +1,12 @@
 /**
- * An air unit loads one infantry unit, and that infantry leaves the fight and dies with the air unit.
+ * An air unit loads up to two infantry units, and that infantry leaves the fight and dies with the air unit.
  * Run: `npm run build:main` then `node dist/main/gameActions/airlift.test.js`
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
-import { dbGetOne, dbRun } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun } from '../gameDb';
 import { insertUnitRow } from '../gameDb/unitInsert';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -58,29 +58,44 @@ function place(id: string, player: string, unitType: string, h3Index: string): v
   });
 }
 
-test('one infantry boards an air unit and a second infantry or armor does not', () => {
+test('two infantry board an air unit by order and a third infantry or armor does not', () => {
+  withTempGameDb('aw-airlift-board-two-', () => {
+    const hex = inlandAirport();
+    place('air-1', HUMAN_SEAT_ID, 'air', hex);
+    for (const id of ['inf-1', 'inf-2', 'inf-3']) place(id, HUMAN_SEAT_ID, 'infantry', hex);
+    place('arm-1', HUMAN_SEAT_ID, 'armor', hex);
+    applyEmbarkOrdersForPlayer(
+      [
+        { unitId: 'inf-1', navalUnitId: 'air-1' },
+        { unitId: 'inf-2', navalUnitId: 'air-1' },
+        { unitId: 'inf-3', navalUnitId: 'air-1' },
+        { unitId: 'arm-1', navalUnitId: 'air-1' },
+      ],
+      HUMAN_SEAT_ID
+    );
+    const aboard = dbGetAll<{ landUnitId: string }>(
+      'SELECT land_unit_id AS landUnitId FROM unit_transport_assignments WHERE naval_unit_id = ? ORDER BY land_unit_id',
+      ['air-1']
+    );
+    assert.deepEqual(aboard.map((row) => row.landUnitId), ['inf-1', 'inf-2']);
+  });
+});
+
+test('two infantry board an air unit through the slot editor, a third slot is refused, and armor is refused', () => {
   withTempGameDb('aw-airlift-board-', () => {
     const hex = inlandAirport();
     place('air-1', HUMAN_SEAT_ID, 'air', hex);
     place('inf-1', HUMAN_SEAT_ID, 'infantry', hex);
     place('inf-2', HUMAN_SEAT_ID, 'infantry', hex);
     place('arm-1', HUMAN_SEAT_ID, 'armor', hex);
-    applyEmbarkOrdersForPlayer(
-      [
-        { unitId: 'inf-1', navalUnitId: 'air-1' },
-        { unitId: 'inf-2', navalUnitId: 'air-1' },
-        { unitId: 'arm-1', navalUnitId: 'air-1' },
-      ],
-      HUMAN_SEAT_ID
-    );
-    const aboard = dbGetOne<{ landUnitId: string }>(
-      'SELECT land_unit_id AS landUnitId FROM unit_transport_assignments WHERE naval_unit_id = ?',
-      ['air-1']
-    );
-    assert.equal(aboard?.landUnitId, 'inf-1');
-    const refused = executeSealiftSlotUpdate({ h3Index: hex, navalUnitId: 'air-1', slotIndex: 2, landUnitId: 'inf-2' });
+    const first = executeSealiftSlotUpdate({ h3Index: hex, navalUnitId: 'air-1', slotIndex: 1, landUnitId: 'inf-1' });
+    assert.equal(first.success, true);
+    const second = executeSealiftSlotUpdate({ h3Index: hex, navalUnitId: 'air-1', slotIndex: 2, landUnitId: 'inf-2' });
+    assert.equal(second.success, true);
+    assert.deepEqual(second.state?.navalRows[0]?.slots.map((slot) => slot.unitId), ['inf-1', 'inf-2']);
+    const refused = executeSealiftSlotUpdate({ h3Index: hex, navalUnitId: 'air-1', slotIndex: 3, landUnitId: 'inf-2' });
     assert.equal(refused.success, false);
-    assert.equal(refused.reason, 'An air unit has only one infantry slot.');
+    assert.equal(refused.reason, 'That carrier has only 2 cargo slots.');
     const armor = executeSealiftSlotUpdate({ h3Index: hex, navalUnitId: 'air-1', slotIndex: 1, landUnitId: 'arm-1' });
     assert.equal(armor.success, false);
     assert.equal(armor.reason, 'An air unit can carry only infantry.');

@@ -12,12 +12,12 @@ import { isSeatId, type SeatId } from './seatIds';
 /**
  * Share of a home's original urban cells that other sides and Neutral must hold to knock its side out.
  *
- * Purpose: One home-loss threshold serves every map, so a side keeps fighting while it holds more than a tenth of its home.
+ * Purpose: One home-loss threshold serves every map, so a side keeps fighting while it holds more than a fifth of its home.
  * When to use: Building a map profile's `controlWinMinUrbanShare`.
- * Expected outcome: `0.9`.
+ * Expected outcome: `0.8`.
  * Exceptions: None.
  */
-export const HOME_CONTROL_WIN_MIN_URBAN_SHARE = 0.9;
+export const HOME_CONTROL_WIN_MIN_URBAN_SHARE = 0.8;
 
 /**
  * City hexes a side may hold and still count as close to being knocked out.

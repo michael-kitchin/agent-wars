@@ -53,7 +53,7 @@ export type AirDropRosterUnit = {
  * Purpose: Strategic embark, and every tactical embark except the lead side of an AI-only battle, runs before the drop.
  *   A free infantry unit on the hex is enough for those sides. The lead side's embark runs after the drop.
  * When to use: Before collecting drop targets. Pass `freeInfantryCounts: false` for that lead side.
- * Expected outcome: True when one own infantry unit is aboard this air unit, or when free infantry counts and one own
+ * Expected outcome: True when at least one own infantry unit is aboard this air unit, or when free infantry counts and one own
  *   unembarked infantry unit shares its hex. Armor and another side's infantry do not count.
  * Exceptions: None.
  */

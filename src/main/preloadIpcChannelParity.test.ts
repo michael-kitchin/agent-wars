@@ -119,6 +119,7 @@ function run(): void {
   const source = fs.readFileSync(preloadPath, 'utf8');
   assertPreloadImportsSharedTables(source);
   assertNoLiteralChannels(source);
+  assertNoLiteralChannels(fs.readFileSync(path.resolve(process.cwd(), 'src', 'main', 'preloadSealiftApi.ts'), 'utf8'));
   assertEveryChannelHasMainHandler();
   console.log('preloadIpcChannelParity.test.ts passed');
 }

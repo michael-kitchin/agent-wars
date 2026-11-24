@@ -19,7 +19,7 @@ If every side would be knocked out on the same turn, none is knocked out and the
 - Scenario: region_vs_region
 - Your home region: Southern Africa
 - Enemy home regions: Eastern Africa
-- Knock an enemy out at the end of a turn by any of these: (1) Other sides and Neutral together holding enemy home region hexes with at least 90% of its original urban cells, OR (2) Eliminating all urban production (tactical urban hexes) in the enemy home region, OR (3) Taking every city hex the enemy holds anywhere.
+- Knock an enemy out at the end of a turn by any of these: (1) Other sides and Neutral together holding enemy home region hexes with at least 80% of its original urban cells, OR (2) Eliminating all urban production (tactical urban hexes) in the enemy home region, OR (3) Taking every city hex the enemy holds anywhere.
 - Every home-region outline is always visible on the map.
 - Your home region hexes are: QY, PU, PL, R7, Q6, SK, SG, T8
 - Eastern Africa home region hexes are: JC, JG, HZ, JP, KI, KK, LS, I5, LZ, LU, KR, KO, NE, ND, M9, OQ, OK, NA, M7, OS, P1, PV, RD, OT, OP, P5, PM
@@ -92,9 +92,9 @@ An air unit ferries any distance in one turn by hopping controlled intact airpor
 
 It strikes within 3 hexes of its current airport. It does not strike from the end of a ferry on the same turn.
 
-It carries one infantry unit. embark with that air unit's id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed.
+It carries up to 2 infantry units. embark with that air unit's id in navalUnitId loads one infantry unit on the same hex; give one embark row per unit. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed.
 
-airDrops lands that infantry on a land hex within 3 of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered.
+airDrops lands every infantry unit aboard on a land hex within 3 of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, all of that infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered.
 
 When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.
 
@@ -144,7 +144,7 @@ Call rules(topic) for a rule that is not printed above. Topics: weather, movemen
 
 - Your goals are, in priority order: (1) Take and hold enemy cities. Taking cities is how you knock sides out. (2) Bring more force to each fight than the enemy can. Mass your ground units before an attack, and use ships, aircraft, and mercenaries to put units where the enemy is weak. (3) Stop the enemy doing the same. Destroy the city cells, airports, and seaports that build and move its units. (4) Keep enough units at home to stop a raid on your cities. (5) Keep every city building, and keep credits coming in for mercenaries. (6) Scout with a few units, not your main force.
 - Your strategy is: (1) Attack where you outnumber the defenders, and avoid fights where you do not. (2) Strike gaps the enemy cannot reinforce quickly. (3) Keep the initiative: move toward your objective every turn.
-- Your tools are: (1) Naval units shell any hex within 2 of them, and carry ground units to a coast the enemy has left open. (2) Air units strike within 3 hexes of their airport, carry one infantry unit between airports, and drop it within 3 hexes. (3) Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside the campaign target, or behind the enemy to split its force.
+- Your tools are: (1) Naval units shell any hex within 2 of them, and carry ground units to a coast the enemy has left open. (2) Air units strike within 3 hexes of their airport, carry up to 2 infantry units between airports, and drop them within 3 hexes. (3) Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside the campaign target, or behind the enemy to split its force.
 - Your doctrine is balanced: (1) Advance on the campaign target while your home cities are safe. (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not. (3) Strike the cities, airports, and seaports your ground units cannot reach. Production the enemy loses is force it cannot bring.
 - Messages from other sides:
     The Messages section of the situation shows the recent messages between you and each other side.
@@ -179,9 +179,9 @@ To choose a different target, set "campaignTarget" to the hex code of an enemy c
 
 The engine runs operations: several turns of orders that carry ground units to an enemy city by sea or by air.
 
-By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it.
+By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. If the force has not gathered after 10 turns, it sails only when the ships at the port can carry at least 75% of its ground units, and is called off otherwise, so keep its ships with it. A campaign lift needs only its own minimum.
 
-By air, it marches one infantry unit to an air unit's airport, loads it, ferries to an airport in range when it must, and drops it onto a city that holds no enemy unit.
+By air, it marches up to 2 infantry units to an air unit's airport, loads them, ferries to an airport in range when it must, and drops them onto a city that holds no enemy unit.
 
 The Active Operations section of the briefing lists each one and how far it has got.
 
@@ -248,9 +248,9 @@ Callback support: subscribe with event "infrastructure_destroyed" and parameters
 
 ## Transport
 
-Embark: coastal, a land seaport with water or coast next to it (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.
+Embark: coastal, a land seaport with water or coast next to it (control not required), or a water seaport you control. Capacity: 4 slots per naval unit; infantry takes 1 and armor 2, so a ship carries 4 infantry, 2 armor, or 1 armor and 2 infantry. Capacity Used in Naval Transport Status counts slots.
 
-An air unit carries one infantry unit, boarded with embark, moved with ferryOrders, unloaded with disembark or airDrops.
+An air unit carries up to 2 infantry units, boarded with embark (one row per unit), moved with ferryOrders, unloaded with disembark or airDrops. A drop lands every infantry unit aboard.
 
 # Available Tools
 
@@ -284,14 +284,14 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 ## Winning
 
-- Win by being the last side standing: an enemy is knocked out when other sides and Neutral together hold its home region (at least 90% of its original urban cells), when its home cities are destroyed, or when it holds no city hex anywhere. Those are the cells that matter. A side with only a few city hexes left is close to being knocked out.
+- Win by being the last side standing: an enemy is knocked out when other sides and Neutral together hold its home region (at least 80% of its original urban cells), when its home cities are destroyed, or when it holds no city hex anywhere. Those are the cells that matter. A side with only a few city hexes left is close to being knocked out.
 - When more than one home region lists the same cells, the listed shared cells count toward each of those sides, so holding them serves defence and attack at once.
 
 ## Using the Briefing
 
 - When Best Options This Turn lists a target for a unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the unit idle. Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from a row listing that unit into explicit_move.destination (approach, advance, or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes; copy an air drop Target Hex into airDrops.
 
-  Each unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same unit. An air unit picks only one of air strike, air drop, and ferry. When its Aboard column is none, embark one infantry unit from its hex in the same orders list.
+  Each unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same unit. An air unit picks only one of air strike, air drop, and ferry. When its Aboard column lists fewer than 2 infantry, embark infantry units from its hex in the same orders list, one embark row each.
 
   Never copy a Target Hex from a row that does not list that unit; if that unit has no row, call plan_route or leave it idle.
 - When the briefing shows no observed enemy unit, move to regain contact along plausible approaches rather than holding position.
@@ -660,7 +660,7 @@ Treasury: 0 credits. No one to rehire.
 
 | Unit ID | Hex | Your control | Seaport Here | Aboard | Capacity Used | Nearest Embark Hex |
 | --- | --- | --- | --- | --- | --- | --- |
-| a1-n1 | SG | yes | yes | infantry 0, armor 0 | 0/2 | SG at hex distance 0 |
+| a1-n1 | SG | yes | yes | infantry 0, armor 0 | 0/4 | SG at hex distance 0 |
 
 ## Unit Roster
 

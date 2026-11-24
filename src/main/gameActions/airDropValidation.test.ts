@@ -39,7 +39,7 @@ function airportAndLandTarget(): { origin: string; target: string } {
   return { origin, target };
 }
 
-test('a drop is legal on an enemy land hex and refused for a second infantry, water, or the home hex', () => {
+test('a drop is legal on an enemy land hex and refused for water or the home hex', () => {
   withTempGameDb('aw-air-drop-valid-', () => {
     const { origin, target } = airportAndLandTarget();
     insertUnitRow(dbRun, {
@@ -81,15 +81,33 @@ test('a drop is legal on an enemy land hex and refused for a second infantry, wa
     dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['inf-1', 'air-1']);
     assert.equal(validateAirDropOrder('air-1', target).valid, true);
     assert.equal(validateAirDropOrder('air-1', origin).valid, false);
-    dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['inf-2', 'air-1']);
-    const second = validateAirDropOrder('air-1', target);
-    assert.equal(second.valid, false);
     const water = dbGetOne<{ h3Index: string }>(
       `SELECT h3_index AS h3Index FROM hexes WHERE terrain = 'water' LIMIT 1`
     )?.h3Index;
     assert.ok(water);
-    dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', ['inf-2']);
     const wet = validateAirDropOrder('air-1', water!);
     assert.equal(wet.valid, false);
+  });
+});
+
+test('a drop with two infantry aboard is legal', () => {
+  withTempGameDb('aw-air-drop-two-', () => {
+    const { origin, target } = airportAndLandTarget();
+    for (const [id, unitType, order] of [['air-1', 'air', 1], ['inf-1', 'infantry', 2], ['inf-2', 'infantry', 3]] as const) {
+      insertUnitRow(dbRun, { id, player: HUMAN_SEAT_ID, unitType, displayOrder: order, h3Index: origin, origin: null, formedTurn: 1 });
+    }
+    for (const id of ['inf-1', 'inf-2']) {
+      dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [id, 'air-1']);
+    }
+    assert.equal(validateAirDropOrder('air-1', target).valid, true);
+  });
+});
+
+test('a drop with nothing aboard needs infantry aboard', () => {
+  withTempGameDb('aw-air-drop-empty-', () => {
+    const { origin, target } = airportAndLandTarget();
+    insertUnitRow(dbRun, { id: 'air-1', player: HUMAN_SEAT_ID, unitType: 'air', displayOrder: 1, h3Index: origin, origin: null, formedTurn: 1 });
+    const result = validateAirDropOrder('air-1', target);
+    assert.deepEqual(result, { valid: false, reason: 'Air drop needs infantry aboard.' });
   });
 });

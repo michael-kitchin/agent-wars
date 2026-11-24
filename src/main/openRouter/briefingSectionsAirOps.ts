@@ -10,6 +10,7 @@
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { findReachableAirportFerryDestinations } from '../../shared/airportFerryRoute';
@@ -162,21 +163,24 @@ export function buildAirOperationsBriefingBlock(
 }
 
 /**
- * The infantry id aboard an air unit, or `none`.
+ * The infantry ids aboard an air unit, or `none`.
  *
  * Purpose: The Air Operations table names cargo the same way the naval table names a ship's cargo.
  * When to use: One air row in either consultation mode.
- * Expected outcome: One infantry id, or `none` when the air unit is empty.
+ * Expected outcome: Every infantry id aboard, sorted with `compareCodeUnits` and joined with `, `, or `none` when the air unit is empty.
  * Exceptions: None.
  */
 function infantryAboardLabel(state: GameStateSnapshot, airUnitId: string): string {
-  const aboard = state.units.find(
-    (unit) =>
-      unit.unitType === 'infantry' &&
-      (unit.embarkedOnCarrierUnitId === airUnitId ||
-        (unit as { embarkedOnSubUnitId?: string }).embarkedOnSubUnitId === airUnitId)
-  );
-  return aboard?.id ?? 'none';
+  const aboard = state.units
+    .filter(
+      (unit) =>
+        unit.unitType === 'infantry' &&
+        (unit.embarkedOnCarrierUnitId === airUnitId ||
+          (unit as { embarkedOnSubUnitId?: string }).embarkedOnSubUnitId === airUnitId)
+    )
+    .map((unit) => unit.id)
+    .sort(compareCodeUnits);
+  return aboard.length > 0 ? aboard.join(', ') : 'none';
 }
 
 /**

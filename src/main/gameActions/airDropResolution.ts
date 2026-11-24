@@ -1,10 +1,11 @@
 import { isLandUnitType } from '../../shared/landUnitType';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 /**
- * Lands embarked infantry from an air unit, or loses both when the target shoots the air unit down.
+ * Lands every embarked infantry unit from an air unit, or loses all of them when the target shoots the air unit down.
  *
  * Purpose: A drop is not an attack roll. Only anti-air uses the combat dice.
  * When to use: Immediately after air strikes and before the ranged-fire list is built.
- * Expected outcome: The infantry is on the target and the air unit is still on its airport, or both are gone.
+ * Expected outcome: Every infantry unit aboard is on the target and the air unit is still on its airport, or the air unit and all its infantry are gone.
  * Exceptions: None. An illegal order is skipped.
  */
 
@@ -33,7 +34,7 @@ import type { CombatUnit } from '../combatUnitTypes';
  *
  * Purpose: Playback, the ranged-fire exclusion list, and the air-strike dice log.
  * When to use: The return of `resolveAirDropPhase`.
- * Expected outcome: Moves for drops that were attempted. Removed ids include the air unit and its infantry when return fire hit.
+ * Expected outcome: Moves for drops that were attempted. Removed ids include the air unit and all its infantry when return fire hit.
  * Exceptions: None.
  */
 export type AirDropPhaseResult = {
@@ -92,7 +93,7 @@ export function reconcileHumanAirActions(args: {
 /**
  * Resolves strategic air drops.
  *
- * Purpose: Infantry lands on the target when the air unit is not shot down. A hit deletes both and does not move the infantry onto the target.
+ * Purpose: Every infantry unit aboard lands on the target when the air unit is not shot down. A hit deletes the air unit and all its infantry, and none of it lands.
  * When to use: After air-strike transport losses, with the same combat die the strike phase used.
  * Expected outcome: One animation row per drop that passed validation and was not skipped. Anti-air dice are `kind: 'antiAir'`.
  * Exceptions: None.
@@ -121,14 +122,14 @@ export function resolveAirDropPhase(
       'SELECT id, player, h3_index AS h3Index, display_order AS displayOrder FROM units WHERE id = ? AND unit_type = ?',
       [order.unitId, 'air']
     );
-    const infantry = dbGetOne<{ id: string; player: string; h3Index: string; displayOrder: number | null }>(
+    const infantry = dbGetAll<{ id: string; player: string; h3Index: string; displayOrder: number | null }>(
       `SELECT lu.id AS id, lu.player AS player, lu.h3_index AS h3Index, lu.display_order AS displayOrder
        FROM unit_transport_assignments uta
        JOIN units lu ON lu.id = uta.land_unit_id
        WHERE uta.naval_unit_id = ?`,
       [order.unitId]
-    );
-    if (!carrier || !infantry) continue;
+    ).sort((left, right) => compareCodeUnits(left.id, right.id));
+    if (!carrier || infantry.length === 0) continue;
     const defenders = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
       'SELECT id, player, unit_type, h3_index FROM units WHERE h3_index = ? AND player != ?',
       [order.targetH3Index, carrier.player]
@@ -167,7 +168,7 @@ export function resolveAirDropPhase(
         id: carrier.id,
         player: carrier.player,
         unitType: 'air',
-        h3Index: infantry.h3Index,
+        h3Index: infantry[0].h3Index,
         displayOrder: carrier.displayOrder ?? undefined,
       }]);
       for (const unit of lost.cargo) {
@@ -184,15 +185,17 @@ export function resolveAirDropPhase(
       });
       continue;
     }
-    dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [infantry.id]);
-    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.targetH3Index, infantry.id]);
+    for (const unit of infantry) {
+      dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [unit.id]);
+      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.targetH3Index, unit.id]);
+    }
     moves.push({
       unitId: carrier.id,
       player: carrier.player,
       fromH3Index: carrier.h3Index,
       targetH3Index: order.targetH3Index,
       returnsToBase: true,
-      infantryUnitId: infantry.id,
+      infantryUnitIds: infantry.map((unit) => unit.id),
     });
   }
   return { moves, removedUnitIds, removedUnits, diceRolls: diceLog.rolls, carrierIdByCargoId };

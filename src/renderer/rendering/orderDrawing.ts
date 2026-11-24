@@ -387,11 +387,11 @@ export function buildAirStrikeReturnPlaybackMoves(
 }
 
 /**
- * Outbound playback for air drops: the air unit flies to the target, and landed infantry flies there too.
+ * Outbound playback for air drops: the air unit flies to the target, and every landed infantry unit flies there too.
  *
  * Purpose: The air unit and the infantry leave the airport together. A shot-down drop draws only the air unit.
  * When to use: Ready playback, before the return leg.
- * Expected outcome: One air move per drop, plus one infantry move when `infantryUnitId` is set.
+ * Expected outcome: One air move per drop, plus one infantry move per id in `infantryUnitIds`.
  * Exceptions: None.
  */
 export function buildAirDropOutboundPlaybackMoves(
@@ -407,9 +407,9 @@ export function buildAirDropOutboundPlaybackMoves(
       fromH3Index: move.fromH3Index,
       toH3Index: move.targetH3Index,
     });
-    if (move.infantryUnitId) {
+    for (const infantryUnitId of move.infantryUnitIds ?? []) {
       outbound.push({
-        unitId: move.infantryUnitId,
+        unitId: infantryUnitId,
         player: move.player,
         unitType: 'infantry',
         fromH3Index: move.fromH3Index,

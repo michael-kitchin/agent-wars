@@ -11,6 +11,7 @@ import { isLandUnitType } from '../../shared/landUnitType';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
+import { cargoSlotsUsed, NAVAL_CARGO_SLOTS } from '../../shared/carrierCargoRules';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { isLandSeaportHex } from '../../shared/navalStrategicEdges';
@@ -98,11 +99,8 @@ export function buildSealiftBriefingBlock(
       const embarked = opponentLand.filter(
         (land) => (land as { embarkedOnSubUnitId?: string }).embarkedOnSubUnitId === naval.id
       );
-      const armor = embarked.filter((u) => u.unitType === 'armor').length;
-      const infantry = embarked.filter((u) => u.unitType === 'infantry').length;
-      const capacityUsed = armor >= 1 ? 2 : Math.min(infantry, 2);
       const aboardIds = embarked.map((u) => u.id).join(', ') || '—';
-      navalRows.push([naval.id, format(naval.h3Index), aboardIds, `${capacityUsed}/2`]);
+      navalRows.push([naval.id, format(naval.h3Index), aboardIds, `${cargoSlotsUsed(embarked.map((unit) => unit.unitType))}/${NAVAL_CARGO_SLOTS}`]);
     }
     lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Aboard', 'Capacity Used'], navalRows));
     return lines.join('\n');
@@ -122,7 +120,6 @@ export function buildSealiftBriefingBlock(
     const armor = embarked.filter((unit) => unit.unitType === 'armor').length;
     const infantry = embarked.filter((unit) => unit.unitType === 'infantry').length;
     const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format, ownSeat, seaAccessOf);
-    const capacityUsed = armor >= 1 ? 2 : Math.min(infantry, 2);
     const aboard = `infantry ${infantry}, armor ${armor}`;
     navalRows.push([
       naval.id,
@@ -130,7 +127,7 @@ export function buildSealiftBriefingBlock(
       controlled ? 'yes' : 'no',
       hasPort ? 'yes' : 'no',
       aboard,
-      `${capacityUsed}/2`,
+      `${cargoSlotsUsed(embarked.map((unit) => unit.unitType))}/${NAVAL_CARGO_SLOTS}`,
       nearestEmbark,
     ]);
   }

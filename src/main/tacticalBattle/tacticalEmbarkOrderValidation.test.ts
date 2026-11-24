@@ -10,6 +10,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { EmbarkOrder } from '../../shared/ipcTypes';
+import { carrierFullReason } from '../../shared/carrierCargoRules';
+import { pickHex, setHexTerrain, setPortControl, withTempDb } from '../testSupport/sealiftTestFixtures';
 import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   validateTacticalHumanEmbarkOrder,
@@ -98,7 +100,7 @@ test('human embark validation keeps the pre-database reasons', () => {
   );
 });
 
-test('an air sub-unit boards one infantry sub-unit and refuses a second', () => {
+test('an air sub-unit boards two infantry sub-units and refuses a third', () => {
   const first = validateTacticalHumanEmbarkOrder(
     { unitId: 'inf-1', navalUnitId: 'air-1' },
     [subUnit('inf-1', 'human', 'infantry', 'cell'), subUnit('air-1', 'human', 'air', 'cell')],
@@ -120,8 +122,43 @@ test('an air sub-unit boards one infantry sub-unit and refuses a second', () => 
     ],
     enclosing
   );
-  assert.equal(second.valid, false);
-  if (!second.valid) assert.equal(second.reason, 'An air unit has only one infantry slot.');
+  assert.deepEqual(second, { valid: true });
+  const third = validateTacticalHumanEmbarkOrder(
+    { unitId: 'inf-3', navalUnitId: 'air-1' },
+    [
+      subUnit('inf-1', 'human', 'infantry', 'cell', 'air-1'),
+      subUnit('inf-2', 'human', 'infantry', 'cell', 'air-1'),
+      subUnit('inf-3', 'human', 'infantry', 'cell'),
+      subUnit('air-1', 'human', 'air', 'cell'),
+    ],
+    enclosing
+  );
+  assert.equal(third.valid, false);
+  if (!third.valid) assert.equal(third.reason, carrierFullReason('air'));
+});
+
+test('a naval sub-unit takes four infantry sub-units', () => {
+  withTempDb(() => {
+    const port = pickHex(1);
+    setHexTerrain(port, 'coastal');
+    setPortControl(port, 'human');
+    const aboard = (count: number): TacticalSubUnitSnapshot[] =>
+      Array.from({ length: count }, (_, index) => subUnit(`inf-${index}`, 'human', 'infantry', 'cell', 'ship'));
+    const order = { unitId: 'inf-new', navalUnitId: 'ship' };
+    const withRoom = validateTacticalHumanEmbarkOrder(
+      order,
+      [...aboard(3), subUnit('inf-new', 'human', 'infantry', 'cell'), subUnit('ship', 'human', 'naval', 'cell')],
+      port
+    );
+    assert.deepEqual(withRoom, { valid: true });
+    const full = validateTacticalHumanEmbarkOrder(
+      order,
+      [...aboard(4), subUnit('inf-new', 'human', 'infantry', 'cell'), subUnit('ship', 'human', 'naval', 'cell')],
+      port
+    );
+    assert.equal(full.valid, false);
+    if (!full.valid) assert.equal(full.reason, carrierFullReason('naval'));
+  });
 });
 
 test('opponent embark validation keeps the pre-database reasons', () => {

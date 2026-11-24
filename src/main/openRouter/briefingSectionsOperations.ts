@@ -75,7 +75,7 @@ function cargoAboardIds(state: GameStateSnapshot, operation: Operation): readonl
  *
  * Purpose: An air operation has no ships at sea, so its sentence names the infantry and the air unit.
  * When to use: When `operation.method` is `air`.
- * Expected outcome: A markdown list line. Transit says the air unit drops this turn when it is already on the launch airport, and otherwise that it ferries there. A return names the infantry and the air unit.
+ * Expected outcome: A markdown list line that names every infantry unit in the operation, joined with ` and `, with singular verbs for one unit and plural for more. Transit says the air unit drops this turn when it is already on the launch airport, and otherwise that it ferries there. A return names the infantry and the air unit.
  * Exceptions: None.
  */
 function airOperationBullet(state: GameStateSnapshot, operation: Operation, format: (h3Index: string) => string): string {
@@ -83,22 +83,23 @@ function airOperationBullet(state: GameStateSnapshot, operation: Operation, form
   const muster = format(operation.musterH3);
   const urban = (state.strategicInfrastructure ?? []).find((row) => row.h3Index === operation.objectiveH3)?.urbanHexCount ?? 0;
   const city = `an enemy city with ${urban} ${noun(urban, 'city cell')}`;
-  const infantry = operation.unitIds[0] ?? '';
+  const infantry = operation.unitIds.join(' and ');
+  const several = operation.unitIds.length > 1;
   const carrierId = operation.carrierIds[0] ?? '';
   if (operation.phase === 'muster') {
-    return `- ${operation.id}: by air to ${objective}, ${city}. ${infantry} is marching to ${muster} to board ${carrierId}.`;
+    return `- ${operation.id}: by air to ${objective}, ${city}. ${infantry} ${several ? 'are' : 'is'} marching to ${muster} to board ${carrierId}.`;
   }
   if (operation.phase === 'transit') {
     const carrier = state.units.find((unit) => unit.id === carrierId);
     const landing = operation.landingH3 === null ? 'an unknown landing' : format(operation.landingH3);
     const onLanding = carrier !== undefined && operation.landingH3 !== null && carrier.h3Index === operation.landingH3;
-    const step = onLanding ? 'drops it this turn' : `ferries to ${landing} this turn`;
-    return `- ${operation.id}: by air to ${objective}, ${city}. ${infantry} is aboard ${carrierId}, which ${step}.`;
+    const step = onLanding ? `drops ${several ? 'them' : 'it'} this turn` : `ferries to ${landing} this turn`;
+    return `- ${operation.id}: by air to ${objective}, ${city}. ${infantry} ${several ? 'are' : 'is'} aboard ${carrierId}, which ${step}.`;
   }
   if (operation.phase === 'assault') {
-    return `- ${operation.id}: by air to ${objective}. ${infantry} has landed and holds it until control passes to you.`;
+    return `- ${operation.id}: by air to ${objective}. ${infantry} ${several ? 'have landed and hold' : 'has landed and holds'} it until control passes to you.`;
   }
-  return `- ${operation.id}: by air, turned back from ${objective}. ${infantry} is with ${carrierId}.`;
+  return `- ${operation.id}: by air, turned back from ${objective}. ${infantry} ${several ? 'are' : 'is'} with ${carrierId}.`;
 }
 
 /**
@@ -156,7 +157,7 @@ function ofTotal(count: number, total: number, singular: string): string {
 /**
  * The plan and cost cells of one air option.
  *
- * Purpose: An air row names one infantry unit and one air unit, and says whether that air unit must ferry first.
+ * Purpose: An air row names its infantry units and one air unit, and says whether that air unit must ferry first.
  * When to use: When `candidate.method` is `air`.
  * Expected outcome: The plan says the air unit carries the infantry when the launch airport is the muster hex, and otherwise that it ferries to the launch airport. The cost counts one air unit out of the seat's air units.
  * Exceptions: None.
@@ -169,10 +170,12 @@ function airPlanAndCost(args: {
 }): { readonly plan: string; readonly cost: string } {
   const { candidate, groundTotal, airTotal, format } = args;
   const carrier = candidate.carrierIds[0] ?? '';
+  const count = candidate.unitIds.length;
+  const them = count === 1 ? 'it' : 'them';
   const carries = candidate.landingH3 === candidate.musterH3
-    ? 'carries it'
-    : `ferries it to ${format(candidate.landingH3)}`;
-  const plan = `1 infantry unit musters at ${format(candidate.musterH3)}; ${carrier} ${carries}; drops on ${format(candidate.objectiveH3)}`;
+    ? `carries ${them}`
+    : `ferries ${them} to ${format(candidate.landingH3)}`;
+  const plan = `${count} infantry ${noun(count, 'unit')} ${count === 1 ? 'musters' : 'muster'} at ${format(candidate.musterH3)}; ${carrier} ${carries}; drops on ${format(candidate.objectiveH3)}`;
   const cost = `${ofTotal(candidate.unitIds.length, groundTotal, 'ground unit')}, ${ofTotal(candidate.carrierIds.length, airTotal, 'air unit')}, about ${candidate.etaTurns} ${noun(candidate.etaTurns, 'turn')}`;
   return { plan, cost };
 }

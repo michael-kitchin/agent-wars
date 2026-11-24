@@ -1,10 +1,11 @@
 import { isLandUnitType } from '../../shared/landUnitType';
+import { compareCodeUnits } from '../../shared/codeUnitOrder';
 /**
  * Tactical air-drop legality and resolution.
  *
- * Purpose: An air sub-unit lands its infantry on a battle cell and stays where it is.
+ * Purpose: An air sub-unit lands every infantry sub-unit it carries on a battle cell and stays where it is.
  * When to use: Group targeting, and the air phase after strikes and before ranged fire.
- * Expected outcome: One infantry moves to the cell, or return fire removes the air unit and that infantry.
+ * Expected outcome: Every infantry sub-unit aboard moves to the cell, or return fire removes the air unit and all of that infantry.
  * Exceptions: None. An illegal order is skipped.
  */
 
@@ -92,7 +93,7 @@ export function tacticalAirDropTargetRefusal(
  *
  * Purpose: Planning and resolution share one gate.
  * When to use: For each selected air sub-unit, and again when the beat resolves.
- * Expected outcome: Null when the air unit carries one infantry unit and the cell is land inside the footprint.
+ * Expected outcome: Null when the air unit carries at least one infantry unit and the cell is land inside the footprint.
  *   A fortified cell owned by someone else is `Blocked: Fortified`. Enemy units on the cell do not refuse the drop.
  * Exceptions: None.
  */
@@ -107,7 +108,7 @@ export function tacticalAirDropRefusal(
   const infantry = battle.subUnits.filter(
     (row) => row.unitType === 'infantry' && row.embarkedOnSubUnitId === unitId
   );
-  if (infantry.length !== 1) return 'Air drop needs exactly one infantry unit aboard.';
+  if (infantry.length === 0) return 'Air drop needs infantry aboard.';
   return tacticalAirDropTargetRefusal(battle, unit, targetH3Index);
 }
 
@@ -147,7 +148,7 @@ export function validateTacticalAirDropGroup(
  *
  * Purpose: The air phase replaces its working list with this result.
  * When to use: The return of `resolveTacticalAirDrops`.
- * Expected outcome: Surviving infantry is on the target. A shot-down air unit and its infantry are in `removedUnits`.
+ * Expected outcome: Every infantry sub-unit aboard a surviving air unit is on the target. A shot-down air unit and its infantry are in `removedUnits`.
  * Exceptions: None.
  */
 export type TacticalAirDropResolution = {
@@ -158,11 +159,11 @@ export type TacticalAirDropResolution = {
 };
 
 /**
- * Lands infantry from air units that are not striking this beat.
+ * Lands all the infantry aboard air units that are not striking this beat.
  *
  * Purpose: The air unit does not change cells. Return fire uses the same anti-air dice as a strike against units.
  * When to use: After tactical air strikes, before ranged fire.
- * Expected outcome: A miss or an empty cell moves the infantry and clears its assignment. A hit removes the air unit and the infantry.
+ * Expected outcome: A miss or an empty cell moves every infantry sub-unit aboard and clears its assignment. A hit removes the air unit and all of that infantry.
  *   Dice are reported through `onRoll`. No attack roll is made against the defenders.
  * Exceptions: None. An illegal order is logged and skipped.
  */
@@ -255,10 +256,13 @@ export function resolveTacticalAirDrops(args: {
       });
       continue;
     }
-    const infantry = sub.find((row) => row.unitType === 'infantry' && row.embarkedOnSubUnitId === attacker.id);
-    if (!infantry) continue;
+    const infantry = sub
+      .filter((row) => row.unitType === 'infantry' && row.embarkedOnSubUnitId === attacker.id)
+      .sort((left, right) => compareCodeUnits(left.id, right.id));
+    if (infantry.length === 0) continue;
+    const landedIds = new Set(infantry.map((row) => row.id));
     sub = sub.map((row) =>
-      row.id === infantry.id ? { ...row, h3Index: order.targetH3Index, embarkedOnSubUnitId: null } : row
+      landedIds.has(row.id) ? { ...row, h3Index: order.targetH3Index, embarkedOnSubUnitId: null } : row
     );
     moves.push({
       unitId: attacker.id,
@@ -266,7 +270,7 @@ export function resolveTacticalAirDrops(args: {
       fromH3Index: attacker.h3Index,
       targetH3Index: order.targetH3Index,
       returnsToBase: true,
-      infantryUnitId: infantry.id,
+      infantryUnitIds: infantry.map((row) => row.id),
     });
   }
   return { subUnits: sub, removedUnits, moves, killsByReturnFire };

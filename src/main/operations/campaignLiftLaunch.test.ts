@@ -125,7 +125,7 @@ function setTurn(turnNumber: number): void {
  *
  * Purpose: A campaign lift needs units that cannot reach the campaign by land, a port, and a city a ship can reach.
  * When to use: The start of each case.
- * Expected outcome: The hexes used. The seat holds the maritime posture, so two ships carry four of the eight infantry.
+ * Expected outcome: The hexes used. The seat holds the maritime posture, so one ship carries four of the eight infantry.
  * Exceptions: Fails an assertion when the seeded map has no such city.
  */
 function arrange(landMass: LandMassByH3): Arranged {
@@ -238,7 +238,7 @@ function storedLifts(): readonly Operation[] {
   return (readOperations({ getOne: dbGetOne }).get(SEAT) ?? []).filter((operation) => operation.purpose === 'campaign');
 }
 
-test('an undefended city gets a lift of four troops on two ships', () => {
+test('an undefended city gets a lift of four troops on one ship', () => {
   withTempGameDb('aw-campaign-lift-', () => {
     const landMass = loadCampaignLandMass(SEAT);
     assert.ok(landMass, 'expected the terrain cache');
@@ -251,7 +251,7 @@ test('an undefended city gets a lift of four troops on two ships', () => {
     assert.equal(lifts[0]?.method, 'sea');
     assert.equal(lifts[0]?.objectiveH3, city);
     assert.equal(lifts[0]?.unitIds.length, 4);
-    assert.equal(lifts[0]?.carrierIds.length, 2);
+    assert.equal(lifts[0]?.carrierIds.length, 1);
     assert.equal(lifts[0]?.minGroundUnits, 2);
     assert.equal(readCampaignObjectives({ getOne: dbGetOne }).get(SEAT)?.liftLaunchedTurn, TURN);
   });

@@ -9,6 +9,12 @@
  */
 
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../../shared/tacticalRanges';
+import {
+  AIRLIFT_INFANTRY_CAPACITY,
+  ARMOR_CARGO_SLOT_COST,
+  INFANTRY_CARGO_SLOT_COST,
+  NAVAL_CARGO_SLOTS,
+} from '../../../shared/carrierCargoRules';
 import { strategicFerryRangeHexes } from '../../../shared/weatherBonusRules';
 import { FORTIFIED_MAP_LEGEND_FRAGMENT } from '../../../shared/fortificationRules';
 import { emptyOverlayGlyph } from '../../briefing/map/hexMapRenderer';
@@ -16,7 +22,12 @@ import { BEST_OPTIONS_ODDS_LINE } from '../../briefing/map/briefingTables';
 import { MISSILE_TARGETS_TABLE_INTRO } from '../briefingSectionsMissiles';
 import { PERSISTENT_LIMIT } from '../../tools/memory';
 import { logTrace } from '../../logger';
-import { SECTION_TITLE_READING_THE_BRIEFING, subHeading, topLevelHeading } from './sectionHeadings';
+import {
+  SECTION_TITLE_NAVAL_TRANSPORT_STATUS,
+  SECTION_TITLE_READING_THE_BRIEFING,
+  subHeading,
+  topLevelHeading,
+} from './sectionHeadings';
 import {
   SECTION_TITLE_AIR_OPERATIONS_TABLE,
   SECTION_TITLE_BEST_OPTIONS_ODDS,
@@ -160,55 +171,55 @@ export const AIR_OPERATIONS_TABLE_RULES =
  *
  * Purpose: The battle sentence does not read the snapshot.
  * When to use: The Air Operations Table subsection of a battle whose roster has air.
- * Expected outcome: Footprint strikes, one-hop ferry, and one infantry sub-unit per air sub-unit.
+ * Expected outcome: Footprint strikes, one-hop ferry, and up to `AIRLIFT_INFANTRY_CAPACITY` infantry sub-units per air sub-unit.
  * Exceptions: None.
  */
 export const TACTICAL_AIR_OPERATIONS_TABLE_RULES =
-  'Air rules (tactical): strikes and drops cover this battle footprint; ferry is one hop between intact airport cells; an air sub-unit carries one infantry sub-unit.';
+  `Air rules (tactical): strikes and drops cover this battle footprint; ferry is one hop between intact airport cells; an air sub-unit carries up to ${AIRLIFT_INFANTRY_CAPACITY} infantry sub-units.`;
 
 /**
  * Strategic naval embark rule.
  *
  * Purpose: The sentence used to sit under Naval Transport Status.
  * When to use: The Transport subsection when the side has naval units.
- * Expected outcome: Coastal, a land seaport with water or coast next to it, or a water seaport the side controls, and the capacity line.
+ * Expected outcome: Coastal, a land seaport with water or coast next to it, or a water seaport the side controls, and the capacity line: `NAVAL_CARGO_SLOTS` slots per naval unit, infantry at `INFANTRY_CARGO_SLOT_COST` and armor at `ARMOR_CARGO_SLOT_COST`, and that Capacity Used counts slots.
  * Exceptions: None.
  */
 export const NAVAL_EMBARK_RULE =
-  'Embark: coastal, a land seaport with water or coast next to it (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.';
+  `Embark: coastal, a land seaport with water or coast next to it (control not required), or a water seaport you control. Capacity: ${NAVAL_CARGO_SLOTS} slots per naval unit; infantry takes ${INFANTRY_CARGO_SLOT_COST} and armor ${ARMOR_CARGO_SLOT_COST}, so a ship carries 4 infantry, 2 armor, or 1 armor and 2 infantry. Capacity Used in ${SECTION_TITLE_NAVAL_TRANSPORT_STATUS} counts slots.`;
 
 /**
  * Battle naval capacity rule.
  *
  * Purpose: The sentence does not read the battle snapshot.
  * When to use: The Transport subsection of a battle whose roster has naval units.
- * Expected outcome: The same capacity, plus the debark reminder.
+ * Expected outcome: The same slot capacity, plus the debark reminder.
  * Exceptions: None.
  */
 export const TACTICAL_SEALIFT_RULE =
-  'Tactical sealift: capacity 1 armor or 2 infantry per naval sub-unit. Debark before independent land marches.';
+  `Tactical sealift: ${NAVAL_CARGO_SLOTS} slots per naval sub-unit; infantry takes ${INFANTRY_CARGO_SLOT_COST} and armor ${ARMOR_CARGO_SLOT_COST}, so a naval sub-unit carries 4 infantry, 2 armor, or 1 armor and 2 infantry. Capacity Used in ${SECTION_TITLE_NAVAL_TRANSPORT_STATUS} counts slots. Debark before independent land marches.`;
 
 /**
  * Strategic airlift rule.
  *
  * Purpose: The sentence used to sit in the sealift block when the side has air units.
  * When to use: The Transport subsection of a strategic consultation.
- * Expected outcome: One infantry unit, boarded with embark and moved with ferryOrders.
+ * Expected outcome: Up to `AIRLIFT_INFANTRY_CAPACITY` infantry units, boarded with embark and moved with ferryOrders, and a drop lands every unit aboard.
  * Exceptions: None.
  */
 export const AIRLIFT_RULE_STRATEGIC =
-  'An air unit carries one infantry unit, boarded with embark, moved with ferryOrders, unloaded with disembark or airDrops.';
+  `An air unit carries up to ${AIRLIFT_INFANTRY_CAPACITY} infantry units, boarded with embark (one row per unit), moved with ferryOrders, unloaded with disembark or airDrops. A drop lands every infantry unit aboard.`;
 
 /**
  * Battle airlift rule.
  *
  * Purpose: The battle sentence names sub-units and omits ferryOrders.
  * When to use: The Transport subsection of a battle whose roster has air.
- * Expected outcome: One infantry sub-unit, boarded with embark.
+ * Expected outcome: Up to `AIRLIFT_INFANTRY_CAPACITY` infantry sub-units, boarded with embark, and a drop lands every sub-unit aboard.
  * Exceptions: None.
  */
 export const AIRLIFT_RULE_TACTICAL =
-  'An air sub-unit carries one infantry sub-unit, boarded with embark, unloaded with disembark or airDrops.';
+  `An air sub-unit carries up to ${AIRLIFT_INFANTRY_CAPACITY} infantry sub-units, boarded with embark (one row per sub-unit), unloaded with disembark or airDrops. A drop lands every infantry sub-unit aboard.`;
 
 /**
  * Missile target-table rule. One definition with the briefing constant.

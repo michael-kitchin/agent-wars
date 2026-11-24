@@ -12,6 +12,7 @@ import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { getLandStepDistances, landUnitCanOccupyHex, STRATEGIC_LAND_MAX_WATER_PCT } from '../../shared/landTraversalStrategic';
 import { isLandUnitType } from '../../shared/landUnitType';
+import { NAVAL_INFANTRY_CAPACITY } from '../../shared/carrierCargoRules';
 import { POSTURE_SETTINGS, type Posture } from '../../shared/postureTypes';
 import type { PostureFitFacts, PostureFitReport, PostureFitRow } from './postureFitTypes';
 import { logDebug, logError, logTrace } from '../logger';
@@ -256,7 +257,7 @@ export function buildPostureFitReport(state: GameStateSnapshot): PostureFitRepor
     const marching = ground.filter((unit) => !unit.embarkedOnCarrierUnitId);
     const landForce = Math.min(CAMPAIGN_ASSAULT_MIN_UNITS, marching.length);
     const navalCap = getMaxUnitsPerType(parseGameSize(state.gameSize)).naval;
-    const maritimeCapacity = Math.min(2 * navalCap, Math.floor(ground.length * POSTURE_SETTINGS.maritime.liftGroundShare));
+    const maritimeCapacity = Math.min(NAVAL_INFANTRY_CAPACITY * navalCap, Math.floor(ground.length * POSTURE_SETTINGS.maritime.liftGroundShare));
     const naval = own.filter((unit) => unit.unitType === 'naval').length;
     const terrain = buildLiftTerrain({ state, seatId, landMass });
     const hexSet = new Set(state.hexes.map((hex) => hex.h3Index));

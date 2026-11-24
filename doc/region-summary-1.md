@@ -6,7 +6,7 @@
 
 - **Regional mode** restricts play to one UN subregion from the global game. Some subregions are split into two maps, and some are excluded. The human and the AI each pick a side group (a home region made of provinces). Everything else on the map is neutral territory, as in the global game.
 - **Resolutions:** strategic hexes are H3 res2 or res3. Battles are always three levels down (res5 or res6). Each strategic hex has 343 tactical children (286 on an H3 pentagon). A battle also includes three rings of neighboring tactical cells. Margin cells whose strategic hex is not on the regional map are left out. Counts in the tables below are children of a strategic hex, not the battle footprint.
-- **Rules:** the same as the global game, except for the per-map economy (Table 2), the 90% urban-cell home-loss knockout, new battles that leave out margin cells past the map edge, and the strategic terrain and combat rules below (Table 3).
+- **Rules:** the same as the global game, except for the per-map economy (Table 2), the 80% urban-cell home-loss knockout, new battles that leave out margin cells past the map edge, and the strategic terrain and combat rules below (Table 3).
 - **Build priority:** Strong tier first. **Eastern Asia is the recommended pilot**: res2/res5 is the smaller step from today, its stored economy scale is 1.617, it has the most terrain that slows armor, and naval, sealift and air all matter there.
 - **Tiers** are a design judgment about how fun each map is likely to be. Strong maps have cities to fight over, terrain that channels movement, a land and sea mix, and sides small enough to win. Weak maps lack two or more of those.
 
@@ -176,8 +176,8 @@ The movement and cover rules barely affect the global game (8% of res1 land hexe
 
 ## Open issues for planning (most important first)
 
-1. **Side-group balance.** Option (a) was adopted. A home is lost when other sides and Neutral hold at least 90% of its generated urban cells (`HOME_CONTROL_WIN_MIN_URBAN_SHARE`, since 3.3.0; it was 75% before). The groups themselves now pass ±25% of an equal urban share, and `regional:check` enforces that.
-2. **An every-hex home loss is slow** on maps whose homes are large. The 90% urban-cell share in issue 1 is the home-loss rule. Table 1 lists each group's current land-hex count.
+1. **Side-group balance.** Option (a) was adopted. A home is lost when other sides and Neutral hold at least 80% of its generated urban cells (`HOME_CONTROL_WIN_MIN_URBAN_SHARE`, 90% from 3.3.0 through 3.5.0; it was 75% before). The groups themselves now pass ±25% of an equal urban share, and `regional:check` enforces that.
+2. **An every-hex home loss is slow** on maps whose homes are large. The 80% urban-cell share in issue 1 is the home-loss rule. Table 1 lists each group's current land-hex count.
 3. **Shoreline "wetlands".** The classifier labels any land cell touching water on one or two edges as wetlands. It's the main kind on up to 49% of a map's hexes (Northern Europe), and armor can't enter wetland cells in battles. Fix the classification before regional battles.
 4. **The classifier checks forest before mountain**, so forested ranges count as forest in battles. That covers 60% of rugged cells in the Rockies, 57% in the Alps and 100% in the Appalachians, and armor pays the forest cost there instead of being blocked. This applies to both modes.
 5. **Urban data quality.** The scalerank ≤ 5 filter drops 68% of India's and 79% of Bangladesh's urban res4 cells, and Cuba has 3 urban cells at any scalerank. An earlier res4 count put the UK at 52% of Northern Europe's urban cells with the filter and 27% without. The live groups are in Table 1, and they use this filter. EarthEnv consensus class 9 (urban/built-up, 1 km) is already on disk and worth comparing.

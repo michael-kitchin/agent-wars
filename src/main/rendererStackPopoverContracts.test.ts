@@ -51,15 +51,16 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
   const stackAllActionHandlerFn = getFunctionSource(source, 'onStackAllActionClick');
 
   assert.ok(
-    renderSealiftSectionFn.includes('.flatMap((row) => [row.slot1UnitId, row.slot2UnitId])') &&
+    renderSealiftSectionFn.includes('.flatMap((row) => sealiftRowCargoIds(row))') &&
       renderSealiftSectionFn.includes('setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);'),
     'sealift rendering should mark all embarked slot occupants as non-selectable in the stack popup'
   );
   assert.ok(
     renderSealiftSectionFn.includes('debarkBtn.style.visibility = debarkEnabled ? \'visible\' : \'hidden\'') &&
       renderSealiftSectionFn.includes('slotRow.appendChild(debarkBtn)') &&
-      renderSealiftSectionFn.includes('row.debarkSlot1Enabled'),
-    'sealift slot rows should always reserve a debark-control gap and enable it when debarkSlot*Enabled'
+      renderSealiftSectionFn.includes('const debarkEnabled = slot.debarkEnabled;') &&
+      renderSealiftSectionFn.includes('row.slots.forEach((slot, index) => addSlotControl(index + 1, slot))'),
+    'sealift slot rows should always reserve a debark-control gap and enable it from each slot debarkEnabled'
   );
   assert.ok(
     setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&

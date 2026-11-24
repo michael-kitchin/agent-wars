@@ -269,7 +269,7 @@ test('a protected unit and a unit already in an operation are not chosen', () =>
   assert.deepEqual(candidates[0]?.unitIds, ['inf-c', 'inf-d']);
 });
 
-test('one ship carries two of the three units the cap allows', () => {
+test('one ship carries all three units the cap allows', () => {
   const port = latLngToCell(0, 0, 1);
   const city = gridDisk(port, 2).find((h3) => !gridDisk(port, 1).includes(h3))!;
   const built = coast({
@@ -278,7 +278,7 @@ test('one ship carries two of the three units the cap allows', () => {
     cities: [{ h3Index: city, urbanHexCount: 4 }],
   });
   const { candidates } = search(built.state, built.landMass);
-  assert.deepEqual(candidates[0]?.unitIds, ['inf-a', 'inf-b']);
+  assert.deepEqual(candidates[0]?.unitIds, ['inf-a', 'inf-b', 'inf-c']);
   assert.deepEqual(candidates[0]?.carrierIds, ['ship-1']);
 });
 

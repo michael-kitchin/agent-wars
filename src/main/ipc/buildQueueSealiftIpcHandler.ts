@@ -1,5 +1,7 @@
 import type { IpcMain } from 'electron';
 import type { BuildQueueItemType } from '../../shared/ipc/productionTypes';
+import type { SealiftSlotEdit } from '../../shared/ipc/sealiftTypes';
+import { MAX_CARRIER_CARGO_SLOTS } from '../../shared/carrierCargoRules';
 import { IPC_GAME } from '../../shared/ipc/channels';
 import { emptySealiftStackState } from '../../shared/sealiftStackState';
 import { logDebug } from '../logger';
@@ -42,27 +44,24 @@ type SealiftSlotPayload = {
  *
  * Purpose: One check for both slot handlers, so strategic and tactical edits accept the same inputs.
  * When to use: First step of the `updateSealiftSlot` and `updateTacticalSealiftSlot` handlers.
- * Expected outcome: The typed edit, or `null` when the hex, naval unit, or slot index is invalid. A `landUnitId` that
- * is neither a string nor `null` becomes `null` (empty the slot).
+ * Expected outcome: The typed edit, or `null` when the hex or naval unit is not a string or the slot index is not an integer from 1 to `MAX_CARRIER_CARGO_SLOTS`. The engine then checks the index against the carrier's own slots. A `landUnitId` that
+ * is not a non-empty string becomes `null` (empty the slot); a string is trimmed.
  * Exceptions: None.
  */
-function parseSealiftSlotPayload(
-  payload: SealiftSlotPayload | undefined
-): {
-  readonly h3Index: string;
-  readonly navalUnitId: string;
-  readonly slotIndex: 1 | 2;
-  readonly landUnitId: string | null;
-} | null {
+export function parseSealiftSlotPayload(payload: SealiftSlotPayload | undefined): SealiftSlotEdit | null {
+  const slotIndex = payload?.slotIndex;
   if (
     typeof payload?.h3Index !== 'string' ||
     typeof payload?.navalUnitId !== 'string' ||
-    (payload?.slotIndex !== 1 && payload?.slotIndex !== 2)
+    typeof slotIndex !== 'number' ||
+    !Number.isInteger(slotIndex) ||
+    slotIndex < 1 ||
+    slotIndex > MAX_CARRIER_CARGO_SLOTS
   ) {
     return null;
   }
-  const landUnitId = payload.landUnitId === null || typeof payload.landUnitId === 'string' ? payload.landUnitId : null;
-  return { h3Index: payload.h3Index, navalUnitId: payload.navalUnitId, slotIndex: payload.slotIndex, landUnitId };
+  const landUnitId = typeof payload.landUnitId === 'string' && payload.landUnitId.trim().length > 0 ? payload.landUnitId.trim() : null;
+  return { h3Index: payload.h3Index, navalUnitId: payload.navalUnitId, slotIndex, landUnitId };
 }
 
 /**
@@ -141,11 +140,11 @@ export function registerBuildQueueSealiftIpcHandler(ipcMain: Pick<IpcMain, 'hand
   ipcMain.handle(IPC_GAME.updateTacticalSealiftSlot, (_event, payload: SealiftSlotPayload | undefined) => {
     const parsed = parseSealiftSlotPayload(payload);
     if (!parsed) return { success: false, reason: 'Invalid tactical sealift payload' };
-    return updateTacticalSealiftSlot(parsed.h3Index, parsed.navalUnitId, parsed.slotIndex, parsed.landUnitId);
+    return updateTacticalSealiftSlot(parsed);
   });
   ipcMain.handle(IPC_GAME.updateSealiftSlot, (_event, payload: SealiftSlotPayload | undefined) => {
     const parsed = parseSealiftSlotPayload(payload);
     if (!parsed) return { success: false, reason: 'Invalid sealift payload' };
-    return updateSealiftSlot(parsed.h3Index, parsed.navalUnitId, parsed.slotIndex, parsed.landUnitId);
+    return updateSealiftSlot(parsed);
   });
 }

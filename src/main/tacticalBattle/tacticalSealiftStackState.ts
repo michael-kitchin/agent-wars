@@ -7,10 +7,11 @@ import type { SealiftLandUnitOption, SealiftStackState } from '../../shared/ipcT
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { emptySealiftStackState } from '../../shared/sealiftStackState';
 import {
+  buildCargoByCarrierId,
   buildSealiftNavalRows,
-  buildSealiftSlotsByNavalId,
   buildSealiftStackState,
-  normalizeSealiftSlots,
+  normalizeCarrierCargo,
+  type CarrierCargoQuery,
 } from '../gameActions/sealiftSlotAssignment';
 import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../gameActions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
@@ -78,29 +79,33 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
   const navalIds = navalSubs.map((u) => u.id);
   const airIds = airSubs.map((unit) => unit.id);
   const carrierIds = [...navalIds, ...airIds];
-  const slotsByNavalId = buildSealiftSlotsByNavalId(carrierIds, assignments);
-  normalizeSealiftSlots(carrierIds, slotsByNavalId, landTypeById);
+  const carrierTypeById = new Map<string, string>([
+    ...navalIds.map((id) => [id, 'naval'] as const),
+    ...airIds.map((id) => [id, 'air'] as const),
+  ]);
+  const cargo: CarrierCargoQuery = {
+    carrierIds,
+    carrierTypeById,
+    cargoByCarrierId: normalizeCarrierCargo({
+      carrierIds,
+      carrierTypeById,
+      cargoByCarrierId: buildCargoByCarrierId({ carrierIds, assignments }),
+      landTypeById,
+    }),
+    landTypeById,
+  };
   const contextMode = getSealiftStackContextModeForHex(h3Index);
   const debarkAllowed = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
   const shipRows = buildSealiftNavalRows({
-    navalIds,
-    slotsByNavalId,
-    landTypeById,
+    cargo: { ...cargo, carrierIds: navalIds },
     contextMode,
     debarkAllowed,
   });
   const airRows = buildSealiftNavalRows({
-    navalIds: airIds,
-    slotsByNavalId,
-    landTypeById,
+    cargo: { ...cargo, carrierIds: airIds },
     contextMode: 'coastal_port',
     debarkAllowed: true,
-  }).map((row) => ({
-    ...row,
-    slot2UnitId: null,
-    slot2Disabled: true,
-    debarkSlot2Enabled: false,
-  }));
+  });
   const navalRows = [...shipRows, ...airRows];
   return buildSealiftStackState({
     h3Index,

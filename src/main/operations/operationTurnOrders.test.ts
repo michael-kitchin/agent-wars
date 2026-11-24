@@ -126,3 +126,28 @@ test('merge removes the carrier strike, keeps another, and appends the drop', ()
   assert.deepEqual(merged.ferryOrders, []);
   assert.equal(merged.airDropOrders?.[0]?.unitId, 'air-1');
 });
+
+test('a two-infantry air operation drops only when both are aboard', () => {
+  withTempGameDb('aw-air-turn-orders-', () => {
+    writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, SEAT, [
+      { ...operation('transit'), unitIds: ['inf-a', 'inf-b'] },
+    ]);
+    const snapshot = (aboardIds: readonly string[]): GameStateSnapshot => ({
+      units: [
+        { id: 'air-1', player: SEAT, unitType: 'air', h3Index: AIRPORT },
+        ...['inf-a', 'inf-b'].map((id) => ({
+          id,
+          player: SEAT,
+          unitType: 'infantry',
+          h3Index: AIRPORT,
+          embarkedOnCarrierUnitId: aboardIds.includes(id) ? 'air-1' : null,
+        })),
+      ],
+    } as unknown as GameStateSnapshot);
+    const partial = operationTurnOrders(SEAT, snapshot(['inf-a']));
+    assert.equal(partial.airDropOrders.length + partial.ferryOrders.length, 0);
+    const both = operationTurnOrders(SEAT, snapshot(['inf-a', 'inf-b']));
+    assert.equal(both.airDropOrders.length, 1);
+    assert.equal(both.airDropOrders[0]?.targetH3Index, CITY);
+  });
+});

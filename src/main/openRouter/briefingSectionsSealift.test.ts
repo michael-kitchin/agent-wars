@@ -156,7 +156,7 @@ function testNearestEmbarkSkipsUncontrolledWaterSeaport(): void {
     (h3) => h3,
     'strategic'
   );
-  assert.match(md, /\| 0\/2 \| — \|/);
+  assert.match(md, /\| 0\/4 \| — \|/);
 }
 
 /**
@@ -196,7 +196,7 @@ function testNearestEmbarkIncludesControlledWaterSeaport(): void {
  *
  * Purpose: Co-located armor on water is not embarked; the table must not spend capacity for it.
  * When to use: After edits to strategic sealift row assembly.
- * Expected outcome: Empty cargo shows infantry 0, armor 0 and capacity 0/2.
+ * Expected outcome: Empty cargo shows infantry 0, armor 0 and capacity 0/4.
  * Exceptions: Propagates assertion errors.
  */
 function testAboardCountsAssignedCargoNotCoLocatedLand(): void {
@@ -212,7 +212,7 @@ function testAboardCountsAssignedCargoNotCoLocatedLand(): void {
     'strategic'
   );
   assert.match(md, /infantry 0, armor 0/);
-  assert.match(md, /0\/2/);
+  assert.match(md, /0\/4/);
 }
 
 /**
@@ -220,7 +220,7 @@ function testAboardCountsAssignedCargoNotCoLocatedLand(): void {
  *
  * Purpose: Happy path for embarked armor on the strategic sealift table.
  * When to use: After edits to strategic sealift row assembly.
- * Expected outcome: Armor 1 and capacity 2/2 when `embarkedOnCarrierUnitId` points at the ship.
+ * Expected outcome: Armor 1 and capacity 2/4 when `embarkedOnCarrierUnitId` points at the ship.
  * Exceptions: Propagates assertion errors.
  */
 function testAboardShowsEmbarkedArmor(): void {
@@ -242,7 +242,7 @@ function testAboardShowsEmbarkedArmor(): void {
     'strategic'
   );
   assert.match(md, /infantry 0, armor 1/);
-  assert.match(md, /2\/2/);
+  assert.match(md, /2\/4/);
 }
 
 /**
@@ -268,6 +268,47 @@ function testStrategicSealiftSectionOmitsWhenRosterEmpty(): void {
   assert.equal(md, '');
 }
 
+/**
+ * Builds a ship with land units aboard.
+ *
+ * Purpose: The Capacity Used cell counts slots in both consultation modes.
+ * When to use: `testCapacityUsedCountsSlotsInBothModes`.
+ * Expected outcome: A snapshot whose ship carries the given land types, linked the way `mode` reads them.
+ * Exceptions: None.
+ */
+function loadedShip(types: readonly ('infantry' | 'armor')[], mode: 'strategic' | 'tactical'): GameStateSnapshot {
+  return sealiftSnapshot({
+    navalH3: WATER_NO_PORT,
+    hexes: [{ h3Index: WATER_NO_PORT, terrain: 'water', terrainKind: 'water' }],
+    extraUnits: types.map((unitType, index) => ({
+      id: `opponent-land-${index}`,
+      player: 'opponent',
+      unitType,
+      h3Index: WATER_NO_PORT,
+      ...(mode === 'tactical'
+        ? { embarkedOnSubUnitId: 'opponent-naval-1' }
+        : { embarkedOnCarrierUnitId: 'opponent-naval-1' }),
+    })) as GameStateSnapshot['units'],
+  });
+}
+
+/**
+ * Verifies Capacity Used counts slots out of four.
+ *
+ * Purpose: One armor reads 2/4 and two infantry plus one armor read 4/4, strategic and tactical.
+ * When to use: After edits to the Naval Transport Status rows.
+ * Expected outcome: The cell shows used slots over `NAVAL_CARGO_SLOTS`.
+ * Exceptions: Propagates assertion errors.
+ */
+function testCapacityUsedCountsSlotsInBothModes(): void {
+  for (const mode of ['strategic', 'tactical'] as const) {
+    const one = buildSealiftBriefingBlock(loadedShip(['armor'], mode), (h3) => h3, mode);
+    assert.match(one, /2\/4/, mode);
+    const full = buildSealiftBriefingBlock(loadedShip(['infantry', 'infantry', 'armor'], mode), (h3) => h3, mode);
+    assert.match(full, /4\/4/, mode);
+  }
+}
+
 function run(): void {
   testStrategicEmbarkSentenceMatchesEngine();
   testNearestEmbarkUsesEngineEligibility();
@@ -276,6 +317,7 @@ function run(): void {
   testNearestEmbarkIncludesControlledWaterSeaport();
   testAboardCountsAssignedCargoNotCoLocatedLand();
   testAboardShowsEmbarkedArmor();
+  testCapacityUsedCountsSlotsInBothModes();
   testStrategicSealiftSectionOmitsWhenRosterEmpty();
   console.log('briefingSectionsSealift.test.ts passed');
 }

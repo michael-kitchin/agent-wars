@@ -8,7 +8,12 @@
  */
 
 import { logTrace } from '../../logger';
-import { OPERATION_MENU_SIZE } from '../../operations/operationRules';
+import {
+  OPERATION_MENU_SIZE,
+  OPERATION_MUSTER_TIMEOUT_TURNS,
+  SEA_RAID_TIMEOUT_MIN_SHARE,
+} from '../../operations/operationRules';
+import { AIRLIFT_INFANTRY_CAPACITY } from '../../../shared/carrierCargoRules';
 import { CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS } from '../campaignSeaConstants';
 import { SECTION_TITLE_OPERATION_RULES, subHeading } from './sectionHeadings';
 
@@ -35,8 +40,8 @@ export function buildOperationRuleBlock(commandsEnabled: boolean, campaignEnable
   logTrace('promptSpec buildOperationRuleBlock', { commandsEnabled, campaignEnabled });
   const paragraphs = [
     'The engine runs operations: several turns of orders that carry ground units to an enemy city by sea or by air.',
-    'By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it.',
-    'By air, it marches one infantry unit to an air unit\'s airport, loads it, ferries to an airport in range when it must, and drops it onto a city that holds no enemy unit.',
+    `By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. If the force has not gathered after ${OPERATION_MUSTER_TIMEOUT_TURNS} turns, it sails only when the ships at the port can carry at least ${Math.round(SEA_RAID_TIMEOUT_MIN_SHARE * 100)}% of its ground units, and is called off otherwise, so keep its ships with it. A campaign lift needs only its own minimum.`,
+    `By air, it marches up to ${AIRLIFT_INFANTRY_CAPACITY} infantry units to an air unit's airport, loads them, ferries to an airport in range when it must, and drops them onto a city that holds no enemy unit.`,
     'The Active Operations section of the briefing lists each one and how far it has got.',
     'Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take out a unit that is not aboard, or a ship, give it any standing order of your own; it keeps that order and the operation goes on without it. A unit aboard one of an operation\'s ships or air units takes no order of its own: the engine refuses it and says so next turn. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.',
     'Outside an operation, a standing order does not move a unit while it is aboard a ship. An explicit_move or a disembark unloads it where the ship is.',

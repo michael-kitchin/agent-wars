@@ -321,46 +321,6 @@ aside#sidebar.tactical-strategic-suppress {
 .build-popup .build-keep-building-checkbox {
   margin: 0;
 }
-.stack-callout {
-  position: fixed;
-  pointer-events: auto;
-  padding: 0.35rem 0.5rem;
-  min-width: 0;
-  width: fit-content;
-  max-width: 240px;
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  color-scheme: dark;
-  border: 1px solid var(--chrome-border);
-  border-radius: 2px;
-  font-size: 12px;
-  z-index: 6500;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-.stack-callout.hidden { display: none; }
-.stack-callout ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  width: 100%;
-}
-.stack-callout li {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  justify-content: space-between;
-  width: 100%;
-  margin-bottom: 0.25rem;
-  white-space: nowrap;
-}
-.stack-callout li:last-child { margin-bottom: 0; }
-.stack-callout .unit-label {
-  flex: 1 1 auto;
-  max-width: 180px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .stack-callout .unit-select,
 .build-popup .unit-select {
   flex-shrink: 0;
@@ -423,50 +383,6 @@ aside#sidebar.tactical-strategic-suppress {
   line-height: 1;
   font-size: 11px;
   font-weight: 700;
-}
-.stack-sealift-section {
-  margin-top: 0.45rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--chrome-border);
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.stack-sealift-title {
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--chrome-text);
-}
-.stack-sealift-row {
-  display: flex;
-  gap: 0.35rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-.stack-sealift-naval {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.stack-sealift-slots {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  flex: 0 0 auto;
-}
-.stack-sealift-slot-row {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-.stack-sealift-select {
-  min-width: 98px;
-  max-width: 120px;
-  font-size: 11px;
-  padding: 0.08rem 0.2rem;
 }
 /* Sized to the visible map by `attachFrameToVisibleMap`; clicks pass through to the backdrop (Ignore). */
 .melee-intercept-frame {
@@ -566,14 +482,16 @@ aside#sidebar.tactical-strategic-suppress {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.build-popup-tab-bar {
+.build-popup-tab-bar,
+.stack-callout-tab-bar {
   display: flex;
   flex-wrap: nowrap;
   gap: 0;
   border-bottom: 1px solid var(--chrome-border);
   margin: 0 0 0.5rem 0;
 }
-.build-popup-tab-bar button {
+.build-popup-tab-bar button,
+.stack-callout-tab-bar button {
   padding: 0.35rem 0.75rem;
   white-space: nowrap;
   flex-shrink: 0;
@@ -585,13 +503,16 @@ aside#sidebar.tactical-strategic-suppress {
   border-radius: 2px 2px 0 0;
   margin-bottom: -1px;
 }
-.build-popup-tab-bar button:hover { background: var(--chrome-bg); }
-.build-popup-tab-bar button:disabled {
+.build-popup-tab-bar button:hover,
+.stack-callout-tab-bar button:hover { background: var(--chrome-bg); }
+.build-popup-tab-bar button:disabled,
+.stack-callout-tab-bar button:disabled {
   color: var(--chrome-disabled);
   cursor: default;
   background: var(--chrome-bg);
 }
-.build-popup-tab-bar button[aria-selected="true"] {
+.build-popup-tab-bar button[aria-selected="true"],
+.stack-callout-tab-bar button[aria-selected="true"] {
   font-weight: 600;
   background: var(--chrome-bg);
   color: var(--button-text);

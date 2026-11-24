@@ -55,8 +55,8 @@ test('a muster waits for a troop that has not arrived', () => {
   assert.equal(seaMusterReady(args({ remainingUnitCount: 3 })), false);
 });
 
-test('a timed-out muster sails with the minimum troops', () => {
-  assert.equal(seaMusterReady(args({ remainingUnitCount: 6, remainingShipCount: 3, timedOut: true })), true);
+test('a timed-out muster sails with every troop present', () => {
+  assert.equal(seaMusterReady(args({ remainingShipCount: 3, timedOut: true })), true);
 });
 
 test('a timed-out muster below the minimum is not ready', () => {
@@ -71,6 +71,54 @@ test('a timed-out campaign lift counts only the troops its present ships can car
   const six = Array.from({ length: 6 }, () => 'infantry');
   const timedOut = { presentUnitTypes: six, remainingUnitCount: 6, shipsPresentCount: 1, remainingShipCount: 3, timedOut: true, minUnitsAtTimeout: 6 };
   assert.equal(seaMusterReady(args({ ...timedOut, campaignLift: true })), false);
-  assert.equal(seaMusterReady(args({ ...timedOut, campaignLift: false })), true);
+  assert.equal(seaMusterReady(args({ ...timedOut, campaignLift: false })), false);
+  assert.equal(seaMusterReady(args({ ...timedOut, shipsPresentCount: 2, campaignLift: false })), true);
   assert.equal(seaMusterReady(args({ ...timedOut, shipsPresentCount: 3, campaignLift: true })), true);
+});
+
+/**
+ * Infantry unit types, one entry per unit.
+ *
+ * Purpose: The timeout cases name troop counts, not types.
+ * When to use: The `presentUnitTypes` of a case.
+ * Expected outcome: An array of `count` infantry entries.
+ * Exceptions: None.
+ */
+function infantry(count: number): string[] {
+  return Array.from({ length: count }, () => 'infantry');
+}
+
+test('a timed-out raid sails when its ships carry three quarters of its troops', () => {
+  const base = { presentUnitTypes: infantry(6), remainingUnitCount: 8, remainingShipCount: 2, timedOut: true, minUnitsAtTimeout: 2 };
+  assert.equal(seaMusterReady(args({ ...base, shipsPresentCount: 1 })), false);
+  assert.equal(seaMusterReady(args({ ...base, shipsPresentCount: 2 })), true);
+});
+
+test('a timed-out raid needs at least the minimum', () => {
+  assert.equal(
+    seaMusterReady(args({ presentUnitTypes: infantry(2), remainingUnitCount: 2, shipsPresentCount: 1, timedOut: true })),
+    true,
+  );
+});
+
+test('a timed-out raid counts only what its ships can carry', () => {
+  assert.equal(
+    seaMusterReady(args({ presentUnitTypes: infantry(6), remainingUnitCount: 6, shipsPresentCount: 1, remainingShipCount: 2, timedOut: true })),
+    false,
+  );
+});
+
+test('a timed-out campaign lift keeps its own minimum', () => {
+  assert.equal(
+    seaMusterReady(args({
+      presentUnitTypes: infantry(4),
+      remainingUnitCount: 8,
+      shipsPresentCount: 1,
+      remainingShipCount: 2,
+      timedOut: true,
+      minUnitsAtTimeout: 4,
+      campaignLift: true,
+    })),
+    true,
+  );
 });
