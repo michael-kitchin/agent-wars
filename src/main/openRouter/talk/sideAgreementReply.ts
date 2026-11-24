@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import { logTrace } from '../../logger';
+import { logDebug } from '../../logger';
 import type { SeatId } from '../../../shared/seatIds';
 import {
   isSideAgreementIntent,
@@ -187,32 +187,55 @@ function zoneStrings(zone: unknown): string[] {
 }
 
 /**
- * Checks one entry against every rule.
+ * The rule a dropped agreement entry failed.
  *
- * Purpose: One place holds the rules for a kept entry.
- * When to use: `parseSideAgreementEntries`, once per array element.
- * Expected outcome: The entry, or null when any rule fails. `seenIds` gains the id of a kept entry with a positive id.
+ * Contract: One word per rule in `parseOneEntry`, in the order the rules run. Never carries model text.
+ * When to use: The DEBUG line of `parseSideAgreementEntries`.
+ * Expected outcome: Tells a reader of `debug.log` why a reply's agreement was not stored.
  * Exceptions: None.
  */
-function parseOneEntry(entry: unknown, args: ParseSideAgreementEntriesArgs, seenIds: Set<number>): TalkReplyAgreement | null {
-  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return null;
+export type AgreementDropReason =
+  | 'not_object'
+  | 'bad_id'
+  | 'bad_with'
+  | 'bad_kind'
+  | 'bad_status'
+  | 'bad_intent'
+  | 'empty_terms'
+  | 'bad_end_turn'
+  | 'repeated_id'
+  | 'bad_against'
+  | 'empty_zone';
+
+/**
+ * Checks one entry against every rule.
+ *
+ * Purpose: One place holds the rules for a kept entry, and names the first rule a dropped entry fails.
+ * When to use: `parseSideAgreementEntries`, once per array element.
+ * Expected outcome: The entry, or the `AgreementDropReason` of the first rule that fails. `seenIds` gains the id of a kept entry with a positive id.
+ * Exceptions: None.
+ */
+function parseOneEntry(entry: unknown, args: ParseSideAgreementEntriesArgs, seenIds: Set<number>): TalkReplyAgreement | AgreementDropReason {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return 'not_object';
   const row = entry as RawAgreementEntry;
   const agreementId = row.id === undefined ? 0 : row.id;
-  if (typeof agreementId !== 'number' || !Number.isSafeInteger(agreementId) || agreementId < 0) return null;
+  if (typeof agreementId !== 'number' || !Number.isSafeInteger(agreementId) || agreementId < 0) return 'bad_id';
   const withSeatId = seatIdForSideCode(row.with, args.addressableSeatIds);
-  if (!withSeatId || withSeatId === args.ownSeatId) return null;
-  if (!isSideAgreementKind(row.kind) || !isSideAgreementStatus(row.status) || !isSideAgreementIntent(row.intent)) return null;
+  if (!withSeatId || withSeatId === args.ownSeatId) return 'bad_with';
+  if (!isSideAgreementKind(row.kind)) return 'bad_kind';
+  if (!isSideAgreementStatus(row.status)) return 'bad_status';
+  if (!isSideAgreementIntent(row.intent)) return 'bad_intent';
   const terms = cleanSideMessageText(row.terms, SIDE_AGREEMENT_TERMS_MAX_CHARS);
-  if (terms.length === 0) return null;
-  if (typeof row.endTurn !== 'number' || !Number.isInteger(row.endTurn)) return null;
-  if (agreementId > 0 && seenIds.has(agreementId)) return null;
+  if (terms.length === 0) return 'empty_terms';
+  if (typeof row.endTurn !== 'number' || !Number.isInteger(row.endTurn)) return 'bad_end_turn';
+  if (agreementId > 0 && seenIds.has(agreementId)) return 'repeated_id';
   let againstSeatId: SeatId | null = null;
   if (row.kind === 'joint_action') {
     againstSeatId = seatIdForSideCode(row.against, args.addressableSeatIds);
-    if (!againstSeatId || againstSeatId === args.ownSeatId || againstSeatId === withSeatId) return null;
+    if (!againstSeatId || againstSeatId === args.ownSeatId || againstSeatId === withSeatId) return 'bad_against';
   }
   const zoneCodes = row.kind === 'no_entry_zone' ? zoneStrings(row.zone) : [];
-  if (row.kind === 'no_entry_zone' && zoneCodes.length === 0) return null;
+  if (row.kind === 'no_entry_zone' && zoneCodes.length === 0) return 'empty_zone';
   if (agreementId > 0) seenIds.add(agreementId);
   return {
     agreementId,
@@ -231,24 +254,36 @@ function parseOneEntry(entry: unknown, args: ParseSideAgreementEntriesArgs, seen
 /**
  * Reads the agreement entries of a talk reply.
  *
- * Purpose: Every rejected entry is dropped and counted, and the rest of the reply is unaffected.
+ * Purpose: Every rejected entry is dropped and counted, and the rest of the reply is unaffected. The DEBUG line names the
+ *   rule each dropped entry failed, so `debug.log` shows whether a commander proposed agreements the rules refused.
  * When to use: `parseTalkReply` with `allowAgreements` on.
- * Expected outcome: The kept entries in order, and the number dropped. A non-array `raw` gives neither.
+ * Expected outcome: The kept entries in order, the number dropped, and one `dropReasons` word per dropped entry in order.
+ *   A non-array `raw` gives none of them. Logs entry counts, kinds, statuses, and drop reasons at DEBUG, never terms or reasons.
  * Exceptions: None.
  */
 export function parseSideAgreementEntries(args: ParseSideAgreementEntriesArgs): {
   readonly agreements: readonly TalkReplyAgreement[];
   readonly droppedCount: number;
+  readonly dropReasons: readonly AgreementDropReason[];
 } {
-  if (!Array.isArray(args.raw)) return { agreements: [], droppedCount: 0 };
+  if (!Array.isArray(args.raw)) {
+    logDebug('sideAgreementReply parseSideAgreementEntries', { seatId: args.ownSeatId, rawType: args.raw === undefined ? 'missing' : typeof args.raw });
+    return { agreements: [], droppedCount: 0, dropReasons: [] };
+  }
   const seenIds = new Set<number>();
   const agreements: TalkReplyAgreement[] = [];
-  let droppedCount = 0;
+  const dropReasons: AgreementDropReason[] = [];
   for (const entry of args.raw as readonly unknown[]) {
     const parsed = parseOneEntry(entry, args, seenIds);
-    if (parsed) agreements.push(parsed);
-    else droppedCount += 1;
+    if (typeof parsed === 'string') dropReasons.push(parsed);
+    else agreements.push(parsed);
   }
-  logTrace('sideAgreementReply parseSideAgreementEntries', { entryCount: args.raw.length, keptCount: agreements.length, droppedCount });
-  return { agreements, droppedCount };
+  logDebug('sideAgreementReply parseSideAgreementEntries', {
+    seatId: args.ownSeatId,
+    entryCount: args.raw.length,
+    keptCount: agreements.length,
+    kept: agreements.map((agreement) => `${agreement.kind}/${agreement.status}`),
+    dropReasons,
+  });
+  return { agreements, droppedCount: dropReasons.length, dropReasons };
 }

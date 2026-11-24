@@ -7,7 +7,7 @@
  * Exceptions: None. A reply that is not an object returns null rather than throwing.
  */
 
-import { logTrace } from '../../logger';
+import { logDebug } from '../../logger';
 import type { SeatId } from '../../../shared/seatIds';
 import {
   cleanRelationshipScore,
@@ -185,7 +185,7 @@ function entryList(value: unknown): readonly unknown[] {
  *
  * Purpose: The talk stage accepts one object and refuses the rest without a second model call.
  * When to use: After the model returns content.
- * Expected outcome: Null when the text has no JSON object or the value is not an object. Otherwise the accepted messages, stances, and agreements, and a count of refused entries. An entry is kept only when it names one of `addressableSeatIds` other than `ownSeatId`. The `agreements` list is read only when `allowAgreements` is true. Otherwise the key is ignored and nothing is counted.
+ * Expected outcome: Null when the text has no JSON object or the value is not an object. Otherwise the accepted messages, stances, and agreements, and a count of refused entries. An entry is kept only when it names one of `addressableSeatIds` other than `ownSeatId`. The `agreements` list is read only when `allowAgreements` is true. Otherwise the key is ignored and nothing is counted. Logs one DEBUG line per reply: why it was refused, or the kept and dropped counts, including how many agreement entries the reply sent. Never logs message, stance, or agreement text.
  * Exceptions: None.
  */
 export function parseTalkReply(args: {
@@ -194,22 +194,19 @@ export function parseTalkReply(args: {
   readonly addressableSeatIds: readonly SeatId[];
   readonly allowAgreements: boolean;
 }): ParsedTalkReply | null {
-  const slice = jsonObjectText(args.replyText);
-  if (slice === null) {
-    logTrace('talkReply parseTalkReply', { parsed: false });
+  const refused = (why: 'no_json_object' | 'invalid_json' | 'not_object'): null => {
+    logDebug('talkReply parseTalkReply', { seatId: args.ownSeatId, parsed: false, why, replyLength: args.replyText.length });
     return null;
-  }
+  };
+  const slice = jsonObjectText(args.replyText);
+  if (slice === null) return refused('no_json_object');
   let parsed: unknown;
   try {
     parsed = JSON.parse(slice);
   } catch {
-    logTrace('talkReply parseTalkReply', { parsed: false });
-    return null;
+    return refused('invalid_json');
   }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    logTrace('talkReply parseTalkReply', { parsed: false });
-    return null;
-  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return refused('not_object');
   const record = parsed as { readonly messages?: unknown; readonly stances?: unknown; readonly agreements?: unknown };
   const messages: TalkReplyMessage[] = [];
   const stances: TalkReplyStance[] = [];
@@ -259,11 +256,15 @@ export function parseTalkReply(args: {
     : { agreements: [], droppedCount: 0 };
   droppedCount += agreementResult.droppedCount;
 
-  logTrace('talkReply parseTalkReply', {
+  logDebug('talkReply parseTalkReply', {
+    seatId: args.ownSeatId,
     parsed: true,
+    allowAgreements: args.allowAgreements,
     messageCount: messages.length,
     stanceCount: stances.length,
+    rawAgreementCount: Array.isArray(record.agreements) ? record.agreements.length : null,
     agreementCount: agreementResult.agreements.length,
+    agreementDroppedCount: agreementResult.droppedCount,
     droppedCount,
   });
   return { messages, stances, agreements: agreementResult.agreements, droppedCount };

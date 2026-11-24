@@ -1,7 +1,7 @@
 /**
  * Parsing the agreements list of a talk reply.
  *
- * Purpose: Each rule drops one entry and counts it, and the other entries are unaffected.
+ * Purpose: Each rule drops one entry, counts it, and names the rule, and the other entries are unaffected.
  * When to use: `npm run build:main`, then `node dist/main/openRouter/talk/sideAgreementReply.test.js`.
  * Expected outcome: The cases below.
  * Exceptions: None.
@@ -58,22 +58,25 @@ test('a valid new entry is kept with id 0', () => {
   assert.equal(result.agreements[0]?.withSeatId, AI_SEAT_IDS[1]);
 });
 
-test('each failed rule drops its entry and counts it', () => {
-  const bad = [
-    'not an object',
-    entry({ id: -1 }),
-    entry({ with: 'a9' }),
-    entry({ with: 'a1' }),
-    entry({ kind: 'alliance' }),
-    entry({ terms: '   ' }),
-    entry({ endTurn: 8.5 }),
-    entry({ id: 1e21 }),
-    entry({ kind: 'joint_action', against: 'a2' }),
-    entry({ kind: 'no_entry_zone', zone: [' ', 4] }),
+test('each failed rule drops its entry, counts it, and names the rule', () => {
+  const bad: Array<[unknown, string]> = [
+    ['not an object', 'not_object'],
+    [entry({ id: -1 }), 'bad_id'],
+    [entry({ with: 'a9' }), 'bad_with'],
+    [entry({ with: 'a1' }), 'bad_with'],
+    [entry({ kind: 'alliance' }), 'bad_kind'],
+    [entry({ status: 'agreed' }), 'bad_status'],
+    [entry({ intent: 'maybe' }), 'bad_intent'],
+    [entry({ terms: '   ' }), 'empty_terms'],
+    [entry({ endTurn: 8.5 }), 'bad_end_turn'],
+    [entry({ id: 1e21 }), 'bad_id'],
+    [entry({ kind: 'joint_action', against: 'a2' }), 'bad_against'],
+    [entry({ kind: 'no_entry_zone', zone: [' ', 4] }), 'empty_zone'],
   ];
-  const result = parse([...bad, entry()]);
+  const result = parse([...bad.map(([raw]) => raw), entry()]);
   assert.equal(result.agreements.length, 1);
   assert.equal(result.droppedCount, bad.length);
+  assert.deepEqual(result.dropReasons, bad.map(([, reason]) => reason));
 });
 
 test('an entry with or against the own seat is dropped even when the own seat is addressable', () => {
@@ -102,6 +105,6 @@ test('zone and against apply only to their own kinds', () => {
 });
 
 test('a non-array value gives no entries and no drops', () => {
-  assert.deepEqual(parse({ id: 0 }), { agreements: [], droppedCount: 0 });
-  assert.deepEqual(parse(undefined), { agreements: [], droppedCount: 0 });
+  assert.deepEqual(parse({ id: 0 }), { agreements: [], droppedCount: 0, dropReasons: [] });
+  assert.deepEqual(parse(undefined), { agreements: [], droppedCount: 0, dropReasons: [] });
 });
