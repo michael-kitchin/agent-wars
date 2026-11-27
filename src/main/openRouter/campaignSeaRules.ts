@@ -473,7 +473,7 @@ function bestRouteForCity(args: CampaignSeaRouteArgs, cityH3: string): CampaignS
  *
  * Purpose: Lets the campaign choose a target across the sea. A city is routed only when a lift could carry the force it needs.
  * When to use: Once per campaign resolution, from the sea route flow.
- * Expected outcome: A map from city hex to its best route. Empty when there is no port or the lift capacity is below `OPERATION_MIN_GROUND_UNITS`. A city beyond `CAMPAIGN_SEA_REACH_LIMIT_STEPS`, or needing more than the lift capacity, has no entry.
+ * Expected outcome: A map from city hex to its best route. A city marked `heldByPactPartner` takes none of the `CAMPAIGN_SEA_CITY_TEST_LIMIT` test slots, so it is routed only when it is `mustTestH3`. Empty when there is no port or the lift capacity is below `OPERATION_MIN_GROUND_UNITS`. A city beyond `CAMPAIGN_SEA_REACH_LIMIT_STEPS`, or needing more than the lift capacity, has no entry.
  * Exceptions: None.
  */
 export function chooseCampaignSeaRoutes(args: CampaignSeaRouteArgs): ReadonlyMap<string, CampaignSeaRoute> {
@@ -498,7 +498,7 @@ export function chooseCampaignSeaRoutes(args: CampaignSeaRouteArgs): ReadonlyMap
       if (campaignScoreBeats(b, baseSteps, a, baseSteps)) return 1;
       return compareCodeUnits(a.h3Index, b.h3Index);
     });
-  const tested = candidates.slice(0, CAMPAIGN_SEA_CITY_TEST_LIMIT);
+  const tested = candidates.filter((city) => city.heldByPactPartner !== true).slice(0, CAMPAIGN_SEA_CITY_TEST_LIMIT);
   const must = candidates.find((city) => city.h3Index === args.mustTestH3);
   if (must !== undefined && !tested.includes(must)) tested.push(must);
   for (const city of tested) {

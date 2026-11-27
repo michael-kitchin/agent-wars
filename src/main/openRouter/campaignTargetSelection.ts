@@ -133,12 +133,21 @@ export interface CampaignCity {
    * Exceptions: None.
    */
   readonly knownFortifiedCount: number;
+  /**
+   * Whether the viewer has an active pact with the city's holder.
+   *
+   * Contract: True when the viewer has an active pact with the city's holder. Absent means false. The engine never chooses such a city on its own.
+   * When to use: Choosing a target in `resolveCampaignObjective`, and filling the sea route test slots.
+   * Expected outcome: True or false.
+   * Exceptions: None.
+   */
+  readonly heldByPactPartner?: boolean;
 }
 
 /**
  * Cities the side may march on, under the fog rule.
  *
- * Purpose: Urban count is public. Control and fortifications count only on explored hexes. An unexplored city inside exactly one active enemy home counts as held by that side, with no fortification penalty. A holder with at most `NEAR_KNOCKOUT_MAX_CITY_HEXES` cities in the result is near knockout, unless it is in `finishingExemptSeatIds`.
+ * Purpose: Urban count is public. Control and fortifications count only on explored hexes. An unexplored city inside exactly one active enemy home counts as held by that side, with no fortification penalty. A holder with at most `NEAR_KNOCKOUT_MAX_CITY_HEXES` cities in the result is near knockout, unless it is in `pactPartnerSeatIds`. A city whose holder is in that set is marked `heldByPactPartner`.
  * When to use: Once per consult, from inputs derived from the snapshot.
  * Expected outcome: Enemy cities only. A hex the caller omitted from `homeSeatByH3` because it lies in more than one enemy home is not a candidate. Neutral and knocked-out sides are never targets.
  * Exceptions: None.
@@ -150,14 +159,14 @@ export function knownCampaignCities(args: {
   readonly explored: ReadonlySet<string>;
   readonly homeSeatByH3: ReadonlyMap<string, string>;
   /**
-   * Holders whose cities never get the finishing weight: the viewer's active pact partners.
+   * The viewer's active pact partners.
    *
-   * Contract: Seat ids from `readActivePactPartnerSeatIds`. Empty when the caller does not rank by weight.
-   * When to use: Setting `ownerNearKnockout`.
-   * Expected outcome: A city held by one of these seats has `ownerNearKnockout` false.
+   * Contract: Seat ids from `readActivePactPartnerSeatIds`. Empty when the caller neither ranks by weight nor chooses a campaign target.
+   * When to use: Setting `ownerNearKnockout` and `heldByPactPartner`.
+   * Expected outcome: A city held by one of these seats has `ownerNearKnockout` false and `heldByPactPartner` true.
    * Exceptions: None.
    */
-  readonly finishingExemptSeatIds: ReadonlySet<string>;
+  readonly pactPartnerSeatIds: ReadonlySet<string>;
 }): CampaignCity[] {
   const cities: CampaignCity[] = [];
   for (const row of args.infrastructure) {
@@ -182,7 +191,8 @@ export function knownCampaignCities(args: {
     ...city,
     ownerNearKnockout:
       (cityCountByOwner.get(city.ownerSeatId) ?? 0) <= NEAR_KNOCKOUT_MAX_CITY_HEXES
-      && !args.finishingExemptSeatIds.has(city.ownerSeatId),
+      && !args.pactPartnerSeatIds.has(city.ownerSeatId),
+    heldByPactPartner: args.pactPartnerSeatIds.has(city.ownerSeatId),
   }));
   logTrace('campaignTargetSelection knownCampaignCities', { rowCount: args.infrastructure.length, cityCount: marked.length });
   return marked;

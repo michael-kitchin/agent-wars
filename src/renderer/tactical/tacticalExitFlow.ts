@@ -6,7 +6,13 @@ import {
   tacticalBoundaryPlanningExitAllowed,
 } from '../../shared/tacticalStateAssertions';
 import { getTacticalAnnihilationOutcome, getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
-import { aiOnlyBattleEndPresentation, formatAiOnlyBeatLimitSentence } from '../../shared/aiOnlyBeatLimit';
+import {
+  aiOnlyBattleEndPresentation,
+  formatAiOnlyBeatLimitSentence,
+  formatAiOnlyExitSentence,
+  formatAiOnlyQuietSentence,
+} from '../../shared/aiOnlyBeatLimit';
+import { QUIET_BEATS_TO_END } from '../../shared/tacticalQuietBeat';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { sideDisplayName } from '../../shared/sideNicknames';
@@ -77,7 +83,7 @@ export type TacticalBattleExitIo = {
    */
   refreshStrategicSnapshotAfterExit?: () => Promise<void>;
   /**
-   * Ends the battle when the beat-limit notice has been up long enough.
+   * Ends the battle when the timed result notice has been up long enough.
    *
    * Purpose: The timer lives beside the overlay. The exit itself stays in the renderer, which owns Ready.
    * When to use: The timed notice only. Other endings do not call it.
@@ -145,13 +151,14 @@ export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessi
  *
  * Purpose: The overlay shows this text. A missing home name uses the seat id.
  * When to use: After playback, and not for the header Exit Battle control.
- * Expected outcome: Null while the battle continues. A beat-limit ending names the completed beat count, which is one less than the stored turn number.
+ * Expected outcome: Null while the battle continues. A beat-limit ending names the completed beat count, which is one less than the stored turn number. An exit or quiet ending reads "Disengaged". An idle ending, from an older save or recording, keeps its own sentence.
  * Exceptions: None.
  */
 function aiOnlyResultSentence(snap: TacticalBattleSnapshot): string | null {
   if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
   if (snap.aiOnlyEndReason === 'mutual') return 'All units destroyed.';
-  if (snap.aiOnlyEndReason === 'exit') return 'The commanders left the battle.';
+  if (snap.aiOnlyEndReason === 'exit') return formatAiOnlyExitSentence();
+  if (snap.aiOnlyEndReason === 'quiet') return formatAiOnlyQuietSentence(QUIET_BEATS_TO_END);
   if (snap.aiOnlyEndReason === 'idle') return 'The battle ended with no orders left to carry out.';
   if (snap.aiOnlyEndReason === 'beat_limit') return formatAiOnlyBeatLimitSentence(snap.tacticalTurnNumber - 1);
   const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);

@@ -32,7 +32,7 @@ import {
 import { resolveCampaignObjective } from './campaignObjectiveResolution';
 import { campaignSeaRoutesForState } from './campaignSeaFlow';
 import { campaignSkipFor } from './campaignSeaRules';
-import { readActivePactPartnerSeatIds } from './campaignPactPartners';
+import { activeOtherSeatIds, readPactPartnerSeatIdsForState } from './campaignPactPartners';
 import { knownCampaignCities, type CampaignCity } from './campaignTargetSelection';
 
 /**
@@ -128,9 +128,7 @@ export interface CampaignStateInputs {
  */
 export function campaignInputsFromState(state: GameStateSnapshot, landMass: LandMassByH3): CampaignStateInputs {
   const seatId = briefingOwnSeatId(state);
-  const activeEnemySeatIds = new Set<string>(
-    (state.seats ?? []).filter((seat) => seat.seatId !== seatId && seat.outTurn == null).map((seat) => seat.seatId)
-  );
+  const activeEnemySeatIds = activeOtherSeatIds(state, seatId);
   const inOperation = operationUnitIdsForSeat(seatId);
   const groundUnits = state.units
     .filter(
@@ -163,7 +161,7 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
     controllerByH3,
     explored,
     homeSeatByH3,
-    finishingExemptSeatIds: readActivePactPartnerSeatIds({ seatId, turnNumber: state.turnNumber, activeSeatIds: activeEnemySeatIds }),
+    pactPartnerSeatIds: readPactPartnerSeatIdsForState(state, seatId),
   });
   const ownControlledLandHexes = (state.strategicControl ?? [])
     .filter((row) => row.controllerPlayerId === seatId && landUnitCanOccupyHex(row.h3Index, landMass))

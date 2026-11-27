@@ -60,12 +60,40 @@ export function sideAgreementTalkBullets(): readonly string[] {
  *
  * Purpose: Tells the orders stage to plan with stances and agreements in mind.
  * When to use: `sideMessageRuleBlock` with `includeAgreements`.
- * Expected outcome: Two bullets, without the leading hyphen.
+ * Expected outcome: Three bullets, without the leading hyphen. The last says that units in one hex fight whatever was agreed, and how to avoid that.
  * Exceptions: None.
  */
 export const SIDE_AGREEMENT_ORDERS_BULLETS = [
   'Diplomacy is part of how you win. Plan with your stances and agreements in mind: a front covered by an agreement you mean to keep needs fewer units, and a side you rate as a high threat needs more.',
   'Each agreement listed in the Messages section is your own private record. The game does not enforce it, and keeping or breaking it is your decision. Weigh what you gain this turn against retaliation and lost trust.',
+  'Units of two sides that end a turn in the same hex fight there, in melee or in a battle, whatever the two sides have agreed, and they fight again every turn until one side leaves or is destroyed. To keep an agreement, do not order units into a hex that side\'s units hold, and move your units out of a hex you share with them.',
+] as const;
+
+/**
+ * The bullets added to the orders message rules of a battle between two commanders.
+ *
+ * Purpose: Tells the orders stage what the read-only agreements and the shot count in the Messages section are, and that orders against a message will be seen.
+ * When to use: `sideMessageRuleBlock` with `battleTruce`.
+ * Expected outcome: Three bullets, without the leading hyphen. No digits.
+ * Exceptions: None.
+ */
+export const BATTLE_TRUCE_ORDERS_BULLETS = [
+  'In a battle between two commanders, the Messages section lists your own agreements with the side you are fighting. They are your private record, the game does not enforce them, and you cannot make or change one during a battle. Hex codes inside an agreement are world-map codes.',
+  'The Messages section also gives the game\'s count of the shots each side fired last beat and whether there was melee. That count is a fact. Check it against what the other side told you: holding fire while the other side keeps shooting loses your units.',
+  'What you told the other side this beat is in the Messages section. Orders that go against it are your choice, and the other side will see what your units did in its own loss lines and shot count.',
+] as const;
+
+/**
+ * The bullets of the battle talk system text about agreements and the last beat.
+ *
+ * Purpose: Tells the talk stage what the read-only agreements and the shot count are, so a promise is made knowing it will be checked.
+ * When to use: The "Agreements and last beat:" block of the tactical talk system text.
+ * Expected outcome: Two bullets, without the leading hyphen. No digits.
+ * Exceptions: None.
+ */
+export const BATTLE_TRUCE_TALK_BULLETS = [
+  'The Agreements and last beat section lists your own agreements with the side you are fighting. They are your private record, the game does not enforce them, and you cannot make or change one during a battle. Hex codes inside an agreement are world-map codes.',
+  'The same section gives the game\'s count of the shots each side fired last beat and whether there was melee. That count is a fact, and the other side sees its own copy. A promise to hold fire is checked against that count on the next beat.',
 ] as const;
 
 /**

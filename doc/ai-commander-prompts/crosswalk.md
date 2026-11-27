@@ -84,6 +84,8 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `CALLBACK_TACTICAL_SCOPE` | [`tactical-prompt.md`](tactical-prompt.md) | Active callbacks; required coaching |
 | `RECENT_TURN_NOTES` | both mode files | Recent turn notes |
 | `SIDE_COMBAT_RECORD` | both mode files | Messages |
+| `PACT_CONTACT` | [`strategic-prompt.md`](strategic-prompt.md) | Messages |
+| `BATTLE_TRUCE` | [`tactical-prompt.md`](tactical-prompt.md) | Messages |
 | `CONSULT_POLICY` | [`variants.md`](variants.md) | Consultation policy |
 | `SCENARIO_ID` | [`variants.md`](variants.md) | Scenarios |
 | `WIN_CONDITIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Goal statement; scenario objective |
@@ -122,7 +124,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
-| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Stance lines carry this commander's own trust and threat. Omitted when this commander has no visible message, no stance, and no combat record. |
+| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Stance lines carry this commander's own trust and threat. The commander's agreements and then the pact contact lines follow the records. Omitted when this commander has no visible message, stance, combat record, agreement, or contact line. |
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
 | `### Production Priorities` | Under Production Status, after Paused Queues and before Controlled Hex Queues, when `buildProductionPriorityLines` returns a line. |
@@ -178,7 +180,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 | `## Operational Map` with the tactical legend | Kept — 2.6 |
 | `### Best Options This Turn` | Kept, including airport ferry dests — 2.6 |
 | `## Recent Turn Notes` | Kept, battle-scoped — 2.6 |
-| `# Messages` | Added, same block as strategic, before the status sections — 2.8 |
+| `# Messages` | Added, same block as strategic, before the status sections. A battle between two AI commanders adds the truce text of `buildBattleTruceText` — 2.8 |
 | `## Active Callbacks` | Kept with sub-unit ids — 2.6 |
 | `# Battle Context` | Kept — 2.8 |
 | `# Air Operations Status`, tactical form | Kept, roster-gated — 2.9 |

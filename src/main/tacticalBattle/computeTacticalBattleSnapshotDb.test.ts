@@ -325,7 +325,7 @@ test('two AI owners place a battle and three owners do not', () => {
       : secondSeat;
     assert.equal(placed.snapshot!.leadPartyId, lead);
     assert.equal(placed.snapshot!.opposingPartyId, lead === firstSeat ? secondSeat : firstSeat);
-    assert.equal(placed.snapshot!.idleBeatStreak, 0);
+    assert.equal(placed.snapshot!.quietBeatStreak, 0);
     assert.equal(placed.snapshot!.subUnits.some((unit) => unit.player === HUMAN_SEAT_ID), false);
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [targetStrategicH3, humanId]);
     const three = computeTacticalBattleSnapshot(targetStrategicH3, 'three-owners');

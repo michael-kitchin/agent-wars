@@ -9,10 +9,12 @@
 
 import { logTrace } from '../../logger';
 import { AIRLIFT_INFANTRY_CAPACITY } from '../../../shared/carrierCargoRules';
+import { QUIET_BEATS_TO_END } from '../../../shared/tacticalQuietBeat';
 import type { CoachingGates } from './coachingGates';
 import { buildDoctrineBlock } from './doctrineText';
 import { buildStrategyBlock } from './coachingTextStrategic';
 import { isTalkStageEnabled } from '../commanderPoolRounds';
+import { sideAgreementsShownInBattle } from '../sideAgreementGate';
 import { sideMessageRuleBlock } from './sideMessageRuleText';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 import {
@@ -26,7 +28,7 @@ import {
  *
  * Purpose: Battle prompts keep a single engage priority instead of the five strategic goals.
  * When to use: `buildContextCoaching` in tactical mode.
- * Expected outcome: The priority, the strategy list, the doctrine block, and the message. Balanced adds its own block.
+ * Expected outcome: The priority, the strategy list, the doctrine block, and the message rules. Balanced adds its own block. A battle between two commanders (`includeExitBattle`) adds the truce bullets to the message rules while `sideAgreementsShownInBattle` is true.
  * Exceptions: None.
  */
 export function buildTacticalContextCoaching(gates: CoachingGates): string {
@@ -35,7 +37,10 @@ export function buildTacticalContextCoaching(gates: CoachingGates): string {
   const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
   return `${TACTICAL_PRIORITY_BLOCK}
 ${buildStrategyBlock('tactical')}${doctrineLine}
-${sideMessageRuleBlock({ talkStageEnabled: isTalkStageEnabled() })}`;
+${sideMessageRuleBlock({
+    talkStageEnabled: isTalkStageEnabled(),
+    battleTruce: gates.includeExitBattle === true && sideAgreementsShownInBattle(),
+  })}`;
 }
 
 /**
@@ -54,7 +59,7 @@ export function buildTacticalCoachingSections(gates: CoachingGates): readonly { 
   const callbacks = [
     CALLBACK_BULLET,
     UNCONSULTED_BEAT_BULLET,
-    ...(gates.includeExitBattle === true ? [EXIT_BATTLE_BULLET] : []),
+    ...(gates.includeExitBattle === true ? [exitBattleBullet(isTalkStageEnabled())] : []),
   ];
   return [
     {
@@ -180,10 +185,12 @@ const UNCONSULTED_BEAT_BULLET =
  * Tells an AI-only commander when to leave the battle.
  *
  * Purpose: The beat still resolves this reply's orders. The flag only asks to end the battle afterward.
- * When to use: `buildTacticalCoachingBullets` when `includeExitBattle` is true.
- * Expected outcome: The locked sentence, including that a missing or false flag stays in the battle.
+ * When to use: `buildTacticalCoachingSections` when `includeExitBattle` is true.
+ * Expected outcome: When to set the flag, that a missing or false flag stays in the battle, that two flags or `QUIET_BEATS_TO_END` quiet beats end it, and that both sides stay in the same world-map hex afterward. With `talkEnabled`, an agreement to stop fighting is also a reason to set it, because only talk can make one.
  * Exceptions: None.
  */
-const EXIT_BATTLE_BULLET =
-  '- Set exitBattle to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. Orders in this reply still resolve for this beat.';
+function exitBattleBullet(talkEnabled: boolean): string {
+  const agreed = talkEnabled ? 'when you and the other commander have agreed to stop fighting, ' : '';
+  return `- Set exitBattle to true ${agreed}when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. The battle ends after a beat in which both commanders set it. It also ends on its own after ${QUIET_BEATS_TO_END} beats in a row with no shots, no melee, and no unit moving closer to the enemy. A battle that ends in either way leaves both sides' units in the same world-map hex, where they fight again next turn unless one side moves out. Orders in this reply still resolve for this beat.`;
+}
 

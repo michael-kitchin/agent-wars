@@ -646,7 +646,7 @@ export function computeTacticalBattleSnapshot(
     const snapshot: TacticalBattleSnapshot = {
       battleId,
       opposingPartyId,
-      ...(leadPartyId ? { leadPartyId, idleBeatStreak: 0 } : {}),
+      ...(leadPartyId ? { leadPartyId, quietBeatStreak: 0 } : {}),
       enclosingStrategicH3Index,
       tacticalChildH3Indexes: [...children],
       coreChildH3Indexes: coreChildren,

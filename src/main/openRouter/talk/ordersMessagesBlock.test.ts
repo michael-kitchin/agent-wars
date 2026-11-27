@@ -19,9 +19,14 @@ import { insertSideAgreement } from '../../gameDb/sideAgreementStore';
 import { insertSentSideMessage, listUnseenInboundSideMessages, markSideMessagesSeen, upsertSideStance } from '../../gameDb/sideMessageStore';
 import { withSeatedTempGameDbAsync } from '../../testSupport/withSeatedTempGameDb';
 import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
+import { setActiveTacticalBattleSnapshotRef } from '../../tacticalBattle/activeTacticalBattleRef';
+import { tacticalDbFixtureRegisterDefaultAfterEach } from '../../tacticalBattle/testSupport/tacticalDbFixture';
+import { withTwoAiBattle } from '../../tacticalBattle/testSupport/twoAiBattleFixture';
 import { countUnreadPromptMessages, readTalkPromptInput } from './talkPromptInput';
 import { buildTalkSituationText } from './talkPrompt';
 import { buildOrdersMessagesBlock } from './ordersMessagesBlock';
+
+tacticalDbFixtureRegisterDefaultAfterEach();
 
 /**
  * The largest listed home regions.
@@ -183,4 +188,34 @@ test('an agreement adds a Your agreements part, and a battle or a switch-off hid
     assert.equal(buildOrdersMessagesBlock({ seatId: seatA, inBattle: true, includeAgreements: true }).text, null);
     assert.equal(buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text, null);
   });
+});
+
+test('both battle prompts show the agreements and the last beat, and talk off drops them from the orders prompt', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  try {
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    withTwoAiBattle('aw-battle-truce-prompts-', (started) => {
+      const lead = started.leadPartyId as AiSeatId;
+      const opposing = started.opposingPartyId as AiSeatId;
+      insertSideAgreement(gameDbOps, {
+        seatId: lead, counterpartSeatId: opposing, kind: 'ceasefire_in_place', terms: 'Hold here.', zoneH3: [], againstSeatId: null,
+        startTurn: 1, endTurn: 99, status: 'active', intent: 'keep', reason: '',
+      });
+      const battle = { ...started, lastBeatActivity: { beatNumber: 1, leadShots: 2, opposingShots: 0, meleeFought: false } };
+      setActiveTacticalBattleSnapshotRef(battle);
+      const prompts = (): string[] => [
+        buildOrdersMessagesBlock({ seatId: lead, inBattle: true, includeAgreements: false }).text ?? '',
+        buildTalkSituationText(readTalkPromptInput({ seatId: lead, turnNumber: battle.strategicTurnNumber, battle }).input),
+      ];
+      for (const text of prompts()) {
+        assert.match(text, /Your agreements with .+ \(a2\), shown for reference:/);
+        assert.match(text, /a2 fired 0 shots, and you fired 2 shots\. There was no melee\./);
+      }
+      process.env.AGENT_WARS_DISABLE_TALK = '1';
+      assert.equal((buildOrdersMessagesBlock({ seatId: lead, inBattle: true, includeAgreements: false }).text ?? '').includes('Last beat'), false);
+    });
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
 });

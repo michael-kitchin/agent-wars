@@ -18,6 +18,7 @@ import { isLandUnitType } from '../../shared/landUnitType';
 import type { Operation } from '../../shared/operationTypes';
 import { logDebug, logError, logTrace } from '../logger';
 import { campaignPlanForState } from '../openRouter/campaignObjectiveFlow';
+import { cityHeldByPactPartner } from '../openRouter/campaignPactPartners';
 import { campaignWaypoint, CAMPAIGN_REACH_LIMIT_STEPS } from '../openRouter/campaignRules';
 import { CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS, CAMPAIGN_LIFT_LANDING_MAX_STEPS } from '../openRouter/campaignSeaConstants';
 import { campaignLiftRequiredUnits } from '../openRouter/campaignSeaRules';
@@ -104,7 +105,7 @@ export function campaignLiftLandings(args: {
  *
  * Purpose: Ground units that cannot walk to the campaign's target sail there in lifts of their own, sized to what waits at the target and to the posture's lift share.
  * When to use: Once per seat per operation tick, after raids. Pass the snapshot with the full unit list, the seat's running operations, and the units released earlier in the tick.
- * Expected outcome: A campaign lift in its muster phase, or null when there is no stored target, the commander cancelled a campaign lift for it fewer than `CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS` turns ago, there is no free campaign lift slot, too few units that cannot walk, no landing or route, or too little force for the defenders and reinforcers.
+ * Expected outcome: A campaign lift in its muster phase, or null when there is no stored target, the engine picked the target and `cityHeldByPactPartner` says a pact partner holds it, the commander cancelled a campaign lift for it fewer than `CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS` turns ago, there is no free campaign lift slot, too few units that cannot walk, no landing or route, or too little force for the defenders and reinforcers.
  * Exceptions: None. A thrown error is logged and gives null.
  */
 export function campaignLiftForSeat(args: {
@@ -159,6 +160,9 @@ export function campaignLiftForSeat(args: {
   try {
     const objective = readCampaignObjectives({ getOne: dbGetOne }).get(seatId);
     if (objective === undefined) return skip(seatId, 'no objective');
+    if (objective.source === 'engine' && cityHeldByPactPartner(state, seatId, objective.targetH3)) {
+      return skip(seatId, 'engine target held by a pact partner');
+    }
     if (
       objective.liftCancelledTurn !== undefined &&
       state.turnNumber - objective.liftCancelledTurn < CAMPAIGN_LIFT_CANCEL_COOLDOWN_TURNS

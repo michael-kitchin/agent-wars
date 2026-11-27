@@ -527,7 +527,7 @@ let tacticalAiOnlyExitInFlight = false;
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
  * Purpose: Delegates boundary checks and DOM restoration to `tacticalPerformBattleExit` while preserving renderer IPC wiring.
- * When to use: Exit Battle in the battle header, Ok on an AI-only result, and the timed beat-limit notice.
+ * When to use: Exit Battle in the battle header, Ok on an AI-only result, and the timed result notice.
  * Expected outcome: An AI-only battle leaves through `leaveAiOnlyBattle`, and the next turn starts only when that leave was asked to press Ready. A second call while that leave is running returns. A human battle still runs Ready after the exit.
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */

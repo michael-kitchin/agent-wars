@@ -20,6 +20,7 @@ import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefing } from './briefingSections';
 import { buildCampaignObjectiveSection, campaignTargetHolderSeatId } from './briefingSectionsCampaign';
+import { readPactPartnerSeatIdsForState } from './campaignPactPartners';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
 import { buildPostureSection, postureHoldUntilTurn } from './briefingSectionsPosture';
 import { buildPostureFitReport, postureAttentionBullet, postureFitLinesFrom } from './postureFit';
@@ -302,7 +303,12 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
   };
   const campaignText =
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
-      ? buildCampaignObjectiveSection({ state: args.state, plan: campaignPlan, format: formatCampaignHex })
+      ? buildCampaignObjectiveSection({
+        state: args.state,
+        plan: campaignPlan,
+        format: formatCampaignHex,
+        pactPartnerSeatIds: readPactPartnerSeatIdsForState(args.state, seatId),
+      })
       : '';
   const offeredCandidates = showOperations
     ? operationCandidatesForSeat({ state: args.state, seatId, active: activeOperations, includeLand: true })

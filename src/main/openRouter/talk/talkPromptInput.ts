@@ -25,17 +25,19 @@ import { sideMessageVisibleTo } from '../../../shared/sideMessages';
 import { playerIdCodeFor } from '../../../shared/unitIds';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { readSideAgreementViews } from '../../sideAgreements/sideAgreementLedger';
+import { buildBattleTruceText } from './battleTruceText';
 import type { TalkPromptInput, TalkPromptSide, TalkPromptThread } from './talkPrompt';
 
 /**
  * The other owner in a battle, when that owner is a seat.
  *
- * Purpose: The situation text names who this commander is fighting.
- * When to use: A talk call inside a battle.
+ * Purpose: Both battle prompts name who this commander is fighting and show the truce with that side.
+ * When to use: A talk call or an orders consult inside a battle.
  * Expected outcome: The other seat, or null when the other owner is Neutral or missing.
  * Exceptions: None.
  */
-function battleOpponentSeatId(seatId: AiSeatId, battle: TacticalBattleSnapshot): SeatId | null {
+export function battleOpponentSeatId(seatId: AiSeatId, battle: TacticalBattleSnapshot): SeatId | null {
+  logTrace('talkPromptInput battleOpponentSeatId', { seatId, battleId: battle.battleId });
   const parties = [battle.leadPartyId, battle.opposingPartyId].filter((id): id is SeatId => typeof id === 'string' && isSeatId(id));
   return parties.find((id) => id !== seatId) ?? null;
 }
@@ -149,11 +151,37 @@ export function readTalkSides(seatId: AiSeatId): TalkPromptSide[] {
 }
 
 /**
+ * The truce text of one commander in a battle.
+ *
+ * Purpose: A commander in a battle between two commanders sees its agreements with the opponent and last beat's fire, the same in its talk prompt and its orders prompt.
+ * When to use: `readTalkPromptInput` and `buildOrdersMessagesBlock`, in a battle, while the talk stage is on.
+ * Expected outcome: Null unless the battle has a lead party and an opponent is given. Otherwise the text from `buildBattleTruceText`, with only the agreements with that opponent.
+ * Exceptions: Propagates a SQLite error from the agreement ledger.
+ */
+export function readBattleTruceText(args: {
+  readonly seatId: AiSeatId;
+  readonly turnNumber: number;
+  readonly battle: TacticalBattleSnapshot;
+  readonly opponent: Pick<SeatRecord, 'seatId' | 'homeRegion'> | undefined;
+}): string | null {
+  const { battle, opponent } = args;
+  logTrace('talkPromptInput readBattleTruceText', { seatId: args.seatId, battleId: battle.battleId, opponentSeatId: opponent?.seatId ?? null });
+  if (battle.leadPartyId == null || opponent === undefined) return null;
+  return buildBattleTruceText({
+    opponentLabel: opponent.homeRegion,
+    opponentCode: playerIdCodeFor(opponent.seatId),
+    agreementViews: readSideAgreementViews(args.seatId, args.turnNumber).filter((view) => view.counterpartSeatId === opponent.seatId),
+    activity: battle.lastBeatActivity ?? null,
+    ownIsLead: battle.leadPartyId === args.seatId,
+  });
+}
+
+/**
  * Reads one talk prompt's inputs from the open match.
  *
  * Purpose: `requestTalk` does not assemble SQL itself. In a battle, only the two sides fighting talk to each other, so a beat does not flood the sides that are not in it.
  * When to use: Once per talk call, before the model is called.
- * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match. The input carries the commander's agreement views on the world map, and null in a battle.
+ * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match. The input carries the commander's agreement views on the world map, and null there in a battle, where a battle between two commanders carries its truce text instead.
  * Exceptions: Propagates a SQLite error.
  */
 export function readTalkPromptInput(args: {
@@ -202,6 +230,7 @@ export function readTalkPromptInput(args: {
           beatNumber: args.battle.tacticalTurnNumber,
           opponentLabel: opponent?.homeRegion ?? null,
           opponentCode: opponent && addressableSeatIds.includes(opponent.seatId) ? playerIdCodeFor(opponent.seatId) : null,
+          truceText: readBattleTruceText({ seatId: args.seatId, turnNumber: args.turnNumber, battle: args.battle, opponent }),
         }
         : null,
       sides,

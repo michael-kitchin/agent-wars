@@ -139,7 +139,8 @@ function renderBattleForceBar(battle: TacticalBattleSnapshot): void {
  * When to use: From `renderTopBarStatus`, with the latest game state and `S.tacticalBattleSnapshot`.
  * Expected outcome: With a game state and a battle, the bar switches to the battle header: the title, such as "Battle at
  *   (E8)", the hex caption, and the status line, such as "Beat 2 · Tactical planning · April, Year 1". An AI-only battle
- *   with a beat limit shows " (N left)" immediately to the right of "Beat N", crimson when N is 5 or less. The line ends with the
+ *   with a beat limit shows " (N left)" immediately to the right of "Beat N", crimson when N is 5 or less. An AI-only battle
+ *   that has not ended shows its quiet-beat count after the phase once it has one. The line ends with the
  *   battle's weather when it has one, and the force bar from `renderBattleForceBar`. Otherwise the bar shows the match
  *   status, and the next battle's caption and counts are written afresh.
  * Exceptions: None; missing elements are skipped.
@@ -167,6 +168,7 @@ export function renderBattleHeader(state: GameStateSnapshot | null, battle: Tact
       dateLabel: state.currentDateLabel ?? '',
       garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId),
       beatsLeft,
+      quietBeats: battle.leadPartyId != null && battle.aiOnlyEndReason == null ? (battle.quietBeatStreak ?? 0) : 0,
     });
     const beatLabel = document.createElement('span');
     beatLabel.className = 'battle-beat-count';

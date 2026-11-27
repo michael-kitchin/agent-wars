@@ -20,6 +20,8 @@ import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } 
 import { dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot, type GameStateSnapshot } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
 import { writePosture } from '../gameDb/postureMemory';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { insertSideAgreement } from '../gameDb/sideAgreementStore';
 import { buildLiftTerrain } from '../operations/liftTerrain';
 import { ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -302,5 +304,28 @@ test('a commander may name a city only a campaign lift can reach, and a land lau
     assert.equal(stored?.approach, 'sea');
     assert.equal(stored?.source, 'commander');
     assert.equal(stored?.phase, 'assault');
+  });
+});
+
+test('echoing an engine target held by a pact partner records it as the commander choice', () => {
+  ensureTerrainClassificationCacheLoaded();
+  withTempGameDb('aw-campaign-target-pact-', () => {
+    ensureStrategicCoordinateRegistryInitialized();
+    const state = getGameStateForPlayer(SEAT, { maskUnexploredTerrain: false });
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass);
+    const reached = stateThatReachesACity(state, landMass, SEAT);
+    const targetH3 = reached.city.h3Index;
+    const echo = { state: reached.state, targetH3, label: h3ToCode(targetH3, STRATEGIC), allowSea: false };
+    const stored = { targetH3, stagingH3: null, phase: 'assault', source: 'engine', chosenTurn: 1 } as const;
+    writeCampaignObjectiveForSeat(ops(), SEAT, stored);
+    applyCampaignTargetH3(echo);
+    assert.deepEqual(readCampaignObjectives(ops()).get(SEAT), stored);
+    insertSideAgreement(gameDbOps, {
+      seatId: SEAT, counterpartSeatId: reached.city.ownerSeatId, kind: 'non_aggression', terms: 'No strikes.', zoneH3: [], againstSeatId: null,
+      startTurn: state.turnNumber, endTurn: state.turnNumber + 3, status: 'active', intent: 'keep', reason: '',
+    });
+    assert.deepEqual(applyCampaignTargetH3(echo), { applied: true, dropReasons: [] });
+    assert.deepEqual(readCampaignObjectives(ops()).get(SEAT), { ...stored, source: 'commander' });
   });
 });

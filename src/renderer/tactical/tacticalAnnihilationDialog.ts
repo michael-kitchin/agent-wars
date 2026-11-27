@@ -83,7 +83,7 @@ export function openAiOnlyBattleResultDialog(sentence: string, okTooltip: string
  *
  * Purpose: Prevents a stuck modal when the tactical session ends without using the overlay button.
  * When to use: Successful `tacticalPerformBattleExit`, `tacticalReleaseRendererSessionForNewStrategicMatch`, and tactical reconcile paths.
- * Expected outcome: Any beat-limit timer is canceled first. `S.tacticalAnnihilationOutcomeDialog` is null, the overlay is `hidden`, and main map interactions are restored unless another overlay owns blocking.
+ * Expected outcome: Any timed-notice timer is canceled first. `S.tacticalAnnihilationOutcomeDialog` is null, the overlay is `hidden`, and main map interactions are restored unless another overlay owns blocking.
  * Exceptions: None; safe when the dialog was never opened.
  */
 export function closeTacticalAnnihilationOutcomeDialog(): void {

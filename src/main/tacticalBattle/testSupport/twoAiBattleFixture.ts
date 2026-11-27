@@ -22,7 +22,7 @@ import { tacticalDbFixtureWithTempDbContestedPlanning } from './tacticalDbFixtur
 /**
  * An empty plan, with the exit flag only when requested.
  *
- * Purpose: Idle and exit cases must not apply an order.
+ * Purpose: Quiet and exit cases must not apply an order.
  * When to use: Beat tests that do not move a unit.
  * Expected outcome: Every order list is empty.
  * Exceptions: None.

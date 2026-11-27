@@ -210,3 +210,42 @@ test('a lift cancel turn is kept with the target and dropped on a new one', () =
   assert.equal(replaced?.targetH3, 'L');
   assert.equal('liftCancelledTurn' in (replaced ?? {}), false);
 });
+
+/**
+ * One enemy city held by a pact partner.
+ *
+ * Purpose: The pact cases differ from the others only by this mark.
+ * When to use: The pact cases below.
+ * Expected outcome: A candidate city with `heldByPactPartner` true.
+ * Exceptions: None.
+ */
+function pactCity(h3Index: string, urbanHexCount = 20): CampaignCity {
+  return { ...city(h3Index, urbanHexCount), heldByPactPartner: true };
+}
+
+const BOTH_BY_LAND = new Map([
+  ['P', 3],
+  ['N', 3],
+]);
+
+test('the engine skips the best city when a pact partner holds it', () => {
+  const chosen = resolve({ stored: null, turnNumber: 4, cities: [pactCity('P'), city('N')], landSteps: BOTH_BY_LAND });
+  assert.equal(chosen?.targetH3, 'N');
+});
+
+test('an engine target whose city becomes a pact partner city is replaced', () => {
+  const stored = seaObjective({ targetH3: 'P', approach: undefined });
+  const next = resolve({ stored, turnNumber: 8, cities: [pactCity('P'), city('N')], landSteps: BOTH_BY_LAND });
+  assert.equal(next?.targetH3, 'N');
+  assert.equal(next?.chosenTurn, 8);
+});
+
+test('a commander target held by a pact partner is kept', () => {
+  const stored: CampaignObjective = { targetH3: 'P', stagingH3: null, phase: 'assault', source: 'commander', chosenTurn: 3 };
+  const kept = resolve({ stored, turnNumber: 8, cities: [pactCity('P'), city('N')], landSteps: BOTH_BY_LAND });
+  assert.deepEqual(kept, stored);
+});
+
+test('no target is chosen when the only reachable city is a pact partner city', () => {
+  assert.equal(resolve({ stored: null, turnNumber: 4, cities: [pactCity('P')], landSteps: BOTH_BY_LAND }), null);
+});

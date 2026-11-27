@@ -162,7 +162,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Ignore: Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.
 - Exit Battle during a fight: Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.
 - Exit Battle on the annihilation result: Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.
-- Ok on an AI-only result: Close this result and return to the world map. The next turn does not start until you press Ready. On the beat-limit notice that closes itself, the tip is `aiOnlyTimedResultOkTooltipText`: Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.
+- Ok on an AI-only result: Close this result and return to the world map. The next turn does not start until you press Ready. On a notice that closes itself (beat limit, commander exit, or quiet ending), the tip is `aiOnlyTimedResultOkTooltipText`: Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.
 - Build or hire close: Close this popup (`buildPopupCloseTooltipText`).
 - Single-hex queue remove: Remove this row from the queue (`singleHexQueueRemoveTooltipText`).
 - Multi-hex queue remove: Remove this row on every selected hex (`multiHexQueueRemoveTooltipText`).

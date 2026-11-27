@@ -1,5 +1,5 @@
 /**
- * Closes the beat-limit notice after a short wait.
+ * Closes the timed result notice after a short wait. A beat limit, a commander exit, and a quiet ending use it.
  *
  * Purpose: An observer who is auto-advancing sees the reason, then the battle ends without a click.
  * When to use: After the timed notice opens, and whenever that overlay closes another way.
@@ -21,7 +21,7 @@ import { rendererSharedState as S } from '../core/state';
 let aiOnlyResultAutoCloseHandle: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Starts the wait that closes the beat-limit notice.
+ * Starts the wait that closes the timed result notice.
  *
  * Purpose: The notice stays up for `AI_ONLY_BEAT_LIMIT_NOTICE_MS`, then ends the battle when auto-advance is still on.
  * When to use: After the timed notice opens.

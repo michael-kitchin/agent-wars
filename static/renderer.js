@@ -30348,6 +30348,12 @@ ${bonuses}`;
   function formatAiOnlyBeatLimitSentence(beats) {
     return `The battle reached its maximum of ${beats} beats.`;
   }
+  function formatAiOnlyExitSentence() {
+    return "Disengaged: both commanders left the battle.";
+  }
+  function formatAiOnlyQuietSentence(beats) {
+    return `Disengaged: ${beats} beats passed with no fighting.`;
+  }
   var AI_ONLY_BEAT_LIMIT_NOTICE_MS = 3e3;
   var AI_ONLY_BEATS_LEFT_URGENT_AT = 5;
   function aiOnlyBeatsLeft(beat, limit) {
@@ -30361,12 +30367,15 @@ ${bonuses}`;
   function formatAiOnlyBeatsLeftLabel(left) {
     return ` (${left} left)`;
   }
+  function aiOnlyEndReasonUsesTimedNotice(reason) {
+    return reason === "beat_limit" || reason === "exit" || reason === "quiet";
+  }
   function aiOnlyBattleEndPresentation(reason, autoAdvance) {
     if (!autoAdvance) return "dialog_until_ok";
-    return reason === "beat_limit" ? "timed_dialog" : "leave_now";
+    return aiOnlyEndReasonUsesTimedNotice(reason) ? "timed_dialog" : "leave_now";
   }
   function aiOnlyLeaveStartsNextTurn(args) {
-    return args.autoAdvance && (!args.resultDialogOpen || args.endReason === "beat_limit");
+    return args.autoAdvance && (!args.resultDialogOpen || aiOnlyEndReasonUsesTimedNotice(args.endReason));
   }
   function aiOnlyTimedNoticeStillCloses(sentence, autoAdvance) {
     return sentence != null && autoAdvance;
@@ -31865,6 +31874,9 @@ ${bonuses}`;
     return { human, opponent, humanShare: total > 0 ? human / total : 0.5 };
   }
 
+  // src/shared/tacticalQuietBeat.ts
+  var QUIET_BEATS_TO_END = 3;
+
   // src/shared/battleHeaderText.ts
   function formatBattleHeaderTitle(hexCode) {
     return hexCode ? `Battle at (${hexCode})` : "Battle";
@@ -31873,6 +31885,9 @@ ${bonuses}`;
     const phase = input.beatPlaybackActive ? "Tactical resolution" : "Tactical planning";
     const beatsLeftLabel = input.beatsLeft == null ? null : formatAiOnlyBeatsLeftLabel(input.beatsLeft);
     let afterBeatsLeft = ` \xB7 ${phase}`;
+    if (input.quietBeats !== void 0 && input.quietBeats >= 1) {
+      afterBeatsLeft += ` \xB7 Holding fire (${input.quietBeats} of ${QUIET_BEATS_TO_END} quiet beats)`;
+    }
     if (input.dateLabel.length > 0) afterBeatsLeft += ` \xB7 ${input.dateLabel}`;
     if (input.garrisonDefendsInPlace) afterBeatsLeft += " \xB7 The garrison defends in place";
     return { beforeBeatsLeft: `Beat ${input.beat}`, beatsLeftLabel, afterBeatsLeft };
@@ -31976,7 +31991,8 @@ ${bonuses}`;
         beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null,
         dateLabel: state.currentDateLabel ?? "",
         garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId),
-        beatsLeft
+        beatsLeft,
+        quietBeats: battle.leadPartyId != null && battle.aiOnlyEndReason == null ? battle.quietBeatStreak ?? 0 : 0
       });
       const beatLabel = document.createElement("span");
       beatLabel.className = "battle-beat-count";
@@ -41027,7 +41043,8 @@ ${bonuses}`;
   function aiOnlyResultSentence(snap) {
     if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
     if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
-    if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
+    if (snap.aiOnlyEndReason === "exit") return formatAiOnlyExitSentence();
+    if (snap.aiOnlyEndReason === "quiet") return formatAiOnlyQuietSentence(QUIET_BEATS_TO_END);
     if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
     if (snap.aiOnlyEndReason === "beat_limit") return formatAiOnlyBeatLimitSentence(snap.tacticalTurnNumber - 1);
     const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);

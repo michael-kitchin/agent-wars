@@ -131,9 +131,9 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.ok(tactical.includes('## Recent Turn Notes'));
 
-    assert.ok(tactical.includes('Turn 1:'));
+    assert.ok(tactical.includes('Beat 1:'));
 
-    assert.ok(!tactical.includes('Beat '), 'tactical notes use Turn labels');
+    assert.ok(!tactical.includes('Turn 1:'), 'battle notes are labeled by beat');
 
     assert.ok(tactical.includes('Strategy: Hold the line'));
     assert.equal(tactical.includes(RECENT_TURN_LOSS_LEGEND), false, 'no legend without a loss line');
@@ -255,7 +255,7 @@ async function testAttributedLossLines(): Promise<void> {
     );
     const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 2, heading: 'Recent Turn Notes' });
     assert.ok(out.includes('- Your Losses:\n  - by h1, Ranged attack: a1-i1 (by 1 Armored)'));
-    assert.ok(out.includes('- Losses of h1:\n  - by you, Melee attack: h1-i9'));
+    assert.ok(out.includes('- Losses of h1:\n  - by you, Melee attack (units of both sides were in the same hex or cell): h1-i9'));
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -403,7 +403,7 @@ async function testLossLineNamesHomeRegion(): Promise<void> {
     assert.ok(humanHome.length > 0);
     const out = buildRecentTurnNotesSection({ scope: 'strategic', battleId: '', currentTurnNumber: 2, heading: 'Recent Turn Notes' });
     assert.ok(out.includes(`  - by h1 (${sideHomeNameKey(humanHome)}), Ranged attack: a1-i1`), out);
-    assert.ok(out.includes('- Losses of h1:\n  - by you, Melee attack: h1-i9'), out);
+    assert.ok(out.includes('- Losses of h1:\n  - by you, Melee attack (units of both sides were in the same hex or cell): h1-i9'), out);
   });
 }
 

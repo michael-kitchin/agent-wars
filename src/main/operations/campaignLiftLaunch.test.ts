@@ -23,6 +23,9 @@ import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import { dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
 import { readOperations, writeOperationsForSeat } from '../gameDb/operationMemory';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { insertSideAgreement } from '../gameDb/sideAgreementStore';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { readPosture, writePosture } from '../gameDb/postureMemory';
 import { POSTURE_MIN_HOLD_TURNS } from '../../shared/postureTypes';
 import { loadCampaignLandMass, resolveCampaignObjectiveForSeat } from '../openRouter/campaignObjectiveFlow';
@@ -494,5 +497,45 @@ test('a landing hex the seat holds near the target is a campaign lift landing', 
     });
     assert.equal(landings.includes(beachhead), true);
     assert.equal(landings.every((hex) => hex === beachhead || own.has(hex)), true);
+  });
+});
+
+test('an engine target held by a pact partner gets no lift, and a commander target still does', () => {
+  withTempGameDb('aw-campaign-lift-pact-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    insertSideAgreement(gameDbOps, {
+      seatId: SEAT, counterpartSeatId: HUMAN_SEAT_ID, kind: 'non_aggression', terms: 'No strikes.', zoneH3: [], againstSeatId: null,
+      startTurn: 1, endTurn: TURN + 3, status: 'active', intent: 'keep', reason: '',
+    });
+    storeObjective(city);
+    setTurn(TURN);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(storedLifts().length, 0);
+    storeObjective(city, { source: 'commander' });
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(storedLifts().length, 1);
+  });
+});
+
+test('an engine target the seat knows only as a pact partner home gets no lift', () => {
+  withTempGameDb('aw-campaign-lift-pact-home-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    dbRun('DELETE FROM res_s_control WHERE h3_index = ?', [city]);
+    assert.equal(getGameStateForPlayer(SEAT, { maskUnexploredTerrain: false }).exploredHexes?.includes(city), false);
+    insertSideAgreement(gameDbOps, {
+      seatId: SEAT, counterpartSeatId: HUMAN_SEAT_ID, kind: 'non_aggression', terms: 'No strikes.', zoneH3: [], againstSeatId: null,
+      startTurn: 1, endTurn: TURN + 3, status: 'active', intent: 'keep', reason: '',
+    });
+    storeObjective(city);
+    setTurn(TURN);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(storedLifts().length, 0);
+    storeObjective(city, { source: 'commander' });
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(storedLifts().length, 1);
   });
 });

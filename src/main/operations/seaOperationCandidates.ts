@@ -10,6 +10,7 @@
 import { getRange } from '../combatConstants';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
+import { activeOtherSeatIds } from '../openRouter/campaignPactPartners';
 import { knownCampaignCities } from '../openRouter/campaignTargetSelection';
 import { compareCodeUnits } from '../../shared/codeUnitOrder';
 import { isLandUnitType } from '../../shared/landUnitType';
@@ -49,9 +50,7 @@ function isGroundUnit(unit: UnitRow): boolean {
  * Exceptions: None.
  */
 export function listKnownEnemyCities(state: GameStateSnapshot, seatId: string): LiftCity[] {
-  const activeEnemySeatIds = new Set<string>(
-    (state.seats ?? []).filter((seat) => seat.seatId !== seatId && seat.outTurn == null).map((seat) => seat.seatId)
-  );
+  const activeEnemySeatIds = activeOtherSeatIds(state, seatId);
   const homeSeatByH3 = new Map<string, string>();
   const inSeveralHomes = new Set<string>();
   for (const enemySeatId of activeEnemySeatIds) {
@@ -69,7 +68,7 @@ export function listKnownEnemyCities(state: GameStateSnapshot, seatId: string): 
     controllerByH3,
     explored,
     homeSeatByH3,
-    finishingExemptSeatIds: new Set<string>(),
+    pactPartnerSeatIds: new Set<string>(),
   }).map((city) => ({
     h3Index: city.h3Index,
     urbanHexCount: city.urbanHexCount,

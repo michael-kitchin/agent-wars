@@ -22,6 +22,8 @@ test('talk off leaves out only the diplomacy sentence', () => {
   assert.equal(off.includes('A message is its sender\'s claim'), true);
   assert.equal(on.includes('A loss line in Recent Turn Notes is a fact reported by the game'), true);
   assert.equal(off.includes('A loss line in Recent Turn Notes is a fact reported by the game'), true);
+  assert.equal(on.includes('Read the cause before you call it an attack'), true);
+  assert.equal(on.includes('"Return fire" means your units attacked first'), true);
   assert.equal(/\d/.test(on), false);
   assert.equal(/\d/.test(off), false);
 });
@@ -34,4 +36,15 @@ test('agreement bullets are added only on request, after the trust bullets and b
   assert.ok(withAgreements.endsWith('Nothing in your orders reply is sent to another side.'));
   assert.ok(withAgreements.indexOf('A loss line in Recent Turn Notes') < withAgreements.indexOf(SIDE_AGREEMENT_ORDERS_BULLETS[0]));
   assert.equal(/\d/.test(withAgreements), false);
+});
+
+test('the battle truce bullets are added only for a battle that asks for them', () => {
+  const sentence = 'holding fire while the other side keeps shooting loses your units';
+  const plain = sideMessageRuleBlock({ talkStageEnabled: true });
+  assert.equal(sideMessageRuleBlock({ talkStageEnabled: true, battleTruce: false }), plain);
+  assert.equal(plain.includes(sentence), false);
+  const battle = sideMessageRuleBlock({ talkStageEnabled: true, battleTruce: true });
+  assert.ok(battle.includes(sentence));
+  assert.ok(battle.endsWith('Nothing in your orders reply is sent to another side.'));
+  assert.equal(/\d/.test(battle), false);
 });

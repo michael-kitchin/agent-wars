@@ -48,6 +48,8 @@ A save stores no version of the game rules. A loaded match plays by the rules of
 
 Regional maps used 90% from 3.3.0 through 3.5.0 and 80% in 3.6.0 and 3.6.1. A regional side that has lost at least 80% but less than 90% of its home is therefore not knocked out for home control.
 
+An open battle travels in the `game_config` row `tactical_battle_snapshot_json_v1`. An AI-only battle saved before 3.7.0 has no `quietBeatStreak` and no `lastBeatActivity`. Both read as absent, so its quiet-beat count starts at 0 on the next beat, and its commanders see no last-beat count until that beat completes. A stored `aiOnlyEndReason` of `idle` still shows its sentence.
+
 A change to the shape of any JSON a save carries in `game_config` needs a new versioned key, or the same bump. An older or newer app would misread the old shape. When `EXPECTED_USER_VERSION` or `MACHINE_LOCAL_CONFIG_KEYS` changes, update this document in the same change.
 
 ## What load accepts

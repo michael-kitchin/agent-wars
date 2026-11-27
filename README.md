@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v3.6.1.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v3.6.1.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v3.7.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v3.7.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -290,7 +290,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ## Status
 
-- **Version:** 3.6.1, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 3.7.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -300,6 +300,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 Release summaries, newest first. Only the newest build of each major version stays on the Releases page. Every other version is kept here and in `doc/release-notes/`. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **3.7.0** shows each commander in an AI-only battle its truces and the last beat's shot count, ends quiet battles, says who attacked first in loss reports, keeps the engine from targeting pact partners on its own, and knocks a side out of a regional map at 90% of its home's city cells.
 - **3.6.1** saves a finished match with its result and history, loads it onto its results screen, and replays it with the results shown only on the last turn, so earlier turns look as they did during the game.
 - **3.6.0** knocks a side out at 80% of its home's city cells, doubles what ships and air units carry (4 cargo slots per ship, 2 infantry per air unit), and calls off a sea raid whose ships cannot carry three quarters of its troops when its muster times out, and makes commanders spend banked credits on mercenaries, whose upkeep doubles.
 - **3.5.0** lets commanders fire mercenaries, with a Firing Risk table and a guard against firing themselves out of the match, forecasts the treasury from what is actually queued, and adds a toggle that collapses the minimap. It also includes the unpublished 3.4.2 changes: treasury attention flags, credits advice only for capped cities, and the Default game size.

@@ -131,6 +131,53 @@ export interface TacticalSubUnitSnapshot {
 }
 
 /**
+ * What one beat of a battle between two AI seats did, as counted by the game.
+ *
+ * Contract: Set from the beat's own dice rolls, so it never depends on what a commander said or ordered.
+ * When to use: Stored on the snapshot as `lastBeatActivity`, and read by the quiet-beat rule and the battle prompts.
+ * Expected outcome: The beat number, each side's attack shots, and whether melee was rolled.
+ * Exceptions: None.
+ */
+export interface TacticalBeatActivity {
+  /**
+   * The beat that produced these counts.
+   *
+   * Contract: `tacticalTurnNumber` before that beat's increment.
+   * When to use: Telling which beat the counts describe.
+   * Expected outcome: A positive beat number.
+   * Exceptions: None.
+   */
+  readonly beatNumber: number;
+  /**
+   * Attack shots the lead side rolled.
+   *
+   * Contract: Dice rolls of kind `ranged` or `airStrike` by the `leadPartyId` side.
+   * When to use: The quiet-beat rule and the last-beat line of a battle prompt.
+   * Expected outcome: A non-negative count.
+   * Exceptions: None.
+   */
+  readonly leadShots: number;
+  /**
+   * Attack shots the other side rolled.
+   *
+   * Contract: Dice rolls of kind `ranged` or `airStrike` by the `opposingPartyId` side.
+   * When to use: The quiet-beat rule and the last-beat line of a battle prompt.
+   * Expected outcome: A non-negative count.
+   * Exceptions: None.
+   */
+  readonly opposingShots: number;
+  /**
+   * Whether the beat rolled any melee dice.
+   *
+   * Contract: True when at least one melee die was rolled in the beat.
+   * When to use: The quiet-beat rule and the last-beat line of a battle prompt.
+   * Expected outcome: True or false.
+   * Exceptions: None.
+   */
+  readonly meleeFought: boolean;
+}
+
+/**
  * Serializable tactical battle state returned to the renderer after a successful start.
  *
  * Contract: Complete tactical footprint for one contested strategic hex at a fixed strategic turn.
@@ -167,23 +214,32 @@ export interface TacticalBattleSnapshot {
    */
   leadPartyId?: OwnerId;
   /**
-   * How many completed beats in a row applied no AI order.
+   * How many completed beats in a row were quiet.
    *
-   * Contract: Absent or 0 means the streak has not started. A beat that applies an order sets it back to 0.
-   * When to use: Ending an AI-only battle after three idle beats.
+   * Contract: Absent or 0 means the streak has not started. A beat with a shot (anti-air fire included), a melee, or a sub-unit moving closer to the enemy sets it back to 0.
+   * When to use: Ending an AI-only battle after `QUIET_BEATS_TO_END` quiet beats, and showing the header text.
    * Expected outcome: A non-negative count. A loaded snapshot that lacks it is treated as 0.
    * Exceptions: None.
    */
-  idleBeatStreak?: number;
+  readonly quietBeatStreak?: number;
+  /**
+   * What the last completed beat of a battle between two AI seats did.
+   *
+   * Contract: Set by every AI-only beat. Absent before the first beat, on a human battle, and on a snapshot saved before this field existed.
+   * When to use: The battle prompts, which tell each commander what both sides fired.
+   * Expected outcome: The beat record, or absent.
+   * Exceptions: None.
+   */
+  readonly lastBeatActivity?: TacticalBeatActivity;
   /**
    * Why an AI-only battle stopped, once the beat that decided it has been stored.
    *
-   * Contract: Absent while the battle continues. `elimination` is one side left, `mutual` is both gone, `idle` is three beats with no applied order, `exit` is both commanders leaving after five beats, and `beat_limit` is the match's stored limit reached.
+   * Contract: Absent while the battle continues. `elimination` is one side left, `mutual` is both gone, `quiet` is `QUIET_BEATS_TO_END` beats in a row with no fighting, `exit` is both commanders leaving, on any beat, and `beat_limit` is the match's stored limit reached. `idle` is no longer set and stays so an older save or recording still loads.
    * When to use: After playback, to choose the result sentence. The header Exit Battle control does not read this field.
-   * Expected outcome: One of the five reasons, or absent.
+   * Expected outcome: One of the six reasons, or absent.
    * Exceptions: None.
    */
-  aiOnlyEndReason?: 'elimination' | 'mutual' | 'idle' | 'exit' | 'beat_limit';
+  aiOnlyEndReason?: 'elimination' | 'mutual' | 'idle' | 'quiet' | 'exit' | 'beat_limit';
   /**
    * Strategic strategic hex enclosing this tactical battle.
    *

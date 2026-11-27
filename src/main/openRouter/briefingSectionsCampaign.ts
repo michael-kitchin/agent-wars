@@ -17,8 +17,8 @@ import { logTrace } from '../logger';
 /**
  * Seat that holds the target, when that side is known.
  *
- * Purpose: The target line and the posture attention flag must agree with the fog rule used to pick the city.
- * When to use: `buildCampaignObjectiveSection`, and the posture attention flag.
+ * Purpose: The target line, the posture attention flag, and the pact checks must agree with the fog rule used to pick the city.
+ * When to use: `buildCampaignObjectiveSection`, the posture attention flag, `cityHeldByPactPartner`, and the engine's operation launch.
  * Expected outcome: The controller's seat when the hex is explored (any seat, or null for none). The single active enemy seat whose home contains an unexplored hex. Null when the owner is not known.
  * Exceptions: None.
  */
@@ -80,13 +80,14 @@ function fortificationPhrase(state: GameStateSnapshot, targetH3: string): string
  *
  * Purpose: The situation message names the city, the staging hex, and why the phase is what it is.
  * When to use: When a campaign plan exists. Omit the section when it does not.
- * Expected outcome: An H1 heading and one bullet per fact. A sea objective prints one Approach bullet in place of the staging hex and phase bullets. A null staging hex says the assault has already started. The defender bullet names the enemy ground units near home and says when the half-force cap held units back.
+ * Expected outcome: An H1 heading and one bullet per fact. When the target's known holder is in `pactPartnerSeatIds`, an Agreement bullet follows the Target bullet. A sea objective prints one Approach bullet in place of the staging hex and phase bullets. A null staging hex says the assault has already started. The defender bullet names the enemy ground units near home and says when the half-force cap held units back.
  * Exceptions: None.
  */
 export function buildCampaignObjectiveSection(args: {
   readonly state: GameStateSnapshot;
   readonly plan: CampaignPlan;
   readonly format: (h3Index: string) => string;
+  readonly pactPartnerSeatIds?: ReadonlySet<string>;
 }): string {
   const { state, plan, format } = args;
   const objective = plan.objective;
@@ -101,6 +102,10 @@ export function buildCampaignObjectiveSection(args: {
     '',
     `- Target: ${target}, ${cityNoun} with ${urban} ${cellNoun} and ${fortificationPhrase(state, objective.targetH3)}. ${chooser} it on turn ${objective.chosenTurn}.`,
   ];
+  const holderSeatId = campaignTargetHolderSeatId(state, objective.targetH3);
+  if (owner !== null && holderSeatId !== null && args.pactPartnerSeatIds?.has(holderSeatId)) {
+    lines.push(`- Agreement: you have an active pact with ${owner}, which holds ${target}. Marching on ${target} breaks that pact.`);
+  }
   if (campaignApproachOf(objective) === 'sea') {
     lines.push(
       `- Approach: by sea. No ground unit of yours can reach ${target} by land, so the engine sails the campaign there in campaign lifts. Active Operations shows the lift.`

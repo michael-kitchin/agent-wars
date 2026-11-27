@@ -5,8 +5,11 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { SideAgreementRow } from '../gameDb/sideAgreementStore';
-import { pactPartnerSeatIdsFrom } from './campaignPactPartners';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { insertSideAgreement, type SideAgreementRow } from '../gameDb/sideAgreementStore';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
+import { pactPartnerSeatIdsFrom, readActivePactPartnerSeatIds } from './campaignPactPartners';
 
 /**
  * Builds one agreement row from the commander `a1` with the counterpart `a2`.
@@ -63,4 +66,25 @@ test('other kinds, proposals, expired pacts, and inactive counterparts are not p
   assert.equal(partners([row({ status: 'proposed' })]).has('a2'), false);
   assert.equal(partners([row({ endTurn: 9 })]).has('a2'), false);
   assert.equal(partners([row()], ['a3']).has('a2'), false);
+});
+
+test('a stored pact makes a partner only while the talk stage is on', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  try {
+    withTempGameDb('aw-pact-talk-switch-', () => {
+      insertSideAgreement(gameDbOps, {
+        seatId: 'opponent', counterpartSeatId: HUMAN_SEAT_ID, kind: 'non_aggression', terms: 'No strikes.', zoneH3: [],
+        againstSeatId: null, startTurn: 1, endTurn: 20, status: 'active', intent: 'keep', reason: '',
+      });
+      const read = (): string[] =>
+        [...readActivePactPartnerSeatIds({ seatId: 'opponent', turnNumber: 10, activeSeatIds: new Set([HUMAN_SEAT_ID]) })];
+      delete process.env.AGENT_WARS_DISABLE_TALK;
+      assert.deepEqual(read(), [HUMAN_SEAT_ID]);
+      process.env.AGENT_WARS_DISABLE_TALK = '1';
+      assert.deepEqual(read(), []);
+    });
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
 });

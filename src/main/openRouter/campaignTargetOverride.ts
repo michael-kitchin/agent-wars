@@ -3,7 +3,7 @@
  *
  * Purpose: The briefing for this turn still shows the previous target. The next consult uses the new one.
  * When to use: After a strategic orders envelope names `campaignTarget`.
- * Expected outcome: A valid new city replaces the stored objective. An echo of the current target changes nothing.
+ * Expected outcome: A valid new city replaces the stored objective. An echo of the current target changes nothing, except that it records an engine-picked target held by a pact partner as the commander's choice.
  * Exceptions: None. A bad code is a drop reason.
  */
 
@@ -14,6 +14,7 @@ import { dbGetOne, dbRun, type GameStateSnapshot } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
 import { logDebug } from '../logger';
 import { campaignInputsFromState, campaignLandSteps, loadCampaignLandMass } from './campaignObjectiveFlow';
+import { cityHeldByPactPartner } from './campaignPactPartners';
 import { CAMPAIGN_REACH_LIMIT_STEPS } from './campaignRules';
 import { CAMPAIGN_SEA_REACH_LIMIT_STEPS } from './campaignSeaConstants';
 import { campaignSeaRoutesForState } from './campaignSeaFlow';
@@ -52,7 +53,7 @@ export function applyCampaignTargetOverride(args: {
  *
  * Purpose: A menu letter and a hex code share one reach check and one write.
  * When to use: After `codeToH3`, and when a land row already names the city hex. Pass `allowSea` true for the commander's `campaignTarget`, so a city reachable only by a campaign lift is accepted. A land launch passes false.
- * Expected outcome: `{ applied: true }` for a stored target or an echo. A city out of land reach is stored as a sea target when `allowSea` is true and a sea route exists within `CAMPAIGN_SEA_REACH_LIMIT_STEPS`. The new target keeps the stored objective's skip while it is active, unless the commander named the skipped city. A drop reason names the city with `label`.
+ * Expected outcome: `{ applied: true }` for a stored target or an echo. An echo changes only the source, to commander, and only when the engine picked the target and a pact partner holds it, so the engine keeps it. A city out of land reach is stored as a sea target when `allowSea` is true and a sea route exists within `CAMPAIGN_SEA_REACH_LIMIT_STEPS`. The new target keeps the stored objective's skip while it is active, unless the commander named the skipped city. A drop reason names the city with `label`.
  * Exceptions: None. A match with no campaign, a missing land mass, an unknown city, and an unreachable city are drop reasons.
  */
 export function applyCampaignTargetH3(args: {
@@ -78,7 +79,12 @@ export function applyCampaignTargetH3(args: {
   const ops = { getOne: dbGetOne, run: dbRun };
   const stored = readCampaignObjectives(ops).get(seatId) ?? null;
   if (stored?.targetH3 === args.targetH3) {
-    logDebug('campaignTargetOverride: echo of the current target ignored', { seatId, label: args.label });
+    if (stored.source === 'engine' && cityHeldByPactPartner(args.state, seatId, args.targetH3)) {
+      writeCampaignObjectiveForSeat(ops, seatId, { ...stored, source: 'commander' });
+      logDebug('campaignTargetOverride: pact partner target recorded as the commander choice', { seatId, label: args.label });
+    } else {
+      logDebug('campaignTargetOverride: echo of the current target ignored', { seatId, label: args.label });
+    }
     return { applied: true, dropReasons: [] };
   }
   const skip = activeCampaignSkip(stored, args.state.turnNumber);

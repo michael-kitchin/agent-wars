@@ -273,7 +273,7 @@ When your units and an AI's end a turn in the same hex, the **Tactical Battles**
 
 A battle you fight takes place inside one strategic turn. Every side sets the strategic game aside for that turn, and units elsewhere keep following their existing orders. So you have to choose where to focus your attention.
 
-You win a battle by destroying the other side's units, or you can leave at any time with **Exit Battle**. Each strategic unit with half or more of its sub-units left returns to the strategic map. To keep things simple, there's no lasting battle damage.
+You win a battle by destroying the other side's units, or you can leave at any time with **Exit Battle**. Each strategic unit with half or more of its sub-units left returns to the strategic map. To keep things simple, there's no lasting battle damage. A battle between two AI commanders also ends on its own when both leave, or when three beats pass with no fighting, and its result reads "Disengaged".
 
 An ignored or abandoned battle can go on for more turns, marked with a magnifying glass (🔍) on the map. Click it to join or rejoin.
 
@@ -329,7 +329,7 @@ Each side holds one draft at a time, so writing to that side again replaces it.
 
 - **It reads it next time it plans.** An unread message makes that commander plan on its next turn, even when it otherwise wouldn't have (see [Managing Commanders](#managing-commanders)).
 - **It sees only its own mail.** A commander reads the messages it sent and the ones sent to it, never your messages to another side.
-- **It talks before it acts.** Before a commander plans its orders, it may write to other sides and update how it sees them. In a battle, only the two sides fighting talk.
+- **It talks before it acts.** Before a commander plans its orders, it may write to other sides and update how it sees them. In a battle, only two AI commanders fighting each other talk.
 - **It weighs deeds over words.** Each commander keeps a private stance toward every other side (hostile, wary, neutral, cordial, or friendly), with trust and threat scores from 0 to 4. The game shows it a record of the units each side destroyed, and tells it to judge a side more by that than by what it says. A friendly message while your armor rolls over its cities won't get you far. A stance is never an alliance, and neither is an [agreement](#agreements).
 
 ### Agreements
@@ -340,8 +340,8 @@ Commanders can also make deals, with each other or with you. When a commander be
 - **No handshake:** each commander records a deal as proposed or active as it sees fit, so two sides' records can disagree. One side may think there's a ceasefire while the other thinks there isn't.
 - **Short-lived:** a deal lasts at most 10 turns, and a commander keeps at most 3 open with any one side. A deal with a side that's been knocked out lapses.
 - **Keep or break:** whenever a commander plans its orders, it can decide to keep or break each active deal. It sees the game's record of losses both ways since the deal began, so a side that says one thing and does another gets noticed.
-- **Never enforced:** no order is blocked, changed, or warned about because of an agreement.
-- **World map only:** battles don't show, make, or change agreements.
+- **Never enforced:** no order is blocked or changed because of an agreement. A commander is told when its units share a hex with a partner in an active non-aggression or ceasefire deal, and the game won't aim its own campaigns or operations at that partner.
+- **Made on the world map:** battles don't make or change agreements. In a battle between two AI commanders, each can read its own deals with the other.
 - **You don't keep a record.** To make a deal with a commander, write to it. If it agrees, it records the deal with you on its side, and whether it keeps it is up to it.
 - **Watching them:** you can't open a commander's record, but the [Charts](#charts) show every commander's agreements turn by turn.
 

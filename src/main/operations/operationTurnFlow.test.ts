@@ -14,6 +14,9 @@ import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { canLandUnitTraverseEdge, getLandStepDistances, STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { insertSideAgreement } from '../gameDb/sideAgreementStore';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { readOperationEventTurn, readOperationNote, readOperationOffer, readOperations, writeOperationEventTurn, writeOperationNote, writeOperationOffer } from '../gameDb/operationMemory';
 import { writePosture } from '../gameDb/postureMemory';
 import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
@@ -255,4 +258,37 @@ test('blitz records one defender and launches that sea city on the next turn', (
     assert.equal(launched[0]?.method, 'sea');
     assert.equal(launched[0]?.objectiveH3, city);
   });
+});
+
+test('the engine does not raid a city it knows only as a pact partner home, until talk is off', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  try {
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    withTempGameDb('aw-operation-turn-pact-', () => {
+      const landMass = loadCampaignLandMass(SEAT);
+      assert.ok(landMass, 'expected the terrain cache');
+      const { city } = arrange(landMass, false);
+      dbRun('DELETE FROM res_s_control WHERE h3_index = ?', [city]);
+      assert.equal(getGameStateForPlayer(SEAT, { maskUnexploredTerrain: false }).exploredHexes?.includes(city), false);
+      insertSideAgreement(gameDbOps, {
+        seatId: SEAT, counterpartSeatId: HUMAN_SEAT_ID, kind: 'non_aggression', terms: 'No strikes.', zoneH3: [], againstSeatId: null,
+        startTurn: 1, endTurn: 20, status: 'active', intent: 'keep', reason: '',
+      });
+      for (const turn of [5, 6]) {
+        setTurn(turn);
+        advanceOperationsForSeat(SEAT, coordinates());
+      }
+      assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+      assert.equal(readOperationOffer({ getOne: dbGetOne }, SEAT).clearOfferTurn, null);
+      process.env.AGENT_WARS_DISABLE_TALK = '1';
+      for (const turn of [7, 8]) {
+        setTurn(turn);
+        advanceOperationsForSeat(SEAT, coordinates());
+      }
+      assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT)?.[0]?.objectiveH3, city);
+    });
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
 });

@@ -45,3 +45,14 @@ test('formatBattleHeaderStatus names the beats left, and 0 is the last beat', ()
     'Beat 30 (0 left) · Tactical resolution'
   );
 });
+
+test('formatBattleHeaderStatus counts quiet beats after the phase, and leaves 0 out', () => {
+  const input = { beat: 4, beatPlaybackActive: false, dateLabel: 'April, Year 1' };
+  const plain = 'Beat 4 · Tactical planning · April, Year 1';
+  assert.equal(
+    formatBattleHeaderStatus({ ...input, quietBeats: 2 }),
+    'Beat 4 · Tactical planning · Holding fire (2 of 3 quiet beats) · April, Year 1'
+  );
+  assert.equal(formatBattleHeaderStatus({ ...input, quietBeats: 0 }), plain);
+  assert.equal(formatBattleHeaderStatus(input), plain);
+});

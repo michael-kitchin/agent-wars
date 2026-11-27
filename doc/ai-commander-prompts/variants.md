@@ -329,5 +329,5 @@ Gate: the active battle has `leadPartyId`. A human-versus-AI battle and every st
 | user | The quoted field list includes `exitBattle` in that same place. |
 | tools | unchanged |
 | envelope | `exitBattle` is a required boolean. Missing or non-boolean parses as false and does not drop the orders on that beat. |
-| coaching | One bullet: set `exitBattle` to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give, and set it to false otherwise. Orders in this reply still resolve for this beat. |
+| coaching | One bullet: set `exitBattle` to true when you and the other commander have agreed to stop fighting, when your side has an overwhelming numerical advantage, or when you have no order you can legally give, and set it to false otherwise. With `AGENT_WARS_DISABLE_TALK` set, the sentence leaves out the agreement reason (`exitBattleBullet`). It says the battle ends after a beat in which both commanders set it, or after `QUIET_BEATS_TO_END` (3) quiet beats in a row, that both sides then stay in the same world-map hex, and that orders in this reply still resolve. While `sideAgreementsShownInBattle()` is true, the message rules also carry `BATTLE_TRUCE_ORDERS_BULLETS` and `# Messages` carries `buildBattleTruceText`. |
 | empty-state | unchanged |

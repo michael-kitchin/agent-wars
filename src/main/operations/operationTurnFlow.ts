@@ -27,6 +27,8 @@ import {
 } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
+import { campaignTargetHolderSeatId } from '../openRouter/briefingSectionsCampaign';
+import { readPactPartnerSeatIdsForState } from '../openRouter/campaignPactPartners';
 import { resolveDefendPostH3 } from '../tools/standingOrdersDefendPost';
 import { parseOrderParams, type StandingOrderRow } from '../tools/standingOrdersShared';
 import {
@@ -45,7 +47,7 @@ import { applyOperationActions } from './operationActions';
 import { advanceOperation } from './operationAdvance';
 import { operationCandidatesForSeat } from './operationCandidates';
 import { decideOperationOffer } from './operationOffer';
-import { OPERATION_MUSTER_CANDIDATE_LIMIT } from './operationRules';
+import { engineMayLaunchOperation, OPERATION_MUSTER_CANDIDATE_LIMIT } from './operationRules';
 import { type OperationFacts, type StoredOrderFact } from './seaOperationAdvance';
 import { listKnownEnemyCities } from './seaOperationCandidates';
 
@@ -203,7 +205,7 @@ export function buildOperationFacts(args: {
  *
  * Purpose: The seat counts enemy units that fog would hide. It launches only a sea or air row the posture counts as clear, after that row has waited one turn. After the raids, it also launches a campaign lift toward a stored campaign target, with no offer wait, when the lift slot and the required force allow.
  * When to use: Once per active AI seat, after knocked-out seats have been cleared.
- * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until a row the posture counts as clear has been offered on an earlier turn. Land rows are not launched. A campaign lift launch also stamps the stored objective with the launch turn and marks the seat for a consult.
+ * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until a row the posture counts as clear has been offered on an earlier turn. Land rows are not launched, and neither is a row against a city a pact partner holds. A campaign lift launch also stamps the stored objective with the launch turn and marks the seat for a consult.
  * Exceptions: Propagates a database or terrain error. The caller logs it and leaves this seat's previous list in place only when the write has not run.
  */
 export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: KnockoutCoordinates): void {
@@ -253,16 +255,22 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
   let offer = readOperationOffer(configOps, seatId);
   let launchedThisTick = false;
   const settings = postureSettingsForSeat(seatId);
+  const pactPartnerSeatIds = readPactPartnerSeatIdsForState(state, seatId);
   /**
    * Whether the engine may treat this sea or air row as clear.
    *
    * Purpose: The offer clock and the launch share one rule, so a lightly held city can start the clock.
    * When to use: On the land-free list only. A land row is removed before this runs.
-   * Expected outcome: True when the row is clear, or its defender count is within the posture's maximum. An air row stays true because its clear flag is true.
+   * Expected outcome: The result of `engineMayLaunchOperation`: false against a pact partner's city, otherwise true when the row is clear or within the posture's defender maximum.
    * Exceptions: None.
    */
   const engineMayLaunch = (candidate: OperationCandidate): boolean =>
-    candidate.clear || candidate.defenders <= settings.engineLaunchMaxDefenders;
+    engineMayLaunchOperation({
+      candidate,
+      maxDefenders: settings.engineLaunchMaxDefenders,
+      objectiveHolderSeatId: campaignTargetHolderSeatId(state, candidate.objectiveH3),
+      pactPartnerSeatIds,
+    });
   while (true) {
     const candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds });
     const launchable = candidates.filter((candidate) => candidate.method !== 'land');

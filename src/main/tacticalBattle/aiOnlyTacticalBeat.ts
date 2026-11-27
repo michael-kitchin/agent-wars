@@ -1,7 +1,7 @@
 /**
  * One beat of a battle between two AI seats.
  *
- * Purpose: Both drafts resolve in the same phase order as a human beat, then the snapshot records whether the battle ended by a wipe, an idle streak, both commanders leaving, or the match's beat limit.
+ * Purpose: Both drafts resolve in the same phase order as a human beat, then the snapshot records what the beat did and whether the battle ended by a wipe, a quiet streak, both commanders leaving, or the match's beat limit.
  * When to use: `commitHumanTacticalDraftOrders` when the active snapshot has `leadPartyId`. The caller has already taken each draft once.
  * Expected outcome: The session stays active. `aiOnlyEndReason` is set only when this beat ends the battle.
  * Exceptions: Returns a failure reason when no AI-only battle is active. Illegal rows are dropped and do not fail the beat.
@@ -10,8 +10,9 @@
 import type { EmbarkOrder } from '../../shared/ipcTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
+import { anySubUnitMovedCloser, countAttackShots, isQuietBeat, QUIET_BEATS_TO_END } from '../../shared/tacticalQuietBeat';
 import type { OwnerId } from '../../shared/seatIds';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattleSnapshot, TacticalBeatActivity } from '../../shared/tacticalBattleTypes';
 import { createCombatRng } from '../combatResolution';
 import { dbGetOne, dbRun, getGameSeed } from '../gameDb';
 import { readAiOnlyBeatLimit } from '../gameDb/gameConfigKv';
@@ -64,19 +65,19 @@ export interface AiOnlyTacticalBeatDrafts {
 }
 
 /**
- * Movement rows the named seat can legally apply, plus how many other rows name that seat's units.
+ * Movement rows the named seat can legally apply.
  *
- * Purpose: A dropped row must not reset the idle streak, and it must not fail the beat.
+ * Purpose: An illegal march is dropped, and it must not fail the beat.
  * When to use: Once per seat before the phases run.
- * Expected outcome: Movement orders whose outcome is ok, and a count of those plus rows that name the seat.
+ * Expected outcome: The movement orders whose outcome is ok.
  * Exceptions: None.
  */
 function keptOrdersForSeat(
   battle: TacticalBattleSnapshot,
   draft: TacticalOpponentPlanPayload | null | undefined,
   player: OwnerId,
-): { readonly movement: { unitId: string; toH3Index: string }[]; readonly applied: number } {
-  if (draft == null) return { movement: [], applied: 0 };
+): { readonly movement: { unitId: string; toH3Index: string }[] } {
+  if (draft == null) return { movement: [] };
   const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const sub = battle.subUnits.map((unit) => ({ ...unit }));
   const byId = new Map(sub.map((unit, index) => [unit.id, index] as const));
@@ -89,12 +90,7 @@ function keptOrdersForSeat(
     }
     movement.push(order);
   }
-  const owns = (unitId: string): boolean => battle.subUnits.some((unit) => unit.id === unitId && unit.player === player);
-  const named = draft.rangedAttacks.filter((row) => owns(row.unitId)).length
-    + draft.airStrikes.filter((row) => owns(row.unitId)).length
-    + draft.ferryOrders.filter((row) => owns(row.unitId)).length
-    + draft.embarkOrders.filter((row) => owns(row.unitId)).length;
-  return { movement, applied: movement.length + named };
+  return { movement };
 }
 
 /**
@@ -132,9 +128,9 @@ export type AiOnlyTacticalBeatResult =
 /**
  * Applies both AI drafts and records the end reason when this beat finishes the battle.
  *
- * Purpose: A wipe, then three idle beats, then both exit flags after five completed beats, then the stored beat limit. The limit uses the beat number before this function stores the next one. The result keeps every phase the playback builder needs.
+ * Purpose: The battle ends on a wiped side, then on `QUIET_BEATS_TO_END` quiet beats in a row, then on both exit flags on any beat, then on the stored beat limit. The limit uses the beat number before this function stores the next one. The result keeps every phase the playback builder needs.
  * When to use: After each seat's draft has been taken once.
- * Expected outcome: `battle` is the stored snapshot. `battleAfterMovementBeforeFerry` is the snapshot before embark and ferry. Removals include both ferry phases.
+ * Expected outcome: `battle` is the stored snapshot, with `lastBeatActivity` and `quietBeatStreak` for this beat. `battleAfterMovementBeforeFerry` is the snapshot before embark and ferry. Removals include both ferry phases.
  * Exceptions: Failure reason `'No AI-only tactical battle is active.'` when no AI-only battle is active.
  */
 export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnlyTacticalBeatResult {
@@ -198,15 +194,31 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
   );
   const synced = tacticalBattleWithSyncedEmbarkCargo(afterOpposingFerry.battle);
   const melee = applyTacticalMeleeAfterSupportOrders(synced, next);
-  const applied = leadKept.applied + opposingKept.applied;
-  const streak = applied > 0 ? 0 : (current.idleBeatStreak ?? 0) + 1;
+  const attackRolls = [...airAndRanged.airStrikeDiceRolls, ...airAndRanged.rangedDiceRolls];
+  const activity: TacticalBeatActivity = {
+    beatNumber: current.tacticalTurnNumber,
+    leadShots: countAttackShots(attackRolls, lead),
+    opposingShots: countAttackShots(attackRolls, opposing),
+    meleeFought: melee.meleeDiceRolls.length > 0,
+  };
+  const quiet = isQuietBeat({
+    activity,
+    antiAirFired: attackRolls.some((roll) => roll.kind === 'antiAir'),
+    movedCloser: anySubUnitMovedCloser({
+      before: current.subUnits,
+      after: melee.battle.subUnits,
+      leadPartyId: lead,
+      opposingPartyId: opposing,
+    }),
+  });
+  const streak = quiet ? (current.quietBeatStreak ?? 0) + 1 : 0;
   const nextTurn = current.tacticalTurnNumber + 1;
   const wiped = getTwoPartyAnnihilationOutcome(melee.battle.subUnits, lead, opposing);
   let aiOnlyEndReason: TacticalBattleSnapshot['aiOnlyEndReason'];
   if (wiped === 'mutual') aiOnlyEndReason = 'mutual';
   else if (wiped != null) aiOnlyEndReason = 'elimination';
-  else if (streak >= 3) aiOnlyEndReason = 'idle';
-  else if (drafts.leadDraft?.exitBattle === true && drafts.opposingDraft?.exitBattle === true && nextTurn >= 6) {
+  else if (streak >= QUIET_BEATS_TO_END) aiOnlyEndReason = 'quiet';
+  else if (drafts.leadDraft?.exitBattle === true && drafts.opposingDraft?.exitBattle === true) {
     aiOnlyEndReason = 'exit';
   } else if (aiOnlyBeatLimitReached(current.tacticalTurnNumber, readAiOnlyBeatLimit({ getOne: dbGetOne, run: dbRun }))) {
     // current.tacticalTurnNumber counts this beat. The stored number is nextTurn, one higher.
@@ -216,7 +228,8 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
     ...melee.battle,
     leadPartyId: lead,
     opposingPartyId: opposing,
-    idleBeatStreak: streak,
+    quietBeatStreak: streak,
+    lastBeatActivity: activity,
     tacticalTurnNumber: nextTurn,
     ...(aiOnlyEndReason != null ? { aiOnlyEndReason } : {}),
   });
@@ -224,8 +237,9 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
   logDebug('applyAiOnlyTacticalBeat stored', {
     battleId: battle.battleId,
     tacticalTurnNumber: battle.tacticalTurnNumber,
-    idleBeatStreak: streak,
-    applied,
+    quietBeatStreak: streak,
+    quiet,
+    activity,
     aiOnlyEndReason: aiOnlyEndReason ?? null,
   });
   return {

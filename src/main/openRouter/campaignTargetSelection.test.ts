@@ -43,7 +43,7 @@ function candidates(
     controllerByH3: new Map(Object.entries(controllers)),
     explored: new Set(Object.keys(controllers)),
     homeSeatByH3: new Map(Object.entries(homes)),
-    finishingExemptSeatIds: new Set(exempt),
+    pactPartnerSeatIds: new Set(exempt),
   });
 }
 
@@ -114,4 +114,10 @@ test('a sea city beyond the sea step limit is not chosen, and no sea steps match
   assert.equal(chooseCampaignTarget([city('far', 30, true, false)], new Map(), new Map([['far', 16]])), 'far');
   assert.equal(chooseCampaignTarget([city('far', 30, true, false)], new Map()), null);
   assert.equal(chooseCampaignTarget([city('near', 5, false, false)], new Map([['near', 3]])), 'near');
+});
+
+test('a city held by a pact partner is marked, and another city is not', () => {
+  const [partner, other] = candidates({ a: 'a2', b: 'a3' }, {}, ['a2']);
+  assert.equal(partner?.heldByPactPartner, true);
+  assert.equal(other?.heldByPactPartner, false);
 });

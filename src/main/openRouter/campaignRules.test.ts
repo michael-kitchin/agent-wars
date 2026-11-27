@@ -109,13 +109,13 @@ test('known cities follow explored control and assume unexplored enemy homes are
       ['e3', null],
       ['r0', 'a2'],
     ]),
-    finishingExemptSeatIds: new Set<string>(),
+    pactPartnerSeatIds: new Set<string>(),
     explored: new Set(['e1', 'e2', 'e3', 'r0']),
     homeSeatByH3: new Map([['h1', 'a3']]),
   });
   assert.deepEqual(cities, [
-    { h3Index: 'e1', urbanHexCount: 10, ownerSeatId: 'a2', inEnemyHome: false, heldByHomeSide: false, ownerNearKnockout: true, knownFortifiedCount: 8 },
-    { h3Index: 'h1', urbanHexCount: 20, ownerSeatId: 'a3', inEnemyHome: true, heldByHomeSide: true, ownerNearKnockout: true, knownFortifiedCount: 0 },
+    { h3Index: 'e1', urbanHexCount: 10, ownerSeatId: 'a2', inEnemyHome: false, heldByHomeSide: false, ownerNearKnockout: true, knownFortifiedCount: 8, heldByPactPartner: false },
+    { h3Index: 'h1', urbanHexCount: 20, ownerSeatId: 'a3', inEnemyHome: true, heldByHomeSide: true, ownerNearKnockout: true, knownFortifiedCount: 0, heldByPactPartner: false },
   ]);
 });
 

@@ -2,6 +2,7 @@
  * The text of the battle header, which replaces the top bar's match status while a battle is open.
  */
 import { formatAiOnlyBeatsLeftLabel } from './aiOnlyBeatLimit';
+import { QUIET_BEATS_TO_END } from './tacticalQuietBeat';
 
 /**
  * Names the battle by its world hex.
@@ -21,7 +22,7 @@ export function formatBattleHeaderTitle(hexCode: string | null): string {
  *
  * Purpose: The beat number, the countdown, and the rest of the line are one sentence, and only the countdown changes color.
  * When to use: `renderBattleHeader` paints `beatsLeftLabel` on its own. `formatBattleHeaderStatus` joins the three pieces.
- * Expected outcome: `beforeBeatsLeft` is "Beat N". `beatsLeftLabel` is " (M left)" or null. `afterBeatsLeft` starts with the phase.
+ * Expected outcome: `beforeBeatsLeft` is "Beat N". `beatsLeftLabel` is " (M left)" or null. `afterBeatsLeft` starts with the phase, then the quiet-beat count when there is one.
  * Exceptions: None.
  */
 export function formatBattleHeaderStatusParts(input: {
@@ -46,6 +47,15 @@ export function formatBattleHeaderStatusParts(input: {
    * Exceptions: None.
    */
   readonly beatsLeft?: number | null;
+  /**
+   * Quiet beats in a row so far.
+   *
+   * Contract: The battle's `quietBeatStreak`. Omit it, or pass 0, when the battle is not AI-only or has ended.
+   * When to use: The header of an AI-only battle.
+   * Expected outcome: At 1 or more, "Holding fire (N of M quiet beats)" follows the phase, with M from `QUIET_BEATS_TO_END`.
+   * Exceptions: None.
+   */
+  readonly quietBeats?: number;
 }): {
   readonly beforeBeatsLeft: string;
   readonly beatsLeftLabel: string | null;
@@ -54,6 +64,9 @@ export function formatBattleHeaderStatusParts(input: {
   const phase = input.beatPlaybackActive ? 'Tactical resolution' : 'Tactical planning';
   const beatsLeftLabel = input.beatsLeft == null ? null : formatAiOnlyBeatsLeftLabel(input.beatsLeft);
   let afterBeatsLeft = ` · ${phase}`;
+  if (input.quietBeats !== undefined && input.quietBeats >= 1) {
+    afterBeatsLeft += ` · Holding fire (${input.quietBeats} of ${QUIET_BEATS_TO_END} quiet beats)`;
+  }
   if (input.dateLabel.length > 0) afterBeatsLeft += ` · ${input.dateLabel}`;
   if (input.garrisonDefendsInPlace) afterBeatsLeft += ' · The garrison defends in place';
   return { beforeBeatsLeft: `Beat ${input.beat}`, beatsLeftLabel, afterBeatsLeft };
@@ -66,7 +79,7 @@ export function formatBattleHeaderStatusParts(input: {
  * When to use: For the header's status line, and for tests of that wording. The renderer paints the same pieces from
  *   `formatBattleHeaderStatusParts` so the countdown can be crimson.
  * Expected outcome: "Beat 2 · Tactical planning · April, Year 1". An empty date leaves the date out. A beats-left count
- *   inserts " (N left)" after the beat number.
+ *   inserts " (N left)" after the beat number. A quiet-beat count of 1 or more follows the phase.
  * Exceptions: None.
  */
 export function formatBattleHeaderStatus(input: {
@@ -91,6 +104,15 @@ export function formatBattleHeaderStatus(input: {
    * Exceptions: None.
    */
   readonly beatsLeft?: number | null;
+  /**
+   * Quiet beats in a row so far.
+   *
+   * Contract: The same count as `formatBattleHeaderStatusParts`.
+   * When to use: The header of an AI-only battle.
+   * Expected outcome: At 1 or more, the "Holding fire" part follows the phase.
+   * Exceptions: None.
+   */
+  readonly quietBeats?: number;
 }): string {
   const parts = formatBattleHeaderStatusParts(input);
   return `${parts.beforeBeatsLeft}${parts.beatsLeftLabel ?? ''}${parts.afterBeatsLeft}`;

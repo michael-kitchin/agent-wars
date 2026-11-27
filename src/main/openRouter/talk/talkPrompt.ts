@@ -11,6 +11,7 @@ import { logTrace } from '../../logger';
 import { RELATIONSHIP_SCALE_MAX, SIDE_MESSAGE_MAX_CHARS, SIDE_STANCES, type SideStance } from '../../../shared/sideMessages';
 import type { SideAgreementView } from '../../sideAgreements/sideAgreementLedger';
 import {
+  BATTLE_TRUCE_TALK_BULLETS,
   DIPLOMACY_PURPOSE_BULLETS,
   SIDE_AGREEMENT_REPLY_RULES,
   sideAgreementReplyShape,
@@ -227,11 +228,24 @@ export interface TalkPromptInput {
    * The battle this call is inside, or null on the world map.
    *
    * Contract: `opponentLabel` is null when the opponent has no label. `opponentCode` is null when the opponent is not a seat still in the match, and then no message can be sent.
-   * When to use: The battle heading, the fighting line, and the line that limits messages to the opponent.
+   * When to use: The battle heading, the fighting line, the line that limits messages to the opponent, and the truce section.
    * Expected outcome: The beat, or null.
    * Exceptions: None.
    */
-  readonly battle: { readonly beatNumber: number; readonly opponentLabel: string | null; readonly opponentCode: string | null } | null;
+  readonly battle: {
+    readonly beatNumber: number;
+    readonly opponentLabel: string | null;
+    readonly opponentCode: string | null;
+    /**
+     * The commander's agreements with the opponent and the last beat's fire.
+     *
+     * Contract: Set only for a battle between two commanders. Text from `buildBattleTruceText`.
+     * When to use: The "Agreements and last beat" section of the situation text.
+     * Expected outcome: The text, or null or absent when there is none.
+     * Exceptions: None.
+     */
+    readonly truceText?: string | null;
+  } | null;
   /**
    * The sides table, including this commander's own side.
    *
@@ -336,7 +350,7 @@ export function formatStanceScores(trust: number | null, threat: number | null):
  *
  * Purpose: The cached system text tells the commander what this step is for, where messages come from, and how far to trust them.
  * When to use: The system message of a talk call. Do not put a turn number, a count, or a message in it.
- * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line. The text depends only on the two arguments.
+ * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line. Only `'tactical'` adds the "Agreements and last beat" block. The text depends only on the two arguments.
  * Exceptions: None.
  */
 export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | 'tactical'): string {
@@ -344,7 +358,10 @@ export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | '
   const strategic = scope === 'strategic';
   const purpose = DIPLOMACY_PURPOSE_BULLETS.map((line) => `- ${line}`).join('\n');
   const agreementBullets = sideAgreementTalkBullets().map((line) => `- ${line}`).join('\n');
-  const agreementsBlock = strategic ? `\nAgreements:\n${agreementBullets}\n` : '';
+  const battleTruceBullets = BATTLE_TRUCE_TALK_BULLETS.map((line) => `- ${line}`).join('\n');
+  const agreementsBlock = strategic
+    ? `\nAgreements:\n${agreementBullets}\n`
+    : `\nAgreements and last beat:\n${battleTruceBullets}\n`;
   const sameMessages = strategic ? 'the same messages and your agreements' : 'the same messages';
   const replyRules = strategic ? SIDE_AGREEMENT_REPLY_RULES : 'Use the side codes from the Sides table. Either list may be empty.';
   const source = SIDE_MESSAGE_SOURCE_BULLETS.map((line) => `- ${line}`).join('\n');
@@ -381,7 +398,7 @@ ${replyRules}`;
  *
  * Purpose: The user message carries the turn, the sides, the last plan, and the messages this commander may see.
  * When to use: The user message of a talk call.
- * Expected outcome: The diplomacy heading, the sides table, the Your agreements section when `input.agreements` is not null, the last plan, the recent-turns section when it is not empty, and the message threads.
+ * Expected outcome: The diplomacy heading, the sides table, the Your agreements section when `input.agreements` is not null, the Agreements and last beat section when a battle has truce text, the last plan, the recent-turns section when it is not empty, and the message threads.
  * Exceptions: None.
  */
 export function buildTalkSituationText(input: TalkPromptInput): string {
@@ -404,6 +421,7 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
   }
   blocks.push(`## Sides\n${sidesTable(input.sides)}`);
   if (input.agreements !== null) blocks.push(`## Your agreements\n${formatSideAgreementLines(input.agreements)}`);
+  if (input.battle?.truceText) blocks.push(`## Agreements and last beat\n${input.battle.truceText}`);
   blocks.push(`## Your last plan\n${input.lastStrategy ?? '(none yet)'}`);
   if (input.recentTurnsSection.trim().length > 0) blocks.push(input.recentTurnsSection.trim());
   blocks.push(`## Messages\n${formatSideMessageThreads(input.threads, input.sides, 3)}`);

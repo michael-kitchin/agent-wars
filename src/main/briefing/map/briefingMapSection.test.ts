@@ -517,6 +517,7 @@ function testEmptyOverlayGlyphAndFirstRowIndent(): void {
   const footnote = renderDisplacedFeaturesLine(rendered.displacedFeatures);
   assert.equal(footnote.includes('AC('), false);
   assert.ok(footnote.includes('AD(A)'), footnote);
+  assert.equal(footnote.endsWith('\n'), false, 'the callers add the blank lines around the footnote');
   assert.equal(lines[0]?.startsWith(' '), true);
   assert.equal(lines[2]?.startsWith(' '), false);
 }

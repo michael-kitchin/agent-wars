@@ -639,7 +639,7 @@ export const aiOnlyResultOkTooltipText =
 
 /**
  * Purpose: Ok on the timed notice skips the wait. The next turn starts only when the observe checkbox is still on.
- * When to use: `#tactical-annihilation-exit-btn` while the beat-limit notice is counting down.
+ * When to use: `#tactical-annihilation-exit-btn` while a timed result notice is counting down.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */

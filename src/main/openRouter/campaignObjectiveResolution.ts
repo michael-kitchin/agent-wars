@@ -41,7 +41,7 @@ function seaFields(approach: CampaignApproach, skip: CampaignSkip | null): Parti
  *
  * Purpose: Keeps a valid target, refreshes a lost staging hex, and retargets when the city is gone, out of reach, or a sea target that waited too long for a campaign lift.
  * When to use: Once per strategic consult, before the briefing.
- * Expected outcome: Null with no ground units or no candidate. Otherwise the kept objective, with its staging hex refreshed only when it was lost, and the phase from `nextCampaignPhase`. A stored target is out of reach when its land steps are missing or greater than `CAMPAIGN_REACH_LIMIT_STEPS` and it has no sea route within `CAMPAIGN_SEA_REACH_LIMIT_STEPS`, unless it is a sea target with a campaign lift stored for it, which stays reachable and keeps the sea approach. When the stored target is not a candidate, is out of reach, or has expired, a new engine objective in assemble, or in assault without a staging hex, chosen without the skipped city. Every objective gets `approach` from `campaignApproachFor` (stored only for sea), keeps `liftLaunchedTurn` and `liftCancelledTurn` while the target is kept (a new target starts without them), and carries the skip.
+ * Expected outcome: Null with no ground units or no candidate. Otherwise the kept objective, with its staging hex refreshed only when it was lost, and the phase from `nextCampaignPhase`. A stored target is out of reach when its land steps are missing or greater than `CAMPAIGN_REACH_LIMIT_STEPS` and it has no sea route within `CAMPAIGN_SEA_REACH_LIMIT_STEPS`, unless it is a sea target with a campaign lift stored for it, which stays reachable and keeps the sea approach. When the stored target is not a candidate, is out of reach, or has expired, a new engine objective in assemble, or in assault without a staging hex, chosen without the skipped city and without any city marked `heldByPactPartner`. A stored engine target whose city becomes `heldByPactPartner` is replaced the same way. A stored commander target is kept even then. Null when no other city can be chosen. Every objective gets `approach` from `campaignApproachFor` (stored only for sea), keeps `liftLaunchedTurn` and `liftCancelledTurn` while the target is kept (a new target starts without them), and carries the skip.
  * Exceptions: None.
  */
 export function resolveCampaignObjective(args: {
@@ -87,6 +87,16 @@ export function resolveCampaignObjective(args: {
     return null;
   }
   const candidateH3s = new Set(args.cities.map((city) => city.h3Index));
+  /**
+   * Whether the viewer has an active pact with the holder of a candidate city.
+   *
+   * Purpose: The engine drops its own target once a pact covers the holder.
+   * When to use: Deciding whether to replace the stored target.
+   * Expected outcome: True only for a candidate city marked `heldByPactPartner`.
+   * Exceptions: None.
+   */
+  const heldByPactPartner = (h3Index: string): boolean =>
+    args.cities.some((city) => city.h3Index === h3Index && city.heldByPactPartner === true);
   const stored = args.stored;
   const storedSteps = stored === null ? undefined : args.landStepsFromForce.get(stored.targetH3);
   const storedSeaSteps = stored === null ? undefined : args.seaStepsByH3.get(stored.targetH3);
@@ -98,6 +108,7 @@ export function resolveCampaignObjective(args: {
   if (
     stored === null ||
     !candidateH3s.has(stored.targetH3) ||
+    (stored.source === 'engine' && heldByPactPartner(stored.targetH3)) ||
     !(landReachable || seaReachable || liftHoldsSeaTarget) ||
     campaignSeaTargetExpired({
       objective: stored,
@@ -106,7 +117,7 @@ export function resolveCampaignObjective(args: {
       campaignLiftRunning: args.campaignLiftRunning,
     })
   ) {
-    const choices = args.cities.filter((city) => city.h3Index !== args.skip?.targetH3);
+    const choices = args.cities.filter((city) => city.h3Index !== args.skip?.targetH3 && city.heldByPactPartner !== true);
     const targetH3 = chooseCampaignTarget(choices, args.landStepsFromForce, args.seaStepsByH3);
     if (targetH3 === null) {
       logDebug('campaignObjectiveResolution resolveCampaignObjective', { storedTarget: stored?.targetH3 ?? null, target: null, steps: null, phase: null });

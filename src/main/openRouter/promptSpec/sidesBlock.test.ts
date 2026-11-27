@@ -36,6 +36,16 @@ test('two seats give two rows and the commander is marked you', () => {
   assert.equal(playerIdCodeFor(HUMAN_SEAT_ID), 'h1');
 });
 
+test('the mercenary note is its own paragraph after the table', () => {
+  const text = buildSidesPromptBlock({
+    ownSeatId: 'opponent',
+    seats: [seat(HUMAN_SEAT_ID, 1, 'Northern America'), seat('opponent', 2, 'Eastern Europe')],
+    includeNeutral: false,
+    includeMercenaryNote: true,
+  });
+  assert.ok(text.includes('| Active |\n\nA rehired unit keeps the id prefix'), text);
+});
+
 test('a knocked-out seat and a neutral unit add those rows', () => {
   const text = buildSidesPromptBlock({
     ownSeatId: 'opponent2',

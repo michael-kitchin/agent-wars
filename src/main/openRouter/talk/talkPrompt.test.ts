@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import { SIDE_AGREEMENT_MAX_OPEN_PER_SIDE, SIDE_AGREEMENT_MAX_TURNS } from '../../../shared/sideAgreements';
 import { SIDE_STANCES } from '../../../shared/sideMessages';
 import {
+  BATTLE_TRUCE_TALK_BULLETS,
   DIPLOMACY_PURPOSE_BULLETS,
   SIDE_AGREEMENT_REPLY_RULES,
   sideAgreementTalkBullets,
@@ -162,4 +163,21 @@ test('the situation text prints Your agreements after the Sides table only when 
   assert.ok(withLedger.indexOf('## Sides') < withLedger.indexOf('## Your agreements'));
   assert.ok(withLedger.indexOf('## Your agreements') < withLedger.indexOf('## Your last plan'));
   assert.equal(buildTalkSituationText(input()).includes('## Your agreements'), false);
+});
+
+test('a battle prints its truce text between the sides and the last plan', () => {
+  const battle = { beatNumber: 2, opponentLabel: 'France', opponentCode: 'a2', truceText: 'TRUCE-TEXT' };
+  const text = buildTalkSituationText(input({ battle }));
+  assert.ok(text.includes('## Agreements and last beat\nTRUCE-TEXT'), text);
+  assert.ok(text.indexOf('## Sides') < text.indexOf('## Agreements and last beat'));
+  assert.ok(text.indexOf('## Agreements and last beat') < text.indexOf('## Your last plan'));
+  const none = buildTalkSituationText(input({ battle: { ...battle, truceText: null } }));
+  assert.equal(none.includes('## Agreements and last beat'), false);
+});
+
+test('only the battle system text explains the agreements and last beat section', () => {
+  const tactical = buildTalkSystemText('Iberia', 'tactical');
+  assert.ok(tactical.includes('\nAgreements and last beat:\n'));
+  for (const bullet of BATTLE_TRUCE_TALK_BULLETS) assert.ok(tactical.includes(`- ${bullet}`));
+  assert.equal(buildTalkSystemText('Iberia', 'strategic').includes('Agreements and last beat:'), false);
 });

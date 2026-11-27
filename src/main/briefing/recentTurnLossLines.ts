@@ -31,11 +31,11 @@ export const RECENT_TURN_LOSS_GROUP_LINES_MAX = 12;
  *
  * Purpose: A loss line is a record kept by the game, so the model must not weigh it like a message from another side. Naming where the side codes come from, and printing each side's home region after its code, lets the model tell who attacked it before it writes to that side.
  * When to use: Printed once under the Recent Turn Notes heading when any block has a loss line.
- * Expected outcome: Names what `by`, `you`, `Neutral`, the side codes, `no side responsible`, `by unknown side`, and the closing counts mean.
+ * Expected outcome: Names what `by`, `you`, `Neutral`, the side codes, `no side responsible`, `by unknown side`, and the closing counts mean. The last two sentences say that a Return fire line is not an attack by the side named, and that a Melee attack line means both sides were in the same place.
  * Exceptions: None.
  */
 export const RECENT_TURN_LOSS_LEGEND =
-  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "you" is your own side, "Neutral" is the Neutral side, and every other side is named by its code, which is the Code column of the Sides table and the prefix of its unit ids, followed by its home region in parentheses. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail.';
+  'Loss lines are game records, not claims by any side. "by" names the side whose units or actions destroyed the units listed, and the closing "(by ...)" counts the units that fought them. "you" is your own side, "Neutral" is the Neutral side, and every other side is named by its code, which is the Code column of the Sides table and the prefix of its unit ids, followed by its home region in parentheses. "no side responsible" means no other side caused the loss. "by unknown side" means the game could not tell, or the loss was recorded before the game kept that detail. A "Return fire" line means the destroyed units attacked first and were hit by the answering fire, so it is not an attack by the side named. In a battle, that includes an air drop that anti-air shoots down. A "Melee attack" line means units of both sides were in the same hex or cell, where they fight every turn or beat whichever side moved there.';
 
 /**
  * Cause label of a unit a tactical battle destroyed.
@@ -52,11 +52,11 @@ export const BATTLE_LOSS_CAUSE_LABEL = 'Battle';
  *
  * Purpose: The legend says a closing `(by ...)` counts the units that fought, and a Battle line has none.
  * When to use: Appended to `RECENT_TURN_LOSS_LEGEND` when any printed block has a Battle line.
- * Expected outcome: Says what a Battle line lists and who it is credited to.
+ * Expected outcome: Says what a Battle line lists, who it is credited to, how a battle starts, and that the line does not say which side fired first.
  * Exceptions: None.
  */
 export const BATTLE_LOSS_LEGEND_SENTENCE =
-  'A "Battle" line lists units destroyed in a tactical battle fought that turn, credited to the other side in that battle. It has no closing count.';
+  'A "Battle" line lists units destroyed in a tactical battle fought that turn, credited to the other side in that battle. It has no closing count. A battle starts on its own when units of two sides are in the same hex, and the line does not say which side fired first.';
 
 /**
  * Owner key for a loss with no known owner.
@@ -439,11 +439,24 @@ function capGroups(sorted: readonly LossGroup[], maxGroupLines: number, input: R
 }
 
 /**
+ * Notes printed after a cause label that a commander could read as an attack.
+ *
+ * Purpose: The note tells a commander which losses were not an attack by the side named.
+ * When to use: `lineFor`, for a group with one of the standard causes.
+ * Expected outcome: A note for return fire and for melee. A cause with no entry prints its label alone.
+ * Exceptions: None.
+ */
+export const LOSS_CAUSE_PROMPT_NOTES: Readonly<Partial<Record<keyof PlayerLossSummary, string>>> = {
+  returnFire: 'the destroyed units attacked first',
+  melee: 'units of both sides were in the same hex or cell',
+};
+
+/**
  * Writes the line of one group.
  *
  * Purpose: One line carries who was responsible, the cause, the hex, the victims, and the killer counts.
  * When to use: `buildRecentTurnLossLines`, once per listed group.
- * Expected outcome: `  - by h1, Ranged attack at QX: a1-i3, a1-a2 (by 2 Armored)`. The hex and the killer part are left out when empty.
+ * Expected outcome: `  - by h1, Ranged attack at QX: a1-i3, a1-a2 (by 2 Armored)`. A cause in `LOSS_CAUSE_PROMPT_NOTES` prints its note in parentheses after the label. A Battle line has no note. The hex and the killer part are left out when empty.
  * Exceptions: None.
  */
 function lineFor(group: LossGroup, input: RecentTurnLossLinesInput): string {
@@ -453,7 +466,9 @@ function lineFor(group: LossGroup, input: RecentTurnLossLinesInput): string {
   }
   const hex = group.hexCode.length > 0 ? ` at ${group.hexCode}` : '';
   const by = killers.size > 0 ? ` (by ${formatGroupedTypeTotals([...killers.values()])})` : '';
-  const cause = group.causeIndex < LOSS_CAUSE_LABELS.length ? LOSS_CAUSE_LABELS[group.causeIndex] : BATTLE_LOSS_CAUSE_LABEL;
+  const label = group.causeIndex < LOSS_CAUSE_LABELS.length ? LOSS_CAUSE_LABELS[group.causeIndex] : BATTLE_LOSS_CAUSE_LABEL;
+  const note = group.causeIndex < LOSS_CAUSE_KEYS.length ? LOSS_CAUSE_PROMPT_NOTES[LOSS_CAUSE_KEYS[group.causeIndex]] : undefined;
+  const cause = note ? `${label} (${note})` : label;
   return `  - ${responsibleText(group.responsible, input)}, ${cause}${hex}: ${formatLossEntriesForPrompt(group.units)}${by}`;
 }
 

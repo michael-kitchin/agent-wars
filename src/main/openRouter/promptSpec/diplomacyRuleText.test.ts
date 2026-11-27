@@ -28,3 +28,8 @@ test('the talk bullets name every kind, and the reply shape lists every status a
   const shape = sideAgreementReplyShape();
   for (const word of [...SIDE_AGREEMENT_STATUSES, ...SIDE_AGREEMENT_INTENTS]) assert.ok(shape.includes(word), word);
 });
+
+test('the orders bullets say units in one hex fight whatever was agreed', () => {
+  assert.equal(SIDE_AGREEMENT_ORDERS_BULLETS.length, 3);
+  assert.ok(SIDE_AGREEMENT_ORDERS_BULLETS.some((bullet) => bullet.includes('whatever the two sides have agreed')));
+});

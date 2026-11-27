@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sideAgreementsEnabled } from './sideAgreementGate';
+import { sideAgreementsEnabled, sideAgreementsShownInBattle } from './sideAgreementGate';
 
 test('tactical is always off, and strategic follows the talk switch', () => {
   const previous = process.env.AGENT_WARS_DISABLE_TALK;
@@ -20,6 +20,19 @@ test('tactical is always off, and strategic follows the talk switch', () => {
     process.env.AGENT_WARS_DISABLE_TALK = '1';
     assert.equal(sideAgreementsEnabled('strategic'), false);
     assert.equal(sideAgreementsEnabled('tactical'), false);
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
+});
+
+test('a battle shows agreements only while talk is enabled', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  try {
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    assert.equal(sideAgreementsShownInBattle(), true);
+    process.env.AGENT_WARS_DISABLE_TALK = '1';
+    assert.equal(sideAgreementsShownInBattle(), false);
   } finally {
     if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
     else process.env.AGENT_WARS_DISABLE_TALK = previous;

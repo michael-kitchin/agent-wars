@@ -112,6 +112,7 @@ export function buildSidesPromptBlock(args: {
   if (args.includeNeutral) {
     lines.push(`| Neutral | (keeps the prefix of the side it came from) | none | ${NEUTRAL_STATUS} |`);
   }
-  if (args.includeMercenaryNote) lines.push(MERCENARY_ID_PREFIX_NOTE);
+  // The note is a paragraph of its own, so a blank line ends the table first.
+  if (args.includeMercenaryNote) lines.push('', MERCENARY_ID_PREFIX_NOTE);
   return lines.join('\n');
 }

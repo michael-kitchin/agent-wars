@@ -64,8 +64,8 @@ export function buildStrategicContextCoaching(gates: CoachingGates): string {
   const message = `${buildStrategicGoalsBlock(gates)}
 ${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
 ${sideMessageRuleBlock({ talkStageEnabled: isTalkStageEnabled(), includeAgreements: sideAgreementsEnabled('strategic') })}`;
-  const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock(gates.operationsEnabled === true)}` : message;
-  const withOperations = gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true)}` : withCampaign;
+  const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock(gates.operationsEnabled === true, sideAgreementsEnabled('strategic'))}` : message;
+  const withOperations = gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true, sideAgreementsEnabled('strategic'))}` : withCampaign;
   return gates.postureEnabled === true ? `${withOperations}\n\n${buildPostureRuleBlock(gates.campaignEnabled === true)}` : withOperations;
 }
 

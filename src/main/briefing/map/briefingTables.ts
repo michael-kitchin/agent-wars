@@ -138,7 +138,7 @@ export function renderThisTurnOptionsTableMarkdown(
  *
  * Purpose: Recovers infrastructure letters hidden by presence markers, per plan.
  * When to use: When `renderHexAsciiMap` returns non-empty `displacedFeatures`.
- * Expected outcome: Single-line compact footnote or an empty string.
+ * Expected outcome: Single-line compact footnote with no trailing newline, or an empty string. The callers add the blank lines around it.
  * Exceptions: None.
  */
 export function renderDisplacedFeaturesLine(
@@ -147,5 +147,5 @@ export function renderDisplacedFeaturesLine(
   logTrace('briefing-tables renderDisplacedFeaturesLine', { count: displaced.length });
   if (displaced.length === 0) return '';
   const inner = displaced.map((d) => `${d.code}(${d.feature})`).join(', ');
-  return `Units at featured hexes: ${inner}\n`;
+  return `Units at featured hexes: ${inner}`;
 }

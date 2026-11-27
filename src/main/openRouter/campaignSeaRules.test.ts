@@ -133,3 +133,10 @@ test('no port, or a capacity below the minimum, gives no routes', () => {
   assert.equal(chooseCampaignSeaRoutes(routeArgs([city('far')], { ports: [] })).size, 0);
   assert.equal(chooseCampaignSeaRoutes(routeArgs([city('far')], { liftCapacity: 1 })).size, 0);
 });
+
+test('a pact partner city takes no test slot, and is still measured when it must be', () => {
+  const partner = Array.from({ length: 8 }, (_, index) => ({ ...city(`p${index}`, 50), heldByPactPartner: true }));
+  const cities = [...partner, city('weak', 1)];
+  assert.deepEqual([...chooseCampaignSeaRoutes(routeArgs(cities)).keys()], ['weak']);
+  assert.equal(chooseCampaignSeaRoutes(routeArgs(cities, { mustTestH3: 'p3' })).has('p3'), true);
+});

@@ -137,10 +137,34 @@ export function formatAiOnlyBeatLimitSentence(beats: number): string {
 }
 
 /**
- * How long the beat-limit notice stays up before it closes itself.
+ * The sentence the result overlay shows when both commanders leave the battle.
+ *
+ * Purpose: A viewer can tell an agreed end from a battle that stopped responding.
+ * When to use: After an `exit` ending.
+ * Expected outcome: `Disengaged: both commanders left the battle.`
+ * Exceptions: None.
+ */
+export function formatAiOnlyExitSentence(): string {
+  return 'Disengaged: both commanders left the battle.';
+}
+
+/**
+ * The sentence the result overlay shows when quiet beats end the battle.
+ *
+ * Purpose: A viewer sees that the battle ended because nothing was happening.
+ * When to use: After a `quiet` ending, with the number of quiet beats that ended it.
+ * Expected outcome: `Disengaged: ${beats} beats passed with no fighting.`
+ * Exceptions: None.
+ */
+export function formatAiOnlyQuietSentence(beats: number): string {
+  return `Disengaged: ${beats} beats passed with no fighting.`;
+}
+
+/**
+ * How long a timed result notice stays up before it closes itself.
  *
  * Purpose: An observer who is auto-advancing still sees why the battle ended.
- * When to use: The timer that closes that notice.
+ * When to use: The timer that closes a beat-limit, commander-exit, or quiet notice.
  * Expected outcome: 3000 milliseconds.
  * Exceptions: None.
  */
@@ -209,7 +233,7 @@ export function formatAiOnlyBeatsLeftPrompt(left: number): string {
 /**
  * How an ended AI-only battle is shown.
  *
- * Purpose: The beat-limit notice is the only ending that both shows a dialog and can close itself.
+ * Purpose: A beat limit, a commander exit, and a quiet ending show a dialog that can close itself.
  * When to use: After playback, once the end reason is known.
  * Expected outcome: `leave_now` skips the dialog. `dialog_until_ok` waits. `timed_dialog` waits, then closes.
  * Exceptions: None.
@@ -217,11 +241,23 @@ export function formatAiOnlyBeatsLeftPrompt(left: number): string {
 export type AiOnlyBattleEndPresentation = 'leave_now' | 'dialog_until_ok' | 'timed_dialog';
 
 /**
+ * Whether this ending's result uses the timed notice while auto-advancing.
+ *
+ * Purpose: The notice choice and the leave check share one list of endings.
+ * When to use: Choosing the presentation, and deciding whether leaving an open dialog presses Ready.
+ * Expected outcome: True for `beat_limit`, `exit`, and `quiet`. False for every other reason and for undefined.
+ * Exceptions: None.
+ */
+export function aiOnlyEndReasonUsesTimedNotice(reason: TacticalBattleSnapshot['aiOnlyEndReason']): boolean {
+  return reason === 'beat_limit' || reason === 'exit' || reason === 'quiet';
+}
+
+/**
  * Which notice to show for this ending and this observe checkbox.
  *
- * Purpose: Other endings keep today's behavior. Only a beat limit while auto-advancing uses the timed notice.
+ * Purpose: While auto-advancing, an ending a viewer should read stays up briefly, and every other ending leaves at once.
  * When to use: `tacticalMaybeScheduleAnnihilationExit`, after the sentence is known.
- * Expected outcome: Checkbox off is `dialog_until_ok`. Checkbox on and `beat_limit` is `timed_dialog`. Checkbox on and any other reason is `leave_now`.
+ * Expected outcome: Checkbox off is `dialog_until_ok`. Checkbox on and a reason `aiOnlyEndReasonUsesTimedNotice` accepts is `timed_dialog`. Checkbox on and any other reason is `leave_now`.
  * Exceptions: None.
  */
 export function aiOnlyBattleEndPresentation(
@@ -229,7 +265,7 @@ export function aiOnlyBattleEndPresentation(
   autoAdvance: boolean
 ): AiOnlyBattleEndPresentation {
   if (!autoAdvance) return 'dialog_until_ok';
-  return reason === 'beat_limit' ? 'timed_dialog' : 'leave_now';
+  return aiOnlyEndReasonUsesTimedNotice(reason) ? 'timed_dialog' : 'leave_now';
 }
 
 /**
@@ -237,7 +273,7 @@ export function aiOnlyBattleEndPresentation(
  *
  * Purpose: Ok on an ordinary result does not start the next turn. Ok on the timed notice does, when the checkbox is still on.
  * When to use: Immediately before `leaveAiOnlyBattle`, while the snapshot and the sentence are still set.
- * Expected outcome: True when auto-advance is on and either no result dialog is open or the ending is the beat limit.
+ * Expected outcome: True when auto-advance is on and either no result dialog is open or `aiOnlyEndReasonUsesTimedNotice` accepts the ending.
  * Exceptions: None.
  */
 export function aiOnlyLeaveStartsNextTurn(args: {
@@ -245,11 +281,11 @@ export function aiOnlyLeaveStartsNextTurn(args: {
   readonly endReason: TacticalBattleSnapshot['aiOnlyEndReason'];
   readonly autoAdvance: boolean;
 }): boolean {
-  return args.autoAdvance && (!args.resultDialogOpen || args.endReason === 'beat_limit');
+  return args.autoAdvance && (!args.resultDialogOpen || aiOnlyEndReasonUsesTimedNotice(args.endReason));
 }
 
 /**
- * Whether the beat-limit timer should still close the notice.
+ * Whether the timed notice's timer should still close it.
  *
  * Purpose: Unticking the checkbox during the wait leaves the dialog up for Ok.
  * When to use: When the timer fires, before it closes the overlay.

@@ -34,3 +34,12 @@ test('the sea paragraph is still one paragraph', () => {
   assert.ok(sea.includes(TIMEOUT_SENTENCES));
   assert.equal(sea.includes('\n'), false);
 });
+
+test('the engine-launch paragraph names pact partners only with agreements on', () => {
+  const sentence =
+    'It never launches a row against a city held by a side you have an active non_aggression or ceasefire_in_place agreement with; launch that row yourself to attack that side.';
+  const plain = buildOperationRuleBlock(true, true);
+  assert.equal(plain.includes(sentence), false);
+  assert.equal(buildOperationRuleBlock(true, true, false), plain);
+  assert.ok(buildOperationRuleBlock(true, true, true).includes(`It never launches a land row. ${sentence}`));
+});

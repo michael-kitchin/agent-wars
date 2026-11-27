@@ -18,6 +18,8 @@ import {
   formatAiOnlyBeatLimitSentence,
   formatAiOnlyBeatsLeftLabel,
   formatAiOnlyBeatsLeftPrompt,
+  formatAiOnlyExitSentence,
+  formatAiOnlyQuietSentence,
 } from './aiOnlyBeatLimit';
 
 test('aiOnlyBeatLimitForRequest keeps null and a listed number, and stores 30 otherwise', () => {
@@ -49,7 +51,11 @@ test('formatAiOnlyBeatLimitSentence names the beat count', () => {
   assert.equal(formatAiOnlyBeatLimitSentence(30), 'The battle reached its maximum of 30 beats.');
 });
 
-test('aiOnlyBattleEndPresentation times only a beat limit while auto-advancing', () => {
+test('aiOnlyBattleEndPresentation times a beat limit, an exit, and a quiet ending while auto-advancing', () => {
+  for (const reason of ['exit', 'quiet'] as const) {
+    assert.equal(aiOnlyBattleEndPresentation(reason, true), 'timed_dialog');
+    assert.equal(aiOnlyBattleEndPresentation(reason, false), 'dialog_until_ok');
+  }
   assert.equal(aiOnlyBattleEndPresentation('beat_limit', false), 'dialog_until_ok');
   assert.equal(aiOnlyBattleEndPresentation('beat_limit', true), 'timed_dialog');
   assert.equal(aiOnlyBattleEndPresentation('idle', false), 'dialog_until_ok');
@@ -57,13 +63,20 @@ test('aiOnlyBattleEndPresentation times only a beat limit while auto-advancing',
   assert.equal(aiOnlyBattleEndPresentation('elimination', true), 'leave_now');
 });
 
-test('aiOnlyLeaveStartsNextTurn starts a turn from a closed dialog or a beat-limit notice', () => {
+test('aiOnlyLeaveStartsNextTurn starts a turn from a closed dialog or a timed notice', () => {
   const leave = aiOnlyLeaveStartsNextTurn;
+  assert.equal(leave({ resultDialogOpen: true, endReason: 'exit', autoAdvance: true }), true);
+  assert.equal(leave({ resultDialogOpen: true, endReason: 'quiet', autoAdvance: true }), true);
   assert.equal(leave({ resultDialogOpen: false, endReason: undefined, autoAdvance: true }), true);
   assert.equal(leave({ resultDialogOpen: true, endReason: 'beat_limit', autoAdvance: true }), true);
   assert.equal(leave({ resultDialogOpen: true, endReason: 'beat_limit', autoAdvance: false }), false);
   assert.equal(leave({ resultDialogOpen: true, endReason: 'idle', autoAdvance: true }), false);
   assert.equal(leave({ resultDialogOpen: true, endReason: undefined, autoAdvance: true }), false);
+});
+
+test('the disengaged sentences say how the battle ended', () => {
+  assert.equal(formatAiOnlyExitSentence(), 'Disengaged: both commanders left the battle.');
+  assert.equal(formatAiOnlyQuietSentence(3), 'Disengaged: 3 beats passed with no fighting.');
 });
 
 test('aiOnlyTimedNoticeStillCloses stops when the sentence is gone or auto-advance is off', () => {

@@ -180,3 +180,19 @@ test('the target holder is the explored controller, the single home seat, or nob
   assert.equal(campaignTargetHolderSeatId(cityState(false, false), 't1'), 'a3');
   assert.equal(campaignTargetHolderSeatId(cityState(false, true), 't1'), null);
 });
+
+test('a target held by a pact partner says that marching on it breaks the pact', () => {
+  const args = {
+    state: cityState(false, false),
+    plan: planFor({ stagingH3: 's1', phase: 'assemble', source: 'commander', massedCount: 4 }),
+    format,
+  };
+  const plain = buildCampaignObjectiveSection(args);
+  assert.equal(buildCampaignObjectiveSection({ ...args, pactPartnerSeatIds: new Set<string>() }), plain);
+  const lines = buildCampaignObjectiveSection({ ...args, pactPartnerSeatIds: new Set(['a3']) }).split('\n');
+  const target = lines.findIndex((line) => line.startsWith('- Target: T1'));
+  assert.equal(
+    lines[target + 1],
+    '- Agreement: you have an active pact with Western Europe, which holds T1. Marching on T1 breaks that pact.'
+  );
+});

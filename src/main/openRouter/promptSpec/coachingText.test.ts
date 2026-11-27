@@ -6,8 +6,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildCreditsCountGuidance } from './gameRuleMercenaryText';
+import { buildFinalJsonContractInstruction } from '../promptContracts';
+import { buildCampaignRuleBlock } from './campaignRuleText';
 import { buildCoachingBullets, buildContextCoaching, type CoachingGates } from './coachingText';
-import { SIDE_AGREEMENT_ORDERS_BULLETS } from './diplomacyRuleText';
+import { QUIET_BEATS_TO_END } from '../../../shared/tacticalQuietBeat';
+import { BATTLE_TRUCE_ORDERS_BULLETS, SIDE_AGREEMENT_ORDERS_BULLETS } from './diplomacyRuleText';
 import { buildOperationRuleBlock } from './operationRuleText';
 import { POSTURE_SETTINGS } from '../../../shared/postureTypes';
 import { buildPostureRuleBlock } from './postureRuleText';
@@ -321,7 +324,7 @@ test('option-copy bullets keep the mode noun and the absent-table sentences', ()
 });
 
 test('exit battle coaching is present only when the gate is on', () => {
-  const sentence = 'Set exitBattle to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. Orders in this reply still resolve for this beat.';
+  const sentence = `Set exitBattle to true when you and the other commander have agreed to stop fighting, when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. The battle ends after a beat in which both commanders set it. It also ends on its own after ${QUIET_BEATS_TO_END} beats in a row with no shots, no melee, and no unit moving closer to the enemy. A battle that ends in either way leaves both sides' units in the same world-map hex, where they fight again next turn unless one side moves out. Orders in this reply still resolve for this beat.`;
   assert.equal(joined(tacticalGates()).includes(sentence), false);
   assert.equal(joined(strategicGates()).includes(sentence), false);
   assert.equal(joined(tacticalGates({ includeExitBattle: true })).includes(sentence), true);
@@ -418,4 +421,47 @@ test('the strategic context carries the first agreement orders bullet and the ta
   const first = SIDE_AGREEMENT_ORDERS_BULLETS[0];
   assert.ok(buildContextCoaching(strategicGates()).includes(first));
   assert.equal(buildContextCoaching(tacticalGates()).includes(first), false);
+});
+
+test('only a battle between two commanders with talk on gets the truce bullets', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  const context = (extra: Partial<CoachingGates>): string => buildContextCoaching(tacticalGates(extra));
+  try {
+    delete process.env.AGENT_WARS_DISABLE_TALK;
+    for (const bullet of BATTLE_TRUCE_ORDERS_BULLETS) {
+      assert.ok(context({ includeExitBattle: true }).includes(bullet));
+      assert.equal(context({}).includes(bullet), false);
+    }
+    process.env.AGENT_WARS_DISABLE_TALK = '1';
+    assert.equal(context({ includeExitBattle: true }).includes(BATTLE_TRUCE_ORDERS_BULLETS[0]), false);
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
+});
+
+test('with talk off the exit bullet does not mention agreeing to stop', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  try {
+    process.env.AGENT_WARS_DISABLE_TALK = '1';
+    const text = joined(tacticalGates({ includeExitBattle: true }));
+    assert.ok(text.includes('Set exitBattle to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give.'));
+    assert.equal(text.includes('agreed to stop fighting'), false);
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
+});
+
+test('repeating the current campaign target is described as not restarting its phase', () => {
+  for (const agreementsEnabled of [false, true]) {
+    const block = buildCampaignRuleBlock(true, agreementsEnabled);
+    assert.ok(block.includes('Omit it to keep the target. Sending the current target does not restart its phase.'), block);
+    assert.equal(block.includes('changes nothing'), false);
+  }
+  const contract = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false, includeProductionOrders: false, includeCampaignTarget: true,
+    movementOrderInstruction: '', submitMemoryClause: '', productionSubmitClause: '',
+  });
+  assert.ok(contract.includes('Omit it to keep the target. Sending the current target does not restart its phase.'), contract);
 });

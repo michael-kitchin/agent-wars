@@ -159,6 +159,15 @@ interface TurnBlockContext {
    */
   readonly hexCodeFor: (h3Index: string) => string | undefined;
   /**
+   * The word that opens each block.
+   *
+   * Contract: `Turn` for the strategic scope, `Beat` for a battle.
+   * When to use: The first line of each block.
+   * Expected outcome: A battle's blocks read `Beat N:`, so they are not mistaken for world-map turns.
+   * Exceptions: None.
+   */
+  readonly periodLabel: 'Turn' | 'Beat';
+  /**
    * Most loss groups this block lists, or null for all.
    *
    * Contract: Null for the newest block.
@@ -179,7 +188,7 @@ interface TurnBlockContext {
  */
 interface FormattedTurnBlock {
   /**
-   * Block text starting with `Turn N:`.
+   * Block text starting with `Turn N:`, or `Beat N:` in a battle.
    *
    * Contract: Non-empty.
    * When to use: Joined into the section.
@@ -254,11 +263,11 @@ function lossHexCodeResolver(args: BuildRecentTurnNotesSectionArgs): (h3Index: s
  *
  * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes. A stored message from an older save is not printed. Units a tactical battle destroyed that turn print under the cause Battle.
  * When to use: For each qualifying row returned from the DB query, with that turn's battle losses (empty for a tactical scope).
- * Expected outcome: Multiline block starting with `Turn N:`, then the strategy bullet, then the loss lines.
+ * Expected outcome: Multiline block starting with `Turn N:` (`Beat N:` in a battle), then the strategy bullet, then the loss lines.
  * Exceptions: None.
  */
 function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext, battleLosses: readonly LostUnit[]): FormattedTurnBlock {
-  const lines: string[] = [`Turn ${row.turnNumber}:`, `- Strategy: ${noteDisplayText(row.strategyText)}`];
+  const lines: string[] = [`${context.periodLabel} ${row.turnNumber}:`, `- Strategy: ${noteDisplayText(row.strategyText)}`];
   const lossLines = buildRecentTurnLossLines({
     ownSeatId: context.ownSeatId,
     // The stored columns are named from the human's point of view: `humanLossJson` holds every other owner's losses.
@@ -278,7 +287,7 @@ function formatTurnBlock(row: TurnNoteRow, context: TurnBlockContext, battleLoss
  * Builds the recent turn notes markdown block for AI prompts.
  *
  * Purpose: Replaces the legacy losses-since-consultation table with rolling ten-entry history, each loss naming who was responsible.
- * When to use: Strategic `formatBriefing`, the tactical briefing, and the talk stage (all use `Turn N:` labels).
+ * When to use: Strategic `formatBriefing`, the tactical briefing, and the talk stage. Strategic blocks read `Turn N:` and battle blocks read `Beat N:`.
  * Expected outcome: Empty string when no qualifying prior turns; otherwise `## heading`, the loss legend when any block has a loss line, and per-turn bullets. The newest block lists every loss group and older blocks are capped. A strategic window also prints the units tactical battles destroyed, under the cause Battle, and adds the Battle sentence to the legend; a turn with only battle losses still prints.
  * Exceptions: None.
  */
@@ -313,6 +322,7 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
         seatOrder,
         homeRegionBySeatId,
         hexCodeFor,
+        periodLabel: args.scope === 'tactical' ? 'Beat' : 'Turn',
         maxGroupLines: index === rows.length - 1 ? null : RECENT_TURN_LOSS_GROUP_LINES_MAX,
       },
       battleByTurn.get(row.turnNumber) ?? []

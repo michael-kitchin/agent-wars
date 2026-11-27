@@ -6,7 +6,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { LossKillerUnit } from '../../shared/lossAttributionTypes';
 import { emptyPlayerLossSummary, type LostUnit, type LostUnitType, type PlayerLossSummary } from '../../shared/lossSummary';
-import { buildRecentTurnLossLines, type RecentTurnLossLinesInput } from './recentTurnLossLines';
+import {
+  BATTLE_LOSS_LEGEND_SENTENCE,
+  buildRecentTurnLossLines,
+  RECENT_TURN_LOSS_LEGEND,
+  type RecentTurnLossLinesInput,
+} from './recentTurnLossLines';
 
 const HEXES = new Map<string, string>([['hA', 'QX'], ['hB', 'RB'], ['hC', 'TT']]);
 for (let i = 1; i <= 12; i += 1) HEXES.set(`g${i}`, `A${i}`);
@@ -60,7 +65,7 @@ test('own and other losses group by responsible side, cause, and hex', () => {
   assert.deepEqual(lines, [
     '- Your Losses:',
     '  - by h1, Ranged attack at QX: a1-i3, a1-a2 (by 2 Armored)',
-    '  - by a2, Melee attack at RB: a1-i4, a1-i5, a1-i6 (by 1 Armored, 2 Infantry)',
+    '  - by a2, Melee attack (units of both sides were in the same hex or cell) at RB: a1-i4, a1-i5, a1-i6 (by 1 Armored, 2 Infantry)',
     '- Losses of h1:',
     '  - by you, Air strike at TT: h1-n1 (by 1 Air)',
   ]);
@@ -75,7 +80,7 @@ test('rows without attribution print as an unknown side with no hex', () => {
     '- Your Losses:',
     '  - by unknown side, Ranged attack: a1-i3',
     '- Losses of other sides:',
-    '  - by unknown side, Melee attack: h1-i1',
+    '  - by unknown side, Melee attack (units of both sides were in the same hex or cell): h1-i1',
   ]);
 });
 
@@ -203,8 +208,25 @@ test('a home region map names each other responsible side after its code', () =>
   );
   const lines = buildRecentTurnLossLines({ ...base, homeRegionBySeatId: homes });
   assert.ok(lines.includes('  - by h1 (North America), Ranged attack at QX: a1-i3 (by 1 Armored)'));
-  assert.ok(lines.includes('  - by you, Melee attack at RB: a2-i1'));
+  assert.ok(lines.includes('  - by you, Melee attack (units of both sides were in the same hex or cell) at RB: a2-i1'));
   assert.ok(lines.includes('  - by a2 (Southern France) and a3 (Southern Europe), Air strike at TT: h1-n1'));
   assert.ok(lines.includes('- Losses of a2:'));
   assert.deepEqual(buildRecentTurnLossLines(base), buildRecentTurnLossLines({ ...base, homeRegionBySeatId: undefined }));
+});
+
+test('a return fire line says the destroyed units attacked first, and a ranged line carries no note', () => {
+  const lines = buildRecentTurnLossLines(input({
+    ranged: [unit('a1-i1', 'infantry', 'opponent', 'hA', ['human'])],
+    returnFire: [unit('a1-i2', 'infantry', 'opponent', 'hB', ['human'])],
+  }, {}));
+  assert.ok(lines.includes('  - by h1, Ranged attack at QX: a1-i1'));
+  assert.ok(lines.includes('  - by h1, Return fire (the destroyed units attacked first) at RB: a1-i2'));
+});
+
+test('the legend says return fire is not an attack, and the battle sentence does not name who fired first', () => {
+  assert.ok(RECENT_TURN_LOSS_LEGEND.includes('not an attack by the side named'));
+  assert.ok(RECENT_TURN_LOSS_LEGEND.includes('A "Return fire" line means the destroyed units attacked first'));
+  assert.ok(RECENT_TURN_LOSS_LEGEND.includes('In a battle, that includes an air drop that anti-air shoots down.'));
+  assert.equal(RECENT_TURN_LOSS_LEGEND.includes('fired'), false);
+  assert.ok(BATTLE_LOSS_LEGEND_SENTENCE.includes('does not say which side fired first'));
 });

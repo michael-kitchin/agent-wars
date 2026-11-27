@@ -1,11 +1,14 @@
 /**
- * Limits for how many sea operations run and how far the engine searches for one.
+ * Limits for how many sea operations run and how far the engine searches for one, and the engine's own launch rule.
  *
  * Purpose: The candidate search and the turn advance share one set of bounds.
- * When to use: When listing landings or deciding that a phase has lasted long enough.
- * Expected outcome: Fixed integers. Nothing in this file reads the database or the map.
+ * When to use: When listing landings, deciding that a phase has lasted long enough, or deciding whether the engine may launch a row.
+ * Expected outcome: Fixed integers and one pure rule. Nothing in this file reads the database or the map.
  * Exceptions: None.
  */
+
+import type { OperationCandidate } from '../../shared/operationTypes';
+import { logTrace } from '../logger';
 
 /**
  * Active sea operations one seat may have on a small map.
@@ -166,3 +169,27 @@ export const OPERATION_TRANSIT_TIMEOUT_TURNS = 20;
  * Exceptions: None.
  */
 export const OPERATION_ASSAULT_TIMEOUT_TURNS = 6;
+
+/**
+ * Whether the engine may launch a sea or air row on its own.
+ *
+ * Purpose: The engine keeps its defender limit and never attacks a side the commander has an active pact with.
+ * When to use: The offer clock and the engine's launch, on rows that are not land rows.
+ * Expected outcome: False when the objective's holder is in `pactPartnerSeatIds`. Otherwise true when the row is clear or has at most `maxDefenders` defenders.
+ * Exceptions: None.
+ */
+export function engineMayLaunchOperation(args: {
+  readonly candidate: Pick<OperationCandidate, 'clear' | 'defenders'>;
+  readonly maxDefenders: number;
+  readonly objectiveHolderSeatId: string | null;
+  readonly pactPartnerSeatIds: ReadonlySet<string>;
+}): boolean {
+  const pactHolder = args.objectiveHolderSeatId !== null && args.pactPartnerSeatIds.has(args.objectiveHolderSeatId);
+  const mayLaunch = !pactHolder && (args.candidate.clear || args.candidate.defenders <= args.maxDefenders);
+  logTrace('operationRules engineMayLaunchOperation', {
+    objectiveHolderSeatId: args.objectiveHolderSeatId,
+    pactHolder,
+    mayLaunch,
+  });
+  return mayLaunch;
+}

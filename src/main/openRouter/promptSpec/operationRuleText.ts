@@ -33,11 +33,14 @@ const CAMPAIGN_LIFT_PARAGRAPH =
  *
  * Purpose: The model needs to leave an operation alone, and to know that a standing order takes out a unit that is not aboard, or a ship.
  * When to use: After the campaign block when `operationsEnabled` is true, and after the context block when the campaign block is absent.
- * Expected outcome: The heading, then one paragraph per idea: what an operation is, the sea steps, the air steps, where the briefing lists them, the land paragraph when `campaignEnabled` is true, the menu, the launch, the engine's own launch, and the cancel when `commandsEnabled` is true, then the paragraph about leaving an operation alone, including that an order on a unit aboard is refused, and the paragraph that, outside an operation, a standing order does not move a unit while it is aboard a ship. When `campaignEnabled` is true, the paragraph on the campaign lift comes last.
+ * Expected outcome: The heading, then one paragraph per idea: what an operation is, the sea steps, the air steps, where the briefing lists them, the land paragraph when `campaignEnabled` is true, the menu, the launch, the engine's own launch, and the cancel when `commandsEnabled` is true, then the paragraph about leaving an operation alone, including that an order on a unit aboard is refused, and the paragraph that, outside an operation, a standing order does not move a unit while it is aboard a ship. When `campaignEnabled` is true, the paragraph on the campaign lift comes last. When `agreementsEnabled` is true, the engine-launch paragraph also says the engine never launches against a pact partner's city.
  * Exceptions: None.
  */
-export function buildOperationRuleBlock(commandsEnabled: boolean, campaignEnabled = false): string {
-  logTrace('promptSpec buildOperationRuleBlock', { commandsEnabled, campaignEnabled });
+export function buildOperationRuleBlock(commandsEnabled: boolean, campaignEnabled = false, agreementsEnabled = false): string {
+  logTrace('promptSpec buildOperationRuleBlock', { commandsEnabled, campaignEnabled, agreementsEnabled });
+  const pactSentence = agreementsEnabled
+    ? ' It never launches a row against a city held by a side you have an active non_aggression or ceasefire_in_place agreement with; launch that row yourself to attack that side.'
+    : '';
   const paragraphs = [
     'The engine runs operations: several turns of orders that carry ground units to an enemy city by sea or by air.',
     `By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. If the force has not gathered after ${OPERATION_MUSTER_TIMEOUT_TURNS} turns, it sails only when the ships at the port can carry at least ${Math.round(SEA_RAID_TIMEOUT_MIN_SHARE * 100)}% of its ground units, and is called off otherwise, so keep its ships with it. A campaign lift needs only its own minimum.`,
@@ -56,7 +59,7 @@ export function buildOperationRuleBlock(commandsEnabled: boolean, campaignEnable
     const commandParagraphs = [
       `Operation Options lists up to ${OPERATION_MENU_SIZE} operations you could launch, with what each would gain, what it would tie up, and what stands in its way. A sea or air row is listed only while you have room for another operation by that method.`,
       'Launch one with "operations": [{"action":"launch","option":"<letter>"}]. You may also name a city that is not listed, with "objective" and "method" in place of "option".',
-      'On the turn after a sea or air row was offered, the engine launches the first one it counts as clear: an undefended row, or a lightly held one when your posture allows it. It never launches a land row.',
+      `On the turn after a sea or air row was offered, the engine launches the first one it counts as clear: an undefended row, or a lightly held one when your posture allows it. It never launches a land row.${pactSentence}`,
       'Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.',
     ];
     paragraphs.splice(campaignEnabled ? 5 : 4, 0, ...commandParagraphs);
