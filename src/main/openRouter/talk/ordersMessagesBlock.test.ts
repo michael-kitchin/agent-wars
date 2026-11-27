@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import { AI_SEAT_IDS, type AiSeatId } from '../../../shared/seatIds';
 import { SIDE_MESSAGE_THREAD_PROMPT_LINES } from '../../../shared/aiConsultationLimits';
 import { strategicStep } from '../../../shared/matchRecording';
-import { dbRun, getScenarioHomeRegionHexes, listScenarioHomeRegions, upsertTurnLossNote } from '../../gameDb';
+import { dbRun, getScenarioHomeRegionHexes, listScenarioHomeRegions, upsertTurnLossNote, upsertTurnStrategyNote } from '../../gameDb';
 import { gameDbOps } from '../../gameDb/dbConnection';
 import { upsertGameConfigValue } from '../../gameDb/gameConfigRows';
 import { insertSideAgreement } from '../../gameDb/sideAgreementStore';
@@ -207,9 +207,13 @@ test('both battle prompts show the agreements and the last beat, and talk off dr
         buildOrdersMessagesBlock({ seatId: lead, inBattle: true, includeAgreements: false }).text ?? '',
         buildTalkSituationText(readTalkPromptInput({ seatId: lead, turnNumber: battle.strategicTurnNumber, battle }).input),
       ];
+      upsertTurnStrategyNote(lead, 'tactical', battle.battleId, 1, { strategyText: 'Hold the ridge' });
+      const beatTwo = { ...battle, tacticalTurnNumber: 2 };
+      const notes = readTalkPromptInput({ seatId: lead, turnNumber: battle.strategicTurnNumber, battle: beatTwo }).input.recentTurnsSection;
+      assert.ok(notes.includes('## Recent Beat Notes') && notes.includes('Beat 1:'), notes);
       for (const text of prompts()) {
         assert.match(text, /Your agreements with .+ \(a2\), shown for reference:/);
-        assert.match(text, /a2 fired 0 shots, and you fired 2 shots\. There was no melee\./);
+        assert.match(text, /a2 fired 0 attack shots, and you fired 2 attack shots\. There was no melee\./);
       }
       process.env.AGENT_WARS_DISABLE_TALK = '1';
       assert.equal((buildOrdersMessagesBlock({ seatId: lead, inBattle: true, includeAgreements: false }).text ?? '').includes('Last beat'), false);

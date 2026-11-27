@@ -191,6 +191,6 @@ const UNCONSULTED_BEAT_BULLET =
  */
 function exitBattleBullet(talkEnabled: boolean): string {
   const agreed = talkEnabled ? 'when you and the other commander have agreed to stop fighting, ' : '';
-  return `- Set exitBattle to true ${agreed}when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. The battle ends after a beat in which both commanders set it. It also ends on its own after ${QUIET_BEATS_TO_END} beats in a row with no shots, no melee, and no unit moving closer to the enemy. A battle that ends in either way leaves both sides' units in the same world-map hex, where they fight again next turn unless one side moves out. Orders in this reply still resolve for this beat.`;
+  return `- Set exitBattle to true ${agreed}when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. The battle ends after a beat in which both commanders set it. It also ends on its own after ${QUIET_BEATS_TO_END} beats in a row with no shots, no melee, and no unit moving closer to the enemy. A battle that ends in either way leaves both sides' units in the same world-map hex, where they fight again next turn unless one side moves out. Either ending still destroys every world-map unit, on both sides, that has fewer than half of its sub-units left, so holding fire until the battle ends does not save a unit that has already lost more than half. Orders in this reply still resolve for this beat.`;
 }
 

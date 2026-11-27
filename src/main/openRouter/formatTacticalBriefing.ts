@@ -5,7 +5,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
-import { buildRecentTurnNotesSection } from '../briefing/recentTurnNotesSection';
+import { buildRecentTurnNotesSection, SECTION_TITLE_RECENT_BEAT_NOTES } from '../briefing/recentTurnNotesSection';
 import { buildTacticalOperationalMapSectionMarkdown } from '../briefing/map/briefingMapSection';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { getSubscriptions } from '../callbackSubscriptions';
@@ -22,7 +22,6 @@ import {
   SECTION_TITLE_ATTENTION_FLAGS,
   SECTION_TITLE_COMMANDERS_BRIEFING,
   SECTION_TITLE_OPERATIONAL_MAP,
-  SECTION_TITLE_RECENT_TURN_NOTES,
   SECTION_TITLE_UNIT_STATUS_AND_THREATS,
 } from './promptSpec/sectionHeadings';
 import {
@@ -98,7 +97,7 @@ export function formatTacticalBriefing(args: {
     scope: 'tactical',
     battleId: tacticalBattle.battleId,
     currentTurnNumber: tacticalBattle.tacticalTurnNumber,
-    heading: SECTION_TITLE_RECENT_TURN_NOTES,
+    heading: SECTION_TITLE_RECENT_BEAT_NOTES,
     seatId: ownSeat,
     tacticalEnclosingH3Index: tacticalBattle.enclosingStrategicH3Index,
   });

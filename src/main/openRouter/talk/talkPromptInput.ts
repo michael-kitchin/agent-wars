@@ -13,7 +13,7 @@ import { isFogOfWarEnabled } from '../../gameDb/fogState';
 import { listSideMessageThread, listSideStances } from '../../gameDb/sideMessageStore';
 import { readSeatRoster } from '../../gameDb/seatRosterStore';
 import { getRecentTurnNotes } from '../../gameDb/turnNotesHistory';
-import { buildRecentTurnNotesSection } from '../../briefing/recentTurnNotesSection';
+import { buildRecentTurnNotesSection, SECTION_TITLE_RECENT_BEAT_NOTES } from '../../briefing/recentTurnNotesSection';
 import { readSideCombatRecords, type SideCombatRecordView } from '../../briefing/sideCombatRecordRead';
 import { formatStanceConflict } from '../../briefing/sideCombatRecordText';
 import { readTurnNumberOrFirst } from '../../gameDb/turnStateReads';
@@ -208,7 +208,7 @@ export function readTalkPromptInput(args: {
     scope,
     battleId,
     currentTurnNumber: noteTurn,
-    heading: SECTION_TITLE_RECENT_TURN_NOTES,
+    heading: args.battle ? SECTION_TITLE_RECENT_BEAT_NOTES : SECTION_TITLE_RECENT_TURN_NOTES,
     seatId: args.seatId,
     tacticalEnclosingH3Index: args.battle?.enclosingStrategicH3Index,
   });

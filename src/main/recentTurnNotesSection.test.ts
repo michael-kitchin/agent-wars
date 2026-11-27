@@ -37,7 +37,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
   const gameDb = await import('./gameDb');
 
-  const { buildRecentTurnNotesSection } = await import('./briefing/recentTurnNotesSection');
+  const { buildRecentTurnNotesSection, SECTION_TITLE_RECENT_BEAT_NOTES } = await import('./briefing/recentTurnNotesSection');
   const { RECENT_TURN_LOSS_LEGEND } = await import('./briefing/recentTurnLossLines');
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-recent-notes-'));
@@ -125,11 +125,11 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
       currentTurnNumber: 2,
 
-      heading: 'Recent Turn Notes',
+      heading: SECTION_TITLE_RECENT_BEAT_NOTES,
 
     });
 
-    assert.ok(tactical.includes('## Recent Turn Notes'));
+    assert.ok(tactical.includes('## Recent Beat Notes'));
 
     assert.ok(tactical.includes('Beat 1:'));
 

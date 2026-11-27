@@ -95,8 +95,9 @@ test('the system text names the side, the limit, the trust rules, and the stance
   assert.match(text, /may or may not be telling the truth/);
   assert.match(text, /may or may not have your interests in mind/);
   assert.match(text, /written by the commander of one of the other sides/);
-  assert.match(text, /A loss line in Recent Turn Notes is a fact reported by the game/);
-  assert.match(text, /Base all three on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says/);
+  assert.match(text, /A loss line in Recent Turn Notes, or in Recent Beat Notes during a battle, is a fact reported by the game/);
+  assert.match(text, /Base all three on what a side has done to you, as the loss lines in Recent Beat Notes and the Record column show, more than on what it says/);
+  assert.match(buildTalkSystemText('Iberia', 'strategic'), /as the loss lines in Recent Turn Notes and the Record column show/);
 });
 
 test('the situation text nests, marks one new line, and quotes safely', () => {
@@ -179,5 +180,6 @@ test('only the battle system text explains the agreements and last beat section'
   const tactical = buildTalkSystemText('Iberia', 'tactical');
   assert.ok(tactical.includes('\nAgreements and last beat:\n'));
   for (const bullet of BATTLE_TRUCE_TALK_BULLETS) assert.ok(tactical.includes(`- ${bullet}`));
+  assert.ok(tactical.includes('as the loss lines in Recent Beat Notes and the Record column show'), 'a battle names its notes by beat');
   assert.equal(buildTalkSystemText('Iberia', 'strategic').includes('Agreements and last beat:'), false);
 });

@@ -18,6 +18,8 @@ import {
   sideAgreementTalkBullets,
 } from '../promptSpec/diplomacyRuleText';
 import { SIDE_MESSAGE_SOURCE_BULLETS, SIDE_MESSAGE_TRUST_BULLETS } from '../promptSpec/sideMessageRuleText';
+import { SECTION_TITLE_RECENT_TURN_NOTES } from '../promptSpec/sectionHeadings';
+import { SECTION_TITLE_RECENT_BEAT_NOTES } from '../../briefing/recentTurnNotesSection';
 import { formatSideAgreementLines } from './sideAgreementPromptLines';
 
 /**
@@ -363,6 +365,7 @@ export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | '
     ? `\nAgreements:\n${agreementBullets}\n`
     : `\nAgreements and last beat:\n${battleTruceBullets}\n`;
   const sameMessages = strategic ? 'the same messages and your agreements' : 'the same messages';
+  const notesTitle = strategic ? SECTION_TITLE_RECENT_TURN_NOTES : SECTION_TITLE_RECENT_BEAT_NOTES;
   const replyRules = strategic ? SIDE_AGREEMENT_REPLY_RULES : 'Use the side codes from the Sides table. Either list may be empty.';
   const source = SIDE_MESSAGE_SOURCE_BULLETS.map((line) => `- ${line}`).join('\n');
   const trust = SIDE_MESSAGE_TRUST_BULLETS.map((line) => `- ${line}`).join('\n');
@@ -386,7 +389,7 @@ What you may do in this step:
 - Send one short message to each other side. A message is one or two sentences, at most ${SIDE_MESSAGE_MAX_CHARS} characters. Longer text is cut off.
 - You may threaten, bargain, propose, bluff, or lie. Nothing you say binds you, and nothing another commander says binds them.
 - Send nothing when you have nothing worth saying. Silence costs nothing.
-- Set how you regard each side. A stance is your private view of one side: ${stances}. With each stance give trust, from 0 to ${max}, for how far you believe what that side tells you, and threat, from 0 to ${max}, for how dangerous that side is to you now. No other commander is told your stance, trust, or threat. Base all three on what a side has done to you, as the loss lines in Recent Turn Notes and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
+- Set how you regard each side. A stance is your private view of one side: ${stances}. With each stance give trust, from 0 to ${max}, for how far you believe what that side tells you, and threat, from 0 to ${max}, for how dangerous that side is to you now. No other commander is told your stance, trust, or threat. Base all three on what a side has done to you, as the loss lines in ${notesTitle} and the Record column show, more than on what it says. Give a stance only for a side whose stance you want to set or change, with a reason of one short sentence.
 ${agreementsBlock}
 Reply with one JSON object and nothing else:
 ${replyShape}

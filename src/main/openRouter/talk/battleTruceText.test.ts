@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import { AI_SEAT_IDS } from '../../../shared/seatIds';
 import type { TacticalBeatActivity } from '../../../shared/tacticalBattleTypes';
 import type { SideAgreementView } from '../../sideAgreements/sideAgreementLedger';
+import { BATTLE_TRUCE_ORDERS_BULLETS, BATTLE_TRUCE_TALK_BULLETS } from '../promptSpec/diplomacyRuleText';
 import { buildBattleTruceText } from './battleTruceText';
 import { formatSideAgreementLines } from './sideAgreementPromptLines';
 
@@ -91,21 +92,28 @@ test('an agreement prints between the heading and the closing sentence', () => {
 });
 
 test('the last-beat line reads the counts from the side the commander is on', () => {
-  assert.equal(truce({ activity }), 'Last beat, counted by the game: a2 fired 1 shot, and you fired 2 shots. There was no melee.');
+  assert.equal(truce({ activity }), 'Last beat, counted by the game: a2 fired 1 attack shot, and you fired 2 attack shots. There was no melee.');
   assert.equal(
     truce({ activity, ownIsLead: false }),
-    'Last beat, counted by the game: a2 fired 2 shots, and you fired 1 shot. There was no melee.'
+    'Last beat, counted by the game: a2 fired 2 attack shots, and you fired 1 attack shot. There was no melee.'
   );
 });
 
 test('no shots is plural, and a melee is reported', () => {
   const text = truce({ activity: { beatNumber: 3, leadShots: 0, opposingShots: 0, meleeFought: true } });
-  assert.equal(text, 'Last beat, counted by the game: a2 fired 0 shots, and you fired 0 shots. Units of both sides fought in melee.');
+  assert.equal(text, 'Last beat, counted by the game: a2 fired 0 attack shots, and you fired 0 attack shots. Units of both sides fought in melee.');
 });
 
 test('agreements come first, one blank line before the last-beat line', () => {
   assert.equal(
     truce({ agreementViews: [], activity }),
-    'You have no agreement on record with Iberia (a2).\n\nLast beat, counted by the game: a2 fired 1 shot, and you fired 2 shots. There was no melee.'
+    'You have no agreement on record with Iberia (a2).\n\nLast beat, counted by the game: a2 fired 1 attack shot, and you fired 2 attack shots. There was no melee.'
   );
+});
+
+test('both battle prompts say the count leaves out return fire and anti-air', () => {
+  for (const bullet of [BATTLE_TRUCE_ORDERS_BULLETS[1], BATTLE_TRUCE_TALK_BULLETS[1]]) {
+    assert.ok(bullet.includes('count of the attack shots each side fired last beat'), bullet);
+    assert.ok(bullet.includes('Return fire and anti-air are not attack shots and are not counted'), bullet);
+  }
 });

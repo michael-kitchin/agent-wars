@@ -133,4 +133,5 @@ test('assemblers import the title module instead of restating the briefing opene
   assert.ok(!briefingFormatter.includes('markdownHeading1("Commander\'s Briefing")'));
   assert.ok(tactical.includes('SECTION_TITLE_COMMANDERS_BRIEFING'));
   assert.ok(tactical.includes('markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING)'));
+  assert.ok(tactical.includes('heading: SECTION_TITLE_RECENT_BEAT_NOTES'), 'a battle names its notes by beat');
 });

@@ -69,15 +69,15 @@ export interface BattleTruceTextArgs {
 }
 
 /**
- * Writes a shot count with its noun.
+ * Writes an attack-shot count with its noun.
  *
  * Purpose: Both counts read the same way.
  * When to use: The last-beat line.
- * Expected outcome: `1 shot`, or `{n} shots` for any other count.
+ * Expected outcome: `1 attack shot`, or `{n} attack shots` for any other count. Return fire and anti-air are not in the count, so the noun says attack.
  * Exceptions: None.
  */
 function shotCount(count: number): string {
-  return count === 1 ? '1 shot' : `${count} shots`;
+  return count === 1 ? '1 attack shot' : `${count} attack shots`;
 }
 
 /**

@@ -179,7 +179,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 | `## Attention Flags` | Kept without standing-order bullets — 2.6 |
 | `## Operational Map` with the tactical legend | Kept — 2.6 |
 | `### Best Options This Turn` | Kept, including airport ferry dests — 2.6 |
-| `## Recent Turn Notes` | Kept, battle-scoped — 2.6 |
+| `## Recent Beat Notes` | Kept, battle-scoped, renamed from Recent Turn Notes — 2.6 |
 | `# Messages` | Added, same block as strategic, before the status sections. A battle between two AI commanders adds the truce text of `buildBattleTruceText` — 2.8 |
 | `## Active Callbacks` | Kept with sub-unit ids — 2.6 |
 | `# Battle Context` | Kept — 2.8 |

@@ -26,6 +26,16 @@ import {
 import { readStrategicBattleLossesByTurn } from './strategicLossWindow';
 
 /**
+ * Title of the notes section in a battle, without ATX hashes.
+ *
+ * Purpose: A battle's notes are kept per beat, so the heading matches the `Beat N:` blocks under it. The world map uses `SECTION_TITLE_RECENT_TURN_NOTES`.
+ * When to use: The heading argument to `buildRecentTurnNotesSection` for the tactical scope.
+ * Expected outcome: `Recent Beat Notes`.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_RECENT_BEAT_NOTES = 'Recent Beat Notes' as const;
+
+/**
  * Arguments for assembling a recent turn notes prompt section.
  */
 export interface BuildRecentTurnNotesSectionArgs {
@@ -60,7 +70,7 @@ export interface BuildRecentTurnNotesSectionArgs {
    * Markdown heading for the section (e.g. `Recent Turn Notes`).
    *
    * Contract: H2 title without leading `##`; added by this builder.
-   * When to use: Strategic and tactical prompt variants (both use `Recent Turn Notes`).
+   * When to use: `SECTION_TITLE_RECENT_TURN_NOTES` on the world map and `SECTION_TITLE_RECENT_BEAT_NOTES` in a battle.
    * Expected outcome: Rendered as `## {heading}` when section is non-empty.
    * Exceptions: None.
    */

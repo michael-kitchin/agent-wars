@@ -1348,3 +1348,13 @@ The user watched a live match with four AI commanders and asked for three format
 - **Fixed:** battle Recent Turn Notes blocks read `Beat N:` instead of `Turn N:` (`periodLabel`). **Ruling:** this reverses an earlier test that asserted Turn labels in battle. Cost if wrong: a model trained on the old label reads one prompt line differently.
 - **Tests (seen failing first):** `briefingMapSection`, `sidesBlock`, and `recentTurnNotesSection`; the tests that import the changed files and the tests that mention the changed strings pass. `build:main`, `lint`, `naming:check`, and `check:circular` pass. The native module is back on the Electron build.
 - **Docs:** `tactical-prompt.md` and `talk-prompt.md` state the battle label. `strategic-prompt.md` and `hybrid-ai.md` had two long paragraphs split, with the wording unchanged.
+
+### Battle Prompt Follow-Ups
+
+After the live run, the user asked for three prompt changes.
+
+- **Count wording:** the last-beat line reads `{n} attack shots` (`shotCount` in `battleTruceText.ts`). Both truce bullet lists say attack shots are ranged shots and air strikes, and that return fire and anti-air are not counted, so a zero count can sit beside a loss.
+- **Exit warning:** `exitBattleBullet` adds that either ending still destroys every world-map unit with fewer than half its sub-units left, on both sides. No rule changed.
+- **Heading:** a battle's notes section is `## Recent Beat Notes` (`SECTION_TITLE_RECENT_BEAT_NOTES`, kept in `recentTurnNotesSection.ts` because `sectionHeadings.ts` is over 600 lines). The shared trust bullet names both headings. The battle talk system text names the beat heading.
+- **Ruling:** the trust bullet is shared between world-map and battle prompts, so it names both headings instead of taking a scope argument. Cost if wrong: one clause on the world map mentions a heading that only appears in battle.
+- **Tests (seen failing first):** `battleTruceText`, `ordersMessagesBlock`, `coachingText`, `recentTurnNotesSection`, `sectionHeadings`, `sideMessageRuleText`, `talkPrompt`. All 28 tests under `promptSpec/` and `talk/`, plus the briefing assemblers, pass; so do the 13 tests that import the changed files. `build:main`, `lint`, `naming:check`, `check:circular` pass.

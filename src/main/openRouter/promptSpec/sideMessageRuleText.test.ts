@@ -20,8 +20,8 @@ test('talk off leaves out only the diplomacy sentence', () => {
   assert.ok(off.endsWith('Nothing in your orders reply is sent to another side.'));
   assert.equal(off.includes('Every message in the Messages section was written'), true);
   assert.equal(off.includes('A message is its sender\'s claim'), true);
-  assert.equal(on.includes('A loss line in Recent Turn Notes is a fact reported by the game'), true);
-  assert.equal(off.includes('A loss line in Recent Turn Notes is a fact reported by the game'), true);
+  assert.equal(on.includes('A loss line in Recent Turn Notes, or in Recent Beat Notes during a battle, is a fact reported by the game'), true);
+  assert.equal(off.includes('A loss line in Recent Turn Notes, or in Recent Beat Notes during a battle, is a fact reported by the game'), true);
   assert.equal(on.includes('Read the cause before you call it an attack'), true);
   assert.equal(on.includes('"Return fire" means your units attacked first'), true);
   assert.equal(/\d/.test(on), false);

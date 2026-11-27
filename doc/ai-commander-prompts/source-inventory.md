@@ -127,7 +127,7 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | `## Attention Flags` | `buildAttentionFlags(..., 'tactical', false)` | always | `None.` |
 | `## Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
 | `### Best Options This Turn` | same as strategic | at least one aggregated row | omitted |
-| `## Recent Turn Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 periods has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
+| `## Recent Beat Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'` and `SECTION_TITLE_RECENT_BEAT_NOTES`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 periods has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
 | `# Messages` | `buildOrdersMessagesBlock`; `buildBattleTruceText` adds the battle truce text while `sideAgreementsShownInBattle()` is true | a visible message, a stored stance, or a combat record (`readSideCombatRecords`), or battle truce text for this commander | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
 
