@@ -464,6 +464,8 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
           []
         )
       );
+    case 'holdAutomaticFireAgainst':
+      return { ...STRING_ARRAY_SCHEMA };
     default:
       throw new Error(`envelopeJsonSchema: no schema for envelope field "${field}"`);
   }

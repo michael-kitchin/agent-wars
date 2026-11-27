@@ -102,6 +102,27 @@ test('a shortened step is held when the sub-unit can already shoot and the step 
   );
 });
 
+test('a shortened step is not held when the only enemy in reach belongs to a spared owner', () => {
+  const { shooterH3, cells } = footprint();
+  const enemyH3 = cellAt(cells, shooterH3, 1, new Set([shooterH3]));
+  const appliedH3 = cellAt(cells, shooterH3, 1, new Set([shooterH3, enemyH3]));
+  const orderedH3 = cellAt(cells, shooterH3, 2, new Set([shooterH3]));
+  const battle = plainsBattle(
+    [infantry('opp-infantry:01', AI_SEAT_IDS[0], shooterH3), infantry('hum-infantry:01', HUMAN_SEAT_ID, enemyH3)],
+    cells
+  );
+  assert.equal(
+    holdsShooterOnClampedMove({
+      battle,
+      subUnitId: 'opp-infantry:01',
+      orderedH3,
+      appliedH3,
+      sparedOwnerIds: new Set<string>([HUMAN_SEAT_ID]),
+    }),
+    false
+  );
+});
+
 test('a shortened step onto an enemy cell is not held', () => {
   const { shooterH3, cells } = footprint();
   const enemyH3 = cellAt(cells, shooterH3, 1, new Set([shooterH3]));

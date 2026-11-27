@@ -19,9 +19,9 @@ import {
   consumeFogNewContactsForPlayer,
   addCombatSinceConsultation,
   clearCombatSinceConsultation,
-  setAiPendingOrders,
   clearAiPendingOrders,
 } from '../gameDb';
+import { storeConsultedPlan } from './holdAutomaticFireAgainstStoredPlan';
 import { getSubscriptions } from '../callbackSubscriptions';
 import {
   evaluateMandatoryOverrides,
@@ -356,7 +356,7 @@ export async function afterResolution(
           });
           return { consulted: false, absenceReason: result.absenceReason };
         }
-        setAiPendingOrders(seatId, {
+        storeConsultedPlan(seatId, {
           movementOrders: result.orders,
           rangedOrders: result.rangedAttacks ?? [],
           airStrikeOrders: result.airStrikes ?? [],

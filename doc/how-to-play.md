@@ -340,7 +340,7 @@ Commanders can also make deals, with each other or with you. When a commander be
 - **No handshake:** each commander records a deal as proposed or active as it sees fit, so two sides' records can disagree. One side may think there's a ceasefire while the other thinks there isn't.
 - **Short-lived:** a deal lasts at most 10 turns, and a commander keeps at most 3 open with any one side. A deal with a side that's been knocked out lapses.
 - **Keep or break:** whenever a commander plans its orders, it can decide to keep or break each active deal. It sees the game's record of losses both ways since the deal began, so a side that says one thing and does another gets noticed.
-- **Never enforced:** no order is blocked or changed because of an agreement. A commander is told when its units share a hex with a partner in an active non-aggression or ceasefire deal, and the game won't aim its own campaigns or operations at that partner.
+- **Never enforced:** no order is blocked or changed because of an agreement. A commander is told when its units share a hex with a partner in an active non-aggression or ceasefire deal, and the game won't aim its own campaigns or operations at that partner. A deal doesn't hold fire by itself: a commander that wants its units to stop firing on their own at a side has to say so in its orders.
 - **Made on the world map:** battles don't make or change agreements. In a battle between two AI commanders, each can read its own deals with the other.
 - **You don't keep a record.** To make a deal with a commander, write to it. If it agrees, it records the deal with you on its side, and whether it keeps it is up to it.
 - **Watching them:** you can't open a commander's record, but the [Charts](#charts) show every commander's agreements turn by turn.
@@ -672,7 +672,7 @@ Map keys do nothing while you're typing in a field. The full input map is in [ux
 ## Things That May Surprise You
 
 - **You pay for the opponent:** every model call bills the OpenRouter account of that commander's key. A commander with a model and no key makes no calls.
-- **The opponent nearly always shoots:** each enemy unit that can fire picks a legal target on its own, unless its commander told it to hold fire.
+- **The opponent nearly always shoots:** each enemy unit that can fire picks a legal target on its own, unless its commander told it to hold fire, or listed your side as one its units don't fire at on their own. A commander can still order an attack on a listed side, and its units still fire back. On the world map, a hex that also holds a side it hasn't listed can still be picked.
 - **Your units wait for orders:** they fire only when you aim them, apart from return fire. There are no defend or hold-fire orders for you.
 - **Fog fades:** an enemy you lose sight of stays at its last known spot for 2 turns, then disappears.
 - **Homes show through fog:** home outlines are drawn through fog, and your own home hexes are always visible.

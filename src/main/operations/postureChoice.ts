@@ -53,3 +53,60 @@ export function applyPostureChoice(args: {
     return { applied: false, dropReasons: ['posture dropped: the engine could not store it.'] };
   }
 }
+
+/**
+ * Applies the posture a strategic reply named, or logs that the reply named none.
+ *
+ * Purpose: One step for the apply path, so an omitted posture is still visible in the debug log.
+ * When to use: Once per strategic consult with orders on, before the refusal note is written.
+ * Expected outcome: The drop reasons to add. An omitted posture adds none, and is logged unless the parser already
+ * dropped a bad posture name.
+ * Exceptions: None; it never throws.
+ */
+export function applyReplyPosture(args: {
+  /**
+   * The commander whose reply is applied.
+   *
+   * Contract: A seat id.
+   * When to use: Every call.
+   * Expected outcome: Only this seat's posture can change.
+   * Exceptions: None.
+   */
+  readonly seatId: string;
+  /**
+   * The posture the reply named.
+   *
+   * Contract: Undefined when the reply named none that is known.
+   * When to use: Every call.
+   * Expected outcome: Undefined changes nothing.
+   * Exceptions: None.
+   */
+  readonly posture: Posture | undefined;
+  /**
+   * The turn of the consult.
+   *
+   * Contract: The strategic turn being played.
+   * When to use: Checking how long the current posture has held.
+   * Expected outcome: Stored with a new posture.
+   * Exceptions: None.
+   */
+  readonly turnNumber: number;
+  /**
+   * The drop reasons collected so far.
+   *
+   * Contract: Read only.
+   * When to use: Telling a refused posture name from an omitted one.
+   * Expected outcome: A refused name is not logged as omitted.
+   * Exceptions: None.
+   */
+  readonly priorDropReasons: readonly string[];
+}): string[] {
+  logDebug('postureChoice applyReplyPosture', { seatId: args.seatId, named: args.posture !== undefined });
+  if (args.posture !== undefined) {
+    return applyPostureChoice({ seatId: args.seatId, posture: args.posture, turnNumber: args.turnNumber }).dropReasons;
+  }
+  if (!args.priorDropReasons.some((reason) => reason.startsWith('posture dropped:'))) {
+    logDebug('requestOrdersApplyParsed posture omitted', { seatId: args.seatId, turnNumber: args.turnNumber });
+  }
+  return [];
+}

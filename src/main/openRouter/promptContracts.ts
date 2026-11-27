@@ -1,6 +1,7 @@
 import { logDebug } from '../logger';
 import { POSTURE_MIN_HOLD_TURNS, POSTURES } from '../../shared/postureTypes';
 import { SIDE_AGREEMENT_DECISIONS_PARAGRAPH } from './promptSpec/diplomacyRuleText';
+import { buildHoldAutomaticFireAgainstParagraph } from './promptSpec/holdAutomaticFireAgainstRuleText';
 import {
   EXAMPLE_CALLBACKS,
   EXAMPLE_MEMORY_UPDATES,
@@ -241,6 +242,7 @@ export function buildFinalJsonContractInstruction(args: {
     operations: '"operations": [...]',
     posture: '"posture": "<posture>"',
     agreementDecisions: '"agreementDecisions": [...]',
+    holdAutomaticFireAgainst: '"holdAutomaticFireAgainst": [...]',
   };
   const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
     .map((field) => headerSlots[field])
@@ -288,6 +290,7 @@ export function buildFinalJsonContractInstruction(args: {
       ? `Required "posture": one of ${POSTURES.join(', ')}. Send your current posture to keep it. A new posture holds for ${POSTURE_MIN_HOLD_TURNS} turns before it can change; the Posture section of the briefing says when.`
       : '';
   const agreementDecisionsParagraph = gates.includeAgreementDecisions === true ? SIDE_AGREEMENT_DECISIONS_PARAGRAPH : '';
+  const holdAutomaticFireAgainstParagraph = buildHoldAutomaticFireAgainstParagraph(periodNoun);
   const paragraphs = [
     ...(structuredOutputs ? [] : [submitHeader]),
     ...(structuredOutputs ? strictSchemaParagraphs.slice(1) : strictSchemaParagraphs),
@@ -301,6 +304,7 @@ export function buildFinalJsonContractInstruction(args: {
     operationsParagraph,
     postureParagraph,
     agreementDecisionsParagraph,
+    holdAutomaticFireAgainstParagraph,
     memoryParagraph,
     ...productionClause.split('\n\n'),
   ].map((part) => part.trim()).filter((part) => part.length > 0);

@@ -59,7 +59,7 @@ import {
   runRequestOrdersToolLoop,
   type RequestOrdersUsageTotals,
 } from './requestOrdersToolLoop';
-import { runParseRepairExchange } from './requestOrdersRepairExchange';
+import { keepEarlierHoldAutomaticFireAgainstChoice, runParseRepairExchange } from './requestOrdersRepairExchange';
 import { applyParsedRequestOrders } from './requestOrdersApplyParsed';
 import { buildStrategicUnitDisplayLabelResolver, tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
@@ -595,7 +595,7 @@ export async function requestOrdersFlow(
       const repairContent = await repairAssistantText();
       if (repairContent) {
         const repaired = parseContent(repairContent);
-        if (repaired) parsed = repaired;
+        if (repaired) parsed = keepEarlierHoldAutomaticFireAgainstChoice(parsed, repaired);
       }
     }
     // A stop during the repair must not apply the earlier text or set the warning.

@@ -25,7 +25,9 @@ import { sideMessageVisibleTo } from '../../../shared/sideMessages';
 import { playerIdCodeFor } from '../../../shared/unitIds';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { readSideAgreementViews } from '../../sideAgreements/sideAgreementLedger';
+import { readHoldAutomaticFireAgainstListedTurns } from '../../gameDb/holdAutomaticFireAgainstMemory';
 import { buildBattleTruceText } from './battleTruceText';
+import { buildHoldAutomaticFireAgainstText, type HoldAutomaticFireAgainstSide } from './holdAutomaticFireAgainstText';
 import type { TalkPromptInput, TalkPromptSide, TalkPromptThread } from './talkPrompt';
 
 /**
@@ -177,6 +179,78 @@ export function readBattleTruceText(args: {
 }
 
 /**
+ * The automatic-fire text of one commander.
+ *
+ * Purpose: Both prompts of both theaters show the same stored list, with what the game recorded each listed side doing.
+ * When to use: `readTalkPromptInput` and `buildOrdersMessagesBlock`, whether or not the talk step is on.
+ * Expected outcome: Null when the list is empty, read before anything else. Otherwise the text from `buildHoldAutomaticFireAgainstText` for the listed sides in `sides` order; a stored seat with no row is skipped. On the world map a side carries the latest turn, from the turn it was listed for, on which its ranged, air, or missile attacks destroyed this commander's units. In a battle between two commanders the opponent carries its attack shots from last beat.
+ * Exceptions: Propagates a SQLite error from the combat record.
+ */
+export function readHoldAutomaticFireAgainstText(args: {
+  /**
+   * The commander being briefed.
+   *
+   * Contract: An AI seat.
+   * When to use: Every call.
+   * Expected outcome: Its own list is read.
+   * Exceptions: None.
+   */
+  readonly seatId: AiSeatId;
+  /**
+   * The rows of the Sides table.
+   *
+   * Contract: Includes the commander's own row.
+   * When to use: Naming listed sides.
+   * Expected outcome: The text names sides in this order.
+   * Exceptions: None.
+   */
+  readonly sides: readonly TalkPromptSide[];
+  /**
+   * The turn being briefed.
+   *
+   * Contract: The strategic turn now being played.
+   * When to use: Bounding the combat record window.
+   * Expected outcome: Only earlier turns are counted.
+   * Exceptions: None.
+   */
+  readonly turnNumber: number;
+  /**
+   * The battle being briefed.
+   *
+   * Contract: Null on the world map.
+   * When to use: Choosing between the attack turn and the beat's shot count.
+   * Expected outcome: A battle reads no combat record.
+   * Exceptions: None.
+   */
+  readonly battle: TacticalBattleSnapshot | null;
+}): string | null {
+  const { seatId, battle } = args;
+  const listedTurns = readHoldAutomaticFireAgainstListedTurns(seatId);
+  logTrace('talkPromptInput readHoldAutomaticFireAgainstText', { seatId, sparedCount: listedTurns.size, inBattle: battle !== null });
+  if (listedTurns.size === 0) return null;
+  const seatByCode = new Map([...listedTurns.keys()].filter(isSeatId).map((id) => [playerIdCodeFor(id), id] as const));
+  const records = battle === null ? readSideCombatRecords(seatId, args.turnNumber) : null;
+  const activity = battle !== null && battle.leadPartyId != null ? battle.lastBeatActivity : undefined;
+  const opponentId = battle === null ? null : battleOpponentSeatId(seatId, battle);
+  const listed = args.sides.flatMap((side): HoldAutomaticFireAgainstSide[] => {
+    const listedSeatId = side.isOwn ? undefined : seatByCode.get(side.code);
+    if (listedSeatId === undefined) return [];
+    const opponentShots = activity && listedSeatId === opponentId
+      ? (battle?.leadPartyId === seatId ? activity.opposingShots : activity.leadShots)
+      : null;
+    const struckTurn = records?.get(listedSeatId)?.latestTurnStruckYou ?? null;
+    const listedTurn = listedTurns.get(listedSeatId);
+    return [{
+      label: side.label,
+      code: side.code,
+      struckSinceListedTurn: struckTurn !== null && listedTurn !== undefined && struckTurn >= listedTurn ? struckTurn : null,
+      shotsLastBeat: opponentShots,
+    }];
+  });
+  return buildHoldAutomaticFireAgainstText(listed);
+}
+
+/**
  * Reads one talk prompt's inputs from the open match.
  *
  * Purpose: `requestTalk` does not assemble SQL itself. In a battle, only the two sides fighting talk to each other, so a beat does not flood the sides that are not in it.
@@ -238,6 +312,7 @@ export function readTalkPromptInput(args: {
       recentTurnsSection,
       threads: readSideMessageThreads(args.seatId),
       agreements: args.battle ? null : readSideAgreementViews(args.seatId, args.turnNumber),
+      holdAutomaticFireAgainstText: readHoldAutomaticFireAgainstText({ seatId: args.seatId, sides, turnNumber: args.turnNumber, battle: args.battle }),
     },
     addressableSeatIds,
     sideCodes,

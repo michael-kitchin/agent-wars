@@ -17,6 +17,7 @@ import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTer
 import { isDbReady } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { holdFireUnitIdsForPlayer } from '../tools/standingOrders';
+import { readHoldAutomaticFireAgainstSeatIds } from '../gameDb/holdAutomaticFireAgainstMemory';
 import {
   applyHumanTacticalDraftBeatInStrategicOrder,
   getActiveTacticalBattleSnapshot,
@@ -256,7 +257,7 @@ function sanitizedAiSeatDraft(
   const taken = takeTacticalDraft(seatId, preBattle.battleId) ?? undefined;
   return sanitizeOpponentTacticalDraftForReadyCommit(
     preBattle,
-    withTacticalTempoAttacks(preBattle, taken, holdFireUnitIdsForPlayer(seatId), seatId),
+    withTacticalTempoAttacks(preBattle, taken, holdFireUnitIdsForPlayer(seatId), seatId, readHoldAutomaticFireAgainstSeatIds(seatId)),
     seatId,
   );
 }
@@ -316,7 +317,7 @@ export function commitHumanTacticalDraftOrders(args: {
     const suppliedDraft = isNeutralOwnerId(party) ? undefined : (args.opponentTacticalDraft ?? pooledDraft ?? undefined);
     const opponentTacticalDraft = sanitizeOpponentTacticalDraftForReadyCommit(
       preBattle,
-      withTacticalTempoAttacks(preBattle, suppliedDraft, holdFireUnitIdsForPlayer(party), party)
+      withTacticalTempoAttacks(preBattle, suppliedDraft, holdFireUnitIdsForPlayer(party), party, readHoldAutomaticFireAgainstSeatIds(party))
     );
     // The human's own slice stays explicit: strategic standing orders neither move nor fire their pawns in tactical.
     const effectiveHumanMarches = [...args.movementOrders];

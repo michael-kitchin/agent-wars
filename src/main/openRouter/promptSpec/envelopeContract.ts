@@ -166,18 +166,20 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'operations',
   'posture',
   'agreementDecisions',
+  'holdAutomaticFireAgainst',
 ] as const;
 
 /**
  * Fields always present in the envelope regardless of roster or tool flags.
  *
  * Purpose: `strategy` and `orders` are mandatory; `callbacks` is always offered so
- * omitting it can clear the subscription list.
+ * omitting it can clear the subscription list. `holdAutomaticFireAgainst` is offered on every consult so a commander
+ * can set the list in either theater.
  * When to use: Inside `envelopeFieldsForGates`.
- * Expected outcome: These three keys appear in every returned list, in canonical order.
+ * Expected outcome: These four keys appear in every returned list, in canonical order.
  * Exceptions: None.
  */
-const ALWAYS_PRESENT_FIELDS: ReadonlySet<string> = new Set(['strategy', 'orders', 'callbacks']);
+const ALWAYS_PRESENT_FIELDS: ReadonlySet<string> = new Set(['strategy', 'orders', 'callbacks', 'holdAutomaticFireAgainst']);
 
 /**
  * Tactical prohibition on standing-order actions, worded once for the envelope and the opening message.

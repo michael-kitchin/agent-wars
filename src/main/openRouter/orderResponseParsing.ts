@@ -11,17 +11,18 @@ import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { LatLng } from '../tools/pathfinding';
 import { executeProductionTools } from '../tools/productionTools';
 import { applyProductionOrdersFromEnvelope } from './productionOrdersApply';
-import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { AirStrikeOrder, AirStrikeTargetType, FerryOrder } from '../../shared/ipcTypes';
 import { isAirStrikeTargetType } from '../../shared/airStrikeTarget';
-import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
 import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
-import { normalizeOperationCommands, type OperationCommand } from './operationCommandParsing';
+import { normalizeOperationCommands } from './operationCommandParsing';
 import { POSTURES, isPosture, type Posture } from '../../shared/postureTypes';
-import { normalizeAgreementDecisions, type ParsedAgreementDecision } from './sideAgreementDecisionParsing';
+import { normalizeAgreementDecisions } from './sideAgreementDecisionParsing';
 import { sideAgreementsEnabled } from './sideAgreementGate';
 import { normalizeAirDropOrders } from './airDropOrderRows';
 import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
+import type { ParsedOrdersResponse } from './orderResponseTypes';
+import { parseHoldAutomaticFireAgainstChoice } from './holdAutomaticFireAgainstParsing';
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
 
@@ -518,104 +519,7 @@ export function parseOrdersResponse(
   latLngByH3: Map<string, LatLng>,
   productionEnabled: boolean,
   context: CoordinateContext
-): {
-  movementOrders: { unitId: string; toH3Index: string }[];
-  rangedAttacks: { unitId: string; targetH3Index: string }[];
-  embarkOrders: EmbarkOrder[];
-  airStrikes: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-  /**
-   * Air drops normalized to H3 targets.
-   *
-   * Contract: One row per expanded actor. Empty when the model omitted the field or every row was dropped.
-   * When to use: `applyParsedRequestOrders` validates this list.
-   * Expected outcome: `unitId` and `targetH3Index` only.
-   * Exceptions: None.
-   */
-  airDropOrders: import('../../shared/ipc/airDropTypes').AirDropOrder[];
-  /**
-   * Missile launches normalized to H3 targets.
-   *
-   * Contract: One row per expanded actor. Empty when the model omitted the field or every row was dropped.
-   * When to use: `applyParsedRequestOrders` validates this list.
-   * Expected outcome: `unitId` and `targetH3Index` only. A tactical envelope yields an empty list and a battle drop reason.
-   * Exceptions: None.
-   */
-  missileLaunches: MissileLaunchOrder[];
-  strategy?: string;
-  /**
-   * Whether this commander asked to leave an AI-only battle.
-   *
-   * Contract: True only when the envelope field is boolean true. Missing and every other value are false.
-   * When to use: Storing the tactical plan. The flag does not drop the orders on this beat.
-   * Expected outcome: `false` unless the model set `exitBattle` to true.
-   * Exceptions: None.
-   */
-  exitBattle: boolean;
-  callbacks?: CallbackSubscription[];
-  memoryUpdates?: MemoryUpdateItem[];
-  /**
-   * Briefing code the commander named as the next campaign city.
-   * Contract: Present only when the strategic envelope's `campaignTarget` is one two-character code. Absent otherwise, including every tactical envelope.
-   * When to use: `applyCampaignTargetOverride` after the orders are stored.
-   * Expected outcome: The trimmed code. A present non-code adds a drop reason and leaves this absent.
-   * Exceptions: None.
-   */
-  campaignTargetCode?: string;
-  /**
-   * Launch and cancel commands from a strategic reply.
-   * Contract: Present when `operations` held at least one command. Absent for a tactical reply, an omitted field, and an empty array.
-   * When to use: `applyOperationCommands` before standing orders are expanded.
-   * Expected outcome: At most one launch, and every well-formed cancel. A bad entry is only a drop reason.
-   * Exceptions: None.
-   */
-  operationCommands?: readonly OperationCommand[];
-  /**
-   * Posture the commander declared.
-   *
-   * Contract: A member of `POSTURES`. Absent for a tactical reply, an omitted field, and a name that is not a posture.
-   * When to use: `applyPostureChoice` after operation commands.
-   * Expected outcome: The lowercased name. A present bad name adds a drop reason and leaves this absent.
-   * Exceptions: None.
-   */
-  postureChoice?: Posture;
-  /**
-   * Keep-or-break decisions the commander recorded for its active agreements.
-   *
-   * Contract: Absent for a tactical reply, an omitted field, and a field with no valid entry.
-   * When to use: `applySideAgreementDecisions` after the orders are applied.
-   * Expected outcome: The accepted entries in reply order. A refused entry adds a drop reason.
-   * Exceptions: None.
-   */
-  agreementDecisions?: readonly ParsedAgreementDecision[];
-  productionAppliedCount?: number;
-  /**
-   * Units whose standing order this response assigned or cancelled.
-   * Contract: Present when at least one assign succeeded or one cancel ran. Absent when that list is empty.
-   * When to use: Skipping a defend-post move for a unit this response already changed through a standing-order row.
-   * Expected outcome: Unit ids in envelope order. Undefined when none.
-   * Exceptions: None.
-   */
-  standingOrderUnitIds?: string[];
-  dropReasons?: string[];
-  /**
-   * True when the envelope named actor rows and none of them were kept.
-   * Contract: True only when the expanded `orders`, `airStrikes`, and `ferryOrders` arrays together are non-empty, and movement, ranged, embark, air, ferry, and applied standing-order counts are all zero. Empty actor arrays are false.
-   * When to use: The consultation flow, to decide whether one repair call should replace this parse.
-   * Expected outcome: False when at least one actor row was applied, or when no actor row was submitted.
-   * Exceptions: None.
-   */
-  everyActorRowDropped: boolean;
-  /**
-   * How many actor rows the envelope submitted after grouped ids were expanded.
-   *
-   * Contract: Sum of the expanded `orders`, `airStrikes`, `ferryOrders`, and `missileLaunches` lengths, including entries that are not objects.
-   * When to use: The debug log when `everyActorRowDropped` triggers a repair.
-   * Expected outcome: Zero when those four arrays are empty.
-   * Exceptions: None.
-   */
-  expandedActorRowCount: number;
-} | null {
+): ParsedOrdersResponse | null {
   const trimmed = content.trim();
   const candidates: string[] = [];
   candidates.push(trimmed);
@@ -736,6 +640,8 @@ export function parseOrdersResponse(
         if (context.mode !== 'tactical' && rawPosture !== undefined && postureChoice === undefined) {
           dropReasons.push(`posture dropped: expected one of ${POSTURES.join(', ')}.`);
         }
+        const holdAutomaticFireAgainst = parseHoldAutomaticFireAgainstChoice(obj.holdAutomaticFireAgainst);
+        dropReasons.push(...holdAutomaticFireAgainst.dropReasons);
         const agreementDecisionResult = sideAgreementsEnabled(context.mode)
           ? normalizeAgreementDecisions(obj.agreementDecisions)
           : { decisions: [], dropReasons: [] };
@@ -756,6 +662,7 @@ export function parseOrdersResponse(
           operationCommands: operationCommands.commands.length > 0 ? operationCommands.commands : undefined,
           postureChoice,
           agreementDecisions: agreementDecisionResult.decisions.length > 0 ? agreementDecisionResult.decisions : undefined,
+          holdAutomaticFireAgainstChoice: holdAutomaticFireAgainst.choice,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
           standingOrderUnitIds: standingOrderUnitIds.length > 0 ? standingOrderUnitIds : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

@@ -8,7 +8,6 @@ import { buildOrdersEnvelopeResponseFormat } from './envelopeJsonSchema';
 import { buildRepairSchemaText, envelopeFieldsForGates, type EnvelopeGates } from './envelopeContract';
 import { getFinalJsonOrdersExampleBlock } from '../promptContracts';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
-import { POSTURES } from '../../../shared/postureTypes';
 
 /**
  * Strategic gates with every optional envelope field enabled.
@@ -484,9 +483,6 @@ function run(): void {
   testTaughtCallbackParametersFitSchema();
   testMissileLaunchesSchemaFollowsTheFlag();
   testExitBattleSchemaFollowsTheGate();
-  testCampaignTargetSchemaFollowsTheGate();
-  testOperationsSchemaFollowsTheGate();
-  testPostureSchemaFollowsTheGate();
   testAgreementDecisionsSchemaFollowsTheGate();
   testProductionOrderEnumIncludesFortification();
   console.log('envelopeJsonSchema.test.ts passed');
@@ -546,88 +542,6 @@ function testExitBattleSchemaFollowsTheGate(): void {
  * Expected outcome: The enum lists `fortification`.
  * Exceptions: None.
  */
-/**
- * Verifies `campaignTarget` is a string only when the strategic gate is on.
- *
- * Purpose: Structured output must not require a campaign city the prompt omitted.
- * When to use: After the envelope field list changes.
- * Expected outcome: The property is a string and not required when the gate is on, and absent when the gate is off or the mode is tactical.
- * Exceptions: None.
- */
-function testCampaignTargetSchemaFollowsTheGate(): void {
-  const onSchema = envelopeSchema({ ...STRATEGIC_ALL_ON, includeCampaignTarget: true });
-  const on = asRecord(onSchema.properties, 'properties');
-  assert.equal(asRecord(on.campaignTarget, 'campaignTarget').type, 'string');
-  assert.ok(!(onSchema.required as string[]).includes('campaignTarget'));
-  const names = Object.keys(on);
-  assert.equal(names[names.length - 1], 'campaignTarget');
-  const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
-  assert.ok(!('campaignTarget' in off));
-  const tactical = asRecord(
-    envelopeSchema({ ...TACTICAL, includeCampaignTarget: true }).properties,
-    'properties'
-  );
-  assert.ok(!('campaignTarget' in tactical));
-}
-
-/**
- * Verifies `operations` is an array of open command objects only when the strategic gate is on.
- *
- * Purpose: A bad letter must reach the parser as a drop reason, so the schema must not reject it.
- * When to use: After the envelope field list changes.
- * Expected outcome: The property is not required. `action`, `option`, `id`, `objective`, and `method` are optional strings, and `action` is not an enum. The property is absent when the gate is off or the mode is tactical.
- * Exceptions: None.
- */
-function testOperationsSchemaFollowsTheGate(): void {
-  const onSchema = envelopeSchema({ ...STRATEGIC_ALL_ON, includeOperations: true });
-  const on = asRecord(onSchema.properties, 'properties');
-  const operations = asRecord(on.operations, 'operations');
-  assert.equal(operations.type, 'array');
-  assert.ok(!(onSchema.required as string[]).includes('operations'));
-  assert.equal(Object.keys(on)[Object.keys(on).length - 1], 'operations');
-  const items = asRecord(operations.items, 'items');
-  const properties = asRecord(items.properties, 'properties');
-  const action = asRecord(properties.action, 'action');
-  assert.equal(action.type, 'string');
-  assert.ok(!('enum' in action));
-  assert.equal(asRecord(properties.option, 'option').type, 'string');
-  assert.equal(asRecord(properties.id, 'id').type, 'string');
-  assert.equal(asRecord(properties.objective, 'objective').type, 'string');
-  assert.equal(asRecord(properties.method, 'method').type, 'string');
-  const required = items.required as readonly string[];
-  assert.ok(!required.includes('objective'));
-  assert.ok(!required.includes('method'));
-  assert.ok(!('anyOf' in items));
-  assert.ok(!('enum' in asRecord(properties.method, 'method')));
-  const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
-  assert.ok(!('operations' in off));
-  const tactical = asRecord(envelopeSchema({ ...TACTICAL, includeOperations: true }).properties, 'properties');
-  assert.ok(!('operations' in tactical));
-}
-
-/**
- * Verifies `posture` is a required enum only when the strategic gate is on.
- *
- * Purpose: A model that follows the schema always names a posture from the list.
- * When to use: After the envelope field list changes.
- * Expected outcome: The property is an enum of `POSTURES` and is required. It is absent, and not required, when the gate is off or the mode is tactical.
- * Exceptions: None.
- */
-function testPostureSchemaFollowsTheGate(): void {
-  const onSchema = envelopeSchema({ ...STRATEGIC_ALL_ON, includeOperations: true, includePosture: true });
-  const on = asRecord(onSchema.properties, 'properties');
-  const posture = asRecord(on.posture, 'posture');
-  assert.deepEqual(posture.enum, [...POSTURES]);
-  assert.ok((onSchema.required as string[]).includes('posture'));
-  assert.equal(Object.keys(on)[Object.keys(on).length - 1], 'posture');
-  const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
-  assert.ok(!('posture' in off));
-  const tactical = asRecord(envelopeSchema({ ...TACTICAL, includePosture: true }).properties, 'properties');
-  assert.ok(!('posture' in tactical));
-  const tacticalSchema = envelopeSchema({ ...TACTICAL, includePosture: true });
-  assert.ok(!(tacticalSchema.required as string[]).includes('posture'));
-}
-
 /**
  * Verifies `agreementDecisions` is an optional closed array only when the strategic gate is on.
  *

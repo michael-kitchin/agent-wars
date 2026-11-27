@@ -23,6 +23,8 @@ import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, SIGHT_CUES_CONFIG_KEY, sightCuesForReq
 import { CAMPAIGN_OBJECTIVES_CONFIG_KEY } from './campaignObjectiveMemory';
 import { OPERATION_EVENTS_CONFIG_KEY, OPERATION_NOTES_CONFIG_KEY, OPERATION_OFFERS_CONFIG_KEY, OPERATIONS_CONFIG_KEY } from './operationMemory';
 import { POSTURES_CONFIG_KEY } from './postureMemory';
+import { HOLD_AUTOMATIC_FIRE_AGAINST_CONFIG_KEY } from './holdAutomaticFireAgainstMemory';
+import { HOLD_AUTOMATIC_FIRE_AGAINST_PLAN_PICKS_CONFIG_KEY } from './holdAutomaticFireAgainstPlanPicks';
 import { QUEUE_PAUSED_HEXES_CONFIG_KEY } from './queuePauseMemory';
 import { victorySettingsForRequest, type VictoryRule } from '../../shared/victoryRules';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
@@ -535,6 +537,8 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   deleteGameConfigRow({ run }, CAMPAIGN_OBJECTIVES_CONFIG_KEY);
   deleteGameConfigRow({ run }, OPERATIONS_CONFIG_KEY);
   deleteGameConfigRow({ run }, POSTURES_CONFIG_KEY);
+  deleteGameConfigRow({ run }, HOLD_AUTOMATIC_FIRE_AGAINST_CONFIG_KEY);
+  deleteGameConfigRow({ run }, HOLD_AUTOMATIC_FIRE_AGAINST_PLAN_PICKS_CONFIG_KEY);
   deleteGameConfigRow({ run }, OPERATION_OFFERS_CONFIG_KEY);
   deleteGameConfigRow({ run }, OPERATION_EVENTS_CONFIG_KEY);
   deleteGameConfigRow({ run }, OPERATION_NOTES_CONFIG_KEY);

@@ -17,6 +17,7 @@ import {
   sideAgreementReplyShape,
   sideAgreementTalkBullets,
 } from '../promptSpec/diplomacyRuleText';
+import { HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET } from '../promptSpec/holdAutomaticFireAgainstRuleText';
 import { SIDE_MESSAGE_SOURCE_BULLETS, SIDE_MESSAGE_TRUST_BULLETS } from '../promptSpec/sideMessageRuleText';
 import { SECTION_TITLE_RECENT_TURN_NOTES } from '../promptSpec/sectionHeadings';
 import { SECTION_TITLE_RECENT_BEAT_NOTES } from '../../briefing/recentTurnNotesSection';
@@ -293,6 +294,15 @@ export interface TalkPromptInput {
    * Exceptions: None.
    */
   readonly agreements: readonly SideAgreementView[] | null;
+  /**
+   * The commander's list of sides its units do not fire at on their own.
+   *
+   * Contract: Text from `readHoldAutomaticFireAgainstText`. Null or absent when the list is empty.
+   * When to use: The "Holding automatic fire" section of the situation text, in both theaters.
+   * Expected outcome: The text, or no section.
+   * Exceptions: None.
+   */
+  readonly holdAutomaticFireAgainstText?: string | null;
 }
 
 /**
@@ -352,7 +362,7 @@ export function formatStanceScores(trust: number | null, threat: number | null):
  *
  * Purpose: The cached system text tells the commander what this step is for, where messages come from, and how far to trust them.
  * When to use: The system message of a talk call. Do not put a turn number, a count, or a message in it.
- * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line. Only `'tactical'` adds the "Agreements and last beat" block. The text depends only on the two arguments.
+ * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line. Only `'tactical'` adds the "Agreements and last beat" block. Each of those two blocks ends with the automatic-fire bullet. The text depends only on the two arguments.
  * Exceptions: None.
  */
 export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | 'tactical'): string {
@@ -361,9 +371,10 @@ export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | '
   const purpose = DIPLOMACY_PURPOSE_BULLETS.map((line) => `- ${line}`).join('\n');
   const agreementBullets = sideAgreementTalkBullets().map((line) => `- ${line}`).join('\n');
   const battleTruceBullets = BATTLE_TRUCE_TALK_BULLETS.map((line) => `- ${line}`).join('\n');
+  const holdAutomaticFireAgainstBullet = `- ${HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET}`;
   const agreementsBlock = strategic
-    ? `\nAgreements:\n${agreementBullets}\n`
-    : `\nAgreements and last beat:\n${battleTruceBullets}\n`;
+    ? `\nAgreements:\n${agreementBullets}\n${holdAutomaticFireAgainstBullet}\n`
+    : `\nAgreements and last beat:\n${battleTruceBullets}\n${holdAutomaticFireAgainstBullet}\n`;
   const sameMessages = strategic ? 'the same messages and your agreements' : 'the same messages';
   const notesTitle = strategic ? SECTION_TITLE_RECENT_TURN_NOTES : SECTION_TITLE_RECENT_BEAT_NOTES;
   const replyRules = strategic ? SIDE_AGREEMENT_REPLY_RULES : 'Use the side codes from the Sides table. Either list may be empty.';
@@ -401,7 +412,7 @@ ${replyRules}`;
  *
  * Purpose: The user message carries the turn, the sides, the last plan, and the messages this commander may see.
  * When to use: The user message of a talk call.
- * Expected outcome: The diplomacy heading, the sides table, the Your agreements section when `input.agreements` is not null, the Agreements and last beat section when a battle has truce text, the last plan, the recent-turns section when it is not empty, and the message threads.
+ * Expected outcome: The diplomacy heading, the sides table, the Your agreements section when `input.agreements` is not null, the Agreements and last beat section when a battle has truce text, the Holding automatic fire section when there is automatic-fire text, the last plan, the recent-turns section when it is not empty, and the message threads.
  * Exceptions: None.
  */
 export function buildTalkSituationText(input: TalkPromptInput): string {
@@ -425,6 +436,7 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
   blocks.push(`## Sides\n${sidesTable(input.sides)}`);
   if (input.agreements !== null) blocks.push(`## Your agreements\n${formatSideAgreementLines(input.agreements)}`);
   if (input.battle?.truceText) blocks.push(`## Agreements and last beat\n${input.battle.truceText}`);
+  if (input.holdAutomaticFireAgainstText) blocks.push(`## Holding automatic fire\n${input.holdAutomaticFireAgainstText}`);
   blocks.push(`## Your last plan\n${input.lastStrategy ?? '(none yet)'}`);
   if (input.recentTurnsSection.trim().length > 0) blocks.push(input.recentTurnsSection.trim());
   blocks.push(`## Messages\n${formatSideMessageThreads(input.threads, input.sides, 3)}`);

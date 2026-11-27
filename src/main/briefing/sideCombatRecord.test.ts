@@ -109,12 +109,24 @@ test('the latest turn a side destroyed a unit differs from the latest turn it at
   assert.equal(record.latestTurnAttackedYou, 6);
 });
 
+test('only ranged, air, and missile losses move the latest turn a side struck you', () => {
+  const record = recordOf([
+    turn(2, { airStrike: [unit('a', OWN, [S2])] }),
+    turn(3, { missileStrike: [unit('b', OWN, [S2])] }),
+    turn(4, { melee: [unit('c', OWN, [S2])] }, {}, [unit('d', OWN, [S2])]),
+    turn(5, { returnFire: [unit('e', OWN, [S2])], other: [unit('f', OWN, [S2])] }),
+  ], S2);
+  assert.equal(record.latestTurnStruckYou, 3);
+  assert.equal(record.latestTurnAttackedYou, 4);
+});
+
 test('no turns give no record, and a quiet side has zero counts and no latest turns', () => {
   assert.equal(buildSideCombatRecords({ ownSeatId: OWN, sideIds: [S2], turns: [] }), null);
   const record = recordOf([turn(2, {})], S3);
   assert.equal(record.destroyedOfYours.total, 0);
   assert.equal(record.latestTurnDestroyedYours, null);
   assert.equal(record.latestTurnAttackedYou, null);
+  assert.equal(record.latestTurnStruckYou, null);
 });
 
 test('the window bounds come from the turns, whatever their order', () => {

@@ -19,7 +19,7 @@ const ZERO: CombatLossCounts = { total: 0, responsibleAttacked: 0, victimAttacke
  * Exceptions: None.
  */
 function record(partial: Partial<SideCombatRecord>): SideCombatRecord {
-  return { sideId: 'opponent2', destroyedOfYours: ZERO, destroyedOfTheirs: ZERO, latestTurnDestroyedYours: null, latestTurnAttackedYou: null, ...partial };
+  return { sideId: 'opponent2', destroyedOfYours: ZERO, destroyedOfTheirs: ZERO, latestTurnDestroyedYours: null, latestTurnAttackedYou: null, latestTurnStruckYou: null, ...partial };
 }
 
 test('a quiet window says there were no losses either way', () => {

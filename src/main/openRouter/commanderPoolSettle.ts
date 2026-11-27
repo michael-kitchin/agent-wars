@@ -10,13 +10,14 @@
 import type { CommanderDispatch, CommanderDispatchMessage } from '../../shared/commanderStatus';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
-import { clearAiPendingOrders, setAiPendingOrders } from '../gameDb';
+import { clearAiPendingOrders } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { recordSeatConsultation, recordSeatThinkTime } from '../gameDb/seatRosterStore';
 import { logDebug, logError, logInfo, logTrace } from '../logger';
 import { recordCommanderToolCounts } from './commanderToolCounts';
 import type { PoolSeat } from './commanderPool';
 import { enqueueCommanderPoolWrite, tacticalDraftKey, type CommanderConsultOutcome } from './commanderPoolSupport';
+import { storeConsultedPlan } from './holdAutomaticFireAgainstStoredPlan';
 import { cancelModelCalls } from './modelCallControl';
 import { getOpenRouterModelCapabilities } from './openRouterModelCapabilities';
 
@@ -204,7 +205,7 @@ export function applyConsultOutcome(
     if (entry.theater === 'tactical' && entry.battleId && outcome.tacticalPlan) {
       context.tacticalDrafts.set(tacticalDraftKey(seatId, entry.battleId), outcome.tacticalPlan);
     } else if (entry.theater === 'strategic') {
-      setAiPendingOrders(seatId, {
+      storeConsultedPlan(seatId, {
         movementOrders: [...outcome.movementOrders],
         rangedOrders: [...outcome.rangedOrders],
         airStrikeOrders: [...outcome.airStrikeOrders],

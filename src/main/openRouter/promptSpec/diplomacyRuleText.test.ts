@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SIDE_AGREEMENT_INTENTS, SIDE_AGREEMENT_KINDS, SIDE_AGREEMENT_STATUSES } from '../../../shared/sideAgreements';
 import {
+  BATTLE_TRUCE_ORDERS_BULLETS,
+  BATTLE_TRUCE_TALK_BULLETS,
   DIPLOMACY_PURPOSE_BULLETS,
   SIDE_AGREEMENT_ORDERS_BULLETS,
   sideAgreementReplyShape,
@@ -32,4 +34,18 @@ test('the talk bullets name every kind, and the reply shape lists every status a
 test('the orders bullets say units in one hex fight whatever was agreed', () => {
   assert.equal(SIDE_AGREEMENT_ORDERS_BULLETS.length, 3);
   assert.ok(SIDE_AGREEMENT_ORDERS_BULLETS.some((bullet) => bullet.includes('whatever the two sides have agreed')));
+});
+
+test('the battle bullets say the shot count includes fire units took on their own', () => {
+  assert.equal(BATTLE_TRUCE_ORDERS_BULLETS.length, 3);
+  assert.equal(BATTLE_TRUCE_TALK_BULLETS.length, 2);
+  for (const bullets of [BATTLE_TRUCE_ORDERS_BULLETS, BATTLE_TRUCE_TALK_BULLETS]) {
+    const text = bullets.join('\n');
+    assert.equal(text.includes('a side ordered'), false);
+    assert.ok(text.includes('fired on their own'));
+    assert.doesNotMatch(text, /\d/);
+  }
+  assert.ok(BATTLE_TRUCE_ORDERS_BULLETS.join('\n').includes(
+    'holding fire while the other side keeps shooting loses your units. To hold fire yourself, give no attack order against that side and list it in "holdAutomaticFireAgainst".',
+  ));
 });

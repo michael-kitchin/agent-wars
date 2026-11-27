@@ -17,7 +17,8 @@ import { readStrategicBattleLossesByTurn } from './strategicLossWindow';
 /**
  * One side's record as the prompts use it.
  *
- * Purpose: The prompts print the text, and the optional conflict check needs the latest attack.
+ * Purpose: The prompts print the text, the optional conflict check needs the latest attack, and the automatic-fire flag
+ * needs the latest ranged, air, or missile attack.
  * When to use: The values of the map `readSideCombatRecords` returns.
  * Expected outcome: Text from `formatSideCombatRecord`.
  * Exceptions: None.
@@ -41,6 +42,15 @@ export interface SideCombatRecordView {
    * Exceptions: None.
    */
   readonly latestTurnAttackedYou: number | null;
+  /**
+   * The latest turn this side's ranged, air, or missile attacks destroyed one of the commander's units.
+   *
+   * Contract: `SideCombatRecord.latestTurnStruckYou`. Null when none in the window.
+   * When to use: Flagging a side the commander holds automatic fire against.
+   * Expected outcome: A turn inside the window.
+   * Exceptions: None.
+   */
+  readonly latestTurnStruckYou: number | null;
 }
 
 /**
@@ -92,6 +102,7 @@ export function readSideCombatRecords(seatId: AiSeatId, currentTurnNumber: numbe
       views.set(record.sideId, {
         text: formatSideCombatRecord({ record, sideCode: playerIdCodeFor(record.sideId), firstTurn: set.firstTurn, lastTurn: set.lastTurn }),
         latestTurnAttackedYou: record.latestTurnAttackedYou,
+        latestTurnStruckYou: record.latestTurnStruckYou,
       });
     }
     return views;

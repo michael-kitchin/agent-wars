@@ -17,6 +17,7 @@ import {
   SIDE_AGREEMENT_REPLY_RULES,
   sideAgreementTalkBullets,
 } from '../promptSpec/diplomacyRuleText';
+import { HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET } from '../promptSpec/holdAutomaticFireAgainstRuleText';
 import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
 import { buildTalkSituationText, buildTalkSystemText, type TalkPromptInput, type TalkPromptSide } from './talkPrompt';
 
@@ -182,4 +183,21 @@ test('only the battle system text explains the agreements and last beat section'
   for (const bullet of BATTLE_TRUCE_TALK_BULLETS) assert.ok(tactical.includes(`- ${bullet}`));
   assert.ok(tactical.includes('as the loss lines in Recent Beat Notes and the Record column show'), 'a battle names its notes by beat');
   assert.equal(buildTalkSystemText('Iberia', 'strategic').includes('Agreements and last beat:'), false);
+});
+
+test('both system texts end the agreements block with the automatic-fire bullet', () => {
+  const strategic = buildTalkSystemText('Iberia', 'strategic');
+  const tactical = buildTalkSystemText('Iberia', 'tactical');
+  const bullet = `- ${HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET}`;
+  assert.ok(strategic.includes(`- ${sideAgreementTalkBullets().at(-1)}\n${bullet}\n\nReply with`), strategic);
+  assert.ok(tactical.includes(`- ${BATTLE_TRUCE_TALK_BULLETS.at(-1)}\n${bullet}\n\nReply with`), tactical);
+});
+
+test('the situation text shows the held-fire section directly before the last plan, only when there is text', () => {
+  const text = buildTalkSituationText(input({ holdAutomaticFireAgainstText: 'HOLD-TEXT' }));
+  assert.ok(text.includes('## Holding automatic fire\nHOLD-TEXT\n\n## Your last plan'), text);
+  assertHeadingsNest(headingOutline(text));
+  const without = buildTalkSituationText(input());
+  assert.equal(buildTalkSituationText(input({ holdAutomaticFireAgainstText: null })), without);
+  assert.equal(without.includes('## Holding automatic fire'), false);
 });

@@ -58,7 +58,7 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Operation Options` | `buildOperationOptionsSection` (`briefingSectionsOperations.ts`), fed by `operationCandidatesForSeat` with land included | standing orders on, not a battle, and the seat has a candidate | omitted. The section still prints when no operation is stored |
 | `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
 | `## Recent Turn Notes` | `buildRecentTurnNotesSection`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 turns has a strategy, a loss, or units a tactical battle destroyed | omitted |
-| `# Messages` | `buildOrdersMessagesBlock` (`talk/ordersMessagesBlock.ts`); a stance line shows the commander's own trust and threat (`formatStanceScores`). Shifted to H2 when a briefing is attached. Contact lines are `readPactContactLines` (`sideAgreements/pactContactLines.ts`), on the world map with agreements enabled. Battle truce text is `buildBattleTruceText` (`talk/battleTruceText.ts`), in a battle between two AI commanders | a visible message, a stored stance, or a combat record (`readSideCombatRecords`), an agreement, a contact line, or battle truce text for this commander | omitted |
+| `# Messages` | `buildOrdersMessagesBlock` (`talk/ordersMessagesBlock.ts`); a stance line shows the commander's own trust and threat (`formatStanceScores`). Shifted to H2 when a briefing is attached. Contact lines are `readPactContactLines` (`sideAgreements/pactContactLines.ts`), on the world map with agreements enabled. Battle truce text is `buildBattleTruceText` (`talk/battleTruceText.ts`), in a battle between two AI commanders. The automatic-fire text is `buildHoldAutomaticFireAgainstText` (`talk/holdAutomaticFireAgainstText.ts`), read by `readHoldAutomaticFireAgainstText` | a visible message, a stored stance, or a combat record (`readSideCombatRecords`), an agreement, a contact line, battle truce text, or a stored automatic-fire list for this commander | omitted |
 | `## Production Status` | `buildProductionBriefingBlock`, then `shiftMarkdownHeadings` inside the briefing. `Production Priorities` is `buildProductionPriorityLines` | `flags.productionEnabled` | omitted |
 | `# Mercenaries` | `buildMercenariesBriefingBlock` | strategic, `mercenaryEconomy` present, and production on or the seat has a mercenary | omitted. Production off uses `buildMercenaryUpkeepRule` and skips hire tables. Production on, 0 credits, no mercenary, no rehire, and no raise row is `Treasury: 0 credits. No one to rehire.` Otherwise the treasury line is followed by a forecast paragraph (`formatTreasuryForecastSentence`) when upkeep or queued credits are above 0, or when production is on and `isTreasuryDeep` holds, then the funds warning paragraph. With production on and a deep treasury, the paragraph ends with a sentence saying the credits are more than needed. Under production, Firing Risk (`buildMercenaryFiringRiskBlock`, `briefingSectionsMercenaryFiring.ts`; reads `mercenaryFireRisk.ts`) follows Your Mercenaries when it applies. At Ready, `gatherCommanderOrdersForReady` clears standing orders and drops orders for units the seat no longer owns, read through `seatUnitOwnership.ts`. |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
@@ -96,7 +96,7 @@ Production status keeps the unit counts and the at-maximum line. Cost, caps, inc
 | `# Naval Transport Status` | `buildSealiftBriefingBlock` | opponent has at least one naval unit | **section omitted** |
 | `# Available Tools` | `toolsSection` + `buildAvailableToolsIntro` + numbered `promptLine`s + `buildToolUsageGuidance` | always | heading plus `No tools available.` |
 | `Enemy units (currently observed): …` | `buildEnemyUnitsPromptLine` | always | groups by side in seat order, then Neutral. Empty-roster phrasing from the same helper |
-| Final JSON contract | `buildFinalJsonContractInstruction` | always | n/a |
+| Final JSON contract | `buildFinalJsonContractInstruction`; `buildHoldAutomaticFireAgainstParagraph` writes the `holdAutomaticFireAgainst` paragraph | always | n/a |
 | Final JSON example | `getFinalJsonOrdersExampleBlock` | always | n/a |
 
 When a strategic briefing is present, planning or assessment tools are on, and standing-order tools are on, the intro says that status is already in the briefing and limits `query_orders` to a rare detail. Memory and production, when those tools are on, are named in the following selective-tools sentence.
@@ -128,7 +128,7 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | `## Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
 | `### Best Options This Turn` | same as strategic | at least one aggregated row | omitted |
 | `## Recent Beat Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'` and `SECTION_TITLE_RECENT_BEAT_NOTES`, loss lines from `buildRecentTurnLossLines` | at least one of the previous 10 periods has a strategy or a loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
-| `# Messages` | `buildOrdersMessagesBlock`; `buildBattleTruceText` adds the battle truce text while `sideAgreementsShownInBattle()` is true | a visible message, a stored stance, or a combat record (`readSideCombatRecords`), or battle truce text for this commander | omitted |
+| `# Messages` | `buildOrdersMessagesBlock`; `buildBattleTruceText` adds the battle truce text while `sideAgreementsShownInBattle()` is true; `buildHoldAutomaticFireAgainstText` adds the automatic-fire text when the list is not empty | a visible message, a stored stance, or a combat record (`readSideCombatRecords`), battle truce text, or a stored automatic-fire list for this commander | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
 
 Tactical unit status uses the same six columns and has **no** standing-order column. Best Options actions in battle: `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`.
@@ -190,7 +190,7 @@ Unchanged from the previous catalog: failures pass through; successes rewrite ge
 ### 4.3 Retry and repair
 
 - Corrective message: neither tool call nor text; answer with one tool call, the JSON object matching the system schema, or exactly one of the two, whichever the round allows; never empty.
-- Repair: compact JSON only; schema from `buildRepairSchemaText` using `ENVELOPE_FIELD_ORDER`; `productionOrders` only when production is on and mode is strategic.
+- Repair: compact JSON only; schema from `buildRepairSchemaText` using `ENVELOPE_FIELD_ORDER`, with no example for `holdAutomaticFireAgainst`; `productionOrders` only when production is on and mode is strategic.
 - Hitting the round cap makes `buildFinalOrdersRequestMessage` the last transcript message, replacing a trailing user message when there is one, and sends one call with tools withheld (`runFinalOrdersRound`). Its text is parsed like any other final reply, including the one repair call. The next-prompt warning is set whether or not that call produced orders. A tool-call reply is not executed. The call is skipped when the wall clock has already passed, and that skip records a successful-but-empty consult and sets the warning. A cancellation does not send the call and does not set the warning.
 
 ### 4.4 Request options (`ordersChatRequestHelpers.ts`)
@@ -213,7 +213,7 @@ Every tool round, the final orders call, and the repair call go through `postOrd
 
 ## 5. Engine information versus prompt
 
-`prompt` column: `present` = stated; `partial` = related fact only, or only in one mode; `absent` = never stated; `absent-by-design` = known engine behavior the prompt omits on purpose.
+`prompt` column: `present` = stated; `partial` = related fact only, or only in one mode; `absent` = never stated.
 
 ### 5.1 Combat, movement, caps (now stated)
 
@@ -241,7 +241,7 @@ Every tool round, the final orders call, and the repair call go through `postOrd
 | Symbol | Prompt |
 | --- | --- |
 | `VISION_RANGE_BY_UNIT_TYPE` | absent (correctly hidden) |
-| `collectTempoRuleAttacks` / `collectTacticalTempoAttacks` | **absent-by-design** (`TEMPO_SWEEP_SILENCE`) |
+| `collectTempoRuleAttacks` / `collectTacticalTempoAttacks` | present only in the `holdAutomaticFireAgainst` texts (`TEMPO_SWEEP_SILENCE`) |
 | Mandatory override names (`first_consultation`, `deadman`, …) | partial — coaching says the model is consulted when a subscribed event fires or the engine forces a consult; it does not list override ids |
 | `territory_changed` | accepted by the parser, never fires, not taught |
 | `storedPoints` on queues | absent |
@@ -265,7 +265,7 @@ Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, 
 | Hits land on lowest defense then infantry, armor, naval, air. Missiles are always hit last | engine-true | casualty sort |
 | Friendly stacks illegal; enemy cells are move/melee | engine-true | `getValidDestinations` / unoccupied approach |
 | `hold_fire` suppresses automatic engagement | engine-true | `holdFireUnitIdsForPlayer` |
-| Tempo: copy each listed Best Options ranged or air-strike row; do not invent a target | engine-true as instruction; sweep still fills omitted shots (`TEMPO_SWEEP_SILENCE`) | `collectTempoRuleAttacks` |
+| Tempo: copy each listed Best Options ranged or air-strike row; do not invent a target | engine-true as instruction; sweep still fills omitted shots at sides not in the `holdAutomaticFireAgainst` list (`TEMPO_SWEEP_SILENCE`) | `collectTempoRuleAttacks` |
 | `damage given up for free` | **not emitted** | matrix tests forbid the substring |
 | Unconditional "enemy remains in play and is hunting you" | **not emitted** | matrix tests forbid the substring |
 | Embark: coastal, a land seaport with water or coast next to it, or a controlled water seaport | engine-true | `canEmbarkAtHex` |
@@ -287,7 +287,7 @@ Every row still resolves the same way: **the engine wins** for mechanics. Wordin
 | `WEGO_ORDER_UNSTATED` | Resolved: combat paragraph states the engine order |
 | `INFANTRY_RANGE_SPLIT` | Resolved: combat paragraph splits by mode |
 | `CALLBACK_DETAILS_THIN` | Details names parameters; unfiltered `infrastructure_destroyed` describes the unfiltered watch |
-| `TEMPO_SWEEP_SILENCE` | **Open by design.** The sweep exists; the prompt does not describe it. |
+| `TEMPO_SWEEP_SILENCE` | **Narrowed by design.** The sweep exists; the prompt describes it only through the `holdAutomaticFireAgainst` texts. |
 | `HOLD_FIRE_UNGUIDED` | Resolved: combat paragraph and coaching state the order |
 | `OCCUPANCY_UNSTATED` | Resolved: `buildDestinationOccupancyRule` |
 | `CASUALTY_ORDER_ABSENT` | Resolved: `buildCasualtySortRule` |

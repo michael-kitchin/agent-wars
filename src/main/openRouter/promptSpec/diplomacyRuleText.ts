@@ -72,28 +72,28 @@ export const SIDE_AGREEMENT_ORDERS_BULLETS = [
 /**
  * The bullets added to the orders message rules of a battle between two commanders.
  *
- * Purpose: Tells the orders stage what the read-only agreements and the attack-shot count in the Messages section are, what the count leaves out, and that orders against a message will be seen.
+ * Purpose: Tells the orders stage what the read-only agreements and the attack-shot count in the Messages section are, that the count includes shots units fired on their own, what it leaves out, how to hold fire, and that orders against a message will be seen.
  * When to use: `sideMessageRuleBlock` with `battleTruce`.
  * Expected outcome: Three bullets, without the leading hyphen. No digits.
  * Exceptions: None.
  */
 export const BATTLE_TRUCE_ORDERS_BULLETS = [
   'In a battle between two commanders, the Messages section lists your own agreements with the side you are fighting. They are your private record, the game does not enforce them, and you cannot make or change one during a battle. Hex codes inside an agreement are world-map codes.',
-  'The Messages section also gives the game\'s count of the attack shots each side fired last beat and whether there was melee. Attack shots are the ranged shots and air strikes a side ordered. Return fire and anti-air are not attack shots and are not counted, so a side can destroy your units in a beat its count shows as zero. The loss lines show those losses. That count is a fact. Check it against what the other side told you: holding fire while the other side keeps shooting loses your units.',
+  'The Messages section also gives the game\'s count of the attack shots each side fired last beat and whether there was melee. Attack shots are the ranged shots and air strikes a side\'s units fired, whether its commander ordered them or the units fired on their own. Return fire and anti-air are not attack shots and are not counted, so a side can destroy your units in a beat its count shows as zero. The loss lines show those losses. That count is a fact. Check it against what the other side told you: holding fire while the other side keeps shooting loses your units. To hold fire yourself, give no attack order against that side and list it in "holdAutomaticFireAgainst".',
   'What you told the other side this beat is in the Messages section. Orders that go against it are your choice, and the other side will see what your units did in its own loss lines and shot count.',
 ] as const;
 
 /**
  * The bullets of the battle talk system text about agreements and the last beat.
  *
- * Purpose: Tells the talk stage what the read-only agreements and the attack-shot count are, what the count leaves out, so a promise is made knowing it will be checked.
+ * Purpose: Tells the talk stage what the read-only agreements and the attack-shot count are, that the count includes shots units fired on their own, and what it leaves out, so a promise is made knowing it will be checked.
  * When to use: The "Agreements and last beat:" block of the tactical talk system text.
  * Expected outcome: Two bullets, without the leading hyphen. No digits.
  * Exceptions: None.
  */
 export const BATTLE_TRUCE_TALK_BULLETS = [
   'The Agreements and last beat section lists your own agreements with the side you are fighting. They are your private record, the game does not enforce them, and you cannot make or change one during a battle. Hex codes inside an agreement are world-map codes.',
-  'The same section gives the game\'s count of the attack shots each side fired last beat and whether there was melee. Attack shots are the ranged shots and air strikes a side ordered. Return fire and anti-air are not attack shots and are not counted, so a side can destroy your units in a beat its count shows as zero. The loss lines show those losses. That count is a fact, and the other side sees its own copy. A promise to hold fire is checked against that count on the next beat.',
+  'The same section gives the game\'s count of the attack shots each side fired last beat and whether there was melee. Attack shots are the ranged shots and air strikes a side\'s units fired, whether its commander ordered them or the units fired on their own. Return fire and anti-air are not attack shots and are not counted, so a side can destroy your units in a beat its count shows as zero. The loss lines show those losses. That count is a fact, and the other side sees its own copy. A promise to hold fire is checked against that count on the next beat.',
 ] as const;
 
 /**

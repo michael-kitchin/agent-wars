@@ -11,18 +11,22 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AI_SEAT_IDS, type AiSeatId } from '../../../shared/seatIds';
 import { SIDE_MESSAGE_THREAD_PROMPT_LINES } from '../../../shared/aiConsultationLimits';
+import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
+import { playerIdCodeFor } from '../../../shared/unitIds';
 import { strategicStep } from '../../../shared/matchRecording';
 import { dbRun, getScenarioHomeRegionHexes, listScenarioHomeRegions, upsertTurnLossNote, upsertTurnStrategyNote } from '../../gameDb';
 import { gameDbOps } from '../../gameDb/dbConnection';
 import { upsertGameConfigValue } from '../../gameDb/gameConfigRows';
 import { insertSideAgreement } from '../../gameDb/sideAgreementStore';
+import { writeHoldAutomaticFireAgainstSeatIds } from '../../gameDb/holdAutomaticFireAgainstMemory';
 import { insertSentSideMessage, listUnseenInboundSideMessages, markSideMessagesSeen, upsertSideStance } from '../../gameDb/sideMessageStore';
 import { withSeatedTempGameDbAsync } from '../../testSupport/withSeatedTempGameDb';
 import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
 import { setActiveTacticalBattleSnapshotRef } from '../../tacticalBattle/activeTacticalBattleRef';
 import { tacticalDbFixtureRegisterDefaultAfterEach } from '../../tacticalBattle/testSupport/tacticalDbFixture';
 import { withTwoAiBattle } from '../../tacticalBattle/testSupport/twoAiBattleFixture';
-import { countUnreadPromptMessages, readTalkPromptInput } from './talkPromptInput';
+import { applyHoldAutomaticFireAgainstChoice } from '../holdAutomaticFireAgainstApply';
+import { countUnreadPromptMessages, readTalkPromptInput, readTalkSides } from './talkPromptInput';
 import { buildTalkSituationText } from './talkPrompt';
 import { buildOrdersMessagesBlock } from './ordersMessagesBlock';
 
@@ -217,6 +221,185 @@ test('both battle prompts show the agreements and the last beat, and talk off dr
       }
       process.env.AGENT_WARS_DISABLE_TALK = '1';
       assert.equal((buildOrdersMessagesBlock({ seatId: lead, inBattle: true, includeAgreements: false }).text ?? '').includes('Last beat'), false);
+    });
+  } finally {
+    if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;
+    else process.env.AGENT_WARS_DISABLE_TALK = previous;
+  }
+});
+
+test('an empty automatic-fire list leaves the section as it was', async () => {
+  await withThreeAi(async () => {
+    /**
+     * The first seat's orders Messages section.
+     *
+     * Purpose: The case compares it before and after a write.
+     * When to use: Between writes.
+     * Expected outcome: The section text, or null.
+     * Exceptions: None.
+     */
+    const orders = (): string | null => buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text;
+    assert.equal(orders(), null);
+    sent(seatB, seatA, 1, 'from-b');
+    const before = orders();
+    writeHoldAutomaticFireAgainstSeatIds(gameDbOps, seatA, [seatB], 1);
+    assert.notEqual(orders(), before);
+    writeHoldAutomaticFireAgainstSeatIds(gameDbOps, seatA, [], 1);
+    assert.equal(orders(), before);
+  });
+});
+
+test('a stored automatic-fire list opens the section on its own and follows the threads', async () => {
+  await withThreeAi(async () => {
+    writeHoldAutomaticFireAgainstSeatIds(gameDbOps, seatA, [seatB], 1);
+    const label = readTalkSides(seatA).find((side) => side.code === 'a2')?.label;
+    const line = `Holding automatic fire: your units do not fire on their own at ${label} (a2).`;
+    const alone = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text ?? '';
+    assert.ok(alone.includes(line), alone);
+    assert.ok(alone.split('\n\n').at(-1)?.startsWith("Each message is its sender's claim."), alone);
+    sent(seatB, seatA, 1, 'thread-line');
+    const full = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text ?? '';
+    assert.ok(full.indexOf('thread-line') < full.indexOf(line), full);
+    assert.ok(full.indexOf(line) < full.indexOf("Each message is its sender's claim."), full);
+  });
+});
+
+/**
+ * Stores one turn's loss note: a unit of the commander destroyed by another side.
+ *
+ * Purpose: The flag reads the same stored notes as the combat record.
+ * When to use: Inside `withThreeAi`.
+ * Expected outcome: One strategic note for that turn, with the loss filed under `cause`.
+ * Exceptions: None.
+ */
+function storeLoss(turnNumber: number, cause: 'ranged' | 'airStrike' | 'melee', bySeat: AiSeatId): void {
+  const lost = { unitType: 'infantry', displayName: 'a1-i1', unitId: 'a1-i1', attribution: { ownerId: seatA, lossH3Index: null, responsibleOwnerIds: [bySeat], killerUnits: [] } };
+  const none = { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
+  upsertTurnLossNote(seatA, 'strategic', '', turnNumber, JSON.stringify({ ...none, [cause]: [lost] }), JSON.stringify(none));
+}
+
+/**
+ * Lists sides as the commander's reply would, then builds both world-map prompts on a later turn.
+ *
+ * Purpose: The flag depends on the turn the side was listed.
+ * When to use: The flag cases.
+ * Expected outcome: The orders Messages section and the talk situation text.
+ * Exceptions: None.
+ */
+function listedThenBriefed(args: {
+  /**
+   * The turn of the listing reply.
+   *
+   * Contract: A strategic turn.
+   * When to use: Applying the choice.
+   * Expected outcome: The side counts from this turn, or the next one for a battle.
+   * Exceptions: None.
+   */
+  readonly listedOnTurn: number;
+  /**
+   * The turn both prompts are built on.
+   *
+   * Contract: Later than the stored loss notes.
+   * When to use: Building the prompts.
+   * Expected outcome: Earlier turns are in the record.
+   * Exceptions: None.
+   */
+  readonly briefedOnTurn: number;
+  /**
+   * The sides to list.
+   *
+   * Contract: Seats other than the first.
+   * When to use: Building the choice.
+   * Expected outcome: All are listed.
+   * Exceptions: None.
+   */
+  readonly sides: readonly AiSeatId[];
+  /**
+   * The battle the listing reply belongs to.
+   *
+   * Contract: Omitted for a world-map reply.
+   * When to use: Applying the choice.
+   * Expected outcome: A battle listing counts from the next turn.
+   * Exceptions: None.
+   */
+  readonly battle?: TacticalBattleSnapshot;
+}): string[] {
+  applyHoldAutomaticFireAgainstChoice({
+    seatId: seatA,
+    choice: { kind: 'replace', sideCodes: args.sides.map((side) => playerIdCodeFor(side)) },
+    turnNumber: args.listedOnTurn,
+    battle: args.battle ?? null,
+  });
+  dbRun('UPDATE turn_state SET turn_number = ? WHERE id = 1', [args.briefedOnTurn]);
+  return [
+    buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text ?? '',
+    buildTalkSituationText(readTalkPromptInput({ seatId: seatA, turnNumber: args.briefedOnTurn, battle: null }).input),
+  ];
+}
+
+const STRUCK_ON = /\(a2\) is on this list, and the game's record shows its ranged, air, or missile attacks destroyed units of yours since you listed it, last on turn (\d+)\./;
+
+test('a listed side whose attacks destroyed units since it was listed is named with the turn, in both world-map prompts', async () => {
+  await withThreeAi(async () => {
+    storeLoss(2, 'airStrike', seatB);
+    for (const text of listedThenBriefed({ listedOnTurn: 2, briefedOnTurn: 3, sides: [seatB, seatC] })) {
+      assert.equal(STRUCK_ON.exec(text)?.[1], '2', text);
+      assert.equal(/\(a3\) is on this list/.test(text), false, text);
+    }
+  });
+});
+
+test('a loss from before the side was listed is not flagged', async () => {
+  await withThreeAi(async () => {
+    storeLoss(1, 'ranged', seatB);
+    for (const text of listedThenBriefed({ listedOnTurn: 2, briefedOnTurn: 3, sides: [seatB] })) {
+      assert.match(text, /Holding automatic fire: /);
+      assert.equal(/is on this list, and/.test(text), false, text);
+    }
+  });
+});
+
+test('a melee loss is not flagged', async () => {
+  await withThreeAi(async () => {
+    storeLoss(2, 'melee', seatB);
+    for (const text of listedThenBriefed({ listedOnTurn: 2, briefedOnTurn: 3, sides: [seatB] })) {
+      assert.equal(/is on this list, and/.test(text), false, text);
+    }
+  });
+});
+
+test('a side listed during a battle is flagged only for attacks of later turns', async () => {
+  await withThreeAi(async () => {
+    const battle = { battleId: 'listing-battle', tacticalTurnNumber: 1 } as TacticalBattleSnapshot;
+    storeLoss(2, 'ranged', seatB);
+    for (const text of listedThenBriefed({ listedOnTurn: 2, briefedOnTurn: 3, sides: [seatB], battle })) {
+      assert.equal(/is on this list, and/.test(text), false, text);
+    }
+    storeLoss(3, 'ranged', seatB);
+    dbRun('UPDATE turn_state SET turn_number = 4 WHERE id = 1');
+    const later = buildOrdersMessagesBlock({ seatId: seatA, inBattle: false, includeAgreements: false }).text ?? '';
+    assert.equal(STRUCK_ON.exec(later)?.[1], '3', later);
+  });
+});
+
+test('a battle counts the listed opponent shots in both prompts, with the talk step off', () => {
+  const previous = process.env.AGENT_WARS_DISABLE_TALK;
+  try {
+    process.env.AGENT_WARS_DISABLE_TALK = '1';
+    withTwoAiBattle('aw-automatic-fire-battle-prompts-', (started) => {
+      const lead = started.leadPartyId as AiSeatId;
+      const opposing = started.opposingPartyId as AiSeatId;
+      writeHoldAutomaticFireAgainstSeatIds(gameDbOps, lead, [opposing], 1);
+      const battle = { ...started, lastBeatActivity: { beatNumber: 1, leadShots: 0, opposingShots: 3, meleeFought: false } };
+      setActiveTacticalBattleSnapshotRef(battle);
+      const texts = [
+        buildOrdersMessagesBlock({ seatId: lead, inBattle: true, includeAgreements: false }).text ?? '',
+        buildTalkSituationText(readTalkPromptInput({ seatId: lead, turnNumber: battle.strategicTurnNumber, battle }).input),
+      ];
+      for (const text of texts) {
+        assert.match(text, /Holding automatic fire: your units do not fire on their own at /);
+        assert.match(text, /\(a2\) is on this list\. Attack shots the game counted from it last beat: 3\./);
+      }
     });
   } finally {
     if (previous === undefined) delete process.env.AGENT_WARS_DISABLE_TALK;

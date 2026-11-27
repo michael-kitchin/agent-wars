@@ -77,7 +77,7 @@ Completed execution plans under [`.spec/completed/`](../../.spec/completed/) tha
 This package describes text the model sees. It does not specify:
 
 - Response parsing and order validation implementation, beyond the response shape the prompt promises.
-- The engine's own attack sweep, standing-order generation, or other fallbacks, beyond recording that they exist and that the prompt does not describe them.
+- The engine's own attack sweep, standing-order generation, or other fallbacks, beyond recording that they exist. Of these, the prompt describes only automatic fire, through the `holdAutomaticFireAgainst` texts.
 - Turn resolution, combat, movement, production, and visibility implementation.
 - The human player's interface.
 - Transport concerns except where they change text the model sees. The tool-round limit is in scope because exhausting it changes the next situation message.

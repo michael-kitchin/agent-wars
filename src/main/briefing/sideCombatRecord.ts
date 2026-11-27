@@ -189,6 +189,15 @@ export interface SideCombatRecord {
    * Exceptions: None.
    */
   readonly latestTurnAttackedYou: number | null;
+  /**
+   * The latest turn this side's ranged, air, or missile attacks destroyed one of the commander's units.
+   *
+   * Contract: Counts the `responsibleAttacked` losses only, so no close combat, battle, return fire, or other loss. Null when none.
+   * When to use: Telling a commander that a side it holds automatic fire against has attacked it.
+   * Expected outcome: Never later than `latestTurnAttackedYou`.
+   * Exceptions: None.
+   */
+  readonly latestTurnStruckYou: number | null;
 }
 
 /**
@@ -268,7 +277,7 @@ function isCreditedTo(unit: LostUnit, sideId: string): boolean {
  *
  * Purpose: Walks the window once for this side.
  * When to use: `buildSideCombatRecords`, once per requested side.
- * Expected outcome: The counts and the two latest turns.
+ * Expected outcome: The counts and the three latest turns.
  * Exceptions: None.
  */
 function recordFor(ownSeatId: string, sideId: string, turns: readonly CombatRecordTurn[]): SideCombatRecord {
@@ -276,6 +285,7 @@ function recordFor(ownSeatId: string, sideId: string, turns: readonly CombatReco
   const theirs = zeroCounts();
   let latestDestroyed: number | null = null;
   let latestAttacked: number | null = null;
+  let latestStruck: number | null = null;
   const later = (current: number | null, turnNumber: number): number => (current === null || turnNumber > current ? turnNumber : current);
   for (const turn of turns) {
     const countYours = (category: CombatRecordCategory): void => {
@@ -283,6 +293,7 @@ function recordFor(ownSeatId: string, sideId: string, turns: readonly CombatReco
       yours.total += 1;
       latestDestroyed = later(latestDestroyed, turn.turnNumber);
       if (category === 'responsibleAttacked' || category === 'closeCombat') latestAttacked = later(latestAttacked, turn.turnNumber);
+      if (category === 'responsibleAttacked') latestStruck = later(latestStruck, turn.turnNumber);
     };
     const countTheirs = (category: CombatRecordCategory): void => {
       theirs[category] += 1;
@@ -300,7 +311,14 @@ function recordFor(ownSeatId: string, sideId: string, turns: readonly CombatReco
       if (unit.attribution?.ownerId === sideId && isCreditedTo(unit, ownSeatId)) countTheirs('closeCombat');
     }
   }
-  return { sideId, destroyedOfYours: yours, destroyedOfTheirs: theirs, latestTurnDestroyedYours: latestDestroyed, latestTurnAttackedYou: latestAttacked };
+  return {
+    sideId,
+    destroyedOfYours: yours,
+    destroyedOfTheirs: theirs,
+    latestTurnDestroyedYours: latestDestroyed,
+    latestTurnAttackedYou: latestAttacked,
+    latestTurnStruckYou: latestStruck,
+  };
 }
 
 /**

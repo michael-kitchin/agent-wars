@@ -86,6 +86,7 @@ test('ENVELOPE_FIELD_ORDER is the canonical field sequence', () => {
     'operations',
     'posture',
     'agreementDecisions',
+    'holdAutomaticFireAgainst',
   ]);
 });
 
@@ -120,7 +121,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeMemoryUpdates: false,
     includeProductionOrders: false,
   });
-  assert.deepEqual(noTails, ['strategy', 'orders', 'callbacks']);
+  assert.deepEqual(noTails, ['strategy', 'orders', 'callbacks', 'holdAutomaticFireAgainst']);
 
   const tacticalWithFlagsOn = envelopeFieldsForGates({
     coordinateMode: 'tactical',
@@ -151,7 +152,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeProductionOrders: true,
     includeCampaignTarget: true,
   });
-  assert.equal(campaignOn[campaignOn.length - 1], 'campaignTarget');
+  assert.deepEqual(campaignOn.slice(-2), ['campaignTarget', 'holdAutomaticFireAgainst']);
   const campaignTactical = envelopeFieldsForGates({
     coordinateMode: 'tactical',
     includeAirActions: true,
@@ -167,7 +168,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeProductionOrders: false,
     includeOperations: true,
   });
-  assert.equal(operationsOn[operationsOn.length - 1], 'operations');
+  assert.deepEqual(operationsOn.slice(-2), ['operations', 'holdAutomaticFireAgainst']);
   assert.ok(!envelopeFieldsForGates({
     coordinateMode: 'strategic',
     includeAirActions: true,
@@ -189,7 +190,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeOperations: true,
     includePosture: true,
   });
-  assert.equal(postureOn[postureOn.length - 1], 'posture');
+  assert.deepEqual(postureOn.slice(-2), ['posture', 'holdAutomaticFireAgainst']);
   assert.ok(!envelopeFieldsForGates({
     coordinateMode: 'tactical',
     includeAirActions: true,
@@ -294,7 +295,7 @@ test('buildRepairSchemaText matches field order and forbids tactical standing-or
     const fields = envelopeFieldsForGates(gates);
     const text = buildRepairSchemaText(gates);
     let cursor = 0;
-    for (const field of fields) {
+    for (const field of fields.filter((name) => name !== 'holdAutomaticFireAgainst')) {
       const at = text.indexOf(`"${field}"`, cursor);
       assert.ok(at >= 0, `repair schema missing ${field} for ${JSON.stringify(gates)}`);
       cursor = at + 1;
@@ -465,7 +466,7 @@ test('the repair schema and the final JSON example share the four tail rows', ()
   }
 });
 
-test('agreementDecisions comes last on the world map and never in a battle', () => {
+test('agreementDecisions follows posture on the world map and never appears in a battle', () => {
   const strategic = envelopeFieldsForGates({
     coordinateMode: 'strategic',
     includeAirActions: true,
@@ -475,7 +476,7 @@ test('agreementDecisions comes last on the world map and never in a battle', () 
     includePosture: true,
     includeAgreementDecisions: true,
   });
-  assert.deepEqual(strategic.slice(-2), ['posture', 'agreementDecisions']);
+  assert.deepEqual(strategic.slice(-3), ['posture', 'agreementDecisions', 'holdAutomaticFireAgainst']);
   assert.ok(!envelopeFieldsForGates({
     coordinateMode: 'tactical',
     includeAirActions: true,
@@ -494,4 +495,17 @@ test('the repair schema example decides nothing', () => {
     includeAgreementDecisions: true,
   });
   assert.ok(repair.includes('"agreementDecisions":[]'));
+});
+
+test('holdAutomaticFireAgainst is the last field in both theaters and has no repair example', () => {
+  for (const coordinateMode of ['strategic', 'tactical'] as const) {
+    const gates: EnvelopeGates = {
+      coordinateMode,
+      includeAirActions: true,
+      includeMemoryUpdates: true,
+      includeProductionOrders: true,
+    };
+    assert.equal(envelopeFieldsForGates(gates).at(-1), 'holdAutomaticFireAgainst', coordinateMode);
+    assert.equal(buildRepairSchemaText(gates).includes('holdAutomaticFireAgainst'), false, coordinateMode);
+  }
 });

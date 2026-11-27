@@ -20,7 +20,7 @@ import type { AiSeatId } from '../../shared/seatIds';
 import type { OperationCandidate } from '../../shared/operationTypes';
 import { writeOperationRefusal } from '../gameDb/operationMemory';
 import { applyOperationCommands } from '../operations/operationCommands';
-import { applyPostureChoice } from '../operations/postureChoice';
+import { applyReplyPosture } from '../operations/postureChoice';
 import { applySideAgreementDecisions } from '../sideAgreements/sideAgreementDecisionApply';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
@@ -40,6 +40,8 @@ import {
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { holdsShooterOnClampedMove } from '../tacticalBattle/tacticalClampedMoveGuards';
+import { readHoldAutomaticFireAgainstSeatIds } from '../gameDb/holdAutomaticFireAgainstMemory';
+import { applyHoldAutomaticFireAgainstChoice } from './holdAutomaticFireAgainstApply';
 import { tacticalComputeMovementOrderOutcomeForPlayer } from '../tacticalBattle/tacticalSnapshotGuards';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
@@ -294,6 +296,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   });
 
   const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
+  dropReasons.push(...applyHoldAutomaticFireAgainstChoice({ seatId, choice: parsed.holdAutomaticFireAgainstChoice, turnNumber: planState.turnNumber, battle: tacticalBattle ?? null }).dropReasons);
   if (!tacticalBattle && ordersEnabled && parsed.operationCommands) {
     const operationResult = applyOperationCommands({
       state: planState,
@@ -305,19 +308,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     });
     dropReasons.push(...operationResult.dropReasons);
   }
-  if (!tacticalBattle && ordersEnabled && parsed.postureChoice) {
-    const postureResult = applyPostureChoice({
-      seatId,
-      posture: parsed.postureChoice,
-      turnNumber: planState.turnNumber,
-    });
-    dropReasons.push(...postureResult.dropReasons);
-  } else if (
-    !tacticalBattle &&
-    ordersEnabled &&
-    !dropReasons.some((reason) => reason.startsWith('posture dropped:'))
-  ) {
-    logDebug('requestOrdersApplyParsed posture omitted', { seatId, turnNumber: planState.turnNumber });
+  if (!tacticalBattle && ordersEnabled) {
+    dropReasons.push(...applyReplyPosture({ seatId, posture: parsed.postureChoice, turnNumber: planState.turnNumber, priorDropReasons: dropReasons }));
   }
   if (!tacticalBattle && ordersEnabled) {
     writeOperationRefusal({ getOne: dbGetOne, run: dbRun }, seatId, planState.turnNumber, dropReasons);
@@ -456,6 +448,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
           subUnitId: order.unitId,
           orderedH3: order.toH3Index,
           appliedH3: appliedTo,
+          sparedOwnerIds: readHoldAutomaticFireAgainstSeatIds(seatId),
         })) {
           dropReasons.push(`Tactical march ${aiOrderUnitLabel(order.unitId)}: held on its firing cell`);
           seenUnits.add(order.unitId);

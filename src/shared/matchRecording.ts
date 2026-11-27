@@ -155,7 +155,7 @@ export const MATCH_FRAME_FORMAT_VERSION = 1;
  *
  * Purpose: The format-version map and the database share one list.
  * When to use: A new event type is added to this list and to `MATCH_EVENT_FORMAT_VERSIONS` together.
- * Expected outcome: The sixteen event names, in record order.
+ * Expected outcome: The seventeen event names, in record order.
  * Exceptions: None.
  */
 export const MATCH_EVENT_TYPES = [
@@ -175,6 +175,7 @@ export const MATCH_EVENT_TYPES = [
   'resolution_view',
   'agreement_recorded',
   'agreement_decision',
+  'hold_automatic_fire_against_changed',
 ] as const;
 
 /**
@@ -182,7 +183,7 @@ export const MATCH_EVENT_TYPES = [
  *
  * Contract: A member of that list.
  * When to use: The `type` of a recorded event.
- * Expected outcome: One of the sixteen names.
+ * Expected outcome: One of the seventeen names.
  * Exceptions: None.
  */
 export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
@@ -212,6 +213,7 @@ export const MATCH_EVENT_FORMAT_VERSIONS: Readonly<Record<MatchEventType, number
   resolution_view: 1,
   agreement_recorded: 1,
   agreement_decision: 1,
+  hold_automatic_fire_against_changed: 1,
 };
 
 /**

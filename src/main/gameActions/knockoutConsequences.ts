@@ -17,6 +17,7 @@ import {
 } from '../gameDb';
 import { writeOperationEventTurn, writeOperationNote, writeOperationOffer, writeOperationsForSeat } from '../gameDb/operationMemory';
 import { writePosture } from '../gameDb/postureMemory';
+import { removeSeatFromHoldAutomaticFireAgainst } from '../gameDb/holdAutomaticFireAgainstMemory';
 import { deleteGameConfigRow } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 import { convertUnitsToNeutral, type KnockoutCoordinates } from './unitOwnershipTransfer';
@@ -67,6 +68,7 @@ export interface KnockoutApplied {
  * Purpose: A knocked-out seat no longer consults, remembers, or keeps a private view.
  * When to use: The first step of `applyKnockout`.
  * Expected outcome: Those tables have no row for the seat, its new-contact key is gone, and its posture entry is gone. Other seats' postures stay.
+ * The seat's automatic-fire list is removed, and the seat is taken off every other seat's list.
  * Exceptions: Propagates SQLite errors.
  */
 function deleteSeatPrivateRows(seatId: SeatId): void {
@@ -91,6 +93,7 @@ function deleteSeatPrivateRows(seatId: SeatId): void {
   writeOperationEventTurn({ getOne: dbGetOne, run: dbRun }, seatId, null);
   writeOperationNote({ getOne: dbGetOne, run: dbRun }, seatId, null);
   writePosture({ getOne: dbGetOne, run: dbRun }, seatId, null);
+  removeSeatFromHoldAutomaticFireAgainst({ getOne: dbGetOne, run: dbRun }, seatId);
 }
 
 /**

@@ -156,6 +156,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
     playerId: 'opponent',
     alreadyAttackingSubUnitIds: new Set<string>(),
     holdFireParentUnitIds: new Set<string>(),
+    sparedOwnerIds: new Set<string>(),
   });
   assert.strictEqual(rangedAttacks.length, 1, 'armor should generate ranged');
   assert.strictEqual(rangedAttacks[0]!.unitId, 'opp-armor:01');
@@ -169,6 +170,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
     playerId: 'opponent',
     alreadyAttackingSubUnitIds: new Set(['opp-armor:01']),
     holdFireParentUnitIds: new Set(['opp-air']),
+    sparedOwnerIds: new Set<string>(),
   });
   assert.strictEqual(
     withExclusions.rangedAttacks.length,
@@ -194,7 +196,8 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
       embarkOrders: [],
     },
     new Set<string>(),
-    AI_SEAT_IDS[0]
+    AI_SEAT_IDS[0],
+    new Set<string>()
   );
   const armorRows = (backfilled?.rangedAttacks ?? []).filter((r) => r.unitId === 'opp-armor:01');
   assert.strictEqual(armorRows.length, 1, 'the model-named sub-unit must keep exactly one attack');
@@ -206,10 +209,81 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
   );
 
   assert.strictEqual(
-    withTacticalTempoAttacks(battle, undefined, new Set<string>(), AI_SEAT_IDS[0])?.rangedAttacks.length,
+    withTacticalTempoAttacks(battle, undefined, new Set<string>(), AI_SEAT_IDS[0], new Set<string>())?.rangedAttacks.length,
     1,
     'an unconsulted beat with no draft at all must still produce the legal shots'
   );
+});
+
+test('a sub-unit with only spared owners in reach is given no automatic attack', () => {
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalArmor = tacticalUnderCorner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
+  const sameParent = [...gridDisk(tacticalArmor, 8)].filter((h) => cellToParent(h, 1) === strategic);
+  const tacticalAirUnit = sameParent.find((h) => h !== tacticalArmor && gridDistance(tacticalArmor, h) === 1);
+  const tacticalHumanEnemy = sameParent.find((h) => h !== tacticalArmor && h !== tacticalAirUnit && gridDistance(tacticalArmor, h) === 1);
+  assert.ok(tacticalAirUnit && tacticalHumanEnemy, 'expected air and enemy cells adjacent to armor');
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-spared-owner',
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: sameParent.slice(0, 40),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'coastal',
+    strategicHexTerrainKind: 'land',
+    tacticalTerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h) => [h, 'plains'])),
+    subUnits: [
+      {
+        id: 'opp-armor:01',
+        parentUnitId: 'opp-armor',
+        player: AI_SEAT_IDS[0],
+        unitType: 'armor',
+        h3Index: tacticalArmor,
+        displayName: 'Armor',
+      },
+      {
+        id: 'opp-air:01',
+        parentUnitId: 'opp-air',
+        player: AI_SEAT_IDS[0],
+        unitType: 'air',
+        h3Index: tacticalAirUnit,
+        displayName: 'Air',
+      },
+      {
+        id: 'hum:01',
+        parentUnitId: 'hum',
+        player: HUMAN_SEAT_ID,
+        unitType: 'infantry',
+        h3Index: tacticalHumanEnemy,
+        displayName: 'Enemy',
+      },
+    ],
+  };
+  const spared = new Set<string>([HUMAN_SEAT_ID]);
+  const swept = collectTacticalTempoAttacks({
+    battle,
+    playerId: AI_SEAT_IDS[0],
+    alreadyAttackingSubUnitIds: new Set<string>(),
+    holdFireParentUnitIds: new Set<string>(),
+    sparedOwnerIds: spared,
+  });
+  assert.deepEqual(swept, { rangedAttacks: [], airStrikes: [] });
+
+  const draft = {
+    movementOrders: [],
+    rangedAttacks: [{ unitId: 'opp-armor:01', targetH3Index: tacticalHumanEnemy }],
+    airStrikes: [],
+    ferryOrders: [],
+    embarkOrders: [],
+  };
+  assert.strictEqual(
+    withTacticalTempoAttacks(battle, draft, new Set<string>(), AI_SEAT_IDS[0], spared),
+    draft,
+    'an ordered attack against a spared owner is kept and nothing is added'
+  );
+  assert.strictEqual(withTacticalTempoAttacks(battle, undefined, new Set<string>(), AI_SEAT_IDS[0], spared), undefined);
+
+  assert.strictEqual(pickClosestEnemyTacticalRangedTargetForSubUnit(battle, 'opp-armor:01', spared), undefined);
+  assert.strictEqual(pickClosestEnemyTacticalRangedTargetForSubUnit(battle, 'opp-armor:01'), tacticalHumanEnemy);
 });
 
 test('pickClosestEnemyTacticalRangedTargetForSubUnit keeps a legal shot gridDistance cannot measure', () => {

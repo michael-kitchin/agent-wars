@@ -2,12 +2,9 @@ import { cellToLatLng } from 'h3-js';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { strategicCellAt } from '../../shared/h3Resolutions';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { getRange } from '../combatConstants';
-import { validateAirStrikeOrder } from '../gameActions/airValidation';
-import { isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './pathfinding';
 import { refreshDefendPostProgress } from './standingOrdersDefendPost';
 import type { LatLng } from './pathfinding';
@@ -21,6 +18,9 @@ import {
   type StandingOrderRow,
 } from './standingOrdersShared';
 import { isLandUnitType } from '../../shared/landUnitType';
+import { appendNearestLegalEngagement, type StandingOrderGeneratedAirStrike } from './nearestLegalEngagement';
+import { readHoldAutomaticFireAgainstSeatIds } from '../gameDb/holdAutomaticFireAgainstMemory';
+export type { StandingOrderGeneratedAirStrike } from './nearestLegalEngagement';
 
 /**
  * Options for `generateOrdersForStandingOrders` so tactical resolution can preview routes without advancing DB state.
@@ -30,65 +30,6 @@ import { isLandUnitType } from '../../shared/landUnitType';
  * Expected outcome: When `mutateProgress` is false, returned movement/ranged rows mirror the live generator while standing_orders rows remain byte-identical aside from concurrent writers.
  * Exceptions: None.
  */
-export type StandingOrderGeneratedAirStrike = {
-  unitId: string;
-  targetH3Index: string;
-  targetType: AirStrikeTargetType;
-};
-
-/**
- * Emits one ranged attack or air strike against the closest in-range enemy from the unit's current hex.
- *
- * Purpose: Shared "shoot the nearest thing you legally can" step. DEFEND units use it to auto-engage without waiting
- * to arrive at the defend post, and the tempo sweep uses it to cover units the model left idle. Air produces strikes,
- * ground and naval produce ranged attacks, and infantry produces nothing because its strategic range is zero.
- * When to use: The `defend` branch of `generateOrdersForStandingOrders`, and `collectTempoRuleAttacks`. Callers are
- * responsible for skipping units that already have an attack or are under `hold_fire`.
- * Expected outcome: At most one attack row appended to the matching array; no-op when no legal target exists.
- * Exceptions: None; enemies whose distance cannot be derived are ranked last rather than dropped.
- */
-export function appendNearestLegalEngagement(
-  unit: GameStateSnapshot['units'][number],
-  playerId: string,
-  unitId: string,
-  state: GameStateSnapshot,
-  rangedAttacks: { unitId: string; targetH3Index: string }[],
-  airStrikes: StandingOrderGeneratedAirStrike[]
-): void {
-  const enemies = state.units.filter((u) => u.player !== playerId);
-  if (unit.unitType === 'air') {
-    let nearest: { h3Index: string; dist: number } | null = null;
-    for (const enemy of enemies) {
-      if (!isWithinAirStrikeGridRange(unit.h3Index, enemy.h3Index, 'nearestLegalEngagement')) continue;
-      const valid = validateAirStrikeOrder(unitId, enemy.h3Index, 'units', { allowedPlayer: playerId });
-      if (!valid.valid) continue;
-      // Range and legality are already settled above, so an unmeasurable pair ranks last rather than
-      // forfeiting a strike the range gate just approved.
-      const dist =
-        computeGridDistanceWithPathFallbackPure(unit.h3Index, enemy.h3Index) ?? Number.POSITIVE_INFINITY;
-      if (nearest === null || dist < nearest.dist) nearest = { h3Index: enemy.h3Index, dist };
-    }
-    if (nearest) {
-      airStrikes.push({ unitId, targetH3Index: nearest.h3Index, targetType: 'units' });
-    }
-    return;
-  }
-
-  const weaponRange = getRange(unit.unitType);
-  if (weaponRange < 1) return;
-  let nearest: { h3Index: string; dist: number } | null = null;
-  for (const enemy of enemies) {
-    const dist = computeGridDistanceWithPathFallbackPure(unit.h3Index, enemy.h3Index);
-    if (dist === null) continue;
-    if (dist <= weaponRange && (nearest === null || dist < nearest.dist)) {
-      nearest = { h3Index: enemy.h3Index, dist };
-    }
-  }
-  if (nearest) {
-    rangedAttacks.push({ unitId, targetH3Index: nearest.h3Index });
-  }
-}
-
 export type GenerateStandingOrdersOptions = {
   mutateProgress?: boolean;
   /** Reuses an existing pathfinding session from the same AI request when provided. */
@@ -137,8 +78,9 @@ function updateStandingOrderComputedRoute(
 /**
  * Reads the unit ids a player has told to hold fire.
  *
- * Purpose: `hold_fire` is the only way to tell a unit not to shoot, so every automatic engagement path has to honour
- * it or the order stops meaning anything. Tactical sub-units carry no standing orders of their own, so a beat looks
+ * Purpose: `hold_fire` is how one unit is told not to shoot at any side, so every automatic engagement path has to
+ * honour it or the order stops meaning anything. The owner's `holdAutomaticFireAgainst` list is separate and covers
+ * listed sides only. Tactical sub-units carry no standing orders of their own, so a beat looks
  * its pawns up by strategic parent id against this same table.
  * When to use: Before any pass that would generate an attack a player did not explicitly order.
  * Expected outcome: Possibly empty set of strategic unit ids; never null.
@@ -320,6 +262,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
  * Purpose: Expires stale rows, runs Tool 1 routes, emits merged movement/ranged rows, and normally persists `computed_route` / deletes like strategic Ready.
  * When to use: Strategic Ready, AI standing-only paths, and tactical Ready **preview** (`mutateProgress: false`) for parent→sub-unit march merge.
  * Expected outcome: Default path mutates SQLite like today; preview path returns the same order shapes without touching standing_orders progression. Embarked infantry and armor add no movement row and do not advance their stored order.
+ * DEFEND fire and `engageEnRoute` fire never choose a unit of a side in the owner's `holdAutomaticFireAgainst` list.
  * Exceptions: None.
  */
 export function generateOrdersForStandingOrders(
@@ -348,6 +291,7 @@ export function generateOrdersForStandingOrders(
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
   const airStrikes: StandingOrderGeneratedAirStrike[] = [];
+  const sparedOwnerIds = readHoldAutomaticFireAgainstSeatIds(playerId);
 
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
@@ -399,7 +343,7 @@ export function generateOrdersForStandingOrders(
       } else if (defendH3 && mutateProgress) {
         updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 });
       }
-      appendNearestLegalEngagement(unit, playerId, row.unit_id, state, rangedAttacks, airStrikes);
+      appendNearestLegalEngagement({ unit, playerId, unitId: row.unit_id, state, sparedOwnerIds, rangedAttacks, airStrikes });
       continue;
     }
 
@@ -450,6 +394,7 @@ export function generateOrdersForStandingOrders(
         let nearestEnRoute: { h3Index: string; dist: number } | null = null;
         for (const e of state.units) {
           if (e.player === playerId) continue;
+          if (sparedOwnerIds.has(e.player)) continue;
           const enemyDistance = computeGridDistanceWithPathFallbackPure(unit.h3Index, e.h3Index);
           if (enemyDistance === null || enemyDistance < 1 || enemyDistance > marchWeaponRange) continue;
           if (nearestEnRoute === null || enemyDistance < nearestEnRoute.dist) {

@@ -5,8 +5,9 @@
 
 import * as assert from 'assert';
 import { cellToLatLng, gridDisk } from 'h3-js';
-import { dbRun, getGameState } from '../gameDb';
+import { dbGetOne, dbRun, getGameState } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
+import { writeHoldAutomaticFireAgainstSeatIds } from '../gameDb/holdAutomaticFireAgainstMemory';
 import { safeGridHexDistance } from './assessUnitProximity';
 import { collectTempoRuleAttacks, mergeCommanderAttackOrders } from './tempoRuleAttacks';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -81,7 +82,7 @@ function testSweepFiresForUnitWithNoStandingOrder(): void {
 /**
  * A hold_fire standing order still means hold fire.
  *
- * Purpose: hold_fire is the only way to tell a unit not to shoot; a sweep that ignored it would remove the control
+ * Purpose: hold_fire is how one unit is told not to shoot at any side; a sweep that ignored it would remove the control
  * entirely. This is the essential failure case for the feature.
  * When to use: After changes to how the sweep reads standing orders.
  * Expected outcome: No attack for the unit that would otherwise fire in the happy-path case above.
@@ -216,12 +217,93 @@ function testModelOrderOutranksStandingOrderAndSweep(): void {
   });
 }
 
+/**
+ * The sweep never aims at a side in the shooter's automatic-fire list.
+ *
+ * Purpose: A commander that lists a side and orders nothing must not fire at it; clearing the list restores the shot.
+ * When to use: After changes to how the sweep chooses targets.
+ * Expected outcome: No attack while the planted enemy's side is listed, and one once the list is empty.
+ * Exceptions: Skips when the seed cannot stage the scenario.
+ */
+function testSweepSkipsListedSides(): void {
+  withSeededGame('listed', () => {
+    const staged = stageAdjacentEnemy('armor');
+    if (!staged) {
+      console.log('testSweepSkipsListedSides: skip — seed lacks opponent armor with a free neighbour');
+      return;
+    }
+    const ops = { getOne: dbGetOne, run: dbRun };
+    /**
+     * How many ranged shots the sweep gives the shooter.
+     *
+     * Purpose: Asked with and without the list.
+     * When to use: After each write.
+     * Expected outcome: Zero or one.
+     * Exceptions: None.
+     */
+    const shotsByShooter = (): number => {
+      const result = collectTempoRuleAttacks({
+        playerId: 'opponent',
+        state: staged.state,
+        alreadyAttackingUnitIds: new Set<string>(),
+      });
+      return result.rangedAttacks.filter((r) => r.unitId === staged.shooter.id).length;
+    };
+    writeHoldAutomaticFireAgainstSeatIds(ops, 'opponent', ['human'], 1);
+    assert.strictEqual(shotsByShooter(), 0, 'a listed side must not be swept');
+    writeHoldAutomaticFireAgainstSeatIds(ops, 'opponent', [], 1);
+    assert.strictEqual(shotsByShooter(), 1, 'an empty list restores the shot');
+  });
+}
+
+/**
+ * The merge aims nothing at a listed side itself, and keeps an attack the model ordered against it.
+ *
+ * Purpose: The list stops only fire the engine aims itself.
+ * When to use: After changes to how the merge applies the list.
+ * Expected outcome: No row for the shooter without a model order, and exactly the model's row with one.
+ * Exceptions: Skips when the seed cannot stage the scenario.
+ */
+function testModelOrderAgainstListedSideIsKept(): void {
+  withSeededGame('listed-ordered', () => {
+    const staged = stageAdjacentEnemy('armor');
+    if (!staged) {
+      console.log('testModelOrderAgainstListedSideIsKept: skip — seed lacks opponent armor with a free neighbour');
+      return;
+    }
+    writeHoldAutomaticFireAgainstSeatIds({ getOne: dbGetOne, run: dbRun }, 'opponent', ['human'], 1);
+    /**
+     * The shooter's rows after a merge with these model attacks.
+     *
+     * Purpose: Compares a merge with and without an ordered attack.
+     * When to use: Twice in this case.
+     * Expected outcome: The merged ranged rows of the shooter.
+     * Exceptions: None.
+     */
+    const shooterRows = (modelRanged: { unitId: string; targetH3Index: string }[]) =>
+      mergeCommanderAttackOrders({
+        seatId: 'opponent',
+        state: staged.state,
+        tacticalBattle: null,
+        standingOrderRanged: [],
+        standingOrderAirStrikes: [],
+        modelRanged,
+        modelAirStrikes: [],
+      }).rangedAttacks.filter((r) => r.unitId === staged.shooter.id);
+    const ordered = [{ unitId: staged.shooter.id, targetH3Index: staged.enemyH3 }];
+    assert.deepStrictEqual(shooterRows([]), [], 'the merge must not aim at a listed side');
+    assert.deepStrictEqual(shooterRows(ordered), ordered, 'an ordered attack on a listed side is kept');
+  });
+}
+
 function run(): void {
   testSweepFiresForUnitWithNoStandingOrder();
   testSweepRespectsHoldFire();
   testSweepSkipsUnitsAlreadyAttacking();
   testSweepSkipsInfantry();
   testModelOrderOutranksStandingOrderAndSweep();
+  testSweepSkipsListedSides();
+  testModelOrderAgainstListedSideIsKept();
   console.log('tempoRuleAttacks tests passed');
 }
 

@@ -1,9 +1,9 @@
 /**
  * Tempo rule for air: ferries idle squadrons toward the enemy so air power stops parking at home bases.
  *
- * `tempoRuleAttacks` guarantees that a unit with a legal shot takes it, but air is the one arm that must *move* before
- * it can shoot: strike range is 3 hexes and ferry range is 4, so a squadron based well behind the line has no legal
- * target and the attack sweep passes over it every turn. A captured strategic turn showed all 24 opponent air units
+ * `tempoRuleAttacks` gives a unit its legal shot at a side outside the owner's `holdAutomaticFireAgainst` list, but air
+ * is the one arm that must *move* before it can shoot: strike range is 3 hexes and ferry range is 4, so a squadron based
+ * well behind the line has no legal target and the attack sweep passes over it every turn. A captured strategic turn showed all 24 opponent air units
  * sitting on DEFEND at their home airports with only 4 in range of anything, ferry destinations listed in the briefing,
  * and not one ferry order issued. Nothing in the engine pushed back, so the air arm was permanently idle.
  *

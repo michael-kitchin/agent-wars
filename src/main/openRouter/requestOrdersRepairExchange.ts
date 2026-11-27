@@ -1,5 +1,6 @@
 /**
- * Off-to-the-side parse-repair exchange for an unparseable final JSON reply.
+ * Off-to-the-side parse-repair exchange for an unparseable final JSON reply, and what the repaired reply keeps from
+ * the first one.
  *
  * Purpose: consultation-flow invariant: the repair runs on a copy of the conversation with tools
  * disabled, and neither the unparseable text nor the repair exchange rejoins the main message list.
@@ -17,6 +18,24 @@ import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersC
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import { logResponsePreview } from './requestOrdersFlowSupport';
 import type { RequestOrdersUsageTotals } from './requestOrdersToolLoop';
+import type { ParsedOrdersResponse } from './orderResponseTypes';
+
+/**
+ * Keeps the first reply's `holdAutomaticFireAgainst` choice when the repaired reply carries none.
+ *
+ * Purpose: The repair request shows no example of the field, so a repaired reply without it has not withdrawn it.
+ * Dropping it would let the units fire at a side the commander had just listed.
+ * When to use: When a parsed repair reply replaces a first reply that also parsed.
+ * Expected outcome: The repaired reply. It gains the first reply's choice only when it has none of its own.
+ * Exceptions: None.
+ */
+export function keepEarlierHoldAutomaticFireAgainstChoice<
+  Parsed extends Pick<ParsedOrdersResponse, 'holdAutomaticFireAgainstChoice'>,
+>(first: Parsed, repaired: Parsed): Parsed {
+  const kept = repaired.holdAutomaticFireAgainstChoice === undefined && first.holdAutomaticFireAgainstChoice !== undefined;
+  logDebug('openRouter keepEarlierHoldAutomaticFireAgainstChoice', { kept });
+  return kept ? { ...repaired, holdAutomaticFireAgainstChoice: first.holdAutomaticFireAgainstChoice } : repaired;
+}
 
 /**
  * Inputs for one parse-repair attempt.

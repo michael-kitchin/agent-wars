@@ -13,6 +13,9 @@
  *
  * The sweep is a floor, never a ceiling. Anything the model ordered itself wins, and the briefing keeps flagging
  * every available shot so the model has no reason to leave target choice to the fallback.
+ *
+ * The sweep never chooses a unit of a side in the seat's `holdAutomaticFireAgainst` list. An attack the model
+ * ordered against such a side is kept.
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
@@ -20,11 +23,10 @@ import type { AiSeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { collectTacticalTempoAttacks } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { logDebug } from '../logger';
-import {
-  appendNearestLegalEngagement,
-  holdFireUnitIdsForPlayer,
-  type StandingOrderGeneratedAirStrike,
-} from './standingOrdersGeneration';
+import { appendNearestLegalEngagement, type StandingOrderGeneratedAirStrike } from './nearestLegalEngagement';
+import { readHoldAutomaticFireAgainstSeatIds } from '../gameDb/holdAutomaticFireAgainstMemory';
+import { stagePlanAttackPicks } from '../gameDb/holdAutomaticFireAgainstPlanPicks';
+import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
 
 /**
  * Inputs for `collectTempoRuleAttacks`, grouped so the argument list stays short as callers add context.
@@ -52,8 +54,9 @@ export type TempoRuleAttackArgs = {
  * When to use: Strategic opponent turns, after merging model and standing-order attacks. Not for the human, whose
  * attacks are theirs to choose, and not inside tactical battles — those use `collectTacticalTempoAttacks`, which
  * works on the tactical grid.
- * Expected outcome: At most one attack per swept unit, targeting its nearest legal enemy. Units already attacking,
- * units under a `hold_fire` standing order, and units with no strategic range (infantry) produce nothing.
+ * Expected outcome: At most one attack per swept unit, targeting its nearest legal enemy among the sides not in the
+ * player's `holdAutomaticFireAgainst` list. Units already attacking, units under a `hold_fire` standing order, units
+ * with no strategic range (infantry), and units with only listed sides in reach produce nothing.
  * Exceptions: None; an empty result is normal when every unit is already engaged or out of range.
  */
 export function collectTempoRuleAttacks(args: TempoRuleAttackArgs): {
@@ -76,12 +79,13 @@ export function collectTempoRuleAttacks(args: TempoRuleAttackArgs): {
   }
 
   const holdFireUnitIds = holdFireUnitIdsForPlayer(playerId);
+  const sparedOwnerIds = readHoldAutomaticFireAgainstSeatIds(playerId);
 
   for (const unit of state.units) {
     if (unit.player !== playerId) continue;
     if (alreadyAttackingUnitIds.has(unit.id)) continue;
     if (holdFireUnitIds.has(unit.id)) continue;
-    appendNearestLegalEngagement(unit, playerId, unit.id, state, rangedAttacks, airStrikes);
+    appendNearestLegalEngagement({ unit, playerId, unitId: unit.id, state, sparedOwnerIds, rangedAttacks, airStrikes });
   }
 
   logDebug('tempoRuleAttacks collectTempoRuleAttacks: result', {
@@ -89,6 +93,7 @@ export function collectTempoRuleAttacks(args: TempoRuleAttackArgs): {
     rangedAdded: rangedAttacks.length,
     airStrikesAdded: airStrikes.length,
     holdFireSkipped: holdFireUnitIds.size,
+    sparedOwnerCount: sparedOwnerIds.size,
   });
   return { rangedAttacks, airStrikes };
 }
@@ -107,7 +112,7 @@ export type MergeCommanderAttackOrdersArgs = {
   /**
    * Commander whose idle units the sweep may fire.
    *
-   * Contract: An AI seat. The sweep and hold-fire list use this seat.
+   * Contract: An AI seat. The sweep, the `hold_fire` orders, and the `holdAutomaticFireAgainst` list use this seat.
    * When to use: Every consulted merge.
    * Expected outcome: Another seat's units are not swept.
    * Exceptions: None.
@@ -158,7 +163,8 @@ export type MergeCommanderAttackOrdersArgs = {
  * ranged attack cannot be shadowed by an auto air strike for the same unit.
  * When to use: Consulted turns and beats, before the merged attacks go through order validation.
  * Expected outcome: At most one entry per unit across both lists, with the model's choice preserved wherever it made
- * one.
+ * one. The sweep adds no attack on a side in the seat's `holdAutomaticFireAgainst` list; an attack the model ordered
+ * against such a side is kept. On a world-map turn, the rows the engine chose are staged with `stagePlanAttackPicks`, and saved if the plan is stored.
  * Exceptions: None.
  */
 export function mergeCommanderAttackOrders(args: MergeCommanderAttackOrdersArgs): {
@@ -173,16 +179,12 @@ export function mergeCommanderAttackOrders(args: MergeCommanderAttackOrdersArgs)
     ...(args.modelFerryUnitIds ?? []),
     ...(args.modelAirDropUnitIds ?? []),
   ]);
-  const rangedBeforeSweep = [
-    ...args.standingOrderRanged.filter((o) => !modelClaimedUnitIds.has(o.unitId)),
-    ...args.modelRanged,
-  ];
-  const airStrikesBeforeSweep = [
-    ...args.standingOrderAirStrikes.filter(
-      (strike) => !modelClaimedUnitIds.has(strike.unitId) && !protectedFromGeneratedStrike.has(strike.unitId)
-    ),
-    ...args.modelAirStrikes,
-  ];
+  const keptStandingRanged = args.standingOrderRanged.filter((o) => !modelClaimedUnitIds.has(o.unitId));
+  const keptStandingAirStrikes = args.standingOrderAirStrikes.filter(
+    (strike) => !modelClaimedUnitIds.has(strike.unitId) && !protectedFromGeneratedStrike.has(strike.unitId)
+  );
+  const rangedBeforeSweep = [...keptStandingRanged, ...args.modelRanged];
+  const airStrikesBeforeSweep = [...keptStandingAirStrikes, ...args.modelAirStrikes];
   const alreadyAttackingUnitIds = new Set([
     ...rangedBeforeSweep.map((r) => r.unitId),
     ...airStrikesBeforeSweep.map((s) => s.unitId),
@@ -194,6 +196,7 @@ export function mergeCommanderAttackOrders(args: MergeCommanderAttackOrdersArgs)
         playerId: args.seatId,
         alreadyAttackingSubUnitIds: alreadyAttackingUnitIds,
         holdFireParentUnitIds: holdFireUnitIdsForPlayer(args.seatId),
+        sparedOwnerIds: readHoldAutomaticFireAgainstSeatIds(args.seatId),
       })
     : collectTempoRuleAttacks({
         playerId: args.seatId,
@@ -214,6 +217,13 @@ export function mergeCommanderAttackOrders(args: MergeCommanderAttackOrdersArgs)
       (rangedBeforeSweep.length + airStrikesBeforeSweep.length - modelTotal),
     sweepAdded: sweep.rangedAttacks.length + sweep.airStrikes.length,
   });
+  if (!args.tacticalBattle) {
+    stagePlanAttackPicks(
+      args.seatId,
+      [...keptStandingRanged, ...keptStandingAirStrikes],
+      [...sweep.rangedAttacks, ...sweep.airStrikes]
+    );
+  }
   return {
     rangedAttacks: [...rangedBeforeSweep, ...sweep.rangedAttacks],
     airStrikes: [...airStrikesBeforeSweep, ...sweep.airStrikes],

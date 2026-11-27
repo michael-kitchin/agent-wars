@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { dbGetOne, dbRun } from '../gameDb';
 import { readPosture } from '../gameDb/postureMemory';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { applyPostureChoice } from './postureChoice';
+import { applyPostureChoice, applyReplyPosture } from './postureChoice';
 
 const SEAT = 'opponent';
 
@@ -71,5 +71,26 @@ test('repeating the stored posture keeps its turn', () => {
     const again = applyPostureChoice({ seatId: SEAT, posture: 'maritime', turnNumber: 5 });
     assert.deepEqual(again, { applied: true, dropReasons: [] });
     assert.deepEqual(readPosture(ops, SEAT), { posture: 'maritime', sinceTurn: 3 });
+  });
+});
+
+test('a reply that names a posture returns what applying that choice returns, and stores it', () => {
+  withTempGameDb('aw-posture-choice-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    applyPostureChoice({ seatId: SEAT, posture: 'maritime', turnNumber: 10 });
+    const direct = applyPostureChoice({ seatId: SEAT, posture: 'blitz', turnNumber: 12 });
+    const fromReply = applyReplyPosture({ seatId: SEAT, posture: 'blitz', turnNumber: 12, priorDropReasons: [] });
+    assert.deepEqual(fromReply, direct.dropReasons);
+    const accepted = applyReplyPosture({ seatId: SEAT, posture: 'blitz', turnNumber: 16, priorDropReasons: [] });
+    assert.deepEqual(accepted, []);
+    assert.deepEqual(readPosture(ops, SEAT), { posture: 'blitz', sinceTurn: 16 });
+  });
+});
+
+test('a reply that names no posture adds no drop reason and stores nothing', () => {
+  withTempGameDb('aw-posture-choice-', () => {
+    const reasons = applyReplyPosture({ seatId: SEAT, posture: undefined, turnNumber: 4, priorDropReasons: [] });
+    assert.deepEqual(reasons, []);
+    assert.equal(readPosture({ getOne: dbGetOne }, SEAT), null);
   });
 });

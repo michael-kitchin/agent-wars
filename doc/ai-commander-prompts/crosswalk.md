@@ -124,7 +124,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
-| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Stance lines carry this commander's own trust and threat. The commander's agreements and then the pact contact lines follow the records. Omitted when this commander has no visible message, stance, combat record, agreement, or contact line. |
+| `# Messages` | Added in the situation message, immediately before Scenario Progress. `buildOrdersMessagesBlock`. Stance lines carry this commander's own trust and threat. The commander's agreements and then the pact contact lines follow the records, and the automatic-fire text comes before the caution when the list is not empty. Omitted when this commander has no visible message, stance, combat record, agreement, contact line, or listed side. |
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
 | `### Production Priorities` | Under Production Status, after Paused Queues and before Controlled Hex Queues, when `buildProductionPriorityLines` returns a line. |
@@ -180,7 +180,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 | `## Operational Map` with the tactical legend | Kept — 2.6 |
 | `### Best Options This Turn` | Kept, including airport ferry dests — 2.6 |
 | `## Recent Beat Notes` | Kept, battle-scoped, renamed from Recent Turn Notes — 2.6 |
-| `# Messages` | Added, same block as strategic, before the status sections. A battle between two AI commanders adds the truce text of `buildBattleTruceText` — 2.8 |
+| `# Messages` | Added, same block as strategic, before the status sections. A battle between two AI commanders adds the truce text of `buildBattleTruceText`, and any battle adds the automatic-fire text when the list is not empty — 2.8 |
 | `## Active Callbacks` | Kept with sub-unit ids — 2.6 |
 | `# Battle Context` | Kept — 2.8 |
 | `# Air Operations Status`, tactical form | Kept, roster-gated — 2.9 |
@@ -264,7 +264,7 @@ From [`source-inventory.md`](source-inventory.md) section 8. Mechanics follow th
 | `TACTICAL_STRUCTURE_V3` | Resolved in doc |
 | `WEGO_ORDER_UNSTATED` | Resolved in combat paragraph |
 | `INFANTRY_RANGE_SPLIT` | Resolved in combat paragraph |
-| `TEMPO_SWEEP_SILENCE` | Deliberate omission; the prompt does not describe the engine fallback |
+| `TEMPO_SWEEP_SILENCE` | Narrowed: the prompt describes automatic fire only through the `holdAutomaticFireAgainst` texts, chiefly `buildHoldAutomaticFireAgainstParagraph` |
 | `TEMPO_FREE_CLAIM` | Resolved: not emitted; tests forbid the substring |
 | `STRATEGIC_CONTEXT_OPENING_UNCONDITIONAL` | Resolved: not emitted; tests forbid the substring |
 | `HOLD_FIRE_UNGUIDED` | Resolved in combat paragraph and coaching |
