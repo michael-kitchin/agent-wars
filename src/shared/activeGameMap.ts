@@ -1,5 +1,5 @@
 import type { GameMapProfile } from './gameMapTypes';
-import { HOME_CONTROL_WIN_MIN_URBAN_SHARE } from './victoryRules';
+import { GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE } from './victoryRules';
 
 /**
  * Rules and scaleranks for the global world map.
@@ -14,7 +14,7 @@ export const GLOBAL_GAME_MAP: GameMapProfile = {
   displayName: 'Global',
   strategicResolution: 1,
   tacticalResolution: 4,
-  controlWinMinUrbanShare: HOME_CONTROL_WIN_MIN_URBAN_SHARE,
+  controlWinMinUrbanShare: GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE,
   rules: {
     infantryCost: 20,
     armorCost: 40,

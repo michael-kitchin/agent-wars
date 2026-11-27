@@ -58,15 +58,16 @@ class ComparisonSpecTests(unittest.TestCase):
         spec = self._load(_payload())
         first = spec.replays[0]
         self.assertEqual((first.note, first.legend_masks, spec.footer), ("", (), ""))
-        self.assertEqual((first.toolbar_hold_seconds, spec.capture), (None, DEFAULT_CAPTURE))
+        self.assertEqual((first.toolbar_hold_seconds, first.capture, spec.capture), (None, None, DEFAULT_CAPTURE))
 
     def test_shipped_editor_export_comparison_moves_the_crops_and_holds_the_finished_toolbar(self) -> None:
         spec = load_comparison_spec(_SHIPPED_SHIFTED)
         replays = layout_replays(spec, "quad")
         self.assertEqual([replay.key for replay in replays], ["v300", "v341", "v360"])
-        self.assertEqual(spec.capture.toolbar_shift_y, 16)
-        self.assertEqual(tuple(spec.capture.map_crop), (126, 84, 1716, 966))
-        self.assertEqual([replay.toolbar_hold_seconds for replay in replays], [None, None, 89.2])
+        self.assertEqual(replays[0].capture.toolbar_shift_y, 16)
+        self.assertEqual(tuple(replays[0].capture.map_crop), (126, 84, 1716, 966))
+        self.assertEqual((replays[1].capture, replays[2].capture, spec.capture), (None, None, DEFAULT_CAPTURE))
+        self.assertEqual([replay.toolbar_hold_seconds for replay in replays], [None, None, 119.4])
 
     def test_map_crop_outside_the_frame_is_rejected(self) -> None:
         capture = {"map_crop": {"x": 126, "y": 84, "width": 1716, "height": 1000}}

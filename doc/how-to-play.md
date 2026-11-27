@@ -549,11 +549,11 @@ Agent Wars is a last-side-standing game, more or less. The full rules are in [re
 
 At the end of each turn, a side is knocked out when any of these is true:
 
-- Other sides and Neutral together hold at least 80% of its home's original city cells.
+- Other sides and Neutral together hold at least 80% of its home's original city cells on the global map, or 90% on a regional map.
 - It holds no city hex anywhere.
 - Its own home has no cities left.
 
-A home hex counts as lost when another side or Neutral holds it. A hex nobody holds counts for no one, so two homes that share hexes don't knock each other out on turn 1. Bombing doesn't lower the 80% target. A home that started with no city cells is lost when every hex of it is held by other sides or Neutral. The notice says "Other sides and Neutral hold 80% of its home's cities", and names the side holding the most of it.
+A home hex counts as lost when another side or Neutral holds it. A hex nobody holds counts for no one, so two homes that share hexes don't knock each other out on turn 1. Bombing doesn't lower that target. A home that started with no city cells is lost when every hex of it is held by other sides or Neutral. The notice says "Other sides and Neutral hold 80% of its home's cities" (90% on a regional map), and names the side holding the most of it.
 
 A knocked-out side's land and units become neutral. Losing every unit isn't a knockout by itself, and a side with no units left can still build.
 

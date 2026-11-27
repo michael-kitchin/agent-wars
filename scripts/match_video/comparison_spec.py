@@ -71,7 +71,8 @@ class ReplaySpec:
     What to expect:
         ``file`` is relative to the source directory given on the command line.
         ``legend_masks`` are sorted by time. ``toolbar_hold_seconds`` None means the legend
-        and turn readout follow the replay to its end.
+        and turn readout follow the replay to its end. ``capture`` None means the replay uses
+        the comparison's capture geometry.
     """
 
     # Short identifier that the layouts use to pick this replay.
@@ -93,6 +94,8 @@ class ReplaySpec:
     # Replay time after which the legend and turn readout keep their last picture, or None.
     # A finished match swaps its toolbar for the start menu, which this keeps off screen.
     toolbar_hold_seconds: float | None
+    # Where the map and the toolbar sit in this replay's frame, or None for the comparison's geometry.
+    capture: CaptureGeometry | None
 
 
 @dataclass(frozen=True)
@@ -117,7 +120,7 @@ class ComparisonSpec:
     replays: tuple[ReplaySpec, ...]
     # Replay keys for each layout the file supports, in on-screen order.
     layouts: MappingProxyType[str, tuple[str, ...]]
-    # Where the map and the toolbar sit in every replay's frame.
+    # Where the map and the toolbar sit in the frame of every replay that sets no geometry of its own.
     capture: CaptureGeometry
 
 
@@ -155,7 +158,7 @@ def load_comparison_spec(path: Path) -> ComparisonSpec:
         footer=_text(root, "footer", ""),
         replays=replays,
         layouts=layouts,
-        capture=_capture_from(root.get("capture")),
+        capture=_capture_from(root.get("capture"), "capture") or DEFAULT_CAPTURE,
     )
     LOGGER.debug("Loaded %d replays and layouts %s from %s.", len(replays), sorted(layouts), path)
     return spec
@@ -217,37 +220,39 @@ def _replay_from(item: object, index: int) -> ReplaySpec:
         legend_width=legend_width,
         legend_masks=masks,
         toolbar_hold_seconds=_optional_seconds(entry, "toolbar_hold_seconds", where),
+        capture=_capture_from(entry.get("capture"), f"{where}.capture"),
     )
 
 
-def _capture_from(item: object) -> CaptureGeometry:
+def _capture_from(item: object, where: str) -> CaptureGeometry | None:
     """
     Why this exists:
-        Check the optional ``capture`` object against the 1920x1080 source frame.
+        Check an optional ``capture`` object against the 1920x1080 source frame.
     When to use:
-        From ``load_comparison_spec``, with the field's value or None when it is absent.
+        For the comparison's ``capture`` and for each replay's, with the field's value or
+        None when it is absent. ``where`` names the field in error messages.
     What to expect:
-        ``DEFAULT_CAPTURE`` for None. Otherwise a geometry whose missing fields keep their
+        None for None. Otherwise a geometry whose missing fields keep the plain-capture
         default, with every crop inside the frame.
     Exceptions:
         ``ComparisonError`` when a value is not a whole number or a crop leaves the frame.
     """
 
     if item is None:
-        return DEFAULT_CAPTURE
-    entry = _require_object(item, "capture")
+        return None
+    entry = _require_object(item, where)
     shift = entry.get("toolbar_shift_y", DEFAULT_CAPTURE.toolbar_shift_y)
     lowest = -min(LEGEND_Y, TURN_CROP.y)
     highest = CAPTURE_HEIGHT - max(LEGEND_Y + LEGEND_HEIGHT, TURN_CROP.y + TURN_CROP.height)
     if not isinstance(shift, int) or isinstance(shift, bool) or not lowest <= shift <= highest:
-        raise ComparisonError(f"capture.toolbar_shift_y must be a whole number from {lowest} to {highest}.")
+        raise ComparisonError(f"{where}.toolbar_shift_y must be a whole number from {lowest} to {highest}.")
     raw_crop = entry.get("map_crop")
     if raw_crop is None:
         return CaptureGeometry(DEFAULT_CAPTURE.map_crop, shift)
-    crop_entry = _require_object(raw_crop, "capture.map_crop")
+    crop_entry = _require_object(raw_crop, f"{where}.map_crop")
     values = [crop_entry.get(field) for field in CaptureRect._fields]
     if not all(isinstance(value, int) and not isinstance(value, bool) for value in values):
-        raise ComparisonError("capture.map_crop needs whole numbers for x, y, width, and height.")
+        raise ComparisonError(f"{where}.map_crop needs whole numbers for x, y, width, and height.")
     crop = CaptureRect(*values)
     inside = (
         crop.x >= 0
@@ -258,7 +263,7 @@ def _capture_from(item: object) -> CaptureGeometry:
         and crop.y + crop.height <= CAPTURE_HEIGHT
     )
     if not inside:
-        raise ComparisonError(f"capture.map_crop must lie inside the {CAPTURE_WIDTH}x{CAPTURE_HEIGHT} frame.")
+        raise ComparisonError(f"{where}.map_crop must lie inside the {CAPTURE_WIDTH}x{CAPTURE_HEIGHT} frame.")
     return CaptureGeometry(crop, shift)
 
 

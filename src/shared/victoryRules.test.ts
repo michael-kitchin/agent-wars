@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { GLOBAL_GAME_MAP } from './activeGameMap';
 import { NEUTRAL_OWNER_ID } from './seatIds';
-import { countCityHexesBySeat, DEFAULT_TURN_LIMIT, HOME_CONTROL_WIN_MIN_URBAN_SHARE, rankSeatsByCityHexes, victorySettingsForRequest } from './victoryRules';
+import { countCityHexesBySeat, DEFAULT_TURN_LIMIT, GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE, REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE, rankSeatsByCityHexes, victorySettingsForRequest } from './victoryRules';
 
 test('an omitted rule is Deathmatch and a city-hex rule keeps a listed limit', () => {
   assert.deepEqual(victorySettingsForRequest(undefined, 40), { rule: 'last_side_standing', turnLimit: null });
@@ -45,6 +46,8 @@ test('tied city hexes share first place', () => {
   assert.equal(places.get('opponent2'), 3);
 });
 
-test('the home-loss share is 80% on every map', () => {
-  assert.equal(HOME_CONTROL_WIN_MIN_URBAN_SHARE, 0.8);
+test('the home-loss share is 80% on the global map and 90% on regional maps', () => {
+  assert.equal(GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE, 0.8);
+  assert.equal(REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE, 0.9);
+  assert.equal(GLOBAL_GAME_MAP.controlWinMinUrbanShare, GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE);
 });

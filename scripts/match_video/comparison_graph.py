@@ -176,7 +176,7 @@ class _GraphBuilder:
 
         # Which part of the replays every input reads.
         self._window = window
-        # Where the map and the toolbar sit in every replay's frame.
+        # Where the map and the toolbar sit in the frame of a replay that sets no geometry of its own.
         self._capture = capture
         # Arguments for each input, in input order.
         self._inputs: list[list[str]] = []
@@ -210,8 +210,9 @@ class _GraphBuilder:
             timing = (["-ss", _seconds(window.start_seconds)] if window.start_seconds > 0 else [])
             timing += ["-t", _seconds(window.duration_seconds)]
         self._inputs.append([*timing, "-i", str(path)])
-        map_crop = self._capture.map_crop
-        shift = self._capture.toolbar_shift_y
+        capture = replay.capture or self._capture
+        map_crop = capture.map_crop
+        shift = capture.toolbar_shift_y
         hold = _toolbar_hold(replay, window)
         self._filters += [
             f"[{index}:v]setpts=PTS-STARTPTS,fps={OUTPUT_FPS},split=3[{label}a][{label}b][{label}c]",

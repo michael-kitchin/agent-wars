@@ -44,7 +44,9 @@ Options the player changes during a match in the Game Options dialog (`writeMatc
 
 Strategic `turn_notes_history` rows with a non-empty `battle_id` hold the units a tactical battle destroyed in that battle (`writeBattleParentLossNotes`). They use the existing columns and primary key, so the save version stays 26. A save made before this change has none, so its earlier battles show no Battle lines.
 
-A save stores no version of the game rules. A loaded match plays by the rules of the build that opened it, from its next end of turn. Since 3.6.0 that means a side that has already lost 80% of its home's original urban cells is knocked out at the end of the first turn after the load (3.3.0 through 3.5.0 used 90%) (`computeHomeLossProgress` in `src/main/gameActions/homeControlProgress.ts`).
+A save stores no version of the game rules. A loaded match plays by the rules of the build that opened it, from its next end of turn. A side that has already lost the loaded map's share of its home's original urban cells (80% on the global map, 90% on a regional map) is knocked out at the end of the first turn after the load (`computeHomeLossProgress` in `src/main/gameActions/homeControlProgress.ts`).
+
+Regional maps used 90% from 3.3.0 through 3.5.0 and 80% in 3.6.0 and 3.6.1. A regional side that has lost at least 80% but less than 90% of its home is therefore not knocked out for home control.
 
 A change to the shape of any JSON a save carries in `game_config` needs a new versioned key, or the same bump. An older or newer app would misread the old shape. When `EXPECTED_USER_VERSION` or `MACHINE_LOCAL_CONFIG_KEYS` changes, update this document in the same change.
 

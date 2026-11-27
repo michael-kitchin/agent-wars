@@ -1,50 +1,50 @@
 {
   "title": "AGENT WARS",
   "subtitle": "Same scenario · four AI powers · no fog",
-  "footer": "90-second condensed replays · v3.0.0 runs about four times as many turns",
-  "capture": {
-    "toolbar_shift_y": 16,
-    "map_crop": { "x": 126, "y": 84, "width": 1716, "height": 966 }
-  },
+  "footer": "Two-minute condensed replays · v3.0.0 runs about four times as many turns",
   "replays": [
     {
       "key": "v300",
-      "file": "agentwars-v3.0.0-90sec-2026-11-15-1.mp4",
+      "file": "agentwars-v3.0.0-120sec-2026-11-15-1.prepared.mp4",
       "version": "v3.0.0",
       "nickname": "“Knockout”",
-      "turns_shown": 445,
+      "turns_shown": 443,
       "legend_width": 437,
       "legend_masks": [
-        { "x": 410, "until_seconds": 42.6 },
-        { "x": 428, "until_seconds": 44.1 }
-      ]
+        { "x": 410, "until_seconds": 56.8 },
+        { "x": 428, "until_seconds": 58.8 }
+      ],
+      "capture": {
+        "toolbar_shift_y": 16,
+        "map_crop": { "x": 126, "y": 84, "width": 1716, "height": 966 }
+      }
     },
     {
       "key": "v341",
-      "file": "agentwars-v3.4.1-90sec-2026-11-24-1.mp4",
+      "file": "agentwars-v3.4.1-120sec-2026-11-24-1.mp4",
       "version": "v3.4.1",
       "nickname": "“Agree to Disagree”",
-      "turns_shown": 105,
+      "turns_shown": 97,
       "note": "Stalemate",
       "legend_width": 386,
       "legend_masks": [
-        { "x": 330, "until_seconds": 17.2 },
-        { "x": 360, "until_seconds": 32.9 }
+        { "x": 330, "until_seconds": 25.3 },
+        { "x": 360, "until_seconds": 51.1 }
       ]
     },
     {
       "key": "v360",
-      "file": "agentwars-v3.6.0-90sec-2026-11-24-1.mp4",
+      "file": "agentwars-v3.6.0-120sec-2026-11-24-1.prepared.mp4",
       "version": "v3.6.0",
       "nickname": "“One Hundred Months”",
       "turns_shown": 105,
       "note": "N. America wins",
       "legend_width": 386,
       "legend_masks": [
-        { "x": 330, "until_seconds": 24.6 },
-        { "x": 360, "until_seconds": 28.5 }
+        { "x": 330, "until_seconds": 33.0 },
+        { "x": 360, "until_seconds": 37.6 }
       ],
-      "toolbar_hold_seconds": 89.2
+      "toolbar_hold_seconds": 119.4
     }
   ],
   "layouts": {

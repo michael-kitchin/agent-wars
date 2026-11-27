@@ -90,10 +90,10 @@ class CaptureGeometry:
         Hold the crops that change when a replay was re-exported from a video editor,
         which can move the game window inside the frame and trim its edges.
     When to use:
-        Read from the optional ``capture`` object of a comparison file. ``DEFAULT_CAPTURE``
-        is a plain capture of the maximized game window.
+        Read from the optional ``capture`` object of a comparison file or of one replay in it.
+        ``DEFAULT_CAPTURE`` is a plain capture of the maximized game window.
     What to expect:
-        One geometry applies to every replay in the comparison.
+        The file's geometry applies to every replay that does not set its own.
     """
 
     # Window on the hex map, in source pixels. It is scaled to one replay pane.

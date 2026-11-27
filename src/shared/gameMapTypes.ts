@@ -239,7 +239,7 @@ export interface GameMapProfile {
    *
    * Contract: A number is the share of the home's original urban cells that other sides and Neutral must hold together. `null` means every home hex must be held by them.
    * When to use: End-of-turn knockout and the win-rule sentences.
-   * Expected outcome: `HOME_CONTROL_WIN_MIN_URBAN_SHARE` (`0.8`) on every shipped map.
+   * Expected outcome: `GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE` (`0.8`) on the global map and `REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE` (`0.9`) on every regional map.
    * Exceptions: None.
    */
   readonly controlWinMinUrbanShare: number | null;

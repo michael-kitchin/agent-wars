@@ -56,7 +56,7 @@ The faction legend for each replay is cropped live from the game's "Observing" l
 
 Every replay starts at `--start` (default 0) and runs for `--duration`. Without `--duration`, the output stops `--end-trim` seconds before the shortest replay in the layout ends. The default trim is 1 second (`_DEFAULT_END_TRIM_SECONDS`). The last `FADE_OUT_SECONDS` (0.75) fade to black unless `--no-fade` is set.
 
-A `--duration` longer than the replays holds each replay's last frame until the output ends. `one_hundred_months.json` is composed with `--duration 93`, which holds the final maps for 3 seconds after the 90-second replays end.
+A `--duration` longer than the replays holds each replay's last frame until the output ends. `one_hundred_months.json` is composed with `--duration 122.4`, which runs to the end of its longest replay and holds the last frame of the two shorter ones.
 
 The output is H.264 at 30 fps (`OUTPUT_FPS`) with no audio. `--crf` defaults to 20 and `--preset` to `veryfast`.
 
@@ -66,7 +66,7 @@ The replays are aligned by elapsed time, not by turn. Condensed replays spend sl
 
 `load_comparison_spec` in `scripts/match_video/comparison_spec.py` reads and checks the file. The top level holds `title`, `subtitle`, an optional `footer`, an optional `capture`, `replays`, and `layouts`. `layouts` maps `quad`, `duo`, or both to replay keys in on-screen order. `LAYOUT_SIZES` gives how many keys each layout takes.
 
-Each replay holds `key`, `file` (relative to `--source-dir`), `version`, `nickname`, `turns_shown`, and `legend_width`, plus an optional `note`, optional `legend_masks`, and an optional `toolbar_hold_seconds`.
+Each replay holds `key`, `file` (relative to `--source-dir`), `version`, `nickname`, `turns_shown`, and `legend_width`, plus an optional `note`, optional `legend_masks`, an optional `toolbar_hold_seconds`, and an optional `capture`.
 
 `turns_shown` is the number of completed turns at the comparison's last frame, not the replay's total. To find it, render `--still` at the end of the output and read each turn readout. A readout of "Turn 516 · Planning" means 515 completed turns.
 
@@ -78,11 +78,25 @@ Each replay holds `key`, `file` (relative to `--source-dir`), `version`, `nickna
 
 The crops in `scripts/match_video/comparison_geometry.py` assume a 1920x1080 capture of the maximized game window, with the toolbar along the top, the command rail on the right, and the Windows taskbar along the bottom. A capture with another size or layout needs new crops there.
 
-A replay that was re-exported from a video editor can sit lower in the frame and lose its bottom rows. The optional `capture` object of the comparison file covers that case for every replay in the file (`CaptureGeometry`). `toolbar_shift_y` is how many pixels the toolbar sits below its usual place, and it moves the legend and turn readout crops. `map_crop` replaces `MAP_CROP` and holds `x`, `y`, `width`, and `height` in source pixels. Keep it close to 16:9, because it is scaled to the 960x540 pane.
+A replay that was re-exported from a video editor can sit lower in the frame and lose its bottom rows. An optional `capture` object covers that case (`CaptureGeometry`). At the top level of the comparison file it applies to every replay that has no `capture` of its own. Inside a replay it applies to that replay only.
+
+A replay's `capture` replaces the top-level one as a whole. A field it leaves out takes the plain-capture value from `DEFAULT_CAPTURE`, not the top-level value. `toolbar_shift_y` is how many pixels the toolbar sits below its usual place, and it moves the legend and turn readout crops. `map_crop` replaces `MAP_CROP` and holds `x`, `y`, `width`, and `height` in source pixels. Keep it close to 16:9, because it is scaled to the 960x540 pane.
+
+### Prepared replays
+
+`one_hundred_months.json` names two `.prepared.mp4` replays. This script writes them into the folder that holds the replays:
+
+```
+bash scripts/match_video/comparisons/one_hundred_months_prepare.sh <folder with the replays>
+```
+
+It drops one black frame from the v3.0.0 clip. The v3.6.0 clip stops on the last planning turn, so the script appends 3 seconds (`WIN_SECONDS`) of the results map, taken from the end of the v3.6.0 condensed replay. That folder therefore needs both 120-second clips and the v3.6.0 `.condensed.mp4`, under the names the script gives.
+
+Both outputs are 30 fps with no audio. Unlike the Python tools, the script overwrites an output that is already there. It needs bash, ffmpeg on PATH, and a `mktemp` that accepts `--suffix`, as GNU `mktemp` does.
 
 ### Title overlays
 
-`scripts/match_video/add_title.ps1` and `scripts/match_video/add_title.sh` burn a full-frame transparent PNG over the opening seconds of a video. They hold it for 3 seconds and fade it out over 1 second by default. Title overlays and the HTML they were rendered from are in `scripts/match_video/titles/`.
+`scripts/match_video/add_title.ps1` and `scripts/match_video/add_title.sh` burn a full-frame transparent PNG over the opening seconds of a video. They hold it for 3 seconds and fade it out over 1 second by default. Title overlays and the HTML they were rendered from are in `scripts/match_video/titles/`. The file name ends with the overlay's size, and some titles come in both 1920x1080 and 3840x2160. Both scripts scale the overlay to the video's size, so pick the file that matches the video.
 
 ## Tests
 

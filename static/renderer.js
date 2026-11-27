@@ -59,7 +59,7 @@
   }
 
   // src/shared/victoryRules.ts
-  var HOME_CONTROL_WIN_MIN_URBAN_SHARE = 0.8;
+  var GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE = 0.8;
   var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
   var DEFAULT_TURN_LIMIT = 30;
   var DEFAULT_VICTORY_RULE = "last_side_standing";
@@ -94,7 +94,7 @@
     displayName: "Global",
     strategicResolution: 1,
     tacticalResolution: 4,
-    controlWinMinUrbanShare: HOME_CONTROL_WIN_MIN_URBAN_SHARE,
+    controlWinMinUrbanShare: GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE,
     rules: {
       infantryCost: 20,
       armorCost: 40,

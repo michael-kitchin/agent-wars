@@ -55,11 +55,13 @@ class ComparisonPlanTests(unittest.TestCase):
 
     def test_editor_export_capture_shifts_the_crops_and_holds_the_finished_toolbar(self) -> None:
         self.spec = load_comparison_spec(_SHIPPED_SHIFTED)
-        video = self._plan("quad", RenderWindow(0.0, 93.0, None, True)).filter_graph
+        video = self._plan("quad", RenderWindow(0.0, 122.4, None, True)).filter_graph
         self.assertIn("crop=1716:966:126:84,scale=960:540", video)
         self.assertIn("crop=437:26:138:48,", video)
-        self.assertIn("crop=146:40:1676:41,", video)
-        self.assertEqual(video.count(",trim=end=89.200["), 2)
+        self.assertEqual(video.count("crop=146:40:1676:41,"), 1)
+        self.assertEqual(video.count("crop=1728:972:120:67,scale=960:540"), 2)
+        self.assertEqual(video.count("crop=146:40:1676:25,"), 2)
+        self.assertEqual(video.count(",trim=end=119.400["), 2)
         still = self._plan("quad", RenderWindow(0.0, 0.0, 60.0, False)).filter_graph
         self.assertNotIn("trim=", still)
 

@@ -3,7 +3,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
-import { resetActiveGameMap } from '../shared/activeGameMap';
+import { activeGameMap, resetActiveGameMap } from '../shared/activeGameMap';
+import { REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE } from '../shared/victoryRules';
 import { setLoadedStrategicFootprint } from '../shared/loadedStrategicFootprint';
 import { getOrderedHexList } from './mapData';
 import { clearLoadedGameMapForTests, ensureGameMapLoaded } from './gameMap/loadGameMap';
@@ -18,7 +19,7 @@ import { installSideGroupHomes } from './regionScenario';
 import { setActiveTerrainPackDirectory } from './terrainMetadataPaths';
 import { clearTacticalOriginAreas } from './unitOrigin/tacticalOriginAreas';
 
-test('maghreb footprint length matches its manifest', (t) => {
+test('maghreb loads its manifest footprint and the regional home-loss share', (t) => {
   const root = resolveGeneratedRegionsDirectory();
   const directory = root ? path.join(root, 'maghreb') : '';
   const manifestPath = directory ? path.join(directory, 'region_manifest.json') : '';
@@ -30,6 +31,7 @@ test('maghreb footprint length matches its manifest', (t) => {
   try {
     ensureGameMapLoaded('maghreb');
     assert.equal(getOrderedHexList().length, manifest.hexes.length);
+    assert.equal(activeGameMap().controlWinMinUrbanShare, REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE);
   } finally {
     clearLoadedGameMapForTests();
     setActiveTerrainPackDirectory(null);
