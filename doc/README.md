@@ -34,7 +34,7 @@ Release **2.16.0** shortens commander prompts, lists the odds of each fight the 
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
 
-Release **3.7.0** shows each commander in an AI-only battle its truces and the last beat's shot count, ends quiet battles, says who attacked first in loss reports, keeps the engine from targeting pact partners on its own, and knocks a side out of a regional map at 90% of its home's city cells.
+Release **3.7.0** shows each commander in an AI-only battle its truces and the last beat's attack-shot count, ends quiet battles, says who attacked first in loss reports, keeps the engine from targeting pact partners on its own, and knocks a side out of a regional map at 90% of its home's city cells.
 
 Release **3.6.1** saves a finished match with its result and history, loads it onto its results screen, and replays it with the results shown only on the last turn, so earlier turns look as they did during the game.
 
