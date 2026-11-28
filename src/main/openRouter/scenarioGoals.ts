@@ -4,8 +4,9 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { isSeatActive, sortSeatsByOrder } from '../../shared/seatRoster';
 import { NEAR_KNOCKOUT_MAX_CITY_HEXES } from '../../shared/victoryRules';
+import { buildCityHexStandingsBody, STANDINGS_SECTION_TITLE } from './cityHexStandingsText';
 import { formatHomeRegionHexCodesForPrompt } from './consultPromptPartsHelpers';
-import { SECTION_TITLE_SCENARIO_OBJECTIVE, topLevelHeading } from './promptSpec/sectionHeadings';
+import { SECTION_TITLE_SCENARIO_OBJECTIVE, subHeading, topLevelHeading } from './promptSpec/sectionHeadings';
 
 /** First sentence of the strategic win reminder (single source for prompts and matrix tests). */
 export const WIN_CONDITION_REMINDER_FIRST_SENTENCE =
@@ -309,11 +310,11 @@ function enemyStatusLines(state: GameStateSnapshot, row: SideKnockoutStatus): st
 }
 
 /**
- * Knockout status bullets for the situation message.
+ * Knockout status bullets and standings for the situation message.
  *
  * Purpose: These counts change as hexes change hands, so they stay out of the cached system prompt.
  * When to use: Under Scenario Progress on a strategic region-versus-region consultation.
- * Expected outcome: The commander's own lines, then each enemy's lines in the order of `status.enemies`. [] when the scenario is not region_vs_region or `status` is null.
+ * Expected outcome: The commander's own lines, then each enemy's lines in the order of `status.enemies`, then a Standings subsection one heading level below the section, from `buildCityHexStandingsBody`: it ranks the sides still in the match by city hexes and, in a match with a turn limit, says when the match ends and who would win now. [] when the scenario is not region_vs_region or `status` is null.
  * Exceptions: None.
  */
 export function buildScenarioProgressLines(state: GameStateSnapshot, status: KnockoutStatusForSeat | null): string[] {
@@ -322,5 +323,13 @@ export function buildScenarioProgressLines(state: GameStateSnapshot, status: Kno
     enemyCount: status?.enemies.length ?? 0,
   });
   if (state.scenarioId !== 'region_vs_region' || !status) return [];
-  return [...ownStatusLines(status.own), ...status.enemies.flatMap((row) => enemyStatusLines(state, row))];
+  const standings = buildCityHexStandingsBody({ status, victory: state.victory, turnNumber: state.turnNumber });
+  return [
+    ...ownStatusLines(status.own),
+    ...status.enemies.flatMap((row) => enemyStatusLines(state, row)),
+    '',
+    subHeading(STANDINGS_SECTION_TITLE),
+    '',
+    standings,
+  ];
 }

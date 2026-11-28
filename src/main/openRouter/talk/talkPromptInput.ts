@@ -7,9 +7,11 @@
  * Exceptions: Propagates a SQLite error from the roster or the message tables.
  */
 
-import { logTrace } from '../../logger';
+import { logError, logTrace } from '../../logger';
 import { gameDbOps } from '../../gameDb/dbConnection';
 import { isFogOfWarEnabled } from '../../gameDb/fogState';
+import { readVictorySettings } from '../../gameDb/gameConfigKv';
+import { knockoutStatusForSeat, type KnockoutStatusForSeat } from '../../gameActions/knockoutStatus';
 import { listSideMessageThread, listSideStances } from '../../gameDb/sideMessageStore';
 import { readSeatRoster } from '../../gameDb/seatRosterStore';
 import { getRecentTurnNotes } from '../../gameDb/turnNotesHistory';
@@ -22,10 +24,12 @@ import { isSeatId, type AiSeatId, type SeatId } from '../../../shared/seatIds';
 import { isSeatActive, sortSeatsByOrder, type SeatRecord } from '../../../shared/seatRoster';
 import { SIDE_MESSAGE_THREAD_PROMPT_LINES } from '../../../shared/aiConsultationLimits';
 import { sideMessageVisibleTo } from '../../../shared/sideMessages';
+import type { VictorySettings } from '../../../shared/victoryRules';
 import { playerIdCodeFor } from '../../../shared/unitIds';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { readSideAgreementViews } from '../../sideAgreements/sideAgreementLedger';
 import { readHoldAutomaticFireAgainstListedTurns } from '../../gameDb/holdAutomaticFireAgainstMemory';
+import { buildCityHexStandingsBody } from '../cityHexStandingsText';
 import { buildBattleTruceText } from './battleTruceText';
 import { buildHoldAutomaticFireAgainstText, type HoldAutomaticFireAgainstSide } from './holdAutomaticFireAgainstText';
 import type { TalkPromptInput, TalkPromptSide, TalkPromptThread } from './talkPrompt';
@@ -179,6 +183,69 @@ export function readBattleTruceText(args: {
 }
 
 /**
+ * The standings one commander is shown in its strategic talk prompt.
+ *
+ * Purpose: The diplomacy step sees the same standings as the orders step, and a failed read never fails the consult.
+ * When to use: `readTalkPromptInput`, on the world map.
+ * Expected outcome: The body from `buildCityHexStandingsBody` for the seat's knockout status, the stored win rule, and the turn. Null when there is no status or a read fails. Tests pass their own readers as `read`.
+ * Exceptions: None. A thrown read is logged.
+ */
+export function readCityHexStandingsText(
+  args: {
+    /**
+     * The commander being briefed.
+     *
+     * Contract: An AI seat.
+     * When to use: Every call.
+     * Expected outcome: The standings are written for this side.
+     * Exceptions: None.
+     */
+    readonly seatId: AiSeatId;
+    /**
+     * The turn being briefed.
+     *
+     * Contract: The strategic turn now being played.
+     * When to use: A match with a turn limit.
+     * Expected outcome: Printed beside the limit.
+     * Exceptions: None.
+     */
+    readonly turnNumber: number;
+  },
+  read: {
+    /**
+     * Reads a side's knockout status.
+     *
+     * Contract: Null when the match has no knockout status or the side is out.
+     * When to use: Once per call.
+     * Expected outcome: The rows the standings rank.
+     * Exceptions: May throw.
+     */
+    readonly status: (seatId: AiSeatId) => KnockoutStatusForSeat | null;
+    /**
+     * Reads the match's win rule.
+     *
+     * Contract: The stored rule and turn limit.
+     * When to use: Once per call, after a status is found.
+     * Expected outcome: The values the standings print.
+     * Exceptions: May throw.
+     */
+    readonly victory: () => VictorySettings;
+  } = { status: knockoutStatusForSeat, victory: () => readVictorySettings(gameDbOps) }
+): string | null {
+  try {
+    const status = read.status(args.seatId);
+    const text = status === null
+      ? null
+      : buildCityHexStandingsBody({ status, victory: read.victory(), turnNumber: args.turnNumber });
+    logTrace('talkPromptInput readCityHexStandingsText', { seatId: args.seatId, turnNumber: args.turnNumber, produced: text !== null });
+    return text;
+  } catch (err) {
+    logError('talkPromptInput readCityHexStandingsText failed', { seatId: args.seatId, turnNumber: args.turnNumber, err });
+    return null;
+  }
+}
+
+/**
  * The automatic-fire text of one commander.
  *
  * Purpose: Both prompts of both theaters show the same stored list, with what the game recorded each listed side doing.
@@ -255,7 +322,7 @@ export function readHoldAutomaticFireAgainstText(args: {
  *
  * Purpose: `requestTalk` does not assemble SQL itself. In a battle, only the two sides fighting talk to each other, so a beat does not flood the sides that are not in it.
  * When to use: Once per talk call, before the model is called.
- * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match. The input carries the commander's agreement views on the world map, and null there in a battle, where a battle between two commanders carries its truce text instead.
+ * Expected outcome: The prompt input, the seats a reply may name, and their side codes. On the world map those are the other active seats. In a battle they are the opposing seat only, or none when that owner is Neutral or has left the match. The input carries the commander's agreement views and standings text on the world map, and null for both in a battle, where a battle between two commanders carries its truce text instead.
  * Exceptions: Propagates a SQLite error.
  */
 export function readTalkPromptInput(args: {
@@ -312,6 +379,7 @@ export function readTalkPromptInput(args: {
       recentTurnsSection,
       threads: readSideMessageThreads(args.seatId),
       agreements: args.battle ? null : readSideAgreementViews(args.seatId, args.turnNumber),
+      standingsText: args.battle ? null : readCityHexStandingsText({ seatId: args.seatId, turnNumber: args.turnNumber }),
       holdAutomaticFireAgainstText: readHoldAutomaticFireAgainstText({ seatId: args.seatId, sides, turnNumber: args.turnNumber, battle: args.battle }),
     },
     addressableSeatIds,

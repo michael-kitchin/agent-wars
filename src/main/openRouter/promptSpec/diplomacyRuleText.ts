@@ -32,6 +32,17 @@ export const DIPLOMACY_PURPOSE_BULLETS = [
 ] as const;
 
 /**
+ * The bullet that says what the Standings section is.
+ *
+ * Purpose: Tells the strategic diplomacy step what the standings count and, in a match with a turn limit, what else they say.
+ * When to use: The last bullet of the "Why diplomacy matters:" block of the strategic talk system text, only when the situation text has the Standings section. A battle has no standings.
+ * Expected outcome: One bullet, without the leading hyphen. No advice and no turn number.
+ * Exceptions: None.
+ */
+export const STANDINGS_TALK_BULLET =
+  'The Standings section ranks the sides still in the match by the city hexes each holds, counted by the game. When the match has a turn limit, that section says when the match ends and who would win if it ended now.';
+
+/**
  * The bullets that explain agreements in the strategic talk system text.
  *
  * Purpose: Explains what an agreement is, its kinds, statuses, limits, and how to change one.

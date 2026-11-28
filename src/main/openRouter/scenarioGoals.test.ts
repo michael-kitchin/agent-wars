@@ -5,10 +5,13 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, type SeatId } from '../../shared/seatIds';
 import type { KnockoutStatusForSeat, SideKnockoutStatus } from '../gameActions/knockoutStatus';
 import type { GameStateSnapshot } from '../gameDb';
+import { assertHeadingsNest, assertNoTripleBlankLines, headingOutline } from '../testSupport/promptOutlineHelpers';
+import { buildCityHexStandingsBody } from './cityHexStandingsText';
 import { formatHomeRegionHexCodesForPrompt } from './consultPromptPartsHelpers';
+import { shiftMarkdownHeadings, topLevelHeading } from './promptSpec/sectionHeadings';
 import {
   GENERIC_OBJECTIVE_SENTENCE,
   REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET,
@@ -54,14 +57,20 @@ function stateWith(exploredHexes?: readonly string[]): GameStateSnapshot {
 /**
  * Builds one side's knockout status row.
  *
- * Purpose: Cases vary the name, city hexes, loss counts, and rule.
+ * Purpose: Cases vary the name, city hexes, loss counts, rule, and seat.
  * When to use: Each progress-line case below.
  * Expected outcome: A row whose loss fields follow `everyHexRule`.
  * Exceptions: None.
  */
-function row(name: string, cityHexes: readonly string[], everyHexRule = false, cells = 1): SideKnockoutStatus {
+function row(
+  name: string,
+  cityHexes: readonly string[],
+  everyHexRule = false,
+  cells = 1,
+  seatId: SeatId = HUMAN_SEAT_ID
+): SideKnockoutStatus {
   return {
-    seatId: HUMAN_SEAT_ID,
+    seatId,
     name,
     cityHexes: cityHexes.map((h3Index) => ({ h3Index, urbanCells: cells })),
     homeLoss: {
@@ -89,8 +98,78 @@ function statusOf(own: SideKnockoutStatus, enemies: readonly SideKnockoutStatus[
   return { share, own, enemies };
 }
 
+/**
+ * The side bullets of a progress result, without the Standings subsection after them.
+ *
+ * Purpose: The bullet cases compare only the lines they were written for.
+ * When to use: A case that counts or indexes the bullets.
+ * Expected outcome: The lines before the blank line that precedes the Standings heading.
+ * Exceptions: Fails the test when the subsection is missing.
+ */
+function bulletsOf(lines: readonly string[]): readonly string[] {
+  const heading = lines.indexOf('## Standings');
+  assert.ok(heading > 0 && lines[heading - 1] === '', lines.join('\n'));
+  return lines.slice(0, heading - 1);
+}
+
+/**
+ * A three-side progress result on a state with the given turn and win rule.
+ *
+ * Purpose: The standings cases need rows with different seats and a state that carries a turn.
+ * When to use: The standings cases below.
+ * Expected outcome: The status and the progress lines built from it.
+ * Exceptions: None.
+ */
+function standingsCase(turnNumber: number, victory?: GameStateSnapshot['victory']) {
+  const state: GameStateSnapshot = { ...stateWith(), turnNumber, victory };
+  const status = statusOf(row('North', ['a'], false, 1, AI_SEAT_IDS[0]), [
+    row('South', ['b', 'c', 'd'], false, 1, HUMAN_SEAT_ID),
+    row('East', ['e', 'f'], false, 1, AI_SEAT_IDS[1]),
+  ]);
+  return { status, lines: buildScenarioProgressLines(state, status) };
+}
+
+test('a standings subsection closes the progress lines, after the unchanged bullets', () => {
+  const { status, lines } = standingsCase(12);
+  assert.deepEqual(lines.slice(-4), [
+    '',
+    '## Standings',
+    '',
+    buildCityHexStandingsBody({ status, victory: undefined, turnNumber: 12 }),
+  ]);
+  const bullets = bulletsOf(lines);
+  assert.equal(bullets.length, lines.length - 4);
+  assert.deepEqual(
+    bullets.filter((line) => line.startsWith('- ')).map((line) => line.slice(0, line.indexOf(':'))),
+    ['- Your side', '- South', '- East']
+  );
+});
+
+test('the standings say when a limited match ends and that an unlimited one has no limit', () => {
+  assert.ok(standingsCase(12).lines.at(-1)!.endsWith('This match has no turn limit. It ends when one side is left, or when every side would be knocked out on the same turn.'));
+  const limited = standingsCase(12, { rule: 'most_city_hexes_at_turn_limit', turnLimit: 30 });
+  assert.ok(limited.lines.at(-1)!.includes('This is turn 12 of 30.'));
+});
+
+test('the standings heading sits one level under Scenario Progress, with and without a briefing', () => {
+  const { lines } = standingsCase(12);
+  const text = `${topLevelHeading('Scenario Progress')}\n\n${lines.join('\n')}`;
+  assert.deepEqual(headingOutline(text), ['# Scenario Progress', '## Standings']);
+  assertHeadingsNest(headingOutline(text));
+  assertNoTripleBlankLines(text);
+  const printed = text.split('\n');
+  const heading = printed.indexOf('## Standings');
+  assert.equal(printed[heading - 1], '');
+  assert.equal(printed[heading + 1], '');
+  const header = printed.indexOf('| Place | Side | Code | City hexes |');
+  assert.equal(printed[header - 1], '');
+  const briefed = shiftMarkdownHeadings(text, 1);
+  assert.deepEqual(headingOutline(briefed), ['## Scenario Progress', '### Standings']);
+  assertNoTripleBlankLines(briefed);
+});
+
 test('the own row states its city hexes and home loss, and lists city hexes when near knockout', () => {
-  const lines = buildScenarioProgressLines(stateWith(), statusOf(row('North', ['a', 'b']), []));
+  const lines = bulletsOf(buildScenarioProgressLines(stateWith(), statusOf(row('North', ['a', 'b']), [])));
   assert.equal(
     lines[0],
     "- Your side: you hold 2 city hexes. Other sides and Neutral hold 30 of your home's 100 original urban cells. You are knocked out if they reach 90, or if you lose every city hex."
@@ -100,7 +179,7 @@ test('the own row states its city hexes and home loss, and lists city hexes when
 });
 
 test('an enemy with more than five city hexes gets one line and no listing', () => {
-  const lines = buildScenarioProgressLines(stateWith(), statusOf(row('North', ['a', 'b', 'c', 'd', 'e', 'f']), [row('South', ['a', 'b', 'c', 'd', 'e', 'f', 'g'])]));
+  const lines = bulletsOf(buildScenarioProgressLines(stateWith(), statusOf(row('North', ['a', 'b', 'c', 'd', 'e', 'f']), [row('South', ['a', 'b', 'c', 'd', 'e', 'f', 'g'], false, 1, AI_SEAT_IDS[1])])));
   assert.equal(lines.length, 2);
   assert.equal(
     lines[1],
@@ -134,7 +213,7 @@ test('the every-hex fallback uses its own wording for both rows', () => {
 });
 
 test('city hex counts read as none, one, and several', () => {
-  const none = buildScenarioProgressLines(stateWith(), statusOf(row('North', []), []));
+  const none = bulletsOf(buildScenarioProgressLines(stateWith(), statusOf(row('North', []), [])));
   assert.match(none[0]!, /you hold no city hexes\./);
   assert.equal(none.length, 1);
   const one = buildScenarioProgressLines(stateWith(), statusOf(row('North', ['a']), []));

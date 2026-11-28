@@ -89,7 +89,7 @@ Production status keeps the unit counts and the at-maximum line. Cost, caps, inc
 | Heading | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
 | `# Scenario Objective (Required)` | `buildScenarioObjectiveRulesBlock`, system message | `state.scenarioId === 'region_vs_region'` and not tactical | omitted |
-| `# Scenario Progress` | `buildScenarioProgressLines` over `knockoutStatusForSeat` (`knockoutStatus.ts`), plus explored and controlled counts, situation message | same scenario | omitted |
+| `# Scenario Progress` | `buildScenarioProgressLines` over `knockoutStatusForSeat` (`knockoutStatus.ts`), plus explored and controlled counts, situation message. It ends with the Standings subsection from `buildCityHexStandingsBody` (`cityHexStandingsText.ts`) | same scenario | omitted |
 | `# Strategic Context` | `buildContextCoaching` | always (strategic) | n/a. Explored, controlled, and home-region bullets are in the situation message |
 | `# Air Operations Status` | `buildAirOperationsBriefingBlock` | opponent has at least one air unit | **section omitted** (empty string, no dash row) |
 | `# Missile Forces` | `buildMissileForcesBriefingBlock` | strategic, and the opponent has at least one missile | **section omitted** in a battle and when the roster has no missile |

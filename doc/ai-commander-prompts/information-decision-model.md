@@ -10,7 +10,7 @@ The model is a weak model. Each job below must be answerable from information th
 
 ### 1.1 Strategic turn jobs
 
-1. **Judge win progress.** Decide whether this turn should push enemy home hexes, protect own home production, or fight in the field. Needs `WIN_CONDITIONS`, `HOME_REGION_HEXES`, `HOME_CONTROL_PROGRESS`, `SCENARIO_ID`, `SIDE_COMBAT_RECORD`.
+1. **Judge win progress.** Decide whether this turn should push enemy home hexes, protect own home production, or fight in the field. Needs `WIN_CONDITIONS`, `HOME_REGION_HEXES`, `HOME_CONTROL_PROGRESS`, `CITY_HEX_STANDINGS`, `SCENARIO_ID`, `SIDE_COMBAT_RECORD`.
 2. **Read the resolution order.** Know that this period's attacks resolve from turn-start positions, before movement, so a unit can shoot and move. Needs `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 3. **Choose this turn's shots and their targets.** Decide, per armed unit, whether to fire and at what. Needs `RANGED_LEGAL_TARGETS`, `BEST_OPTIONS_ROWS`, `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER`, `ACTION_NEEDED_FLAG`.
 4. **Decide when a unit should not fire.** Recognise the one case where withholding is a real choice, and that it is expressed as an order rather than as silence. Withholding automatic fire from a whole side is `holdAutomaticFireAgainst`, also something the reply sends. Needs `HOLD_FIRE_SEMANTICS`.
@@ -55,7 +55,7 @@ The model is a weak model. Each job below must be answerable from information th
 
 ## 2. Visibility contract
 
-What the commander may be told is decided by the snapshot it is given, never by the prompt reaching past it.
+What the commander may be told is decided by the snapshot it is given, never by the prompt reaching past it. Some counts are an exception. The knockout status counts and `CITY_HEX_STANDINGS` come from true control (`knockoutStatusForSeat`), with fog on too, because the game decides knockouts and places by them.
 
 1. **Fog on** (`fogOfWarEnabled` true; the default in `isFogOfWarEnabled`). The snapshot passed to prompt assembly is already filtered by `getGameStateForPlayer` for the seat being briefed (`playerPerspective`). Own units are that seat (`briefingOwnSeatId`). Enemy units are every other owner in the snapshot, including Neutral. The prompt may state: own units in full; enemy units only where the snapshot lists them; `exploredHexes` terrain; `enemyIntel` last-known positions with `intelState` and `lastSeenTurn`. Printed nearest-enemy distances are path lengths when a path exists. That length is not the hex to put in explicit_move; Best Options Target Hexes are the one-step destinations inside this turn's budget, including weather. The prompt must not state: unexplored terrain (masked to `unknown`), enemy units absent from the snapshot, or `pendingOrders`. Own home region hexes and the intersection are force-visible per `getForcedVisibleHomeRegionHexesForPlayer`, so home-region bullets are legitimate even when the region is not scouted. `HOP_VS_PATH_CAVEAT` is required here as the path-versus-Best-Options line.
 2. **Fog off.** Every hex is visible and explored, and every enemy unit appears with `intelState: 'current'`. `INTEL_FRESHNESS` collapses to "current" for every row, and `HOP_VS_PATH_CAVEAT` becomes required because `usesOmniscientGridProximity` is true for a strategic cell.
@@ -203,6 +203,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `HOME_REGION_HEXES` | The cells that make up each home region | `homeRegionHexesBySeat` via `ownHomeHexes` and `enemyHomeHexes` | force-visible | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` |
 | `HOME_REGION_OVERLAP` | Cells belonging to more than one home region | `computeHomeRegionHexPartitionsForPrompting.intersection`, or any hex listed by two or more homes | force-visible | 14 | strategic | conditional — the shared list is non-empty |
 | `HOME_CONTROL_PROGRESS` | Own home cells held and enemy home cells taken | `countControlledHexesInRegion` | own-side aggregate | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` |
+| `CITY_HEX_STANDINGS` | Every side still in the match ranked by city hexes held, with the commander's place and any tie. On a turn-limit match, also the turn, the limit, and who would win if the match ended now. Otherwise that there is no limit and how the match ends. The diplomacy step is shown the same text | `buildCityHexStandingsBody` (`cityHexStandingsText.ts`) over `knockoutStatusForSeat`, with places from `rankSeatsByCityHexes` | the counts are the full record, with fog on too | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` and a knockout status for the seat |
 | `HOME_REGION_VISIBILITY` | Both home outlines are always visible | `getForcedVisibleHomeRegionHexesForPlayer` | n/a | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` |
 
 ### 3.10 Consultation mechanics

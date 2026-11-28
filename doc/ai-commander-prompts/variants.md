@@ -168,7 +168,7 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 
 | Surface | Contract |
 | --- | --- |
-| system | Include `# Scenario Objective (Required)` in the system message with the scenario id, both region names when present, the three knockout paths, and the always-visible-outlines statement, then the home hex lists and `## Sides`. `# Scenario Progress` in the situation message carries explored, controlled, and home-control counts, plus the knockout status lines (`buildScenarioProgressLines`). |
+| system | Include `# Scenario Objective (Required)` in the system message with the scenario id, both region names when present, the three knockout paths, and the always-visible-outlines statement, then the home hex lists and `## Sides`. `# Scenario Progress` in the situation message carries explored, controlled, and home-control counts, plus the knockout status lines (`buildScenarioProgressLines`), then the Standings subsection (`buildCityHexStandingsBody`). |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |

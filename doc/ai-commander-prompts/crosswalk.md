@@ -93,6 +93,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `HOME_REGION_HEXES` | [`strategic-prompt.md`](strategic-prompt.md) | Situation message, after the scenario objective |
 | `HOME_REGION_OVERLAP` | [`variants.md`](variants.md) | Scenarios; combinations |
 | `HOME_CONTROL_PROGRESS` | [`strategic-prompt.md`](strategic-prompt.md) | Situation message, after the scenario objective |
+| `CITY_HEX_STANDINGS` | [`strategic-prompt.md`](strategic-prompt.md) | Situation message, end of Scenario Progress. The diplomacy copy is in [`talk-prompt.md`](talk-prompt.md) |
 | `HOME_REGION_VISIBILITY` | [`strategic-prompt.md`](strategic-prompt.md) | Scenario objective |
 | `TOOL_CATALOG` | [`assembly-contract.md`](assembly-contract.md) | Tools versus envelope writes |
 | `TOOL_BUDGET_WARNING` | [`variants.md`](variants.md) | Consultation policy |

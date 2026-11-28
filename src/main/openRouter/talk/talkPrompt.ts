@@ -16,11 +16,13 @@ import {
   SIDE_AGREEMENT_REPLY_RULES,
   sideAgreementReplyShape,
   sideAgreementTalkBullets,
+  STANDINGS_TALK_BULLET,
 } from '../promptSpec/diplomacyRuleText';
 import { HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET } from '../promptSpec/holdAutomaticFireAgainstRuleText';
 import { SIDE_MESSAGE_SOURCE_BULLETS, SIDE_MESSAGE_TRUST_BULLETS } from '../promptSpec/sideMessageRuleText';
 import { SECTION_TITLE_RECENT_TURN_NOTES } from '../promptSpec/sectionHeadings';
 import { SECTION_TITLE_RECENT_BEAT_NOTES } from '../../briefing/recentTurnNotesSection';
+import { STANDINGS_SECTION_TITLE } from '../cityHexStandingsText';
 import { formatSideAgreementLines } from './sideAgreementPromptLines';
 
 /**
@@ -295,6 +297,15 @@ export interface TalkPromptInput {
    */
   readonly agreements: readonly SideAgreementView[] | null;
   /**
+   * Where each side stands by city hexes.
+   *
+   * Contract: The body from `buildCityHexStandingsBody`, a table and two paragraphs with no heading. Null or absent in a battle and when the status could not be read.
+   * When to use: The "Standings" section of the world-map situation text.
+   * Expected outcome: The text, or no section.
+   * Exceptions: None.
+   */
+  readonly standingsText?: string | null;
+  /**
    * The commander's list of sides its units do not fire at on their own.
    *
    * Contract: Text from `readHoldAutomaticFireAgainstText`. Null or absent when the list is empty.
@@ -362,13 +373,30 @@ export function formatStanceScores(trust: number | null, threat: number | null):
  *
  * Purpose: The cached system text tells the commander what this step is for, where messages come from, and how far to trust them.
  * When to use: The system message of a talk call. Do not put a turn number, a count, or a message in it.
- * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line. Only `'tactical'` adds the "Agreements and last beat" block. Each of those two blocks ends with the automatic-fire bullet. The text depends only on the two arguments.
+ * Expected outcome: The diplomacy instructions, with `{ownSide}` replaced by `ownSideLabel`. The character limit and the stance list come from the shared constants. Both scopes carry the "Why diplomacy matters" block. Only `'strategic'` adds the Agreements block, the `agreements` list in the reply shape, and its rules line, and ends the purpose block with `STANDINGS_TALK_BULLET` when `options.standings` is true. Only `'tactical'` adds the "Agreements and last beat" block. Each of those two blocks ends with the automatic-fire bullet. The text depends only on the arguments, so it stays the same from turn to turn while the situation text keeps or lacks its Standings section.
  * Exceptions: None.
  */
-export function buildTalkSystemText(ownSideLabel: string, scope: 'strategic' | 'tactical'): string {
-  logTrace('talkPrompt buildTalkSystemText', { labelLength: ownSideLabel.length, scope });
+export function buildTalkSystemText(
+  ownSideLabel: string,
+  scope: 'strategic' | 'tactical',
+  options: {
+    /**
+     * Whether the situation text has a Standings section.
+     *
+     * Contract: True only when `TalkPromptInput.standingsText` is not empty. Ignored for `'tactical'`. Defaults to false.
+     * When to use: The strategic talk call.
+     * Expected outcome: The bullet that says what the section is, so the text never names a section the commander cannot see.
+     * Exceptions: None.
+     */
+    readonly standings?: boolean;
+  } = {}
+): string {
+  logTrace('talkPrompt buildTalkSystemText', { labelLength: ownSideLabel.length, scope, standings: options.standings === true });
   const strategic = scope === 'strategic';
-  const purpose = DIPLOMACY_PURPOSE_BULLETS.map((line) => `- ${line}`).join('\n');
+  const purposeBullets = strategic && options.standings === true
+    ? [...DIPLOMACY_PURPOSE_BULLETS, STANDINGS_TALK_BULLET]
+    : DIPLOMACY_PURPOSE_BULLETS;
+  const purpose = purposeBullets.map((line) => `- ${line}`).join('\n');
   const agreementBullets = sideAgreementTalkBullets().map((line) => `- ${line}`).join('\n');
   const battleTruceBullets = BATTLE_TRUCE_TALK_BULLETS.map((line) => `- ${line}`).join('\n');
   const holdAutomaticFireAgainstBullet = `- ${HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET}`;
@@ -412,7 +440,7 @@ ${replyRules}`;
  *
  * Purpose: The user message carries the turn, the sides, the last plan, and the messages this commander may see.
  * When to use: The user message of a talk call.
- * Expected outcome: The diplomacy heading, the sides table, the Your agreements section when `input.agreements` is not null, the Agreements and last beat section when a battle has truce text, the Holding automatic fire section when there is automatic-fire text, the last plan, the recent-turns section when it is not empty, and the message threads.
+ * Expected outcome: The diplomacy heading, the sides table, the Standings section when there is standings text, the Your agreements section when `input.agreements` is not null, the Agreements and last beat section when a battle has truce text, the Holding automatic fire section when there is automatic-fire text, the last plan, the recent-turns section when it is not empty, and the message threads.
  * Exceptions: None.
  */
 export function buildTalkSituationText(input: TalkPromptInput): string {
@@ -434,6 +462,7 @@ export function buildTalkSituationText(input: TalkPromptInput): string {
     blocks.push(`# Diplomacy: turn ${input.turnNumber}`);
   }
   blocks.push(`## Sides\n${sidesTable(input.sides)}`);
+  if (input.standingsText) blocks.push(`## ${STANDINGS_SECTION_TITLE}\n${input.standingsText}`);
   if (input.agreements !== null) blocks.push(`## Your agreements\n${formatSideAgreementLines(input.agreements)}`);
   if (input.battle?.truceText) blocks.push(`## Agreements and last beat\n${input.battle.truceText}`);
   if (input.holdAutomaticFireAgainstText) blocks.push(`## Holding automatic fire\n${input.holdAutomaticFireAgainstText}`);

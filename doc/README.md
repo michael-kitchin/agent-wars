@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **3.7.1** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **3.7.2** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **3.7.2** shows every commander the sides still in the match ranked by city hexes, in its world-map orders and diplomacy prompts, and in a match with a turn limit says when the match ends and who would win now.
 
 Release **3.7.1** lets a commander hold automatic fire against the sides it names, tells commanders that their unordered units fire on their own, flags a listed side that attacks, and lets a shortened battle withdrawal move when the only targets in reach belong to listed sides.
 
@@ -138,7 +140,7 @@ When you change one of these, update [combat-rules-v3.md](combat-rules-v3.md) (a
 | Missile range, cell hit number, and launch timing | `missileRangeHexes` in `src/shared/gameRules.ts`, `getAttack('air')` in `src/main/combatConstants.ts`, and `resolveMissileLaunchPhase` in `src/main/gameActions/missileLaunchResolution.ts`. A set flag or a fortification is destroyed when its d20 is at or below that attack. Launches run after embark and before air strikes. |
 | Dice chip line and face limits (quoted in [ux/resolution-playback.md](ux/resolution-playback.md), not in the combat rules) | `COMBAT_DICE_CHIP_MAX_LINES` and `COMBAT_DICE_ROW_MAX_FACES` in `src/shared/combatDiceChips.ts` |
 | Seat limits and seat ids | `MIN_SEATS`, `MAX_SEATS`, `AI_SEAT_IDS`, `HUMAN_SEAT_ID`, `NEUTRAL_OWNER_ID` in `src/shared/seatIds.ts` |
-| Win rules, knockout, and places | `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`, `computeHomeLossProgress` in `src/main/gameActions/homeControlProgress.ts`, `knockoutStatusForSeat` in `src/main/gameActions/knockoutStatus.ts`, `TURN_LIMIT_OPTIONS`, `DEFAULT_TURN_LIMIT`, `victorySettingsForRequest`, `DEFAULT_VICTORY_RULE`, `GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE`, `REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE`, and `NEAR_KNOCKOUT_MAX_CITY_HEXES` in `src/shared/victoryRules.ts` |
+| Win rules, knockout, and places | `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`, `computeHomeLossProgress` in `src/main/gameActions/homeControlProgress.ts`, `knockoutStatusForSeat` in `src/main/gameActions/knockoutStatus.ts`, `TURN_LIMIT_OPTIONS`, `DEFAULT_TURN_LIMIT`, `victorySettingsForRequest`, `DEFAULT_VICTORY_RULE`, `GLOBAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE`, `REGIONAL_HOME_CONTROL_WIN_MIN_URBAN_SHARE`, and `NEAR_KNOCKOUT_MAX_CITY_HEXES` in `src/shared/victoryRules.ts`. The standings a commander is shown are `buildCityHexStandingsBody` in `src/main/openRouter/cityHexStandingsText.ts`. |
 | AI-only battles | `selectAiOnlyBattle`, `aiOnlyBattlesForRequest`, and `aiOnlyBattlesFromStored` in `src/shared/aiOnlyBattles.ts`. The offer is `buildAiOnlyBattleOffer`. End reasons are `applyAiOnlyTacticalBeat`. The beat cap is `aiOnlyBeatLimitReached` in `src/shared/aiOnlyBeatLimit.ts`. The beats still ahead are `aiOnlyBeatsLeft`, crimson at `AI_ONLY_BEATS_LEFT_URGENT_AT`, and the situation sentence is `formatAiOnlyBeatsLeftPrompt`. A start request is `aiOnlyBeatLimitForRequest`. A stored row is `aiOnlyBeatLimitFromStored`. The parties are `tacticalBattlePartiesForOwners`. A quiet beat is `isQuietBeat`, and the streak that ends a battle is `QUIET_BEATS_TO_END`, both in `src/shared/tacticalQuietBeat.ts`. The endings that use the timed notice are `aiOnlyEndReasonUsesTimedNotice`. |
 | Head-on contact | `resolveHeadOnContacts` in `src/shared/headOnContact.ts`. Strategic turns use `withoutStrategicHeadOnHolderMoves`. Battle beats use `withoutTacticalHeadOnHolderMoves`. The held cell is `createHeadOnInitiativePicker`. |
 

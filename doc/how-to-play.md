@@ -566,6 +566,7 @@ A knocked-out side's land and units become neutral. Losing every unit isn't a kn
 
 - **Everyone out at once:** when every remaining side would be knocked out on the same turn, none of them is. The match ends there, and the side holding the most city hexes wins.
 - **Ties:** when several sides tie for the most city hexes, no side wins.
+- **Commanders see the standings:** whenever a commander talks or plans on the world map, it's shown every side still in the match ranked by city hexes held, and its own place, even with fog of war on. In a turn-limit match it also reads which turn it is, when the match ends, and who would win if it ended now.
 
 ### The Result Screen
 

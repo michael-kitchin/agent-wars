@@ -181,7 +181,9 @@ export async function requestTalk(
       responseFormat: useSchema ? buildTalkReplyResponseFormat(prepared.sideCodes, { includeAgreements: args.battle === null }) : null,
       telemetry,
     };
-    const systemText = buildTalkSystemText(prepared.input.ownSideLabel, args.battle ? 'tactical' : 'strategic');
+    const systemText = buildTalkSystemText(prepared.input.ownSideLabel, args.battle ? 'tactical' : 'strategic', {
+      standings: Boolean(prepared.input.standingsText),
+    });
     const situationText = buildTalkSituationText(prepared.input);
     const aiIndex = aiIndexForSeatId(args.seatId) ?? 1;
     logPromptPreview('requestTalk: system prompt', systemText, { artifactKind: 'talk-system', aiIndex, previewWhenDisabled: false });

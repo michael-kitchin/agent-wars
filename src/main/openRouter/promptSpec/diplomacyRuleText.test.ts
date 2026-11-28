@@ -17,11 +17,22 @@ import {
   SIDE_AGREEMENT_ORDERS_BULLETS,
   sideAgreementReplyShape,
   sideAgreementTalkBullets,
+  STANDINGS_TALK_BULLET,
 } from './diplomacyRuleText';
 
 test('no bullet names a turn by number', () => {
-  const all = [...DIPLOMACY_PURPOSE_BULLETS, ...sideAgreementTalkBullets(), ...SIDE_AGREEMENT_ORDERS_BULLETS];
+  const all = [...DIPLOMACY_PURPOSE_BULLETS, STANDINGS_TALK_BULLET, ...sideAgreementTalkBullets(), ...SIDE_AGREEMENT_ORDERS_BULLETS];
   for (const bullet of all) assert.doesNotMatch(bullet, /turn \d/);
+});
+
+test('the standings bullet is one line of its own, outside the purpose bullets both theaters share', () => {
+  assert.equal(STANDINGS_TALK_BULLET.startsWith('-'), false);
+  assert.equal(STANDINGS_TALK_BULLET.includes('\n'), false);
+  assert.equal((DIPLOMACY_PURPOSE_BULLETS as readonly string[]).includes(STANDINGS_TALK_BULLET), false);
+  assert.equal(
+    STANDINGS_TALK_BULLET,
+    'The Standings section ranks the sides still in the match by the city hexes each holds, counted by the game. When the match has a turn limit, that section says when the match ends and who would win if it ended now.'
+  );
 });
 
 test('the talk bullets name every kind, and the reply shape lists every status and intent', () => {

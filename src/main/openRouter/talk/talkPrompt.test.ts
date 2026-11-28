@@ -10,15 +10,19 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SIDE_AGREEMENT_MAX_OPEN_PER_SIDE, SIDE_AGREEMENT_MAX_TURNS } from '../../../shared/sideAgreements';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../../shared/seatIds';
 import { SIDE_STANCES } from '../../../shared/sideMessages';
+import { buildCityHexStandingsBody } from '../cityHexStandingsText';
 import {
   BATTLE_TRUCE_TALK_BULLETS,
   DIPLOMACY_PURPOSE_BULLETS,
   SIDE_AGREEMENT_REPLY_RULES,
   sideAgreementTalkBullets,
+  STANDINGS_TALK_BULLET,
 } from '../promptSpec/diplomacyRuleText';
 import { HOLD_AUTOMATIC_FIRE_AGAINST_TALK_BULLET } from '../promptSpec/holdAutomaticFireAgainstRuleText';
-import { assertHeadingsNest, headingOutline } from '../../testSupport/promptOutlineHelpers';
+import { sideStatusWithCityHexes } from '../../testSupport/knockoutStatusFixtures';
+import { assertHeadingsNest, assertNoTripleBlankLines, headingOutline } from '../../testSupport/promptOutlineHelpers';
 import { buildTalkSituationText, buildTalkSystemText, type TalkPromptInput, type TalkPromptSide } from './talkPrompt';
 
 const own: TalkPromptSide = {
@@ -200,4 +204,57 @@ test('the situation text shows the held-fire section directly before the last pl
   const without = buildTalkSituationText(input());
   assert.equal(buildTalkSituationText(input({ holdAutomaticFireAgainstText: null })), without);
   assert.equal(without.includes('## Holding automatic fire'), false);
+});
+
+/**
+ * A standings body for two sides in a match with a turn limit.
+ *
+ * Purpose: The section cases need the same text the reader would hand the builder.
+ * When to use: The standings cases below.
+ * Expected outcome: The table and paragraphs from `buildCityHexStandingsBody`.
+ * Exceptions: None.
+ */
+function standingsBody(): string {
+  return buildCityHexStandingsBody({
+    status: {
+      share: 0.9,
+      own: sideStatusWithCityHexes(AI_SEAT_IDS[0], 'Iberia', 1),
+      enemies: [sideStatusWithCityHexes(HUMAN_SEAT_ID, 'France', 1)],
+    },
+    victory: { rule: 'most_city_hexes_at_turn_limit', turnLimit: 30 },
+    turnNumber: 4,
+  });
+}
+
+test('the standings bullet ends the purpose block only on the world map and only when the section is shown', () => {
+  const lastPurpose = `- ${DIPLOMACY_PURPOSE_BULLETS.at(-1)}\n`;
+  const shown = buildTalkSystemText('Iberia', 'strategic', { standings: true });
+  assert.ok(shown.includes(`${lastPurpose}- ${STANDINGS_TALK_BULLET}\n\nWhere messages come from:`), shown);
+  const hidden = buildTalkSystemText('Iberia', 'strategic');
+  assert.ok(hidden.includes(`${lastPurpose}\nWhere messages come from:`), hidden);
+  assert.equal(buildTalkSystemText('Iberia', 'strategic', { standings: false }), hidden);
+  assert.equal(shown.replace(`- ${STANDINGS_TALK_BULLET}\n`, ''), hidden);
+  assert.equal(buildTalkSystemText('Iberia', 'tactical', { standings: true }), buildTalkSystemText('Iberia', 'tactical'));
+  assert.equal(buildTalkSystemText('Iberia', 'tactical').includes(STANDINGS_TALK_BULLET), false);
+});
+
+test('the situation text prints the standings between the sides and the agreements', () => {
+  const body = standingsBody();
+  const text = buildTalkSituationText(input({ agreements: [], standingsText: body }));
+  assert.ok(text.includes(`## Standings\n${body}\n\n## Your agreements`), text);
+  assert.ok(text.indexOf('## Sides') < text.indexOf('## Standings'));
+  assertHeadingsNest(headingOutline(text));
+  assertNoTripleBlankLines(text);
+  assert.equal(headingOutline(text).filter((line) => line === '## Standings').length, 1);
+  const lines = text.split('\n');
+  const heading = lines.indexOf('## Standings');
+  assert.equal(lines[heading - 1], '');
+  assert.equal(lines[heading + 1], '| Place | Side | Code | City hexes |');
+  assert.equal(lines[lines.indexOf('## Sides') + 1]!.startsWith('| Side |'), true);
+});
+
+test('without standings text the situation text is what it was without the field', () => {
+  const without = buildTalkSituationText(input({ agreements: [] }));
+  assert.equal(buildTalkSituationText(input({ agreements: [], standingsText: null })), without);
+  assert.equal(without.includes('## Standings'), false);
 });
